@@ -40,8 +40,9 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
 
     if (state.pendingDialogVisible) {
         PendingExportDialog(
-            pendingByKind = state.plan.pendingByKind(),
-            onMaskAllAndExport = { vm.confirmMaskAllAndExport(applyWatermark = true) },
+            pendingCount = state.plan.pendingCount,
+            byKind = state.plan.pendingByKind(),
+            onMaskAll = { vm.confirmMaskAllAndExport(applyWatermark = true) },
             onExportAnyway = { vm.confirmExportAnyway(applyWatermark = true) },
             onDismiss = vm::dismissDialog,
         )

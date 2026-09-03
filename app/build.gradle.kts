@@ -128,8 +128,14 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
 
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // Compose ui-test 传递进来的 espresso-core 3.5.0 在 API 35+ 上崩：
+    // 它反射 android.hardware.input.InputManager.getInstance，那个方法已被移除。
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.truth)
     androidTestImplementation(libs.kotlinx.coroutines.test)
 }

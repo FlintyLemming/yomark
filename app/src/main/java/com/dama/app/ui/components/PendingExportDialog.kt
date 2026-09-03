@@ -5,47 +5,32 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import com.dama.app.core.model.SensitiveKind
+import com.dama.app.core.model.SensitiveKindLabels
 
 /**
- * 导出拦截（spec §7.4）。pendingCount > 0 时**无例外**先弹这个框，
- * 不提供「不再提示」——它是分层默认的唯一安全网。
+ * 导出拦截（spec §7.4）。
  *
- * M1 里 pending 只可能来自「手动框被点成仅圈出」；计划 04 接上识别后
- * 这里会换成按类型分行的完整版（「2 个网址、1 个 IP 地址」）。
+ * 三态模型开了一个二态模型没有的风险：有候选会以 OUTLINED 状态出厂，
+ * 用户没注意就导出 = 泄露。这个对话框**不是打磨项，是这套模型成立的前提**。
+ *
+ * 刻意不提供「不再提示」：它是分层默认的唯一安全网，关掉它等于把
+ * URL / IP / 快递单号三类彻底变成静默漏检。有留存数据后再评估。
  */
 @Composable
 fun PendingExportDialog(
-    pendingByKind: Map<SensitiveKind, Int>,
-    onMaskAllAndExport: () -> Unit,
+    pendingCount: Int,
+    byKind: Map<SensitiveKind, Int>,
+    onMaskAll: () -> Unit,
     onExportAnyway: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val total = pendingByKind.values.sum()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("还有 $total 处只圈出、没打码") },
-        text = { Text(pendingByKind.entries.joinToString("、") { "${it.value} 处${it.key.label()}" }) },
-        confirmButton = { TextButton(onClick = onMaskAllAndExport) { Text("全部打码并导出") } },
+        title = { Text("还有 $pendingCount 处已识别的内容未打码") },
+        text = {
+            Text(byKind.entries.joinToString("、") { (kind, n) -> SensitiveKindLabels.plural(kind, n) })
+        },
+        confirmButton = { TextButton(onClick = onMaskAll) { Text("全部打码") } },
         dismissButton = { TextButton(onClick = onExportAnyway) { Text("仍然导出") } },
     )
-}
-
-private fun SensitiveKind.label() = when (this) {
-    SensitiveKind.PHONE -> "电话号码"
-    SensitiveKind.EMAIL -> "邮箱"
-    SensitiveKind.PAYMENT_CARD -> "银行卡号"
-    SensitiveKind.IBAN -> "IBAN"
-    SensitiveKind.SSN -> "证件号"
-    SensitiveKind.PASSPORT -> "护照号"
-    SensitiveKind.TRACKING_NO -> "运单号"
-    SensitiveKind.IP_ADDR -> "IP 地址"
-    SensitiveKind.MAC_ADDR -> "MAC 地址"
-    SensitiveKind.URL -> "网址"
-    SensitiveKind.API_KEY -> "密钥"
-    SensitiveKind.POSTAL_ADDRESS -> "地址"
-    SensitiveKind.PERSON_NAME -> "人名"
-    SensitiveKind.ORG_NAME -> "机构名"
-    SensitiveKind.FACE -> "人脸"
-    SensitiveKind.BARCODE -> "条码"
-    SensitiveKind.MANUAL -> "手动框"
 }
