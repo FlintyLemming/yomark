@@ -15,6 +15,13 @@ import com.dama.app.core.model.MaskItem
 import com.dama.app.core.model.MaskState
 import com.dama.app.core.model.MaskStyle
 import com.dama.app.core.model.SensitiveKind
+import com.dama.app.core.image.SourceImage
+import com.dama.app.core.model.Candidate
+import com.dama.app.core.model.TextLine
+import com.dama.app.engine.CandidateMerger
+import com.dama.app.engine.RedactionEngine
+import com.dama.app.engine.SensitivityClassifier
+import com.dama.app.engine.TextRecognizer
 import com.dama.app.export.Exporter
 import com.dama.app.export.ImageSink
 import com.dama.app.export.WatermarkDrawer
@@ -59,9 +66,28 @@ class EditorViewModelTest {
         return EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
+            engine = emptyEngine(),
             ioDispatcher = dispatcher,
         )
     }
+
+    /**
+     * 什么都不产出的引擎。本测试类验的是编辑与导出，不验识别——
+     * 识别接进 ViewModel 的行为由 EditorViewModelAnalysisTest 覆盖。
+     */
+    private fun emptyEngine() = RedactionEngine(
+        object : TextRecognizer {
+            override val id = "none"
+            override suspend fun recognize(image: SourceImage) = emptyList<TextLine>()
+        },
+        emptyList(),
+        listOf(object : SensitivityClassifier {
+            override val id = "none"
+            override suspend fun isAvailable() = true
+            override suspend fun classify(lines: List<TextLine>) = emptyList<Candidate>()
+        }),
+        CandidateMerger(),
+    )
 
     private fun sampleUri(name: String = "vm.jpg"): Uri {
         val f = File(context.cacheDir, name)

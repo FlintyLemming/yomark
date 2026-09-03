@@ -13,6 +13,8 @@ data class EditorUiState(
     val image: SourceImage? = null,
     val plan: MaskPlan = MaskPlan.empty(),
     val loading: Boolean = false,
+    /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
+    val analyzing: Boolean = false,
     val exporting: Boolean = false,
     /** 长按手动框进入的选中态：出现四角手柄与删除按钮。 */
     val selectedManualId: String? = null,

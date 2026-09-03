@@ -14,6 +14,7 @@ import androidx.core.content.IntentCompat
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dama.app.core.image.ImageIntake
+import com.dama.app.engine.buildEngine
 import com.dama.app.export.Exporter
 import com.dama.app.export.MediaStoreSink
 import com.dama.app.export.WatermarkDrawer
@@ -38,6 +39,7 @@ class EditorActivity : ComponentActivity() {
                         WatermarkDrawer(),
                         MediaStoreSink(app),
                     ),
+                    engine = buildEngine(app),
                 )
             }
         }

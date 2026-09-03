@@ -8,13 +8,16 @@ import androidx.lifecycle.viewModelScope
 import com.dama.app.core.geometry.Quad
 import com.dama.app.core.image.ImageIntake
 import com.dama.app.core.image.IntakeResult
+import com.dama.app.core.image.SourceImage
 import com.dama.app.core.image.SourceImageLoader
 import com.dama.app.core.model.DetectorSource
 import com.dama.app.core.model.MaskItem
 import com.dama.app.core.model.MaskPlan
+import com.dama.app.core.model.MaskPlanFactory
 import com.dama.app.core.model.MaskState
 import com.dama.app.core.model.MaskStyle
 import com.dama.app.core.model.SensitiveKind
+import com.dama.app.engine.RedactionEngine
 import com.dama.app.export.ExportOutcome
 import com.dama.app.export.ExportRequest
 import com.dama.app.export.Exporter
@@ -30,6 +33,7 @@ import java.util.UUID
 class EditorViewModel(
     private val intake: ImageIntake,
     private val exporter: Exporter,
+    private val engine: RedactionEngine,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
@@ -54,7 +58,12 @@ class EditorViewModel(
             }.onSuccess { (result, image) ->
                 intakeResult = result
                 undoStack.clear()                     // 换图时两个栈都清空
-                _state.value = EditorUiState(image = image, plan = MaskPlan.empty(_state.value.plan.style))
+                _state.value = EditorUiState(
+                    image = image,
+                    plan = MaskPlan.empty(_state.value.plan.style),
+                    analyzing = true,
+                )
+                analyze(image)
             }.onFailure {
                 _state.value = _state.value.copy(
                     loading = false,
@@ -62,6 +71,23 @@ class EditorViewModel(
                 )
             }
         }
+    }
+
+    /**
+     * 识别（spec §7.1）：选中即进编辑器，候选已按规则表的默认状态打好码，
+     * 不是「等你逐个确认」。分析期间画布可交互，结果到达时并入现有 plan。
+     */
+    private suspend fun analyze(image: SourceImage) {
+        val candidates = runCatching { engine.analyze(image).candidates }.getOrElse { emptyList() }
+        val detected = MaskPlanFactory.itemsFrom(candidates)
+        // 分析结果不进撤销栈——它是初始状态，不是用户动作。
+        // 用户在分析期间画的手动框排在后面，不被覆盖。
+        val current = _state.value
+        if (current.image !== image) return            // 用户已经换了图，丢弃这批结果
+        _state.value = current.copy(
+            analyzing = false,
+            plan = current.plan.copy(items = detected + current.plan.items),
+        )
     }
 
     // ---------- 编辑 ----------
