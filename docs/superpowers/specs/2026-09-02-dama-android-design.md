@@ -651,7 +651,26 @@ dependencies {
 
 2. **零权限下的完整闭环。** Photo Picker 选图 → 编辑 → 写回相册，全程不弹任何权限框；再验一遍 `ACTION_SEND` 进来的 content URI 在 Activity 重建后是否仍可读（§7.1 的私有副本方案就是为此，但需实测确认必要性与时机）。
 
+   **实测（2026-09-03，模拟器 Medium_Phone / android-37）**：闭环成立——Photo Picker 选图 → 画框 → 导出到
+   `Pictures/DAMA/`，全程零权限对话框；导出件 600×900（原图分辨率）、无 EXIF 段、水印在右下且不压遮罩。
+   从系统分享面板 `ACTION_SEND` 进来同样直接进编辑器（注意：`adb am start` 显式指定组件的合成 intent
+   **不会**真正授予 URI 权限，会报 `SecurityException`，必须走真实分享面板才测得准）。
+   **但 Activity 重建这条不成立**：开「不保留活动」后离开再回来，图片丢失、退回 Photo Picker。
+   原因不是 URI 授权失效，而是重建路径根本没走到读 URI 那一步——私有副本的路径没有存进
+   `onSaveInstanceState`，且 `EditorViewModel.onCleared()` 会清空整个 intake 目录。
+   即：Task 6 的私有副本目前只防「原图被删/授权在同一实例内失效」，不防 Activity 重建。
+   要覆盖后者，需把副本路径与 MaskPlan 一起持久化，并把 intake 目录的清理时机从 `onCleared` 挪到
+   明确的「换图/导出成功」时点。**留到计划 04（三态编辑）一并处理，届时状态持久化本来就要做一遍。**
+
 3. **冷启动直接拉 Photo Picker 的实际体验。** 会不会出现闪白、双层 Activity、或返回时留下空壳 Activity。若体验不佳，退路是加一个极简首屏（一个大按钮），但那会牺牲「打开就是相册」的即时感。
+
+   **实测（2026-09-03，模拟器 Medium_Phone / android-37）**：体验可接受，**维持不加首屏**。
+   点图标到 Picker 出现约 0.5s（`am start -W` TotalTime 536ms），中间是自家 Surface 的主题背景色，
+   没有闪白；Picker 以底部大半屏 sheet 的形态压在自家窗口上，同一个 task 内两个 Activity，
+   不是「双层 app」的观感。Picker 里按返回 / 点 ✕ → `uri == null` → `finish()`，
+   任务栈里不留空壳，直接回到桌面。
+   一处与预期不同：android-37 的 Photo Picker 单选也要点一次「Done」才回传，不是点中即回。
+   这是系统 Picker 的行为，不在本应用控制范围内。
 
 4. **Play Billing 合并后的权限清单。** 确认 manifest merger 只并入 `com.android.vending.BILLING` 一条，没有别的。这条直接决定 §13 的 CI 断言怎么写。
 
