@@ -12,6 +12,11 @@ sealed interface EditorMessage {
 data class EditorUiState(
     val image: SourceImage? = null,
     val plan: MaskPlan = MaskPlan.empty(),
+    /**
+     * Activity 重建后的恢复尚未落地。为 true 时不要拉 Photo Picker——
+     * 图马上就回来了；为 false 而 image 仍是 null 才说明确实没有可恢复的会话。
+     */
+    val restoring: Boolean = false,
     val loading: Boolean = false,
     /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
     val analyzing: Boolean = false,

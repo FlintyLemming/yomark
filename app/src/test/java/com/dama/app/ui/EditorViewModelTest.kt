@@ -7,6 +7,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
 import androidx.core.net.toUri
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.dama.app.core.geometry.Quad
 import com.dama.app.core.image.ImageIntake
@@ -67,6 +68,7 @@ class EditorViewModelTest {
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
             engine = emptyEngine(),
+            savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
     }

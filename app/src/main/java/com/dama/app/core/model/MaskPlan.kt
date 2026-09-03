@@ -1,13 +1,16 @@
 package com.dama.app.core.model
 
 import android.graphics.Color
+import android.os.Parcelable
 import com.dama.app.core.geometry.Quad
+import kotlinx.parcelize.Parcelize
 
 /** 未圈出的区域根本不在 plan 里，因此只有两个枚举值。 */
 enum class MaskState { MASKED, OUTLINED }
 
 enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, EMOJI, ERASE }
 
+@Parcelize
 data class MaskOptions(
     val solidColor: Int = Color.BLACK,
     /** 像素块边长 = 区域短边 / divisor，再受 12px 下限约束（spec §8）。 */
@@ -15,21 +18,23 @@ data class MaskOptions(
     val blurRadiusRatio: Float = 0.08f,
     val markerColor: Int = 0x99FFEB3B.toInt(),
     val emoji: String = "🙂",
-)
+) : Parcelable
 
+@Parcelize
 data class MaskItem(
     val candidateId: String,
     val quad: Quad,                   // 降采样坐标系；导出时按 1/scale 反算
     val kind: SensitiveKind,
     val source: DetectorSource,
     val state: MaskState,
-)
+) : Parcelable
 
+@Parcelize
 data class MaskPlan(
     val items: List<MaskItem>,
     val style: MaskStyle,             // 全局，非逐项（spec §7.5）
     val options: MaskOptions,
-) {
+) : Parcelable {
     /** 已识别但尚未打码的数量。导出拦截（spec §7.4）的触发条件。 */
     val pendingCount: Int get() = items.count { it.state == MaskState.OUTLINED }
 

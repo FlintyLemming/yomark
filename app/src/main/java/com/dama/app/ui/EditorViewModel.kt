@@ -3,6 +3,7 @@ package com.dama.app.ui
 import android.graphics.PointF
 import android.net.Uri
 import androidx.annotation.VisibleForTesting
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dama.app.core.geometry.Quad
@@ -34,23 +35,89 @@ class EditorViewModel(
     private val intake: ImageIntake,
     private val exporter: Exporter,
     private val engine: RedactionEngine,
+    private val savedState: SavedStateHandle,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
 
+    /**
+     * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——
+     * 持久化因此不依赖「记得在每个改动点补一行」，加新的编辑动作也不会漏掉。
+     */
+    private var uiState: EditorUiState
+        get() = _state.value
+        set(value) {
+            _state.value = value
+            savedState[KEY_PLAN] = value.plan
+        }
+
     private val undoStack = UndoStack()
     private var intakeResult: IntakeResult? = null
+        set(value) {
+            field = value
+            savedState[KEY_FILE] = value?.file?.absolutePath
+            savedState[KEY_MIME] = value?.mimeType
+        }
 
     /** 一次拖动开始前的 plan 快照，抬手时才压进撤销栈。 */
     private var dragOrigin: MaskPlan? = null
 
+    init {
+        restore()
+    }
+
     // ---------- 载入 ----------
 
-    fun onImageChosen(uri: Uri) {
-        _state.value = _state.value.copy(loading = true, message = null)
+    /**
+     * Activity 重建后的恢复（spec §15 第 2 条的实测缺口）。
+     *
+     * 「不保留活动」下 Activity 被销毁时 ViewModel 一并 onCleared，
+     * 之前的版本因此在返回时丢图、退回 Photo Picker。私有副本的路径与整棵
+     * MaskPlan 都进了 SavedStateHandle，这里直接把结果读回来——
+     * **不重跑识别**：候选是已经确定的事实，重算既慢又可能和用户已做的编辑打架。
+     *
+     * 撤销栈不持久化。它是「这次会话里做过什么」，重建之后那段上下文
+     * 对用户已经不成立了，恢复出来反而会撤销到一个他没见过的状态。
+     */
+    private fun restore() {
+        val path = savedState.get<String>(KEY_FILE) ?: return
+        val mime = savedState.get<String>(KEY_MIME) ?: return
+        val plan = savedState.get<MaskPlan>(KEY_PLAN) ?: return
+        val file = java.io.File(path)
+        if (!file.exists()) {
+            clearSavedState()                          // 副本被清掉了，静默退回 Picker
+            return
+        }
+        uiState = uiState.copy(restoring = true)
         viewModelScope.launch {
+            val image = runCatching {
+                SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher)
+            }.getOrElse {
+                clearSavedState()
+                uiState = uiState.copy(restoring = false)
+                return@launch
+            }
+            intakeResult = IntakeResult(file, mime)
+            uiState = EditorUiState(image = image, plan = plan)
+        }
+    }
+
+    private fun clearSavedState() {
+        savedState.remove<String>(KEY_FILE)
+        savedState.remove<String>(KEY_MIME)
+        savedState.remove<MaskPlan>(KEY_PLAN)
+    }
+
+    fun onImageChosen(uri: Uri) {
+        uiState = _state.value.copy(loading = true, message = null)
+        viewModelScope.launch {
+            // 换图时先清掉上一张的私有副本。清理时机从 onCleared 挪到这里：
+            // onCleared 会在 Activity 重建时把副本一起删掉，恢复就无从谈起了
+            // （spec §15 第 2 条）。
+            intake.clear()
+            intakeResult = null
             runCatching {
                 val result = intake.copyToPrivate(uri, ioDispatcher)
                 val image = SourceImageLoader.loadForAnalysis(result.file, result.mimeType, ioDispatcher)
@@ -58,14 +125,14 @@ class EditorViewModel(
             }.onSuccess { (result, image) ->
                 intakeResult = result
                 undoStack.clear()                     // 换图时两个栈都清空
-                _state.value = EditorUiState(
+                uiState = EditorUiState(
                     image = image,
                     plan = MaskPlan.empty(_state.value.plan.style),
                     analyzing = true,
                 )
                 analyze(image)
             }.onFailure {
-                _state.value = _state.value.copy(
+                uiState = _state.value.copy(
                     loading = false,
                     message = EditorMessage.Error("无法打开这张图片"),
                 )
@@ -84,7 +151,7 @@ class EditorViewModel(
         // 用户在分析期间画的手动框排在后面，不被覆盖。
         val current = _state.value
         if (current.image !== image) return            // 用户已经换了图，丢弃这批结果
-        _state.value = current.copy(
+        uiState = current.copy(
             analyzing = false,
             plan = current.plan.copy(items = detected + current.plan.items),
         )
@@ -96,7 +163,7 @@ class EditorViewModel(
         val plan = _state.value.plan
         val hit = GestureRules.hitTest(plan.items, imagePoint)
         if (hit == null) {
-            _state.value = _state.value.copy(selectedManualId = null)
+            uiState = _state.value.copy(selectedManualId = null)
             return
         }
         mutate { it.toggle(hit.candidateId) }
@@ -115,18 +182,18 @@ class EditorViewModel(
 
     fun onLongPress(imagePoint: PointF) {
         val hit = GestureRules.hitTest(_state.value.plan.items, imagePoint)
-        _state.value = _state.value.copy(selectedManualId = hit?.candidateId)
+        uiState = _state.value.copy(selectedManualId = hit?.candidateId)
     }
 
     fun clearSelection() {
-        _state.value = _state.value.copy(selectedManualId = null)
+        uiState = _state.value.copy(selectedManualId = null)
     }
 
     /** 只有手动框删得掉；MaskPlan.remove 自己会拦住其余来源。 */
     fun deleteSelected() {
         val id = _state.value.selectedManualId ?: return
         mutate { it.remove(id) }
-        _state.value = _state.value.copy(selectedManualId = null)
+        uiState = _state.value.copy(selectedManualId = null)
     }
 
     /**
@@ -137,7 +204,7 @@ class EditorViewModel(
         val id = _state.value.selectedManualId ?: return
         val item = _state.value.plan.find(id) ?: return
         if (dragOrigin == null) dragOrigin = _state.value.plan
-        _state.value = _state.value.copy(plan = _state.value.plan.replace(item.copy(quad = quad)))
+        uiState = _state.value.copy(plan = _state.value.plan.replace(item.copy(quad = quad)))
     }
 
     fun commitDrag() {
@@ -145,19 +212,19 @@ class EditorViewModel(
         dragOrigin = null
         if (origin == _state.value.plan) return
         undoStack.push(origin)
-        _state.value = _state.value.withHistoryFlags()
+        uiState = _state.value.withHistoryFlags()
     }
 
     fun setStyle(style: MaskStyle) = mutate { it.copy(style = style) }
 
     fun undo() {
         val restored = undoStack.undo(_state.value.plan) ?: return
-        _state.value = _state.value.copy(plan = restored).withHistoryFlags()
+        uiState = _state.value.copy(plan = restored).withHistoryFlags()
     }
 
     fun redo() {
         val restored = undoStack.redo(_state.value.plan) ?: return
-        _state.value = _state.value.copy(plan = restored).withHistoryFlags()
+        uiState = _state.value.copy(plan = restored).withHistoryFlags()
     }
 
     // ---------- 导出 ----------
@@ -168,7 +235,7 @@ class EditorViewModel(
      */
     fun requestExport(applyWatermark: Boolean) {
         if (_state.value.plan.pendingCount > 0) {
-            _state.value = _state.value.copy(pendingDialogVisible = true)
+            uiState = _state.value.copy(pendingDialogVisible = true)
             return
         }
         runExport(_state.value.plan, applyWatermark)
@@ -176,27 +243,27 @@ class EditorViewModel(
 
     fun confirmMaskAllAndExport(applyWatermark: Boolean) {
         mutate { it.maskAll() }
-        _state.value = _state.value.copy(pendingDialogVisible = false)
+        uiState = _state.value.copy(pendingDialogVisible = false)
         runExport(_state.value.plan, applyWatermark)
     }
 
     fun confirmExportAnyway(applyWatermark: Boolean) {
-        _state.value = _state.value.copy(pendingDialogVisible = false)
+        uiState = _state.value.copy(pendingDialogVisible = false)
         runExport(_state.value.plan, applyWatermark)
     }
 
     fun dismissDialog() {
-        _state.value = _state.value.copy(pendingDialogVisible = false)
+        uiState = _state.value.copy(pendingDialogVisible = false)
     }
 
     fun consumeMessage() {
-        _state.value = _state.value.copy(message = null)
+        uiState = _state.value.copy(message = null)
     }
 
     private fun runExport(plan: MaskPlan, applyWatermark: Boolean) {
         val image = _state.value.image ?: return
         val source = intakeResult ?: return
-        _state.value = _state.value.copy(exporting = true)
+        uiState = _state.value.copy(exporting = true)
         viewModelScope.launch {
             val outcome = exporter.export(
                 ExportRequest(
@@ -208,7 +275,7 @@ class EditorViewModel(
                 ),
                 dispatcher = ioDispatcher,
             )
-            _state.value = when (outcome) {
+            uiState = when (outcome) {
                 is ExportOutcome.Success -> _state.value.copy(
                     exporting = false,
                     message = EditorMessage.Exported(outcome.uri, outcome.downscaled, outcome.width, outcome.height),
@@ -221,11 +288,6 @@ class EditorViewModel(
         }
     }
 
-    override fun onCleared() {
-        intake.clear()          // 私有副本在 Activity 销毁时删除
-        super.onCleared()
-    }
-
     // ---------- 内部 ----------
 
     /** 所有改动都先把当前 plan 压进撤销栈，再替换。 */
@@ -234,14 +296,20 @@ class EditorViewModel(
         val next = block(current)
         if (next == current) return
         undoStack.push(current)
-        _state.value = _state.value.copy(plan = next).withHistoryFlags()
+        uiState = _state.value.copy(plan = next).withHistoryFlags()
     }
 
     private fun EditorUiState.withHistoryFlags() =
         copy(canUndo = undoStack.canUndo, canRedo = undoStack.canRedo)
 
+    private companion object {
+        const val KEY_FILE = "intake.file"
+        const val KEY_MIME = "intake.mime"
+        const val KEY_PLAN = "plan"
+    }
+
     @VisibleForTesting
     fun replacePlanForTest(plan: MaskPlan) {
-        _state.value = _state.value.copy(plan = plan)
+        uiState = _state.value.copy(plan = plan)
     }
 }

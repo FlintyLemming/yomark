@@ -11,6 +11,8 @@ import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.createSavedStateHandle
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dama.app.core.image.ImageIntake
@@ -19,6 +21,8 @@ import com.dama.app.export.Exporter
 import com.dama.app.export.MediaStoreSink
 import com.dama.app.export.WatermarkDrawer
 import com.dama.app.render.RendererRegistry
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * 全应用唯一的 Activity（spec §7.1）：既是启动器入口，也是分享目标。
@@ -40,6 +44,7 @@ class EditorActivity : ComponentActivity() {
                         MediaStoreSink(app),
                     ),
                     engine = buildEngine(app),
+                    savedState = createSavedStateHandle(),
                 )
             }
         }
@@ -54,7 +59,19 @@ class EditorActivity : ComponentActivity() {
         setContent {
             MaterialTheme { Surface { EditorScreen(vm) { finish() } } }
         }
-        if (savedInstanceState == null) route(intent)
+        if (savedInstanceState == null) {
+            route(intent)
+        } else {
+            // 重建路径：状态由 SavedStateHandle 恢复（spec §15 第 2 条）。
+            // 等恢复落地再判断——恢复不出东西（副本被清掉了）才退回 Picker，
+            // 否则会在图正要回来的那一瞬间弹出相册。
+            lifecycleScope.launch {
+                vm.state.first { !it.restoring }
+                if (vm.state.value.image == null) {
+                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                }
+            }
+        }
     }
 
     override fun onNewIntent(intent: Intent) {

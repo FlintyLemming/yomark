@@ -3,6 +3,8 @@ package com.dama.app.core.geometry
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
@@ -14,7 +16,8 @@ import kotlin.math.sin
  * 图像上的任意四边形。OCR 的文本框会是倾斜的，一律用四点表示，不退化成 Rect。
  * 点按顺时针或逆时针给出（不要求特定绕向，但必须是一个简单多边形）。
  */
-data class Quad(val p0: PointF, val p1: PointF, val p2: PointF, val p3: PointF) {
+@Parcelize
+data class Quad(val p0: PointF, val p1: PointF, val p2: PointF, val p3: PointF) : Parcelable {
 
     fun points(): List<PointF> = listOf(p0, p1, p2, p3)
 

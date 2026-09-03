@@ -7,6 +7,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
 import androidx.core.net.toUri
+import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.dama.app.core.geometry.Quad
 import com.dama.app.core.image.ImageIntake
@@ -75,6 +76,7 @@ class EditorViewModelAnalysisTest {
         intake = ImageIntake(context),
         exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
         engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(candidates)), CandidateMerger()),
+        savedState = SavedStateHandle(),
         ioDispatcher = dispatcher,
     )
 
@@ -151,6 +153,7 @@ class EditorViewModelAnalysisTest {
                 }),
                 CandidateMerger(),
             ),
+            savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
 
@@ -182,6 +185,7 @@ class EditorViewModelAnalysisTest {
                     override suspend fun classify(lines: List<TextLine>): List<Candidate> = error("boom")
                 }
             ), CandidateMerger()),
+            savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
