@@ -2337,10 +2337,62 @@ git commit -m "feat: assemble the first-version engine in a single factory funct
 
 ## 本计划出口
 
-- [ ] 全部单测与 instrumented 测试通过
-- [ ] 权限断言仍然通过（加了 ML Kit 与 libphonenumber 之后）
-- [ ] 断网状态下 ML Kit 识别照常工作（spec §15.1 已验并记录）
-- [ ] element 切分粒度的实测结论已写进 spec §15 第 5 条
-- [ ] `DefaultRuleSet.rules` 恰好 11 条，8 条默认打码、3 条仅圈出
+- [x] 全部单测与 instrumented 测试通过（198 条单测 + 17 条 instrumented，全绿）
+- [x] 权限断言仍然通过（加了 ML Kit 与 libphonenumber 之后）
+- [x] 断网状态下 ML Kit 识别照常工作（spec §15.1 已验并记录）
+- [x] element 切分粒度的实测结论已写进 spec §15 第 5 条
+- [x] `DefaultRuleSet.rules` 恰好 11 条，8 条默认打码、3 条仅圈出
 
 引擎已能产出候选，但还没接到编辑器上——那是计划 04。
+
+---
+
+## 执行记录：与计划文本的偏差（2026-09-03）
+
+按索引约定，偏差记回本文件。以下五处实现与计划写的不同，均已在对应提交里说明。
+
+1. **Task 16 —— `RedactionEngine` 的 `runCatching` 必须写在 `async` 内部。**
+   计划 Step 3 写的是 `async { recognizer.recognize(image) }` + 外层
+   `runCatching { linesJob.await() }`。结构化并发下这拦不住：子 `async` 抛异常会先取消
+   父 `coroutineScope`，整次 `analyze` 跟着失败，正好违背「任何一条链路失败都降级为空结果」。
+   改成和 `regionDetectors` 一样把 `runCatching` 放进 `async` 里。
+   测试另需补 `import kotlinx.coroutines.test.currentTime`（顶层扩展属性）
+   与 `@OptIn(ExperimentalCoroutinesApi::class)`。
+
+2. **Task 17 Step 1 —— 权限断言当场阻断，来源不是 ML Kit 的模型下载。**
+   `com.google.mlkit:text-recognition`（确为 bundled）传递依赖到
+   `com.google.android.datatransport:transport-backend-cct`，即 GMS 的**遥测上报后端**，
+   它把 `INTERNET` 与 `ACCESS_NETWORK_STATE` 并进了合并 manifest。
+   处理：`AndroidManifest.xml` 里用 `tools:node="remove"` 摘掉这两条。
+   **不要改成 exclude 掉那几个 artifact** —— ML Kit 的日志代码直接引用其类，
+   摘依赖会在初始化时 `NoClassDefFoundError`。摘权限反而更强：类还在，但系统不给这个进程开网络。
+   摘除后断网实测识别功能不受任何影响。
+
+3. **Task 18 —— UPS 校验位的加倍奇偶写反了。**
+   计划的 `sum += if (i % 2 == 0) v else v * 2` 会把计划自己指定的公开标准样例
+   `1Z12345E0205271688` 算出校验位 6（实际是 8）。正确的是**偶数下标加倍**：
+   `sum += if (i % 2 == 0) v * 2 else v`。按 Step 4 的指示「确认样例无误则修实现」。
+
+4. **Task 24 —— `dedupe` 必须要求两个候选 `kind` 相同。**
+   计划的实现只按 IoU 去重、完全不看 kind。计划预言 `RedactionEngineTest` 的
+   「classifier 与 detector 的候选合并」仍会通过——预言是错的：EMAIL 与 FACE 两个候选
+   quad 完全相同，IoU = 1.0，`dedupe` 直接吃掉一个。
+   真实场景更糟：条码下方印着同一串快递单号时，条码候选会被文字候选静默吃掉，那是漏检。
+   `dedupe` 的判定加一层 `comparable(a, b) = a.kind == b.kind`，与 `canJoin` 的口径一致。
+   补了两条回归测试（条码不被重叠文字候选去重掉；两个重叠人脸仍然去重），
+   `CandidateMergerTest` 因此是 15 条而不是 13 条。
+
+5. **Task 25 —— `EngineFactoryTest` 用 `targetContext` 而非 `context`。**
+   `InstrumentationRegistry.getInstrumentation().context` 是测试 APK 的 context，
+   `buildEngine` 要的是被测应用的。
+
+### 顺带发现的、留给后续计划的两件事
+
+均已写进 spec §15 第 5 条，本计划不处理，因为都会牵动已定稿的规则测试：
+
+- **低置信度行会照常喂进规则层。** 真实中文截图上，bundled 拉丁识别器把中文识别成
+  置信度 0.25–0.4 的乱码，这些串会参与规则匹配，是误报的一个来源。
+  建议计划 04 给 `RuleClassifier` 加一个置信度下限。
+- **实测到一例真实漏检：28 位支付宝交易号不被任何规则命中。**
+  `card` 限 13–19 位、`tracking` 限 12/15/20/22 位，28 位落在所有规则之外。
+  留给计划 04 的评测 harness 量化后再决定要不要加一条「长数字串」兜底规则。
