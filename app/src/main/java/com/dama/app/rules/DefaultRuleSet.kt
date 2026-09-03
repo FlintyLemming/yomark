@@ -61,5 +61,26 @@ object DefaultRuleSet {
         validate = { _, m -> KnownTlds.isKnown(m.groupValues[1]) },
     )
 
-    val rules: List<Rule> = listOf(CARD, IBAN, SSN, MAC, EMAIL, PhoneRule())
+    private val PASSPORT = RegexRule(
+        id = "passport",
+        kind = SensitiveKind.PASSPORT,
+        enabledByDefault = true,
+        // TD3：两行各 44 字符，字符集是大写字母、数字与填充符
+        pattern = Regex("""(?<![A-Z0-9<])[A-Z0-9<]{44}(?![A-Z0-9<])"""),
+        confidence = 0.95f,
+        validate = { _, m ->
+            Checksums.mrzTd3Line1(m.value) || Checksums.mrzTd3Line2Valid(m.value)
+        },
+    )
+
+    private val API_KEY = RegexRule(
+        id = "apikey",
+        kind = SensitiveKind.API_KEY,
+        enabledByDefault = true,
+        pattern = Regex("""(?<![A-Za-z0-9_-])(?:sk-|ghp_|gho_|ghs_|AKIA|eyJ)[A-Za-z0-9_\-.]{12,}"""),
+        confidence = 0.9f,
+        validate = { _, m -> Checksums.shannonEntropy(m.value) > 3.5 },
+    )
+
+    val rules: List<Rule> = listOf(CARD, IBAN, SSN, MAC, EMAIL, PhoneRule(), PASSPORT, API_KEY)
 }
