@@ -35,6 +35,9 @@ object SyntheticSamples {
         Entry("host 192.168.1.10", SensitiveKind.IP_ADDR),
         Entry("open https://app.com/r/AbCdEf123", SensitiveKind.URL),
         Entry("ship 1Z12345E0205271688", SensitiveKind.TRACKING_NO),
+        // spec §15 第 5 条实测到的两处真实漏检，longnum 兜底规则的回归样本
+        Entry("txn 2026090323001114571431156787", SensitiveKind.LONG_NUMBER),
+        Entry("order 5127402746064028833", SensitiveKind.LONG_NUMBER),
         Entry("Total 42.50 USD", null),
         Entry("Delivered on Tuesday", null),
         Entry("Thanks for your order", null),

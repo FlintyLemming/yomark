@@ -150,8 +150,47 @@ object DefaultRuleSet {
         }
     }
 
+    /**
+     * 长数字串兜底（spec §15 第 5 条的实测漏检）。
+     *
+     * 实测：真实淘宝订单页上的 28 位支付宝交易号不被任何规则命中——
+     * CARD 限 13–19 位、TRACKING 限 12/15/20/22 位，28 位落在所有窗口之外。
+     * 漏检是事故，所以补一条不看语义、只看长度的兜底。
+     *
+     * 三条边界，都是为了不跟已有规则抢同一串数字（合并只在同 kind 之间做，
+     * 抢起来会在同一处叠出两个候选）：
+     * - 下限 16 位：E.164 电话最长 15 位，兜底与 PhoneRule 完全不重叠；
+     * - 排除 20/22 位：那是 TRACKING 的 USPS 窗口；
+     * - 排除 13–19 位里 Luhn 通过的：那是 CARD 的地盘。
+     *   只在 CARD 的窗口内让位——别处 Luhn 碰巧通过（约十分之一）不该让兜底失灵。
+     *
+     * 没有任何校验位，误报天然多（时间戳拼接、纯序号都会撞上），
+     * 因此按 §6「默认按误报率划线」默认仅圈出，靠导出拦截兜底。
+     */
+    private val LONG_NUMBER = object : Rule {
+        override val id = "longnum"
+        override val kind = SensitiveKind.LONG_NUMBER
+        override val enabledByDefault = false
+
+        private val run = Regex("""(?<![A-Za-z0-9])\d{16,}(?![A-Za-z0-9])""")
+        private val trackingLengths = setOf(20, 22)
+
+        override fun findIn(text: String): List<RuleMatch> =
+            run.findAll(text)
+                .filter { m ->
+                    val v = m.value
+                    when {
+                        v.length in trackingLengths -> false
+                        v.length in 13..19 && Checksums.luhn(v) -> false
+                        else -> true
+                    }
+                }
+                .map { RuleMatch(it.range, 0.4f) }      // 无校验位 → 低置信度
+                .toList()
+    }
+
     val rules: List<Rule> = listOf(
         CARD, IBAN, SSN, MAC, EMAIL, PhoneRule(), PASSPORT, API_KEY,
-        URL, IP, TRACKING,
+        URL, IP, TRACKING, LONG_NUMBER,
     )
 }

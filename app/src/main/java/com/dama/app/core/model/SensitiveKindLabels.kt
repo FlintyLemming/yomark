@@ -15,6 +15,7 @@ object SensitiveKindLabels {
         SensitiveKind.MAC_ADDR -> "MAC 地址"
         SensitiveKind.URL -> "网址"
         SensitiveKind.API_KEY -> "密钥"
+        SensitiveKind.LONG_NUMBER -> "长数字串"
         SensitiveKind.POSTAL_ADDRESS -> "地址"
         SensitiveKind.PERSON_NAME -> "人名"
         SensitiveKind.ORG_NAME -> "机构名"
