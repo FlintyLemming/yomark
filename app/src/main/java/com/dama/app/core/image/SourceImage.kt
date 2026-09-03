@@ -23,4 +23,11 @@ data class SourceImage(
     fun toOriginal(quad: Quad): Quad = quad.scaled(1f / scale)
 }
 
-data class ExportBitmap(val bitmap: Bitmap, val downscaled: Boolean, val width: Int, val height: Int)
+data class ExportBitmap(
+    val bitmap: Bitmap,
+    val downscaled: Boolean,
+    val width: Int,
+    val height: Int,
+    /** 导出解码用的 inSampleSize：原图宽 = width * downsampleFactor。 */
+    val downsampleFactor: Int = 1,
+)

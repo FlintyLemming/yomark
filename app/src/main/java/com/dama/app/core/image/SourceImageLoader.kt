@@ -49,12 +49,15 @@ object SourceImageLoader {
         val sample = sampleSizeForPixels(rawW.toLong() * rawH.toLong(), EXPORT_MAX_PIXELS.toLong())
 
         val decoded = decode(file, sample)
-        val upright = applyOrientation(decoded, orientation)
+        // 导出要在这张位图上直接画遮罩，必须可变：BitmapFactory 默认解出的是不可变位图，
+        // 直接塞给 Canvas 会抛 "Immutable bitmap passed to Canvas constructor"。
+        val upright = applyOrientation(decoded, orientation).ensureMutable()
         ExportBitmap(
             bitmap = upright,
             downscaled = sample > 1,
             width = upright.width,
             height = upright.height,
+            downsampleFactor = sample,
         )
     }
 
@@ -74,6 +77,7 @@ object SourceImageLoader {
         val opts = BitmapFactory.Options().apply {
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
+            inMutable = true
         }
         return BitmapFactory.decodeFile(file.absolutePath, opts)
             ?: throw IOException("解码返回 null：${file.name}")
@@ -114,6 +118,10 @@ object SourceImageLoader {
         if (out !== src) src.recycle()
         return out
     }
+
+    /** 只在真的需要时才拷贝——大图拷贝一次就是几十 MB。 */
+    private fun Bitmap.ensureMutable(): Bitmap =
+        if (isMutable) this else copy(Bitmap.Config.ARGB_8888, true).also { if (it !== this) recycle() }
 
     private val ROTATED_90_OR_270 = setOf(
         ExifInterface.ORIENTATION_ROTATE_90,
