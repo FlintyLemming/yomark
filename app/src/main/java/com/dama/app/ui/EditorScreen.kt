@@ -19,6 +19,7 @@ import com.dama.app.render.RendererRegistry
 import com.dama.app.ui.canvas.ImageCanvas
 import com.dama.app.ui.components.EditorBottomBar
 import com.dama.app.ui.components.EditorTopBar
+import com.dama.app.ui.components.PendingExportDialog
 
 @Composable
 fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
@@ -35,6 +36,15 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
             is EditorMessage.Error -> snackbar.showMessage(m.text, vm)
             null -> Unit
         }
+    }
+
+    if (state.pendingDialogVisible) {
+        PendingExportDialog(
+            pendingByKind = state.plan.pendingByKind(),
+            onMaskAllAndExport = { vm.confirmMaskAllAndExport(applyWatermark = true) },
+            onExportAnyway = { vm.confirmExportAnyway(applyWatermark = true) },
+            onDismiss = vm::dismissDialog,
+        )
     }
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->

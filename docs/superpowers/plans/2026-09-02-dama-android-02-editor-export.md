@@ -2985,3 +2985,67 @@ git tag m1-manual-redaction
 > **M1 出口（spec §12）**：能当一个可用的手动打码工具发出去，全程零权限弹窗。
 
 达成即可以考虑上架首个版本。识别能力在计划 03 / 04 加。
+
+---
+
+## 执行时与计划不符之处（2026-09-03 执行，供计划 03 起参考）
+
+1. **导出位图必须可变，否则第一行就崩。** `Exporter.export` 里 `Canvas(bitmap)` 直接用
+   `BitmapFactory` 解出的位图，那是**不可变**位图，真机与 Robolectric 都会抛
+   `IllegalStateException: Immutable bitmap passed to Canvas constructor`。
+   已在 `SourceImageLoader.decode` 设 `inMutable = true`，并给 `loadForExport` 的结果加
+   `ensureMutable()`（只有 EXIF 旋转真的发生时才会多拷一次，大图不白白翻倍内存）。
+
+2. **「导出不带 EXIF」不能断言 `TAG_ORIENTATION` 为 null。** androidx 的 `ExifInterface`
+   会从 JPEG 的 SOF 段合成 `ImageWidth`/`ImageLength`，并把缺失的方向报成
+   `ORIENTATION_UNDEFINED(0)` —— 那是库的默认值，不是文件里的数据（实测编码结果里
+   连 `Exif` 标记都没有）。`ExporterTest` 的那条断言已改成：字节流中不含 EXIF 段，
+   且方向读出来是 `ORIENTATION_UNDEFINED`。
+
+3. **调度器改成调用方可注入。** `ImageIntake.copyToPrivate` / `SourceImageLoader.loadForAnalysis`
+   / `loadForExport` / `Exporter.export` 各加了一个 `dispatcher` 参数（默认值与原来写死的
+   一致），`EditorViewModel` 一律传自己的 `ioDispatcher`。
+   不这么做，计划给的 `EditorViewModelTest` 有 5 条必然失败：这些方法内部
+   `withContext(Dispatchers.IO/Default)` 跳到真实线程池，`advanceUntilIdle()` 等不到它们。
+
+4. **`connectedDebugAndroidTest` 不接受 `--tests`。** 跑单个 instrumented 测试用
+   `-Pandroid.testInstrumentationRunnerArguments.class=<全限定类名>`。
+
+5. **`ImageCanvas` 的手势循环必须读 `rememberUpdatedState(state)`。**
+   `pointerInput(image)` 的 block 只在 key 变化时重启，捕获的是重启那一刻的 `state`。
+   照计划直接读 `state`，长按选中后立刻拖手柄时循环里看到的 `selectedManualId` 还是 null，
+   于是拖出一个新框而不是改选中框 —— 实机复现过。
+
+6. **双击用手势循环内的时间戳判定，不用第二层 `detectTapGestures`（计划 Step 7 的备选方案）。**
+   实机验证：叠在同一个 Canvas 上的第二层 `pointerInput` 收不到本层已在处理的手势，
+   `onDoubleTap` 从不触发。改成在主循环里记上一次点击的时刻与位置，300ms 内、位移小于
+   2×touchSlop 判为第二击。**第二击只做缩放、不再切换遮罩状态**（第一击已经切过一次），
+   这样单击零延迟，代价是双击一个遮罩会让它多切一次状态 —— 相比「每次点遮罩都等 300ms」
+   这是更划算的一侧。
+
+7. **画布补了 `clipToBounds()`。** 计划没提。不加的话双击放大后图像溢出画布区，直接压在顶栏上。
+
+8. **`ImageCanvas` 签名与计划不同**：去掉了 `onDoubleTap`（缩放在画布内部自己处理），
+   新增 `onResize` / `onCommitDrag` / `onDeleteSelected`。`onCommitDrag` 是计划 Task 14 Step 6
+   要求「抬手调 commitDrag()」所必需的，计划的参数清单漏了它。
+
+9. **补做了 `ui/components/PendingExportDialog.kt`（计划里没有，本属计划 04）。**
+   计划 Task 12 写着「M1 没有识别，pendingCount 恒为 0，拦截不会触发」——**这是错的**：
+   M1 的用户点一下手动框就会把它切成 `OUTLINED`，`pendingCount` 立刻大于 0。
+   没有对话框 UI 时，点导出的结果是「什么都没发生」，而索引里的 Global Constraint
+   写着「`pendingCount > 0` 时点击导出**必然**弹拦截对话框」。
+   现在这个是最小实现（标题 + 按类型分行 + 两个按钮），计划 04 可以直接替换成完整版。
+
+10. **未验证项**：两指捏合缩放 / 平移**没有在设备上验过** —— `adb shell input` 注入不了多点触控。
+    `Viewport` 的 `zoomAround` / `pan` / `clamped` 有单测覆盖，但「两指手势喂进去」这一段
+    只有代码走查。第一次拿到真机时优先手验这一条。
+
+11. **包体基线**：`bundleRelease` 产出的 `app-release.aab` = **1.9 MB**。本机没装 bundletool，
+    没跑 `get-size total`；M1 阶段没有任何 native 库，ABI split 还不起作用，
+    这个数就是加 ML Kit 之前的基线。
+
+12. **§15.2 / §15.3 的实测结论已写回 spec**（见 spec §15 对应条目下的「实测（2026-09-03）」）。
+    要点：闭环与零权限成立、冷启动直接拉 Picker 的体验可接受（不加首屏）；
+    但 `ACTION_SEND` 进来的图在 Activity 重建后会丢失，退回 Picker ——
+    私有副本的路径没进 `onSaveInstanceState`，且 `onCleared()` 会清空 intake 目录。
+    留到计划 04 与状态持久化一起做。
