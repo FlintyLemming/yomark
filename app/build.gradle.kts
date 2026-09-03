@@ -121,6 +121,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.face.detection)
+    implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.libphonenumber)
     debugImplementation(libs.androidx.compose.ui.tooling)
