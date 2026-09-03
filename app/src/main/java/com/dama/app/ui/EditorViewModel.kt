@@ -39,6 +39,9 @@ class EditorViewModel(
     private val undoStack = UndoStack()
     private var intakeResult: IntakeResult? = null
 
+    /** 一次拖动开始前的 plan 快照，抬手时才压进撤销栈。 */
+    private var dragOrigin: MaskPlan? = null
+
     // ---------- 载入 ----------
 
     fun onImageChosen(uri: Uri) {
@@ -100,10 +103,23 @@ class EditorViewModel(
         _state.value = _state.value.copy(selectedManualId = null)
     }
 
-    fun moveSelected(quad: Quad) {
+    /**
+     * 拖动期间只改状态不压栈——每帧压一次会往撤销栈里塞几十个快照，
+     * 用户想撤销一次拖动就得按几十次。抬手时由 commitDrag() 补一次。
+     */
+    fun previewSelectedQuad(quad: Quad) {
         val id = _state.value.selectedManualId ?: return
         val item = _state.value.plan.find(id) ?: return
-        mutate { it.replace(item.copy(quad = quad)) }
+        if (dragOrigin == null) dragOrigin = _state.value.plan
+        _state.value = _state.value.copy(plan = _state.value.plan.replace(item.copy(quad = quad)))
+    }
+
+    fun commitDrag() {
+        val origin = dragOrigin ?: return
+        dragOrigin = null
+        if (origin == _state.value.plan) return
+        undoStack.push(origin)
+        _state.value = _state.value.withHistoryFlags()
     }
 
     fun setStyle(style: MaskStyle) = mutate { it.copy(style = style) }

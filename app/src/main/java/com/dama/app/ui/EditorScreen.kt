@@ -49,9 +49,11 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                     state = state,
                     registry = registry,
                     onTap = vm::onTap,
-                    onDoubleTap = { _, _, _ -> },
                     onLongPress = vm::onLongPress,
                     onManualBox = vm::onManualBox,
+                    onResize = vm::previewSelectedQuad,
+                    onCommitDrag = vm::commitDrag,
+                    onDeleteSelected = vm::deleteSelected,
                 )
             }
             EditorBottomBar(
