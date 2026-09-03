@@ -27,7 +27,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import com.dama.app.core.geometry.Quad
+import com.dama.app.core.model.MaskItem
 import com.dama.app.core.model.MaskState
+import com.dama.app.core.model.SensitiveKindLabels
 import com.dama.app.render.RendererRegistry
 import com.dama.app.ui.EditorUiState
 import kotlin.math.hypot
@@ -225,8 +227,12 @@ fun ImageCanvas(
             sorted.filter { it.state == MaskState.MASKED }.forEach {
                 registry[state.plan.style].render(canvas, image.bitmap, it.quad, state.plan.options)
             }
-            sorted.filter { it.state == MaskState.OUTLINED }.forEach {
-                canvas.drawPath(it.quad.toPath(), outlinePaint(viewport.scale))
+            sorted.filter { it.state == MaskState.OUTLINED }.forEach { item ->
+                canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale))
+                // 类型小标签只在缩放比 ≥ 0.5 时绘制，避免密集截图上标签糊成一片
+                if (viewport.scale >= GestureRules.LABEL_MIN_SCALE) {
+                    drawKindLabel(canvas, item, viewport.scale)
+                }
             }
             state.selectedManualId?.let { id ->
                 state.plan.find(id)?.let { item ->
@@ -290,4 +296,25 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     color = AndroidColor.argb(200, 255, 255, 255)
     strokeWidth = 3f / scale
     pathEffect = DashPathEffect(floatArrayOf(10f / scale, 6f / scale), 0f)
+}
+
+/** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
+private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
+    val text = SensitiveKindLabels.display(item.kind)
+    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.BLACK
+        textSize = 26f / scale
+    }
+    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
+        style = Paint.Style.FILL
+    }
+    val b = item.quad.bounds()
+    val padding = 6f / scale
+    val w = textPaint.measureText(text) + padding * 2
+    val h = textPaint.textSize + padding * 2
+    val top = (b.top - h - 2f / scale).coerceAtLeast(0f)
+    val rect = android.graphics.RectF(b.left, top, b.left + w, top + h)
+    canvas.drawRoundRect(rect, 4f / scale, 4f / scale, bg)
+    canvas.drawText(text, rect.left + padding, rect.bottom - padding - textPaint.descent() * 0.5f, textPaint)
 }
