@@ -1255,3 +1255,66 @@ git tag m2-recognition
 合成样本上的指标是本计划结束时就能拿到的；真实 200 张样本集按 `docs/eval-sample-set.md` 采集完成后再跑一次，两组数都记进文档。
 
 **这一版可以发布**：完整识别、三态编辑、导出拦截、原图导出、零权限。人脸与条码在计划 05 加。
+
+---
+
+## 执行记录（2026-09-03）
+
+Task 26–30 全部执行完毕，外加索引约定之外、由 spec §15 甩给本计划的三件事
+（经确认后一并做掉）。环境：模拟器 `Medium_Phone` / android-37。
+
+**最终状态**：235 条单测 + 25 条 instrumented 全绿；`assertDebugNoRuntimePermissions`
+与 `assertReleaseNoRuntimePermissions` 均通过；断网下行为与联网时逐位一致。
+
+### 与计划文本的偏差
+
+1. **Task 26 —— 计划给的「manual boxes during analysis」测试序列不成立。**
+   `StandardTestDispatcher` 下 `onImageChosen` 之后立刻 `onManualBox`，载入协程一步都还没跑，
+   框落在载入前的空 plan 上，随后被载入时的 `EditorUiState` 重置抹掉。
+   而那个场景在 UI 上根本走不到——`image == null` 时 `ImageCanvas` 直接 return。
+   改成用 `CompletableDeferred` 卡住分类器，精确命中计划真正描述的
+   「图已载入、分析还没回来」窗口，并断言此刻 `analyzing == true`。实现未因此改动。
+   另：`onImageChosen` 沿用仓库现有的「dispatcher 作参数传进 `copyToPrivate` /
+   `loadForAnalysis`」写法，不改成计划里的 `withContext(ioDispatcher)` 包裹，两者等价。
+
+2. **Task 27 —— 计划给的 `plural` 实现过不了计划自己写的测试。**
+   `"$count 个${display(kind)}"` 产出「1 个IP 地址」，而 spec §7.4 的例子是
+   「1 个 IP 地址」，中文与拉丁字母之间有一个空格。按 Step 4「确认样例无误则修实现」
+   的口径修实现：拉丁开头的显示名前补空格，纯中文名不补。
+
+3. **Task 28 —— `PendingExportDialog` 是替换不是新建。**
+   计划 02 已经建过一个签名与措辞都不同的 M1 版（`pendingByKind` / `onMaskAllAndExport` /
+   「还有 N 处只圈出、没打码」）。按计划 02 自己的注释整体替换成 spec §7.4 的完整版，
+   并同步改 `EditorScreen` 的调用点。
+
+4. **Task 28 —— 必须显式引入 espresso-core 3.7.0。**
+   Compose `ui-test-junit4` 传递进来的是 3.5.0，在 android-37 上四条测试全崩：
+   `NoSuchMethodException android.hardware.input.InputManager.getInstance`，
+   该方法在新版本 Android 上已被移除。按索引「版本解析失败取最新稳定版并写回
+   `libs.versions.toml`」的口径处理。只进 androidTest，不影响 release。
+
+5. **Task 29 —— 计划的延迟测试量错了尺寸。**
+   计划量的是 `generate().first()`，即一张 1080×300 的单行条，跑出 6ms——数字好看但
+   测不出真实开销，而 spec §13 的口径写死了「1080×2400 截图」。补了
+   `SyntheticSamples.screenshot()`（1080×2400，全部行竖排堆进去），延迟测试改量它，
+   并加一条同尺寸的指标测试。实测 39ms。
+
+### spec §15 甩过来、计划文本里没有对应任务的三件事
+
+计划 04 的任务列表里没有它们，但 §15.2 / §15.5 明确写了「留给计划 04」。确认后一并做掉：
+
+- **`RuleClassifier` 行置信度下限**（§15.5）。`MIN_LINE_CONFIDENCE = 0.5`，可注入。
+- **`longnum` 长数字串兜底规则 + `SensitiveKind.LONG_NUMBER`**（§15.5）。
+  规则表因此从 11 条变 12 条（8 打码 / 4 圈出），`OutlinedByDefaultRuleTest` 的两条
+  完整性断言同步更新——**这条改动推翻了计划 03 出口里「恰好 11 条」的说法**。
+- **Activity 重建的状态持久化**（§15.2）。`@Parcelize` + `SavedStateHandle`，
+  `intake.clear()` 从 `onCleared` 挪到 `onImageChosen`。撤销栈刻意不持久化。
+  没有按 §15.2 字面加「导出成功时清理」那一档——那会让用户改个样式再导出一次直接失败。
+
+### 仍需人工过一遍的
+
+- 缩放比跨过 0.5 时类型小标签的出现 / 消失（要双指捏合，adb 驱动不了）
+- 真实银行 app / 聊天记录 / 证件照截图上的表现
+- spec §13 要求的 200 张真实样本集尚未采集，`androidTest/assets/samples/` 为空，
+  评测里那条测试会打印提示并跳过。采集说明见 `docs/eval-sample-set.md`。
+  **因此 M2 的正式出口指标尚未达成**——合成集上的 1.00 只说明规则对自己造的输入自洽。
