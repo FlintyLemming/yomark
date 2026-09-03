@@ -1,5 +1,8 @@
 package com.dama.app.rules
 
+import com.dama.app.core.model.SensitiveKind
+import com.dama.app.rules.validator.Checksums
+
 /**
  * 首版的全部规则（spec §6）。11 条，每条都有校验步骤。
  *
@@ -7,5 +10,45 @@ package com.dama.app.rules
  * 一直在跟 app 对着干；有校验位兜底的类型误报接近零，自动打码不打扰任何人。
  */
 object DefaultRuleSet {
-    val rules: List<Rule> = emptyList()      // Task 20-23 逐条填入
+
+    // ---------- 高置信：有校验位兜底，误报接近零，默认打码 ----------
+
+    private val CARD = RegexRule(
+        id = "card",
+        kind = SensitiveKind.PAYMENT_CARD,
+        enabledByDefault = true,
+        // 13–19 位数字，容忍空格与连字符分组；前后不能紧邻数字
+        pattern = Regex("""(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])"""),
+        confidence = 0.95f,
+        validate = { _, m -> Checksums.luhn(m.value.filter { it.isDigit() }) },
+    )
+
+    private val IBAN = RegexRule(
+        id = "iban",
+        kind = SensitiveKind.IBAN,
+        enabledByDefault = true,
+        pattern = Regex("""(?<![A-Z0-9])[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{1,4}){2,8}(?![A-Z0-9])"""),
+        confidence = 0.95f,
+        validate = { _, m -> Checksums.ibanValid(m.value) },
+    )
+
+    private val SSN = RegexRule(
+        id = "ssn",
+        kind = SensitiveKind.SSN,
+        enabledByDefault = true,
+        pattern = Regex("""(?<!\d)\d{3}-\d{2}-\d{4}(?!\d)"""),
+        confidence = 0.95f,
+        validate = { _, m -> Checksums.ssnValid(m.value) },
+    )
+
+    private val MAC = RegexRule(
+        id = "mac",
+        kind = SensitiveKind.MAC_ADDR,
+        enabledByDefault = true,
+        pattern = Regex("""(?<![0-9A-Fa-f:-])(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}(?![0-9A-Fa-f:-])"""),
+        confidence = 0.9f,
+        validate = { _, m -> Checksums.macSeparatorConsistent(m.value) },
+    )
+
+    val rules: List<Rule> = listOf(CARD, IBAN, SSN, MAC)
 }
