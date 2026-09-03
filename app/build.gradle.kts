@@ -120,6 +120,7 @@ dependencies {
     implementation(libs.androidx.exifinterface)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.face.detection)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.libphonenumber)
     debugImplementation(libs.androidx.compose.ui.tooling)
