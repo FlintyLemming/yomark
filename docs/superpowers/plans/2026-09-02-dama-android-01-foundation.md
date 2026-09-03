@@ -2008,11 +2008,36 @@ git commit -m "feat: decode with EXIF orientation baked in, power-of-two downsam
 
 ## 本计划出口
 
-- [ ] `./gradlew :app:assembleDebug` 成功
-- [ ] `./gradlew :app:testDebugUnitTest` 全绿（约 35 个测试）
-- [ ] `./gradlew :app:connectedDebugAndroidTest` 全绿（ImageIntake 5 个）
-- [ ] `./gradlew :app:assertDebugNoRuntimePermissions` 打印「uses-permission = （空）」
-- [ ] 反向验证做过一次：临时加一条 `INTERNET` 权限确实让构建失败
+- [x] `./gradlew :app:assembleDebug` 成功
+- [x] `./gradlew :app:testDebugUnitTest` 全绿（实际 42 个测试）
+- [x] `./gradlew :app:connectedDebugAndroidTest` 全绿（ImageIntake 5 个，跑在 API 37 模拟器上）
+- [x] `./gradlew :app:assertDebugNoRuntimePermissions` 通过 —— 但打印的不是「（空）」，见下
+- [x] 反向验证做过一次：临时加一条 `INTERNET` 权限确实让构建失败，删掉后恢复通过
+
+### 执行时与计划不符之处（供计划 02 参考）
+
+1. **权限断言的允许名单多了一条。** androidx.core 会合并进
+   `com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`，它是本应用给自己定义的
+   `protectionLevel="signature"` 权限，供 `ContextCompat.registerReceiver` 注册非导出
+   广播接收器用。不弹授权框、不触及用户数据，signature 级别决定了其他应用拿不到。
+   已逐条写进 `AssertPermissionsTask.ALLOWED` 并注明理由；**允许名单不做前缀匹配**，
+   任何新出现的权限仍然会让构建失败。
+
+2. **Robolectric 升到 4.15.1，且单元测试运行时钉在 SDK 35。**
+   `targetSdk = 36` 是 Global Constraint 不能动，而 Robolectric 最新稳定版支持的最高
+   SDK 是 35，直接跑会报 `Package targetSdkVersion=36 > maxSdkVersion=35` 无法初始化。
+   已加 `app/src/test/resources/robolectric.properties` 写 `sdk=35`。等 Robolectric
+   支持 36 后删掉即可。
+
+3. **`Quad` 的两处实现按测试修正**（计划给的代码与它自己的测试不符）：
+   `expand` 改为按边外法线偏移（原实现让角只移动 px/√2，余量窄 30%）；
+   `clipEdge` 的绕向改为取自裁剪多边形自身（原实现在两框不相交时算出 iou = 1.0）。
+
+4. **本机环境**：用 `brew install openjdk@21`（formula，免 sudo）而非 temurin cask，
+   JDK 在 `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`；
+   它是 keg-only，`/usr/libexec/java_home` 找不到，故 `JAVA_HOME` 写进了 `~/.zshrc`。
+   Gradle wrapper 因 Homebrew 的 Gradle 9.7.1 与 AGP 8.11.1 不兼容，是在临时空工程里
+   生成后拷进来的。
 
 出口不是「可发布」——UI 还没有。可发布形态在计划 02 结束时达成。
 
