@@ -129,3 +129,39 @@ adb logcat -d -s System.out:I | grep DAMA-EVAL
 
 **未由自动化覆盖、仍需人工过一遍的**：缩放比跨过 0.5 时类型小标签的出现/消失（要双指捏合），
 以及真实银行 app / 聊天记录截图上的表现。
+
+---
+
+## M3 区域检测的素材（人脸 / 二维码）
+
+`RegionEvaluationTest` 量 spec §12 的 M3 出口，素材另放两个目录，格式比上面的样本集简单——
+不需要 JSON 标注，只要求「每张图恰好含一个该类目标」：
+
+```
+app/src/androidTest/assets/faces/     每张恰好一张正脸
+app/src/androidTest/assets/qrcodes/   每张恰好一个二维码
+```
+
+隐私要求与上面完全一致：只用自己的照片、公开官方样张、自造数据。
+
+**读 assets 用的是测试 APK 的 Context**（`getInstrumentation().context`），
+不是 `targetContext`——androidTest 的 assets 打进测试 APK，被测应用的 assets 是空的。
+
+### M3 跑分（2026-09-03）
+
+环境同上：模拟器 `Medium_Phone` / android-37 / arm64-v8a，debug 变体。
+
+| 指标 | 素材 | 实测 | 阈值 |
+|---|---|---|---|
+| 二维码检出 | 36 张自造二维码（`tools/gen_qr_corpus.py`） | **36/36 = 1.00** | 1.00 |
+| 正脸召回 | **无素材，测试跳过** | — | ≥ 0.98 |
+| 识别延迟（1080×2400） | 合成截图 | **138 ms**（M2 时是 39 ms） | < 800 ms |
+| arm64-v8a 下发体积 | `bundletool get-size total` | **16.6 MB** | ≤ 25 MB |
+
+**正脸召回没有量。** M3 的这一半出口尚未达成，需要 30+ 张含正脸的真实照片。
+`MlKitFaceDetector` 本身的行为由 `MlKitFaceDetectorTest`（合成简笔脸）守着，
+但那证明不了真实人脸的召回率。
+
+二维码那 36 张是自造的（生成脚本在 `tools/gen_qr_corpus.py`，种子写死可复现），
+覆盖了尺寸、纠错级别、旋转 ±33°、JPEG 压缩、模糊、缩放、周边杂物。
+它替代不了真实收款码截屏：没有屏幕摩尔纹、没有反光、没有深色模式下的反色二维码。

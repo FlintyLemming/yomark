@@ -8,6 +8,7 @@ import com.dama.app.core.model.Candidate
 import com.dama.app.core.model.DetectorSource
 import com.dama.app.core.model.SensitiveKind
 import com.dama.app.engine.RegionDetector
+import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.tasks.await
@@ -25,7 +26,19 @@ class MlKitBarcodeDetector : RegionDetector {
     override val id = "mlkit-barcode"
     override val kind = SensitiveKind.BARCODE
 
-    private val client by lazy { BarcodeScanning.getClient() }
+    /**
+     * `enableAllPotentialBarcodes` 是这个类的关键一行：它让检测器连**解不出内容**的条码
+     * 也一并返回。打码工具只关心「这里有一个条码」，从来不需要它的内容——
+     * 默认配置下 ML Kit 只报解码成功的条码，倾斜、轻微失焦、缩放过的二维码
+     * 会被静默丢掉（自造的 36 张评测图里丢了 6 张）。漏检是事故，误报只是麻烦。
+     */
+    private val client by lazy {
+        BarcodeScanning.getClient(
+            BarcodeScannerOptions.Builder()
+                .enableAllPotentialBarcodes()
+                .build()
+        )
+    }
 
     override suspend fun detect(image: SourceImage): List<Candidate> {
         val input = InputImage.fromBitmap(image.bitmap, 0)

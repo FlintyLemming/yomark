@@ -652,3 +652,92 @@ git tag m3-face-barcode
 - [ ] arm64-v8a 下发体积仍 ≤ 25 MB
 - [ ] 识别延迟仍 < 800 ms
 - [ ] 权限断言仍然通过
+
+---
+
+## 执行记录（2026-09-03）
+
+Task 31–33 全部完成，直接在 main 上推进。与计划文本的偏差如下。
+
+### 1. 条码检测开了 `enableAllPotentialBarcodes()`（Task 32，实现层）
+
+计划的实现是 `BarcodeScanning.getClient()`（默认配置）。默认配置**只报解码成功的条码**，
+自造的 36 张评测图里丢了 6 张（旋转 20°/33°、轻微失焦、缩放过的），检出率 30/36 = 0.83，
+达不到 M3 出口要求的 1.00。
+
+`BarcodeScannerOptions.Builder().enableAllPotentialBarcodes()` 让检测器把**检出但解不出内容**
+的条码也返回。打码工具只关心「这里有一个条码」，从来不需要它的内容，这个选项正对口径。
+开了之后 36/36 = 1.00。
+
+**代价是误报。** 实测一张高对比简笔脸（两只眼 + 鼻子）会被报成一个条码，
+在编辑器里表现为脸上多一个黑块。按 spec 的取舍原则（漏检是事故，误报只是麻烦）这笔换算是划算的，
+但要注意它和**不对称删除规则**叠加后的后果：误报的条码候选**删不掉**，
+用户只能把它切成琥珀色虚线框，而虚线框又会让每次导出都弹拦截对话框。
+换句话说，一个误报会在这张图的整个编辑周期里一直跟着用户。
+真实截图上的误报率还没量过——采集真实素材后要顺带记一下这个数。
+
+### 2. 条码测试补了一张真二维码（Task 32，测试层）
+
+计划给的 `barcodeImage()` 是手绘条纹，ML Kit 解不出格式；而计划的四条断言全是
+`forEach { ... }` 形式，空列表上全部空转——测试会绿，但什么都没验证。
+
+补了 `app/src/androidTest/assets/barcodes/qr-sample.png`（segno 生成，
+内容 `https://example.com/dama-test`），并加两条真断言：真二维码必须被检出、
+旋转 20° 时候选四边形的面积必须明显小于它的轴对齐外接矩形（守住「用 cornerPoints
+而不是 boundingBox」这条规格）。
+
+### 3. `EngineFactoryTest` 的人脸断言从注释变成了真断言（Task 33 Step 2）
+
+计划担心简笔脸检不出，把人脸那条留成了注释。`MlKitFaceDetectorTest` 证明当前 ML Kit 版本
+对**带鼻子、眼距正常**的那张简笔脸是检得出的，于是把计划给的那张脸（少鼻子、眼距窄，实测检不出）
+换成 `MlKitFaceDetectorTest` 里同一张，断言就真的立起来了。
+另加一条 `engine_reports_a_barcode_alongside_text_candidates`：二维码贴在文字旁边，
+两条链路各自出结果，互不吞掉。
+
+### 4. `RegionEvaluationTest` 的 assets Context 是错的（Task 33 Step 3）
+
+计划写的是 `targetContext.assets`。androidTest 的 assets 打进的是**测试 APK**，
+`targetContext` 指向被测应用自己的 assets（`src/main/assets`），那里永远是空的——
+两个指标会静默 `assumeTrue` 跳过，跑出一片绿却什么都没量。改成
+`getInstrumentation().context.assets`。
+
+### 5. 二维码素材是自造的，人脸素材没有（Task 33 Step 4）
+
+`tools/gen_qr_corpus.py`（segno + Pillow，种子写死）生成 36 张二维码进
+`androidTest/assets/qrcodes/`，覆盖尺寸、纠错级别、旋转 ±33°、JPEG 压缩、模糊、缩放、周边杂物。
+计划允许的素材来源里就有「自己生成的二维码」。**36/36 = 1.00**。
+
+`androidTest/assets/faces/` 仍然是空的——正脸素材只能是真人照片，得由人来采。
+`frontal_face_recall_is_at_least_98_percent` 因此是 SKIPPED，**M3 的人脸出口尚未达成**。
+
+### 6. Step 5 的 bundletool 命令写错了
+
+计划写的 `bundletool get-size total --bundle=...` 不是合法调用，`get-size total` 收的是 `--apks`。
+实际跑法：
+
+```bash
+./gradlew :app:bundleRelease
+bundletool build-apks --bundle=app/build/outputs/bundle/release/app-release.aab --output=/tmp/app-release.apks
+bundletool get-size total --apks=/tmp/app-release.apks --dimensions=ABI
+```
+
+结果：arm64-v8a **16,618,919 B ≈ 16.6 MB**（阈值 25 MB）。四个 ABI 里最大的是 x86 的 17.6 MB。
+
+### 7. Step 6 的前四条改由单测守住，实机只做肉眼确认
+
+`MaskPlanFactory` 与 `MaskPlan.remove` 都是与 kind 无关的纯逻辑，
+新增 `RegionMaskItemRulesTest` 把「人脸/条码进来即 MASKED」「点击两个方向都能切」
+「两者都删不掉，旁边的手动框能删」钉死在单测里。
+
+实机（模拟器 `Medium_Phone`，走系统 Photo Picker 选图）复核了同样六条，全部符合：
+人脸与二维码进编辑器即黑块、点击变琥珀色虚线框并显示「人脸」「条码」小标签、再点回黑块、
+长按选中后点红色删除按钮**候选不消失**、留一个虚线框点导出必然弹「还有 1 处已识别的内容未打码 / 1 个条码」。
+
+一个 UI 瑕疵，不属于本计划范围，记在这里：区域候选长按后**仍然会显示那个红色删除按钮**，
+只是点了无效。计划的验收口径是「没有删除按钮，或删除按钮无效」，所以算过，
+但对用户来说一个点了没反应的按钮不如不显示。
+
+### 8. 延迟
+
+加两条链路后，1080×2400 合成截图的识别延迟从 39 ms 涨到 **138 ms**（阈值 800 ms）。
+人脸与条码是并行跑的，没有叠加成三倍。
