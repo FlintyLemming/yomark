@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import androidx.exifinterface.media.ExifInterface
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -21,7 +22,15 @@ object SourceImageLoader {
     const val ANALYSIS_MAX_EDGE = 2048
     const val EXPORT_MAX_PIXELS = 32_000_000
 
-    suspend fun loadForAnalysis(file: File, mimeType: String): SourceImage = withContext(Dispatchers.IO) {
+    /**
+     * @param dispatcher 解码跑在哪个调度器上。默认 IO；调用方（如 EditorViewModel）
+     * 传入自己的调度器，测试里就能用 TestDispatcher 把这段异步工作纳入调度控制。
+     */
+    suspend fun loadForAnalysis(
+        file: File,
+        mimeType: String,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): SourceImage = withContext(dispatcher) {
         val (rawW, rawH) = readSize(file)
         val orientation = readOrientation(file)
         val sample = sampleSizeForEdge(max(rawW, rawH), ANALYSIS_MAX_EDGE)
@@ -43,7 +52,10 @@ object SourceImageLoader {
         )
     }
 
-    suspend fun loadForExport(file: File): ExportBitmap = withContext(Dispatchers.IO) {
+    suspend fun loadForExport(
+        file: File,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): ExportBitmap = withContext(dispatcher) {
         val (rawW, rawH) = readSize(file)
         val orientation = readOrientation(file)
         val sample = sampleSizeForPixels(rawW.toLong() * rawH.toLong(), EXPORT_MAX_PIXELS.toLong())

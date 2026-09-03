@@ -2,6 +2,7 @@ package com.dama.app.core.image
 
 import android.content.Context
 import android.net.Uri
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -22,7 +23,10 @@ class ImageIntake(private val context: Context) {
 
     private val dir: File get() = File(context.cacheDir, DIR).apply { mkdirs() }
 
-    suspend fun copyToPrivate(uri: Uri): IntakeResult = withContext(Dispatchers.IO) {
+    suspend fun copyToPrivate(
+        uri: Uri,
+        dispatcher: CoroutineDispatcher = Dispatchers.IO,
+    ): IntakeResult = withContext(dispatcher) {
         val mime = context.contentResolver.getType(uri) ?: DEFAULT_MIME
         val ext = if (mime.equals("image/png", ignoreCase = true)) "png" else "jpg"
         val target = File(dir, "src-${System.currentTimeMillis()}-${uri.hashCode()}.$ext")

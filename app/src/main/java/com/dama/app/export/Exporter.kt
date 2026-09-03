@@ -8,6 +8,7 @@ import com.dama.app.core.image.SourceImageLoader
 import com.dama.app.core.model.MaskPlan
 import com.dama.app.core.model.MaskState
 import com.dama.app.render.RendererRegistry
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -42,9 +43,13 @@ class Exporter(
     private val sink: ImageSink,
 ) {
 
-    suspend fun export(request: ExportRequest): ExportOutcome = withContext(Dispatchers.Default) {
+    /** @param dispatcher 整条管线跑在哪个调度器上；默认 Default，调用方可换成自己的。 */
+    suspend fun export(
+        request: ExportRequest,
+        dispatcher: CoroutineDispatcher = Dispatchers.Default,
+    ): ExportOutcome = withContext(dispatcher) {
         runCatching {
-            val decoded = SourceImageLoader.loadForExport(request.file)
+            val decoded = SourceImageLoader.loadForExport(request.file, dispatcher)
             val bitmap = decoded.bitmap
             val canvas = Canvas(bitmap)
 
