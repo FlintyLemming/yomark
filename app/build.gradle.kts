@@ -119,6 +119,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mlkit.text.recognition)
     implementation(libs.kotlinx.coroutines.play.services)
+    implementation(libs.libphonenumber)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

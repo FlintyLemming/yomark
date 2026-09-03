@@ -2,6 +2,7 @@ package com.dama.app.rules
 
 import com.dama.app.core.model.SensitiveKind
 import com.dama.app.rules.validator.Checksums
+import com.dama.app.rules.validator.KnownTlds
 
 /**
  * 首版的全部规则（spec §6）。11 条，每条都有校验步骤。
@@ -50,5 +51,15 @@ object DefaultRuleSet {
         validate = { _, m -> Checksums.macSeparatorConsistent(m.value) },
     )
 
-    val rules: List<Rule> = listOf(CARD, IBAN, SSN, MAC)
+    private val EMAIL = RegexRule(
+        id = "email",
+        kind = SensitiveKind.EMAIL,
+        enabledByDefault = true,
+        // RFC 5322 简化式
+        pattern = Regex("""(?<![A-Za-z0-9._%+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.([A-Za-z]{2,24})(?![A-Za-z0-9.-])"""),
+        confidence = 0.9f,
+        validate = { _, m -> KnownTlds.isKnown(m.groupValues[1]) },
+    )
+
+    val rules: List<Rule> = listOf(CARD, IBAN, SSN, MAC, EMAIL, PhoneRule())
 }
