@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <!--
       本文件不声明任何权限。
       构建产物中唯一的 uses-permission 是 com.android.vending.BILLING，
       由 Play Billing Library 的 manifest merger 并入，不可规避，且不授予任何数据访问能力。
       合并结果由 :app:assertNoRuntimePermissions 断言。
     -->
+
+    <!--
+      ML Kit（bundled 变体，模型随包发行、识别全程离线）传递依赖到
+      com.google.android.datatransport:transport-backend-cct —— GMS 的遥测上报后端。
+      它跟识别能力毫无关系，只用于把使用统计回传 Google，却把 INTERNET 与
+      ACCESS_NETWORK_STATE 合并进了本应用的 manifest。
+
+      本项目承诺「运行期网络请求数 = 0」（spec §0 / §13），所以在合并阶段直接摘掉这两条。
+      摘权限比摘依赖更强：类还在，但系统层面就不给这个进程开网络，
+      任何回传尝试都拿不到 socket，不依赖任何第三方库的自觉。
+
+      不要改成 exclude 掉 datatransport 那几个 artifact：ML Kit 的日志代码直接引用了
+      它们的类，摘掉会在初始化时 NoClassDefFoundError。
+    -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
+
     <application
         android:name=".DamaApplication"
         android:allowBackup="false"

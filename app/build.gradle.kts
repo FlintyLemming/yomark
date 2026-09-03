@@ -117,6 +117,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.exifinterface)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mlkit.text.recognition)
+    implementation(libs.kotlinx.coroutines.play.services)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     testImplementation(libs.junit)

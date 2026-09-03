@@ -649,6 +649,18 @@ dependencies {
 
 1. **ML Kit bundled 是否真的完全不需要网络。** 官方文档说 bundled 模型编译进 app、安装即用、无需联网。零权限方案完全建立在这条上——拿一台断网设备跑完整流程，抓包确认零请求。
 
+   **实测（2026-09-03，模拟器 Medium_Phone / android-37，ML Kit text-recognition 16.0.1）**：**成立**。
+   飞行模式 + wifi/data 全关（`Active default network: none`）下，`MlKitTextRecognizerTest` 5 条全绿，
+   识别结果与联网时一致。APK 里能看到 `libmlkit_google_ocr_pipeline.so`，模型确实随包发行。
+
+   **但发现一个计划没预料到的权限泄漏，已修**：bundled 的 `com.google.mlkit:text-recognition`
+   传递依赖到 `com.google.android.datatransport:transport-backend-cct`（GMS 遥测上报后端），
+   它把 `INTERNET` 与 `ACCESS_NETWORK_STATE` 合并进了本应用 manifest，`assertDebugNoRuntimePermissions` 当场阻断。
+   泄漏的不是模型下载，是使用统计回传。处理办法是在 `AndroidManifest.xml` 里用
+   `tools:node="remove"` 摘掉这两条——摘权限比 exclude 掉 artifact 更强：类还在（ML Kit 的日志代码
+   直接引用它们，exclude 会 `NoClassDefFoundError`），但系统层面不给这个进程开网络，
+   任何回传都拿不到 socket。摘除后识别功能不受任何影响，见上面的断网实测。
+
 2. **零权限下的完整闭环。** Photo Picker 选图 → 编辑 → 写回相册，全程不弹任何权限框；再验一遍 `ACTION_SEND` 进来的 content URI 在 Activity 重建后是否仍可读（§7.1 的私有副本方案就是为此，但需实测确认必要性与时机）。
 
    **实测（2026-09-03，模拟器 Medium_Phone / android-37）**：闭环成立——Photo Picker 选图 → 画框 → 导出到
@@ -675,6 +687,28 @@ dependencies {
 4. **Play Billing 合并后的权限清单。** 确认 manifest merger 只并入 `com.android.vending.BILLING` 一条，没有别的。这条直接决定 §13 的 CI 断言怎么写。
 
 5. **词级映射的实际粒度。** 用真实截图看 ML Kit 的 element 切分——如果卡号被拆成多个 element，或者标签和值被合成一个，§5.3 的遮罩范围会和预期不同。这个必须看真实数据，不能靠推断。
+
+   **实测（2026-09-03，真实淘宝订单详情页截图 1206×2622，降采样到 640×1428 后识别）**：
+
+   - **长数字串是一整个 element，不会被拆。** 19 位订单号 `5127402746064028833`（conf 0.95）与
+     28 位支付宝交易号 `2026090323001114571431156787`（conf 0.92）各自独占一个 element，
+     也各自独占一行。§5.3 的遮罩范围因此符合预期：命中整串就遮整串，不会出现只遮一半。
+   - **标签和值不会粘成一个 element。** 视觉上左标签右值的行，ML Kit 分成不同的 line；
+     即使同一 line 内（如 `2026-09-03 12:08:06`），日期与时间也是两个独立 element。
+     所以「遮住值、保留标签」这件事在 element 粒度上是可做的。
+   - **⚠️ bundled 拉丁识别器对中文完全无能，这是首版的硬边界。** 截图里全部中文标签
+     （「订单信息」「支付宝交易号」「实付款」）都被识别成乱码
+     （`KN9F22]N#ShAiA`、`7RfRBER`、`HË;M`），置信度 0.25–0.4。两个直接后果：
+     1. `PhoneRule` 的中文提示词（订单/单号/流水/发票）在真实中文页面上**永远不会命中**，
+        排除订单号误报这件事在中文场景下只能靠数字长度本身，不能靠上下文。
+     2. 低置信度乱码串会照常喂进规则层，是误报的一个来源。`RuleClassifier` 目前不看
+        `line.confidence`——**建议在计划 04 加一个置信度下限（如 < 0.5 的行不参与规则判定）**，
+        本计划不改，因为那会牵动已经定稿的规则测试。
+   - **⚠️ 实测到一例真实漏检：28 位支付宝交易号不被任何规则命中。**
+     `card` 规则限 13–19 位、`tracking` 限 12/15/20/22 位，28 位落在所有规则之外；
+     19 位订单号则因 Luhn 不通过被 `card` 正确排除（已验算）。
+     这是「漏检是事故」原则下需要正视的缺口，但补法不属于本计划——
+     记在这里，留给计划 04 的评测 harness 量化后再决定要不要加一条「长数字串」兜底规则。
 
 6. **像素化块尺寸下限是否足够。** 「短边/8 且不小于 12px」是一个工程估计值，需要用公开的去码工具实测校准，必要时上调。
 
