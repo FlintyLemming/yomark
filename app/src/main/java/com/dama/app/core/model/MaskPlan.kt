@@ -18,6 +18,16 @@ data class MaskOptions(
     val blurRadiusRatio: Float = 0.08f,
     val markerColor: Int = 0x99FFEB3B.toInt(),
     val emoji: String = "🙂",
+    /**
+     * 当前渲染坐标系相对**原图**的比例。预览画在降采样的分析图上（< 1），导出画在原图上（= 1）。
+     *
+     * 渲染器里的绝对像素常数（像素化的 12px 块下限、抹除的 4px 采样环）按它换算。
+     * 不换算的话，长边超过 2048 的图上预览会比导出更糊——而预览是用户判断
+     * 「这块到底遮没遮住」的唯一依据，预览比导出安全等于在骗用户。
+     *
+     * 不是用户可调项：两个调用方（ImageCanvas / Exporter）各自在渲染前填进来。
+     */
+    val renderScale: Float = 1f,
 ) : Parcelable
 
 @Parcelize

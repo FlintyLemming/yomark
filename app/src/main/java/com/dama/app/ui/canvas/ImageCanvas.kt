@@ -222,10 +222,14 @@ fun ImageCanvas(
 
             canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
+            // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
+            // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
+            val options = state.plan.options.copy(renderScale = image.scale)
+
             // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
             val sorted = state.plan.items.sortedByDescending { it.quad.area() }
             sorted.filter { it.state == MaskState.MASKED }.forEach {
-                registry[state.plan.style].render(canvas, image.bitmap, it.quad, state.plan.options)
+                registry[state.plan.style].render(canvas, image.bitmap, it.quad, options)
             }
             sorted.filter { it.state == MaskState.OUTLINED }.forEach { item ->
                 canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale))

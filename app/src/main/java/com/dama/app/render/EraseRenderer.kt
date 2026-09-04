@@ -23,15 +23,20 @@ class EraseRenderer(private val fallback: MaskRenderer = SolidRenderer()) : Mask
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.style = Paint.Style.FILL }
 
-    /** 给 UI 用：用户选了抹除但这张图会降级时，需要告诉他为什么。 */
-    fun willDegrade(source: Bitmap, quad: Quad): Boolean {
-        val samples = ringSamples(source, quad)
+    /**
+     * 给 UI 用：用户选了抹除但这张图会降级时，需要告诉他为什么。
+     *
+     * @param renderScale 见 [MaskOptions.renderScale]。UI 在分析图上问，导出在原图上画，
+     *   采样环宽度不折算的话两边会给出不同的降级判断。
+     */
+    fun willDegrade(source: Bitmap, quad: Quad, renderScale: Float = 1f): Boolean {
+        val samples = ringSamples(source, quad, renderScale)
         if (samples.size < MIN_SAMPLES) return true
         return variance(samples) > VARIANCE_THRESHOLD
     }
 
     override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
-        val samples = ringSamples(source, quad)
+        val samples = ringSamples(source, quad, options.renderScale)
         if (samples.size < MIN_SAMPLES || variance(samples) > VARIANCE_THRESHOLD) {
             fallback.render(canvas, source, quad, options)
             return
@@ -41,8 +46,8 @@ class EraseRenderer(private val fallback: MaskRenderer = SolidRenderer()) : Mask
     }
 
     /** Quad 外扩 RING_PX 的环形区域上的像素：在外扩框内、原框外。 */
-    private fun ringSamples(source: Bitmap, quad: Quad): IntArray {
-        val outer = quad.expand(RING_PX).bounds()
+    private fun ringSamples(source: Bitmap, quad: Quad, renderScale: Float): IntArray {
+        val outer = quad.expand(RING_PX * renderScale).bounds()
         val out = ArrayList<Int>(256)
         val stepX = max(1, (outer.width() / SAMPLE_STEPS).roundToInt())
         val stepY = max(1, (outer.height() / SAMPLE_STEPS).roundToInt())

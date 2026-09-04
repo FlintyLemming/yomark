@@ -21,14 +21,15 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
 
     override val style = MaskStyle.PIXELATE
 
-    fun blockSizeFor(quad: Quad, divisor: Int): Float =
-        max(quad.shortEdge() / max(1, divisor), MIN_BLOCK_PX)
+    /** @param renderScale 见 [MaskOptions.renderScale]：12px 下限是原图口径，按它折算到当前坐标系。 */
+    fun blockSizeFor(quad: Quad, divisor: Int, renderScale: Float = 1f): Float =
+        max(quad.shortEdge() / max(1, divisor), MIN_BLOCK_PX * renderScale)
 
-    fun willFallBack(quad: Quad, divisor: Int): Boolean =
-        blockSizeFor(quad, divisor) >= quad.shortEdge()
+    fun willFallBack(quad: Quad, divisor: Int, renderScale: Float = 1f): Boolean =
+        blockSizeFor(quad, divisor, renderScale) >= quad.shortEdge()
 
     override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
-        if (willFallBack(quad, options.pixelBlockDivisor)) {
+        if (willFallBack(quad, options.pixelBlockDivisor, options.renderScale)) {
             fallback.render(canvas, source, quad, options)
             return
         }
@@ -42,7 +43,7 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
         )
         if (src.width() <= 0 || src.height() <= 0) return
 
-        val block = blockSizeFor(quad, options.pixelBlockDivisor)
+        val block = blockSizeFor(quad, options.pixelBlockDivisor, options.renderScale)
         val smallW = max(1, (src.width() / block).roundToInt())
         val smallH = max(1, (src.height() / block).roundToInt())
 

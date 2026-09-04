@@ -59,12 +59,15 @@ class Exporter(
             // 分析坐标 → 导出坐标。导出图可能因 32MP 上限又降过一次，两个系数合成一个。
             val factor = 1f / (request.analysisScale * decoded.downsampleFactor)
 
+            // 渲染器里的绝对像素常数是原图口径；导出图可能因 32MP 上限降过一次，按它折算。
+            val options = request.plan.options.copy(renderScale = 1f / decoded.downsampleFactor)
+
             val maskedBounds = ArrayList<RectF>()
             request.plan.items
                 .filter { it.state == MaskState.MASKED }
                 .forEach { item ->
                     val quad = item.quad.scaled(factor)
-                    registry[request.plan.style].render(canvas, bitmap, quad, request.plan.options)
+                    registry[request.plan.style].render(canvas, bitmap, quad, options)
                     maskedBounds += quad.bounds()
                 }
 

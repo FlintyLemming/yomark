@@ -231,7 +231,7 @@ class EditorViewModel(
         val eraser = EraseRenderer()
         val masked = _state.value.plan.items.filter { it.state == MaskState.MASKED }
         if (masked.isEmpty()) return null
-        val degrading = masked.count { eraser.willDegrade(image.bitmap, it.quad) }
+        val degrading = masked.count { eraser.willDegrade(image.bitmap, it.quad, image.scale) }
         return if (degrading == 0) null
         else "$degrading 处背景过于复杂，抹除已自动降级为实色块"
     }
