@@ -24,6 +24,8 @@ data class EditorUiState(
     /** 长按手动框进入的选中态：出现四角手柄与删除按钮。 */
     val selectedManualId: String? = null,
     val pendingDialogVisible: Boolean = false,
+    /** 当前样式在这张图上会降级时的说明。抹除遇到复杂背景时非空。 */
+    val degradeNote: String? = null,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,

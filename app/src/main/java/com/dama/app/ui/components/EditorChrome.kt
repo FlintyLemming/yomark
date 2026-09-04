@@ -1,6 +1,7 @@
 package com.dama.app.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -38,32 +39,19 @@ fun EditorTopBar(
 @Composable
 fun EditorBottomBar(
     style: MaskStyle,
-    implemented: Set<MaskStyle>,
+    degradeNote: String?,
     onStyleChange: (MaskStyle) -> Unit,
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier.fillMaxWidth().padding(12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            // M1 只有实色块；M4 补齐后这里自然列出全部六种
-            implemented.forEach { s ->
-                Button(onClick = { onStyleChange(s) }, enabled = s != style) { Text(s.label()) }
-            }
+    Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        StyleBar(style = style, onChange = onStyleChange, degradeNote = degradeNote)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
         }
-        Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
     }
-}
-
-private fun MaskStyle.label() = when (this) {
-    MaskStyle.SOLID -> "实色块"
-    MaskStyle.PIXELATE -> "像素化"
-    MaskStyle.BLUR -> "模糊"
-    MaskStyle.MARKER -> "马克笔"
-    MaskStyle.EMOJI -> "Emoji"
-    MaskStyle.ERASE -> "抹除"
 }

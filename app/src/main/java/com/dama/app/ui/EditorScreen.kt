@@ -69,7 +69,7 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
             }
             EditorBottomBar(
                 style = state.plan.style,
-                implemented = registry.implemented(),
+                degradeNote = state.degradeNote,
                 onStyleChange = vm::setStyle,
                 onExport = { vm.requestExport(applyWatermark = true) },
                 exporting = state.exporting,

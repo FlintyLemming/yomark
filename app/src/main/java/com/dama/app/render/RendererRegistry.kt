@@ -17,7 +17,16 @@ class RendererRegistry(renderers: List<MaskRenderer>) {
     fun implemented(): Set<MaskStyle> = byStyle.keys
 
     companion object {
-        /** M1 只有实色块。后续里程碑往这个列表里加实现。 */
-        fun default() = RendererRegistry(listOf(SolidRenderer()))
+        /** 全部六种样式。 */
+        fun default() = RendererRegistry(
+            listOf(
+                SolidRenderer(),
+                PixelateRenderer(),
+                BlurRenderer(),
+                MarkerRenderer(),
+                EmojiRenderer(),
+                EraseRenderer(),
+            )
+        )
     }
 }

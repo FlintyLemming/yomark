@@ -22,6 +22,7 @@ import com.dama.app.engine.RedactionEngine
 import com.dama.app.export.ExportOutcome
 import com.dama.app.export.ExportRequest
 import com.dama.app.export.Exporter
+import com.dama.app.render.EraseRenderer
 import com.dama.app.ui.canvas.GestureRules
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -215,7 +216,25 @@ class EditorViewModel(
         uiState = _state.value.withHistoryFlags()
     }
 
-    fun setStyle(style: MaskStyle) = mutate { it.copy(style = style) }
+    fun setStyle(style: MaskStyle) {
+        mutate { it.copy(style = style) }
+        _state.value = _state.value.copy(degradeNote = degradeNoteFor(style))
+    }
+
+    /**
+     * 抹除在复杂背景上会降级为实色块（spec §8）。用户需要知道为什么，
+     * 而不是导出后发现「怎么和预览不一样」。
+     */
+    private fun degradeNoteFor(style: MaskStyle): String? {
+        if (style != MaskStyle.ERASE) return null
+        val image = _state.value.image ?: return null
+        val eraser = EraseRenderer()
+        val masked = _state.value.plan.items.filter { it.state == MaskState.MASKED }
+        if (masked.isEmpty()) return null
+        val degrading = masked.count { eraser.willDegrade(image.bitmap, it.quad) }
+        return if (degrading == 0) null
+        else "$degrading 处背景过于复杂，抹除已自动降级为实色块"
+    }
 
     fun undo() {
         val restored = undoStack.undo(_state.value.plan) ?: return
