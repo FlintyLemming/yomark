@@ -707,6 +707,20 @@ dependencies {
 
 4. **Play Billing 合并后的权限清单。** 确认 manifest merger 只并入 `com.android.vending.BILLING` 一条，没有别的。这条直接决定 §13 的 CI 断言怎么写。
 
+   **实测（2026-09-03，计划 07 Task 44，`com.android.billingclient:billing-ktx:8.0.0`）**：**成立**。
+   加进依赖后 `assertDebugNoRuntimePermissions` 的输出是：
+
+   ```
+   权限断言通过：合并后 manifest 的 uses-permission =
+     com.android.vending.BILLING, com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+   ```
+
+   合并后 manifest 里的 `uses-permission` 就这两条，Billing 只并入了 `BILLING` 一条，
+   没有夹带 `INTERNET`（购买流程的网络是 Play 商店进程发起的，不是本进程）。
+   两条都不是运行期权限：`BILLING` 不弹授权框、不授予任何数据访问能力；
+   `DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` 是 androidx.core 给本应用自己定义的
+   `signature` 级权限。断言的允许名单逐条写死，不做前缀匹配，新冒出任何一条都会阻断构建。
+
 5. **词级映射的实际粒度。** 用真实截图看 ML Kit 的 element 切分——如果卡号被拆成多个 element，或者标签和值被合成一个，§5.3 的遮罩范围会和预期不同。这个必须看真实数据，不能靠推断。
 
    **实测（2026-09-03，真实淘宝订单详情页截图 1206×2622，降采样到 640×1428 后识别）**：
