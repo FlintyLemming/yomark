@@ -200,7 +200,7 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
-        vm.requestExport(applyWatermark = true)
+        vm.requestExport()
         advanceUntilIdle()
 
         assertThat(vm.state.value.pendingDialogVisible).isFalse()
@@ -214,7 +214,7 @@ class EditorViewModelTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
 
-        vm.requestExport(applyWatermark = true)
+        vm.requestExport()
         advanceUntilIdle()
 
         assertThat(vm.state.value.pendingDialogVisible).isTrue()
@@ -226,9 +226,9 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-        vm.requestExport(applyWatermark = true); advanceUntilIdle()
+        vm.requestExport(); advanceUntilIdle()
 
-        vm.confirmMaskAllAndExport(applyWatermark = true); advanceUntilIdle()
+        vm.confirmMaskAllAndExport(); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.pendingCount).isEqualTo(0)
         assertThat(vm.state.value.pendingDialogVisible).isFalse()
@@ -240,9 +240,9 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-        vm.requestExport(applyWatermark = true); advanceUntilIdle()
+        vm.requestExport(); advanceUntilIdle()
 
-        vm.confirmExportAnyway(applyWatermark = true); advanceUntilIdle()
+        vm.confirmExportAnyway(); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
         assertThat(sink.writes).isEqualTo(1)

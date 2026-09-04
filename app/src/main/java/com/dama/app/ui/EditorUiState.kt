@@ -33,6 +33,12 @@ data class EditorUiState(
     val purposeSheetVisible: Boolean = false,
     /** ACTION_SEND_MULTIPLE 进来的批量会话；单张时为 null，底栏也就没有「下一张」。 */
     val batch: BatchSession? = null,
+    /**
+     * 已买断去水印（spec §10）。免费版一项隐私能力都不缺，付费买到的纯粹是外观。
+     * 由 BillingRepository 的缓存优先购买态推过来，飞行模式下沿用缓存。
+     */
+    val isPro: Boolean = false,
+    val paywallVisible: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,

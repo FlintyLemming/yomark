@@ -12,6 +12,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -32,11 +33,16 @@ fun EditorTopBar(
     onPurpose: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
+    onRemoveWatermark: (() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, "撤销") }
         IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, "重做") }
         Row(Modifier.weight(1f)) {}
+        if (onRemoveWatermark != null) {
+            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
+        }
         IconButton(onClick = onPurpose) { Icon(Icons.Filled.Layers, "用途水印") }
         IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "关闭") }
     }

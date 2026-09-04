@@ -20,6 +20,8 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.dama.app.billing.BillingRepository
+import com.dama.app.billing.PurchaseStore
 import com.dama.app.core.image.ImageIntake
 import com.dama.app.data.SettingsStore
 import com.dama.app.engine.buildEngine
@@ -60,6 +62,10 @@ class EditorActivity : ComponentActivity() {
 
     private val settings by lazy { SettingsStore(applicationContext) }
 
+    private val billing by lazy {
+        BillingRepository(applicationContext, PurchaseStore(applicationContext), lifecycleScope)
+    }
+
     private val picker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) finish() else vm.onImageChosen(uri)
     }
@@ -68,6 +74,11 @@ class EditorActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val coldStart = savedInstanceState == null
         val shared = incomingUris(intent)
+
+        // 先用缓存点亮购买态，再尝试联网校验。这是全应用唯一会碰网络的地方，
+        // 而且只在 Play 商店进程里发生（spec §10 / §13）。
+        billing.start()
+        vm.observePro(billing.isPro)
 
         setContent {
             // null = 还没读到设置。这一瞬间什么都不画：先画编辑器再切引导页会闪一下，
@@ -88,7 +99,13 @@ class EditorActivity : ComponentActivity() {
                             lifecycleScope.launch { settings.markOnboardingSeen() }
                             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                         }
-                        else -> EditorScreen(vm) { finish() }
+                        else -> EditorScreen(
+                            vm = vm,
+                            onBuyClicked = {
+                                lifecycleScope.launch { billing.launchPurchase(this@EditorActivity) }
+                            },
+                            onClose = { finish() },
+                        )
                     }
                 }
             }
@@ -111,6 +128,11 @@ class EditorActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onDestroy() {
+        billing.stop()
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

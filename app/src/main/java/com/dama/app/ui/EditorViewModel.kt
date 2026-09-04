@@ -122,7 +122,7 @@ class EditorViewModel(
                 return@launch
             }
             intakeResult = IntakeResult(file, mime)
-            uiState = EditorUiState(image = image, plan = plan)
+            uiState = EditorUiState(image = image, plan = plan, isPro = _state.value.isPro)
         }
         return true
     }
@@ -152,6 +152,8 @@ class EditorViewModel(
                     image = image,
                     plan = MaskPlan.empty(_state.value.plan.style),
                     analyzing = true,
+                    // 换图是换一张图，不是换一个人：购买态必须活过每一次 EditorUiState 重建。
+                    isPro = _state.value.isPro,
                 )
                 analyze(image)
             }.onFailure {
@@ -180,6 +182,7 @@ class EditorViewModel(
         undoStack.clear()
         uiState = EditorUiState(
             plan = MaskPlan.empty(_state.value.plan.style),
+            isPro = _state.value.isPro,
             batch = BatchSession(
                 items = uris.map { BatchItem(it, null, "image/jpeg", null, 1f) },
                 index = 0,
@@ -350,12 +353,12 @@ class EditorViewModel(
      * 导出拦截（spec §7.4）：pendingCount > 0 时**无例外**先弹对话框。
      * 这是分层默认的唯一安全网，不提供「不再提示」。
      */
-    fun requestExport(applyWatermark: Boolean) {
+    fun requestExport() {
         if (_state.value.plan.pendingCount > 0) {
             uiState = _state.value.copy(pendingDialogVisible = true)
             return
         }
-        runExport(_state.value.plan, applyWatermark)
+        runExport(_state.value.plan)
     }
 
     /**
@@ -363,17 +366,17 @@ class EditorViewModel(
      * 拦截按**全部图片**的待打码数之和判定，不是只看当前这张——
      * 只看当前这张的话，前面几张里被放过的 OUTLINED 就永远没有第二次机会了。
      */
-    fun exportBatch(applyWatermark: Boolean) {
+    fun exportBatch() {
         val batch = _state.value.batch?.withPlan(_state.value.plan) ?: return
         uiState = _state.value.copy(batch = batch)
         if (batch.totalPending > 0) {
             uiState = _state.value.copy(pendingDialogVisible = true)
             return
         }
-        runBatchExport(batch, applyWatermark)
+        runBatchExport(batch)
     }
 
-    fun confirmMaskAllAndExport(applyWatermark: Boolean) {
+    fun confirmMaskAllAndExport() {
         uiState = _state.value.copy(pendingDialogVisible = false)
         val batch = _state.value.batch
         if (batch != null) {
@@ -382,19 +385,29 @@ class EditorViewModel(
                 batch = cleared,
                 plan = cleared.current.plan ?: _state.value.plan.maskAll(),
             )
-            runBatchExport(cleared, applyWatermark)
+            runBatchExport(cleared)
         } else {
             mutate { it.maskAll() }
-            runExport(_state.value.plan, applyWatermark)
+            runExport(_state.value.plan)
         }
     }
 
-    fun confirmExportAnyway(applyWatermark: Boolean) {
+    fun confirmExportAnyway() {
         uiState = _state.value.copy(pendingDialogVisible = false)
         val batch = _state.value.batch
-        if (batch != null) runBatchExport(batch.withPlan(_state.value.plan), applyWatermark)
-        else runExport(_state.value.plan, applyWatermark)
+        if (batch != null) runBatchExport(batch.withPlan(_state.value.plan))
+        else runExport(_state.value.plan)
     }
+
+    /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
+    fun observePro(flow: StateFlow<Boolean>) {
+        viewModelScope.launch {
+            flow.collect { pro -> _state.value = _state.value.copy(isPro = pro) }
+        }
+    }
+
+    fun showPaywall() { _state.value = _state.value.copy(paywallVisible = true) }
+    fun dismissPaywall() { _state.value = _state.value.copy(paywallVisible = false) }
 
     fun showPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = true) }
     fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false) }
@@ -410,7 +423,13 @@ class EditorViewModel(
         uiState = _state.value.copy(message = null)
     }
 
-    private fun runExport(plan: MaskPlan, applyWatermark: Boolean) {
+    /**
+     * 水印只由购买态决定，调用点一律不传（spec §10）。
+     * 留一个 applyWatermark 参数就等于留了一条「某个入口忘了接购买态」的路。
+     */
+    private fun applyWatermark(): Boolean = !_state.value.isPro
+
+    private fun runExport(plan: MaskPlan) {
         val image = _state.value.image ?: return
         val source = intakeResult ?: return
         uiState = _state.value.copy(exporting = true)
@@ -421,7 +440,7 @@ class EditorViewModel(
                     mimeType = source.mimeType,
                     plan = plan,
                     analysisScale = image.scale,
-                    applyWatermark = applyWatermark,
+                    applyWatermark = applyWatermark(),
                     purposeText = _state.value.purposeText,
                 ),
                 dispatcher = ioDispatcher,
@@ -439,7 +458,7 @@ class EditorViewModel(
         }
     }
 
-    private fun runBatchExport(batch: BatchSession, applyWatermark: Boolean) {
+    private fun runBatchExport(batch: BatchSession) {
         uiState = _state.value.copy(exporting = true)
         viewModelScope.launch {
             var ok = 0
@@ -453,7 +472,7 @@ class EditorViewModel(
                         mimeType = item.mimeType,
                         plan = plan,
                         analysisScale = item.analysisScale,
-                        applyWatermark = applyWatermark,
+                        applyWatermark = applyWatermark(),
                         purposeText = _state.value.purposeText,
                     ),
                     dispatcher = ioDispatcher,

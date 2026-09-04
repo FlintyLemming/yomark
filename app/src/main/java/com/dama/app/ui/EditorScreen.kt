@@ -19,11 +19,12 @@ import com.dama.app.render.RendererRegistry
 import com.dama.app.ui.canvas.ImageCanvas
 import com.dama.app.ui.components.EditorBottomBar
 import com.dama.app.ui.components.EditorTopBar
+import com.dama.app.ui.components.PaywallDialog
 import com.dama.app.ui.components.PendingExportDialog
 import com.dama.app.ui.components.PurposeWatermarkSheet
 
 @Composable
-fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
+fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: () -> Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
@@ -52,10 +53,14 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
         PendingExportDialog(
             pendingCount = pending,
             byKind = byKind,
-            onMaskAll = { vm.confirmMaskAllAndExport(applyWatermark = true) },
-            onExportAnyway = { vm.confirmExportAnyway(applyWatermark = true) },
+            onMaskAll = vm::confirmMaskAllAndExport,
+            onExportAnyway = vm::confirmExportAnyway,
             onDismiss = vm::dismissDialog,
         )
+    }
+
+    if (state.paywallVisible) {
+        PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
     }
 
     if (state.purposeSheetVisible) {
@@ -71,7 +76,10 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
-                onPurpose = vm::showPurposeSheet, onClose = onClose,
+                onPurpose = vm::showPurposeSheet,
+                // 已购用户不该再看见购买入口
+                onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
+                onClose = onClose,
             )
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()
@@ -92,8 +100,7 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                 degradeNote = state.degradeNote,
                 onStyleChange = vm::setStyle,
                 onExport = {
-                    if (batch != null) vm.exportBatch(applyWatermark = true)
-                    else vm.requestExport(applyWatermark = true)
+                    if (batch != null) vm.exportBatch() else vm.requestExport()
                 },
                 exporting = state.exporting,
                 batchLabel = batch?.let { "${it.index + 1} / ${it.total}" },
