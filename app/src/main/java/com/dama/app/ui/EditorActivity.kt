@@ -10,6 +10,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.lifecycleScope
@@ -22,6 +27,7 @@ import com.dama.app.export.Exporter
 import com.dama.app.export.MediaStoreSink
 import com.dama.app.export.WatermarkDrawer
 import com.dama.app.render.RendererRegistry
+import com.dama.app.ui.onboarding.OnboardingScreen
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -52,17 +58,48 @@ class EditorActivity : ComponentActivity() {
         }
     }
 
+    private val settings by lazy { SettingsStore(applicationContext) }
+
     private val picker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri == null) finish() else vm.onImageChosen(uri)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val coldStart = savedInstanceState == null
+        val shared = incomingUri(intent)
+
         setContent {
-            MaterialTheme { Surface { EditorScreen(vm) { finish() } } }
+            // null = 还没读到设置。这一瞬间什么都不画：先画编辑器再切引导页会闪一下，
+            // 而这一屏恰恰是用户对这个 app 的第一印象。
+            val seen by produceState<Boolean?>(initialValue = null) {
+                value = settings.onboardingSeen.first()
+            }
+            // 点过「选择图片」之后这一次就不该再回到引导页。onboardingSeen 是异步写的，
+            // 光靠它回读会在 Picker 返回后又把引导页画回来。
+            var dismissed by remember { mutableStateOf(false) }
+
+            MaterialTheme {
+                Surface {
+                    when {
+                        seen == null -> Unit
+                        seen == false && !dismissed && shared == null && coldStart -> OnboardingScreen {
+                            dismissed = true
+                            lifecycleScope.launch { settings.markOnboardingSeen() }
+                            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        }
+                        else -> EditorScreen(vm) { finish() }
+                    }
+                }
+            }
         }
-        if (savedInstanceState == null) {
-            route(intent)
+
+        if (coldStart) {
+            lifecycleScope.launch {
+                // 看过引导的、以及从分享进来的，走原来的路由；没看过的等用户点按钮，
+                // 否则 Picker 会盖在引导页上面弹出来。
+                if (shared != null || settings.onboardingSeen.first()) route(intent)
+            }
         } else {
             // 重建路径：状态由 SavedStateHandle 恢复（spec §15 第 2 条）。
             // 等恢复落地再判断——恢复不出东西（副本被清掉了）才退回 Picker，
