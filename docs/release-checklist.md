@@ -1,6 +1,6 @@
-# DAMA 上架前验收记录
+# 有码上架前验收记录
 
-对照 `docs/superpowers/specs/2026-09-02-dama-android-design.md` §13 逐条实测。
+对照 `docs/superpowers/specs/2026-09-02-youma-android-design.md` §13 逐条实测。
 每一行都要有**实测数值**，不是打勾。达不到的写「未达成」并说明卡在哪里——
 这份文档的用处全在于它敢记不好看的数。
 
@@ -17,7 +17,7 @@ debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1�
 
 | 维度 | 指标 | 阈值 | 实测 | 怎么测的 |
 |---|---|---|---|---|
-| 圈出率 | 标注实体被 MASKED 或 OUTLINED 覆盖 | ≥ 0.95 | **1.00（合成集）**；真实样本集**未采集** | `EvaluationTest`，`DAMA-EVAL synthetic/screenshot` |
+| 圈出率 | 标注实体被 MASKED 或 OUTLINED 覆盖 | ≥ 0.95 | **1.00（合成集）**；真实样本集**未采集** | `EvaluationTest`，`YOUMA-EVAL synthetic/screenshot` |
 | 默认打码召回率 | 默认打码类型被 MASKED 覆盖 | ≥ 0.95 | **1.00（合成集）**；真实样本集**未采集** | 同上 |
 | 精确率 | MASKED 区域确实覆盖敏感内容 | ≥ 0.70 | **1.00（合成集）**；真实样本集**未采集** | 同上 |
 | 识别延迟 | 1080×2400，选中到候选出现 | < 800 ms | **143 ms**（断网）／**191 ms**（联网）✅ | `EvaluationTest` 的延迟用例 |
@@ -48,10 +48,10 @@ debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1�
 
 ```
 com.android.vending.BILLING
-com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+com.youma.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 ```
 
-两条都不是运行期权限。设备侧 `dumpsys package com.dama.app` 复核：
+两条都不是运行期权限。设备侧 `dumpsys package com.youma.app` 复核：
 `requested permissions` 就这两条，两条 `install permissions` 均 `granted=true`，
 **`runtime permissions` 一节为空**。
 
@@ -88,7 +88,7 @@ com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 
 本机没有可用的 Play Console 应用与测试账号，以下三条留给上架前人工验：
 
-- [ ] Play Console 建一次性商品，ID 填 `dama_remove_watermark`
+- [ ] Play Console 建一次性商品，ID 填 `youma_remove_watermark`
 - [ ] internal testing 轨道用测试账号买一次 → 导出无水印
 - [ ] **杀进程 → 飞行模式 → 重开 → 导出：水印仍不出现**（离线购买态的关键验证）
 - [ ] 清除应用数据 → 联网打开 → `queryPurchasesAsync` 恢复购买态，水印消失
@@ -142,17 +142,17 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 
 # 评测指标
 adb logcat -c && ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.package=com.dama.app.eval
-adb logcat -d -s System.out:I | grep DAMA-EVAL
+  -Pandroid.testInstrumentationRunnerArguments.package=com.youma.app.eval
+adb logcat -d -s System.out:I | grep YOUMA-EVAL
 
 # 冷启动
-adb shell am force-stop com.dama.app
-adb shell am start -W -n com.dama.app/.ui.EditorActivity | grep TotalTime
+adb shell am force-stop com.youma.app
+adb shell am start -W -n com.youma.app/.ui.EditorActivity | grep TotalTime
 
 # 下发体积
 bundletool build-apks --bundle=app/build/outputs/bundle/release/app-release.aab \
-  --output=/tmp/dama.apks
-bundletool get-size total --apks=/tmp/dama.apks --dimensions=ABI
+  --output=/tmp/youma.apks
+bundletool get-size total --apks=/tmp/youma.apks --dimensions=ABI
 
 # 零网络复核
 adb shell svc wifi disable && adb shell svc data disable

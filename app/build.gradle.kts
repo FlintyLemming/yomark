@@ -37,7 +37,7 @@ abstract class AssertPermissionsTask : DefaultTask() {
          * \u65b0\u51fa\u73b0\u7684\u4efb\u4f55\u6743\u9650\u90fd\u5e94\u8be5\u8ba9\u6784\u5efa\u5931\u8d25\uff0c\u7531\u4eba\u5224\u65ad\u540e\u518d\u51b3\u5b9a\u8981\u4e0d\u8981\u52a0\u8fdb\u6765\u3002
          *
          * - com.android.vending.BILLING\uff1aPlay Billing \u5408\u5e76\u8fdb\u6765\uff0c\u4e0d\u53ef\u89c4\u907f\u3002
-         * - com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION\uff1aandroidx.core \u5408\u5e76\u8fdb\u6765\u3002
+         * - com.youma.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION\uff1aandroidx.core \u5408\u5e76\u8fdb\u6765\u3002
          *   \u5b83\u662f\u672c\u5e94\u7528\u7ed9\u81ea\u5df1\u5b9a\u4e49\u7684 protectionLevel="signature" \u6743\u9650\uff0c
          *   \u7528\u4e8e ContextCompat.registerReceiver \u6ce8\u518c\u975e\u5bfc\u51fa\u5e7f\u64ad\u63a5\u6536\u5668\u3002
          *   \u5b83\u4e0d\u662f\u8fd0\u884c\u671f\u6743\u9650\uff1a\u4e0d\u5f39\u6388\u6743\u6846\u3001\u4e0d\u89e6\u53ca\u4efb\u4f55\u7528\u6237\u6570\u636e\uff0c
@@ -45,17 +45,17 @@ abstract class AssertPermissionsTask : DefaultTask() {
          */
         val ALLOWED = setOf(
             "com.android.vending.BILLING",
-            "com.dama.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            "com.youma.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
         )
     }
 }
 
 android {
-    namespace = "com.dama.app"
+    namespace = "com.youma.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.dama.app"
+        applicationId = "com.youma.app"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
         versionCode = 1

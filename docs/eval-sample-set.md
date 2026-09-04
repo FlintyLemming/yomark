@@ -1,4 +1,4 @@
-# DAMA 评测样本集
+# 有码评测样本集
 
 这份样本集是后续每次识别改动的回归基准。spec §13 的原话是「比任何公开数据集都重要」。
 
@@ -58,8 +58,8 @@ app/src/androidTest/assets/samples/
 
 ```bash
 ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.dama.app.eval.EvaluationTest
-adb logcat -d -s System.out:I | grep DAMA-EVAL
+  -Pandroid.testInstrumentationRunnerArguments.class=com.youma.app.eval.EvaluationTest
+adb logcat -d -s System.out:I | grep YOUMA-EVAL
 ```
 
 样本目录为空时 `real_sample_set_meets_the_m2_exit_criteria_when_present` 会打印提示并跳过，不会失败。
