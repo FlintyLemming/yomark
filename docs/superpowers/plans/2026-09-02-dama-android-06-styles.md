@@ -1791,3 +1791,109 @@ git tag m4-styles
 - [ ] 抹除的方差降级会告诉用户原因
 - [ ] 用途水印可用，且与品牌水印互不干扰
 - [ ] 包体与延迟仍达标
+
+---
+
+## 执行记录（2026-09-03）
+
+Task 34–40 全部完成，直接在 main 上推进。与计划文本的偏差如下。
+
+### 1. `MaskStyleInfoTest` 要加 Robolectric runner（Task 38 Step 1）
+
+计划写的是纯 JUnit 测试类，但最后一条 `the registry implements every style` 会构造
+全部六个渲染器，而 `SolidRenderer` / `EraseRenderer` / `EmojiRenderer` 在**构造期**就
+`Paint(...).apply { style = ... }`，纯 JUnit 下直接 `Method setStyle in android.graphics.Paint not mocked`。
+
+加了 `@RunWith(RobolectricTestRunner::class)`。不读像素，所以**不需要** `NATIVE` 图形模式。
+断言一条没改——改测试的运行环境，不是改测试的口径。
+
+### 2. 预览与导出的糊度不一致，已修（Task 38 Step 7 的验收项）
+
+Step 7 的最后一条是「导出后的图与预览完全一致」。**实测不成立**，写了
+`PreviewExportParityTest` 钉住：
+
+- 预览画在**降采样到 2048 的分析图**上，导出画在**原图**上；
+- 但 `PixelateRenderer.MIN_BLOCK_PX = 12f` 与 `EraseRenderer.RING_PX = 4f` 是**绝对像素常数**，
+  直接用在各自的渲染坐标系里；
+- 长边超过 2048 的图上（原图 4096 → scale 0.5，一条 100px 高的文本行）：
+  预览的块占区域短边 **24%**，导出只有 **12.5%**。
+
+方向很要命：**预览比导出更糊，用户看到的比实际拿到的安全**。预览是用户判断
+「这块到底遮没遮住」的唯一依据，比导出安全等于在骗人。
+
+修法：`MaskOptions` 增加 `renderScale`（当前渲染坐标系相对原图的比例），
+`ImageCanvas` 填 `image.scale`、`Exporter` 填 `1f / decoded.downsampleFactor`，
+`PixelateRenderer.blockSizeFor/willFallBack` 与 `EraseRenderer.ringSamples/willDegrade`
+按它折算那两个常数。`renderScale` 不是用户可调项，两个调用方各自在渲染前填入。
+
+### 3. 像素化实测可还原，已降级为 COSMETIC（Task 40 Step 3）
+
+**这是本计划最重要的一条偏差，改了 UI 对用户的安全承诺。**
+
+Step 3 要求「人工用去码工具验证」，并写了补救办法：「若能还原：上调 `MIN_BLOCK_PX`
+直到还原失败」。实测的结论是：**能还原，而且不存在能让它还原失败的块尺寸。**
+
+**判据一 · 模板泄漏探针（决定性）**：用生产的 `PixelateRenderer` 渲染一行 16 位卡号，
+固定区域几何与块网格，只改其中一位数字，比较像素化后各块中心的灰度向量。
+10 个数字两两可区分 = 马赛克里还留着这一位的身份。
+
+| 参数 | 每字高块数 | 两两可区分 | 最大块间灰度差 |
+|---|---|---|---|
+| **当前默认** divisor=8 / floor=12px，字号 40 / 60 / 96px | 3.3 / 5.0 / 7.7 | **45 / 45** | 245 |
+| 当前默认，字号 32px | 2.7 | 42 / 45 | 245 |
+| 当前默认，字号 24px | 2.0 | 39 / 45 | 239 |
+| floor=24px，字号 32px | 1.3 | 0 / 45 | 0 |
+| divisor=2 / floor=12px，字号 24 / 32 / 60px | 1.1 / 1.1 / 1.3 | 0 / 45 | ≤ 7 |
+
+唯一不泄漏的区间是「每字高约 1 块」——那时马赛克视觉上就是个实色块，
+像素化作为独立样式的意义没了。**保留马赛克的观感，它就必然泄漏。**
+
+注意块尺寸对字号是**分辨率无关**的：下限不生效时 `block = 区域短边/8`，
+而区域短边≈行高，所以永远是每字高约 5.8 块，换多大的图都一样。
+12px 下限只在行高 < 96px 时生效，这才是小字号相对安全的原因。
+
+**判据二 · Depix 实跑（辅证）**：`github.com/spipm/Depix`，搜索图用同字体同字号同底色
+渲染的数字全 bigram 序列（攻击者知道这是卡号，只搜数字是**更强**的攻击）。
+40px 字号（12px 下限生效，每字高 3.3 块）：**未能还原**——5 个候选块里 4 个直接匹配，
+输出图无可读字符。这与探针不矛盾：Depix 还要解决块网格与整行上下文的对齐，
+比「信息是否泄漏」这个下界要求高得多，跑不出来不等于信息没漏。
+96px 那次跑了 20 分钟仍未收敛，没有等到结论。
+
+**处置（经用户拍板）**：`MaskStyleInfo.safety(PIXELATE)` 从 `IRREVERSIBLE` 改为 `COSMETIC`，
+`StyleBar` 下方显示「像素化是外观优先，非安全手段——已知字体的截图可被逐位还原」。
+`note()` 从「按档位共用一句」改成逐样式给文案——两种 COSMETIC 的失效方式不一样。
+块尺寸参数**不动**（改了也不安全，只会更难看）。
+`IrreversibilityTest` 里像素化那条保留，但改名为
+`pixelate_output_is_not_readable_by_ocr_but_is_not_a_safety_claim`，语义降为「至少没盖漏」。
+
+结论已写进 spec §8 的像素化那一行与 §15.6。
+
+### 4. 用途水印的顶栏入口用了 `Icons.Filled.Layers`
+
+计划说「图标名以实际可用的为准」。用了 `Layers`。
+
+### 5. 出口指标实测
+
+- **包体**：`bundletool get-size total --dimensions=ABI`，arm64-v8a **16,828,856 B ≈ 16.8 MB**（阈值 25 MB）。
+  四个 ABI 里最大的是 x86 的 17.8 MB。样式全集没引入新模型，与 M3 的 16.6 MB 基本持平。
+- **模糊的拖动开销**（`dumpsys gfxinfo`，同一张图上各拖 12 次）：
+
+  | 样式 | 50th | 90th | 95th | 99th |
+  |---|---|---|---|---|
+  | 实色块 | 17ms | 20ms | 21ms | 44ms |
+  | 模糊 | 17ms | 21ms | 25ms | 61ms |
+
+  尾部多约 4ms，**没有降 `BlurRenderer.PASSES`**。
+
+### 6. Step 7 / Step 5 的实机走查（模拟器 `Medium_Phone`，走系统 Photo Picker）
+
+六种样式都能选，切换后整张图的所有遮罩一起变（全局单值语义成立）；
+模糊 / 马克笔 / 像素化下方出现红色警示；抹除在纯色背景上真的「消失」，
+在噪点背景上降级为黑块并显示「1 处背景过于复杂，抹除已自动降级为实色块」；
+用途水印从顶栏进、斜向平铺整张图、品牌水印仍在右下且清晰可读、「不加」能清掉。
+
+### 7. 未做的一项
+
+Task 40 Step 3 要求的**人工**去码工具验证只做到了「跑了 Depix 并记录结果」这一档；
+40px 用例有结论（未还原），96px 用例没跑完。
+但探针给出的结论比 Depix 更强也更早，处置不依赖那次跑完。
