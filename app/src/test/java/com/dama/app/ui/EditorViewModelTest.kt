@@ -19,6 +19,7 @@ import com.dama.app.core.model.SensitiveKind
 import com.dama.app.core.image.SourceImage
 import com.dama.app.core.model.Candidate
 import com.dama.app.core.model.TextLine
+import com.dama.app.data.isolatedSettingsStore
 import com.dama.app.engine.CandidateMerger
 import com.dama.app.engine.RedactionEngine
 import com.dama.app.engine.SensitivityClassifier
@@ -68,6 +69,7 @@ class EditorViewModelTest {
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
             engine = emptyEngine(),
+            settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )

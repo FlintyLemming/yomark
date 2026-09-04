@@ -18,6 +18,7 @@ import com.dama.app.core.model.MaskPlanFactory
 import com.dama.app.core.model.MaskState
 import com.dama.app.core.model.MaskStyle
 import com.dama.app.core.model.SensitiveKind
+import com.dama.app.data.SettingsStore
 import com.dama.app.engine.RedactionEngine
 import com.dama.app.export.ExportOutcome
 import com.dama.app.export.ExportRequest
@@ -29,6 +30,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -36,6 +38,7 @@ class EditorViewModel(
     private val intake: ImageIntake,
     private val exporter: Exporter,
     private val engine: RedactionEngine,
+    private val settings: SettingsStore,
     private val savedState: SavedStateHandle,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -65,8 +68,24 @@ class EditorViewModel(
     /** 一次拖动开始前的 plan 快照，抬手时才压进撤销栈。 */
     private var dragOrigin: MaskPlan? = null
 
+    /** 用户这次会话里已经自己选过样式。选过之后就不再被「上次样式」的异步恢复覆盖。 */
+    private var styleChosenByUser = false
+
     init {
-        restore()
+        // 恢复出来的 plan 自带上一次会话的样式，比设置里的「上次样式」更贴近用户当下的上下文。
+        if (!restore()) restoreLastStyle()
+    }
+
+    /**
+     * 「记住上次样式」（spec §12 M5）。读设置是异步的，用户完全可能抢在它之前
+     * 就点了样式栏——那时以用户的当次选择为准，不要把他刚点的样式改回去。
+     */
+    private fun restoreLastStyle() {
+        viewModelScope.launch {
+            val style = settings.lastStyle.first()
+            if (styleChosenByUser) return@launch
+            uiState = uiState.copy(plan = uiState.plan.copy(style = style))
+        }
     }
 
     // ---------- 载入 ----------
@@ -82,14 +101,14 @@ class EditorViewModel(
      * 撤销栈不持久化。它是「这次会话里做过什么」，重建之后那段上下文
      * 对用户已经不成立了，恢复出来反而会撤销到一个他没见过的状态。
      */
-    private fun restore() {
-        val path = savedState.get<String>(KEY_FILE) ?: return
-        val mime = savedState.get<String>(KEY_MIME) ?: return
-        val plan = savedState.get<MaskPlan>(KEY_PLAN) ?: return
+    private fun restore(): Boolean {
+        val path = savedState.get<String>(KEY_FILE) ?: return false
+        val mime = savedState.get<String>(KEY_MIME) ?: return false
+        val plan = savedState.get<MaskPlan>(KEY_PLAN) ?: return false
         val file = java.io.File(path)
         if (!file.exists()) {
             clearSavedState()                          // 副本被清掉了，静默退回 Picker
-            return
+            return false
         }
         uiState = uiState.copy(restoring = true)
         viewModelScope.launch {
@@ -103,6 +122,7 @@ class EditorViewModel(
             intakeResult = IntakeResult(file, mime)
             uiState = EditorUiState(image = image, plan = plan)
         }
+        return true
     }
 
     private fun clearSavedState() {
@@ -217,8 +237,10 @@ class EditorViewModel(
     }
 
     fun setStyle(style: MaskStyle) {
+        styleChosenByUser = true
         mutate { it.copy(style = style) }
         _state.value = _state.value.copy(degradeNote = degradeNoteFor(style))
+        viewModelScope.launch { settings.setLastStyle(style) }
     }
 
     /**

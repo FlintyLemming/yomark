@@ -17,6 +17,7 @@ import com.dama.app.core.model.MaskState
 import com.dama.app.core.model.MaskStyle
 import com.dama.app.core.model.SensitiveKind
 import com.dama.app.core.model.TextLine
+import com.dama.app.data.isolatedSettingsStore
 import com.dama.app.engine.CandidateMerger
 import com.dama.app.engine.RedactionEngine
 import com.dama.app.engine.SensitivityClassifier
@@ -89,6 +90,7 @@ class EditorViewModelRestoreTest {
         intake = ImageIntake(context),
         exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
         engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(classifier), CandidateMerger()),
+        settings = isolatedSettingsStore(context),
         savedState = saved,
         ioDispatcher = dispatcher,
     )

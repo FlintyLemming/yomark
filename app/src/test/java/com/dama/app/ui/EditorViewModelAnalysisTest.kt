@@ -17,6 +17,7 @@ import com.dama.app.core.model.DetectorSource
 import com.dama.app.core.model.MaskState
 import com.dama.app.core.model.SensitiveKind
 import com.dama.app.core.model.TextLine
+import com.dama.app.data.isolatedSettingsStore
 import com.dama.app.engine.CandidateMerger
 import com.dama.app.engine.RedactionEngine
 import com.dama.app.engine.SensitivityClassifier
@@ -76,6 +77,7 @@ class EditorViewModelAnalysisTest {
         intake = ImageIntake(context),
         exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
         engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(candidates)), CandidateMerger()),
+        settings = isolatedSettingsStore(context),
         savedState = SavedStateHandle(),
         ioDispatcher = dispatcher,
     )
@@ -153,6 +155,7 @@ class EditorViewModelAnalysisTest {
                 }),
                 CandidateMerger(),
             ),
+            settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
@@ -185,6 +188,7 @@ class EditorViewModelAnalysisTest {
                     override suspend fun classify(lines: List<TextLine>): List<Candidate> = error("boom")
                 }
             ), CandidateMerger()),
+            settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )

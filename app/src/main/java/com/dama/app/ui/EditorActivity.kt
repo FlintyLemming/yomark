@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dama.app.core.image.ImageIntake
+import com.dama.app.data.SettingsStore
 import com.dama.app.engine.buildEngine
 import com.dama.app.export.Exporter
 import com.dama.app.export.MediaStoreSink
@@ -44,6 +45,7 @@ class EditorActivity : ComponentActivity() {
                         MediaStoreSink(app),
                     ),
                     engine = buildEngine(app),
+                    settings = SettingsStore(app),
                     savedState = createSavedStateHandle(),
                 )
             }
