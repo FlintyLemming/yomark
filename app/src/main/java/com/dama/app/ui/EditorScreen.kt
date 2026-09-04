@@ -20,6 +20,7 @@ import com.dama.app.ui.canvas.ImageCanvas
 import com.dama.app.ui.components.EditorBottomBar
 import com.dama.app.ui.components.EditorTopBar
 import com.dama.app.ui.components.PendingExportDialog
+import com.dama.app.ui.components.PurposeWatermarkSheet
 
 @Composable
 fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
@@ -48,11 +49,20 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
         )
     }
 
+    if (state.purposeSheetVisible) {
+        PurposeWatermarkSheet(
+            initial = state.purposeText,
+            onConfirm = vm::setPurposeText,
+            onDismiss = vm::dismissPurposeSheet,
+        )
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
-                onUndo = vm::undo, onRedo = vm::redo, onClose = onClose,
+                onUndo = vm::undo, onRedo = vm::redo,
+                onPurpose = vm::showPurposeSheet, onClose = onClose,
             )
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()

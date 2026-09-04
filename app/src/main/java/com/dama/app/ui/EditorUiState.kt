@@ -26,6 +26,9 @@ data class EditorUiState(
     val pendingDialogVisible: Boolean = false,
     /** 当前样式在这张图上会降级时的说明。抹除遇到复杂背景时非空。 */
     val degradeNote: String? = null,
+    /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
+    val purposeText: String? = null,
+    val purposeSheetVisible: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,

@@ -23,6 +23,8 @@ data class ExportRequest(
     /** SourceImage.scale：分析图边长 / 原图边长。遮罩按 1/scale 反算。 */
     val analysisScale: Float,
     val applyWatermark: Boolean,
+    /** 用途水印文案（「仅供办理 XX 使用」）。与品牌水印无关，不受购买态影响。 */
+    val purposeText: String? = null,
 )
 
 sealed interface ExportOutcome {
@@ -41,6 +43,7 @@ class Exporter(
     private val registry: RendererRegistry,
     private val watermark: WatermarkDrawer,
     private val sink: ImageSink,
+    private val purposeWatermark: PurposeWatermarkDrawer = PurposeWatermarkDrawer(),
 ) {
 
     /** @param dispatcher 整条管线跑在哪个调度器上；默认 Default，调用方可换成自己的。 */
@@ -65,6 +68,8 @@ class Exporter(
                     maskedBounds += quad.bounds()
                 }
 
+            // 顺序不能反：品牌水印必须画在最上层，否则用途水印的斜纹会压在它上面影响可读性。
+            request.purposeText?.let { purposeWatermark.draw(canvas, bitmap.width, bitmap.height, it) }
             if (request.applyWatermark) watermark.draw(canvas, bitmap, maskedBounds)
 
             val png = request.mimeType.equals("image/png", ignoreCase = true)

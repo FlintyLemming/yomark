@@ -271,6 +271,12 @@ class EditorViewModel(
         runExport(_state.value.plan, applyWatermark)
     }
 
+    fun showPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = true) }
+    fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false) }
+    fun setPurposeText(text: String?) {
+        _state.value = _state.value.copy(purposeText = text, purposeSheetVisible = false)
+    }
+
     fun dismissDialog() {
         uiState = _state.value.copy(pendingDialogVisible = false)
     }
@@ -291,6 +297,7 @@ class EditorViewModel(
                     plan = plan,
                     analysisScale = image.scale,
                     applyWatermark = applyWatermark,
+                    purposeText = _state.value.purposeText,
                 ),
                 dispatcher = ioDispatcher,
             )
