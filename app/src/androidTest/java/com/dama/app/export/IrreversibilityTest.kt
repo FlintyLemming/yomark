@@ -33,7 +33,8 @@ import java.io.File
  *
  * 判据用 OCR：如果 ML Kit 还能从导出图里读出那串卡号，那它显然没被遮住。
  * 这守得住「盖漏了」这类错误；守不住「像素化块太小可被算法还原」——
- * 后者必须人工拿去码工具验，见 Step 3。
+ * 后者已经用模板泄漏探针 + Depix 验过，结论是像素化**确实**可还原，
+ * 因此它在 MaskStyleInfo 里被降级为 COSMETIC，这里也不再拿它当安全断言（spec §15.6）。
  */
 @RunWith(AndroidJUnit4::class)
 class IrreversibilityTest {
@@ -107,8 +108,14 @@ class IrreversibilityTest {
         assertThat(ocrText(exportWith(MaskStyle.SOLID))).doesNotContain("4111")
     }
 
+    /**
+     * 像素化只守到「OCR 读不出」这一档，**不承诺不可还原**（spec §15.6）：
+     * 固定块网格下只改一位数字，40–96px 字号上 10 个数字的马赛克两两全部可区分，
+     * 知道字体字号的攻击者可以逐位模板还原。UI 已按 COSMETIC 标注。
+     * 这条测试守的是「至少没盖漏」，不是安全承诺。
+     */
     @Test
-    fun pixelate_output_is_unreadable() = runTest {
+    fun pixelate_output_is_not_readable_by_ocr_but_is_not_a_safety_claim() = runTest {
         assertThat(ocrText(exportWith(MaskStyle.PIXELATE))).doesNotContain("4111")
     }
 
