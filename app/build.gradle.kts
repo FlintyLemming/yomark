@@ -121,6 +121,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mlkit.text.recognition)
+    implementation(libs.mlkit.text.recognition.chinese)
     implementation(libs.mlkit.face.detection)
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.play.services)

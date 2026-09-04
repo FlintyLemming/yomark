@@ -9,6 +9,7 @@ exifinterface = "1.4.1"
 datastore = "1.1.7"
 coroutines = "1.10.2"
 mlkitText = "16.0.1"
+mlkitTextChinese = "16.0.1"
 mlkitFace = "16.1.7"
 mlkitBarcode = "17.3.0"
 libphonenumber = "8.13.52"
@@ -41,6 +42,7 @@ androidx-datastore-preferences = { module = "androidx.datastore:datastore-prefer
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }
 mlkit-text-recognition = { module = "com.google.mlkit:text-recognition", version.ref = "mlkitText" }
+mlkit-text-recognition-chinese = { module = "com.google.mlkit:text-recognition-chinese", version.ref = "mlkitTextChinese" }
 mlkit-face-detection = { module = "com.google.mlkit:face-detection", version.ref = "mlkitFace" }
 mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version.ref = "mlkitBarcode" }
 libphonenumber = { module = "com.googlecode.libphonenumber:libphonenumber", version.ref = "libphonenumber" }
