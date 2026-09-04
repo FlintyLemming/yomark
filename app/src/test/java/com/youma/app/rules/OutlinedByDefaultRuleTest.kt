@@ -69,17 +69,20 @@ class OutlinedByDefaultRuleTest {
     }
 
     // ---------- 规则表完整性 ----------
-    // spec §6 的 11 条 + 计划 04 按 §15 第 5 条的实测漏检补的 longnum 兜底
-    @Test fun `the rule set has the eleven spec rules plus the long-number fallback`() {
+    // spec §6 的 11 条
+    //   + 计划 04 按 §15 第 5 条的实测漏检补的 longnum 兜底
+    //   + 2026-09-04 增补 §3 按真机漏检补的 datetime
+    @Test fun `the rule set has the eleven spec rules plus the two field-added fallbacks`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
             "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey",
-            "url", "ip", "tracking", "longnum",
+            "url", "ip", "tracking", "longnum", "datetime",
         )
     }
 
-    @Test fun `exactly eight rules are masked by default and four are outlined`() {
+    @Test fun `exactly eight rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
         assertThat(masked).hasSize(8)
-        assertThat(outlined.map { it.id }).containsExactly("url", "ip", "tracking", "longnum")
+        assertThat(outlined.map { it.id })
+            .containsExactly("url", "ip", "tracking", "longnum", "datetime")
     }
 }

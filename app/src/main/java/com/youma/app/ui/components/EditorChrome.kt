@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
@@ -31,6 +32,7 @@ fun EditorTopBar(
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     onPurpose: () -> Unit,
+    onSettings: () -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
@@ -44,6 +46,7 @@ fun EditorTopBar(
             IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
         }
         IconButton(onClick = onPurpose) { Icon(Icons.Filled.Layers, "用途水印") }
+        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "识别设置") }
         IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "关闭") }
     }
 }

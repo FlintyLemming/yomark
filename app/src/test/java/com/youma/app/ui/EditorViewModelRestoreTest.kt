@@ -89,7 +89,7 @@ class EditorViewModelRestoreTest {
     private fun vm(saved: SavedStateHandle, classifier: SensitivityClassifier) = EditorViewModel(
         intake = ImageIntake(context),
         exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
-        engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(classifier), CandidateMerger()),
+        engineProvider = { RedactionEngine(DeadRecognizer(), emptyList(), listOf(classifier), CandidateMerger()) },
         settings = isolatedSettingsStore(context),
         savedState = saved,
         ioDispatcher = dispatcher,

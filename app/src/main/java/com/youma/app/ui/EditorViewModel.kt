@@ -19,6 +19,7 @@ import com.youma.app.core.model.MaskState
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.core.model.SensitiveKind
 import com.youma.app.data.SettingsStore
+import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RedactionEngine
 import com.youma.app.export.ExportOutcome
 import com.youma.app.export.ExportRequest
@@ -39,7 +40,11 @@ import java.util.UUID
 class EditorViewModel(
     private val intake: ImageIntake,
     private val exporter: Exporter,
-    private val engine: RedactionEngine,
+    /**
+     * config 变了就丢掉旧 engine 建新的（2026-09-04 增补设计 §2）。
+     * ML Kit 的 client 全是 lazy，没被选中的后端不会初始化。
+     */
+    private val engineProvider: (RecognitionConfig) -> RedactionEngine,
     private val settings: SettingsStore,
     private val savedState: SavedStateHandle,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
@@ -60,6 +65,12 @@ class EditorViewModel(
         }
 
     private val undoStack = UndoStack()
+
+    private var config = RecognitionConfig()
+    private var engine: RedactionEngine = engineProvider(config)
+
+    /** 当前 plan 是用哪套 config 跑出来的。null = 还没跑过识别。 */
+    private var analyzedWith: RecognitionConfig? = null
     private var intakeResult: IntakeResult? = null
         set(value) {
             field = value
@@ -76,6 +87,46 @@ class EditorViewModel(
     init {
         // 恢复出来的 plan 自带上一次会话的样式，比设置里的「上次样式」更贴近用户当下的上下文。
         if (!restore()) restoreLastStyle()
+        observeRecognitionConfig()
+    }
+
+    /**
+     * 设置页改动即时生效：写 DataStore，这里收到就换引擎并重跑（增补设计 §5、§6）。
+     *
+     * 重跑的条件是「当前 plan 是用另一套 config 跑出来的」，不是「这是第几次收到」。
+     * 冷启动时持久化的 config 可能比第一张图晚到，用次数判断会让第一张图用错方案。
+     */
+    private fun observeRecognitionConfig() {
+        viewModelScope.launch {
+            settings.recognitionConfig.collect { incoming ->
+                if (incoming == config) return@collect
+                config = incoming
+                engine = engineProvider(incoming)
+                uiState = uiState.copy(recognitionConfig = incoming)
+                val image = _state.value.image ?: return@collect
+                if (analyzedWith != null && analyzedWith != incoming) reanalyze(image)
+            }
+        }
+    }
+
+    fun setRecognitionConfig(next: RecognitionConfig) {
+        viewModelScope.launch { settings.setRecognitionConfig(next) }
+    }
+
+    fun showSettings() { _state.value = _state.value.copy(settingsVisible = true) }
+    fun dismissSettings() { _state.value = _state.value.copy(settingsVisible = false) }
+
+    /**
+     * 换方案后的重跑。整次重跑压**一个**快照，用户不满意按一下撤销就回到切换前，
+     * 这就是「切着看」这件事成立的全部依据。
+     *
+     * 丢掉的是用户对规则候选做过的三态切换：新方案产出的候选和旧的不是同一批，
+     * 把旧的状态往新候选上贴没有正确答案。手动框留着——那是用户自己画的。
+     */
+    private fun reanalyze(image: SourceImage) {
+        undoStack.push(_state.value.plan)
+        uiState = _state.value.copy(analyzing = true).withHistoryFlags()
+        viewModelScope.launch { analyze(image, keepOnlyManual = true) }
     }
 
     /**
@@ -244,16 +295,21 @@ class EditorViewModel(
      * 识别（spec §7.1）：选中即进编辑器，候选已按规则表的默认状态打好码，
      * 不是「等你逐个确认」。分析期间画布可交互，结果到达时并入现有 plan。
      */
-    private suspend fun analyze(image: SourceImage) {
+    private suspend fun analyze(image: SourceImage, keepOnlyManual: Boolean = false) {
+        val ranWith = config
         val candidates = runCatching { engine.analyze(image).candidates }.getOrElse { emptyList() }
         val detected = MaskPlanFactory.itemsFrom(candidates)
         // 分析结果不进撤销栈——它是初始状态，不是用户动作。
         // 用户在分析期间画的手动框排在后面，不被覆盖。
         val current = _state.value
         if (current.image !== image) return            // 用户已经换了图，丢弃这批结果
+        val kept =
+            if (keepOnlyManual) current.plan.items.filter { it.kind == SensitiveKind.MANUAL }
+            else current.plan.items
+        analyzedWith = ranWith
         uiState = current.copy(
             analyzing = false,
-            plan = current.plan.copy(items = detected + current.plan.items),
+            plan = current.plan.copy(items = detected + kept),
         )
     }
 

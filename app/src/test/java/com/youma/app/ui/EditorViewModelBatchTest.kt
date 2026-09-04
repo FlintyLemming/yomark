@@ -75,7 +75,7 @@ class EditorViewModelBatchTest {
         return EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
-            engine = engine,
+            engineProvider = { engine },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,

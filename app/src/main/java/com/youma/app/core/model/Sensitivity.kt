@@ -7,6 +7,9 @@ enum class SensitiveKind {
     /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。默认仅圈出。 */
     LONG_NUMBER,
 
+    /** 日期与时间。出厂仅圈出——时间在截图里无处不在，默认打码会打扰所有人。 */
+    DATETIME,
+
     // v2：需要 NER，首版不产出。枚举位先占住，接口按 spec §14 已留。
     POSTAL_ADDRESS, PERSON_NAME, ORG_NAME,
 

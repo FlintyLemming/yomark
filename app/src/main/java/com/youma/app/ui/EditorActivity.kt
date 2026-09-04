@@ -52,7 +52,7 @@ class EditorActivity : ComponentActivity() {
                         WatermarkDrawer(),
                         MediaStoreSink(app),
                     ),
-                    engine = buildEngine(app),
+                    engineProvider = { cfg -> buildEngine(app, cfg) },
                     settings = SettingsStore(app),
                     savedState = createSavedStateHandle(),
                 )

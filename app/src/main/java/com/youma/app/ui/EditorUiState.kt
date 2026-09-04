@@ -3,6 +3,7 @@ package com.youma.app.ui
 import android.net.Uri
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.MaskPlan
+import com.youma.app.engine.RecognitionConfig
 import com.youma.app.ui.batch.BatchSession
 
 sealed interface EditorMessage {
@@ -39,6 +40,9 @@ data class EditorUiState(
      */
     val isPro: Boolean = false,
     val paywallVisible: Boolean = false,
+    /** 当前识别方案（2026-09-04 增补设计 §1）。设置页读它画选中态。 */
+    val recognitionConfig: RecognitionConfig = RecognitionConfig(),
+    val settingsVisible: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,

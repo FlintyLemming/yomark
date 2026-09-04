@@ -68,7 +68,7 @@ class EditorViewModelTest {
         return EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
-            engine = emptyEngine(),
+            engineProvider = { emptyEngine() },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,

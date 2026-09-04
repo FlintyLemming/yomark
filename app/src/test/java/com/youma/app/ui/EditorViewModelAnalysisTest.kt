@@ -76,7 +76,7 @@ class EditorViewModelAnalysisTest {
     private fun vm(candidates: List<Candidate>) = EditorViewModel(
         intake = ImageIntake(context),
         exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
-        engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(candidates)), CandidateMerger()),
+        engineProvider = { RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(candidates)), CandidateMerger()) },
         settings = isolatedSettingsStore(context),
         savedState = SavedStateHandle(),
         ioDispatcher = dispatcher,
@@ -143,7 +143,7 @@ class EditorViewModelAnalysisTest {
         val vm = EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
-            engine = RedactionEngine(
+            engineProvider = { RedactionEngine(
                 DeadRecognizer(), emptyList(),
                 listOf(object : SensitivityClassifier {
                     override val id = "gated"
@@ -154,7 +154,7 @@ class EditorViewModelAnalysisTest {
                     }
                 }),
                 CandidateMerger(),
-            ),
+            ) },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
@@ -181,13 +181,17 @@ class EditorViewModelAnalysisTest {
         val vm = EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
-            engine = RedactionEngine(DeadRecognizer(), emptyList(), listOf(
-                object : SensitivityClassifier {
-                    override val id = "boom"
-                    override suspend fun isAvailable() = true
-                    override suspend fun classify(lines: List<TextLine>): List<Candidate> = error("boom")
-                }
-            ), CandidateMerger()),
+            engineProvider = { RedactionEngine(
+                DeadRecognizer(), emptyList(),
+                listOf(
+                    object : SensitivityClassifier {
+                        override val id = "boom"
+                        override suspend fun isAvailable() = true
+                        override suspend fun classify(lines: List<TextLine>): List<Candidate> = error("boom")
+                    }
+                ),
+                CandidateMerger(),
+            ) },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,

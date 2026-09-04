@@ -8,8 +8,14 @@
 debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1。
 日期：2026-09-03。
 
-**自动化总览**：单元测试 316 条全绿；instrumented 59 条，58 通过 1 跳过
-（跳过的是正脸召回，无素材）。
+**自动化总览**：单元测试 360 条全绿；instrumented 64 条（含识别设置页 4 条），
+**其中 5 条在改完可切换识别方案后尚未上设备复跑**。
+
+> **2026-09-04 更新**：加入可切换识别方案（见
+> `docs/superpowers/specs/2026-09-04-youma-recognition-profiles-design.md`）。
+> 体积与权限两行已按新依赖复测；延迟、圈出率、召回率三行的旧数值是在
+> 「拉丁 OCR + 条码全部默认打码」下测的，**新出厂默认（两者并跑 + 疑似条码仅圈出）
+> 下的数值尚未测**。
 
 ---
 
@@ -22,7 +28,7 @@ debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1�
 | 精确率 | MASKED 区域确实覆盖敏感内容 | ≥ 0.70 | **1.00（合成集）**；真实样本集**未采集** | 同上 |
 | 识别延迟 | 1080×2400，选中到候选出现 | < 800 ms | **143 ms**（断网）／**191 ms**（联网）✅ | `EvaluationTest` 的延迟用例 |
 | 冷启动 | 点图标到 Photo Picker 可交互 | < 1.2 s | 首帧 **392–445 ms**（中位 414）；Picker 成为 topResumedActivity **544–712 ms** ✅ | `am start -W` TotalTime ×5；轮询 `dumpsys activity activities` ×3 |
-| 下发体积 | arm64-v8a split | ≤ 25 MB | **16,995,342 B = 16.2 MiB / 17.0 MB** ✅ | `bundletool get-size total --dimensions=ABI` |
+| 下发体积 | arm64-v8a split | ≤ 25 MB | **17,652,832 B = 16.8 MiB / 17.65 MB** ✅（含中文 OCR 包） | `bundletool get-size total --dimensions=ABI` |
 | 运行期敏感权限 | 除 BILLING 外的 uses-permission 条数 | 0 | **0** ✅（见下方清单） | `assertReleaseNoRuntimePermissions` + 设备侧 `dumpsys package` |
 | 网络请求 | 全流程（不含购买）运行期请求数 | 0 | **0** ✅ | 无 `INTERNET` 权限 + 断网复跑全套 |
 | 导出拦截 | pendingCount > 0 时对话框触发率 | 100% | **100%** ✅ | `EditorViewModelTest` / `EditorViewModelBatchTest` + 实机走查 |

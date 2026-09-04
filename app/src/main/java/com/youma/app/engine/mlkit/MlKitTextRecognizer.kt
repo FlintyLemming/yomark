@@ -10,11 +10,12 @@ import com.youma.app.engine.TextRecognizer
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.tasks.await
 
 /**
- * ML Kit 文字识别（bundled 拉丁脚本）。
+ * ML Kit 文字识别（bundled）。脚本由 script 决定，两个模型都随包发行，都不联网。
  *
  * 图像进来时已按 EXIF 转正（spec §5.1），所以 rotationDegrees 恒为 0——
  * 全流程只有一个坐标系。
@@ -22,11 +23,28 @@ import kotlinx.coroutines.tasks.await
  * 拼接规则：TextLine.text = elements 的 text 用单个空格连接，同时记录字符区间。
  * 不用 ML Kit 自己的 Line.text：规则跑在拼接串上，两者不一致会让区间映射错位。
  */
-class MlKitTextRecognizer : TextRecognizer {
+class MlKitTextRecognizer(
+    private val script: TextScript = TextScript.LATIN,
+) : TextRecognizer {
 
-    override val id = "mlkit-text-v2-latin"
+    override val id = when (script) {
+        TextScript.LATIN -> "mlkit-text-v2-latin"
+        TextScript.CHINESE -> "mlkit-text-v2-chinese"
+    }
 
-    private val client by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
+    /**
+     * lazy 是有意的：没被选中的后端不会初始化。中文模型在 APK 里
+     * 不等于中文模型在内存里——这个应用还要跟 32 MP 大图抢堆。
+     */
+    private val client by lazy {
+        TextRecognition.getClient(
+            when (script) {
+                TextScript.LATIN -> TextRecognizerOptions.DEFAULT_OPTIONS
+                // 中文识别器同时认拉丁字符，所以它不是「只认中文」的那个
+                TextScript.CHINESE -> ChineseTextRecognizerOptions.Builder().build()
+            }
+        )
+    }
 
     override suspend fun recognize(image: SourceImage): List<TextLine> {
         val input = InputImage.fromBitmap(image.bitmap, 0)

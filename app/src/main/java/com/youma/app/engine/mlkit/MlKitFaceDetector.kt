@@ -6,6 +6,7 @@ import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.SensitiveKind
+import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RegionDetector
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
@@ -21,15 +22,20 @@ import kotlin.math.min
  * ML Kit 给的是五官外接框，发际线与下巴常在框外，直接用会露脸。
  * 按短边比例外扩再裁回图内。
  */
-class MlKitFaceDetector : RegionDetector {
+class MlKitFaceDetector(
+    private val mode: FaceOption = FaceOption.FAST,
+) : RegionDetector {
 
-    override val id = "mlkit-face"
+    override val id = "mlkit-face-${mode.name.lowercase()}"
     override val kind = SensitiveKind.FACE
 
     private val client by lazy {
         FaceDetection.getClient(
             FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setPerformanceMode(
+                    if (mode == FaceOption.ACCURATE) FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE
+                    else FaceDetectorOptions.PERFORMANCE_MODE_FAST
+                )
                 .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
                 .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
                 .setMinFaceSize(MIN_FACE_SIZE)

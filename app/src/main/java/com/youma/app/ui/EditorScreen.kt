@@ -22,6 +22,7 @@ import com.youma.app.ui.components.EditorTopBar
 import com.youma.app.ui.components.PaywallDialog
 import com.youma.app.ui.components.PendingExportDialog
 import com.youma.app.ui.components.PurposeWatermarkSheet
+import com.youma.app.ui.settings.RecognitionSettingsScreen
 
 @Composable
 fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: () -> Unit) {
@@ -71,12 +72,23 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
         )
     }
 
+    // 设置是整屏页而不是对话框：13 条规则各三个选项，对话框塞不下。
+    if (state.settingsVisible) {
+        RecognitionSettingsScreen(
+            config = state.recognitionConfig,
+            onChange = vm::setRecognitionConfig,
+            onBack = vm::dismissSettings,
+        )
+        return
+    }
+
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
                 onPurpose = vm::showPurposeSheet,
+                onSettings = vm::showSettings,
                 // 已购用户不该再看见购买入口
                 onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
                 onClose = onClose,
