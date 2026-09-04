@@ -34,15 +34,24 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                 val extra = if (m.downscaled) "（原图过大，已压缩至 ${m.width}×${m.height}）" else ""
                 snackbar.showMessage("已保存到相册$extra", vm)
             }
+            is EditorMessage.BatchExported -> snackbar.showMessage("已保存 ${m.count} 张到相册", vm)
             is EditorMessage.Error -> snackbar.showMessage(m.text, vm)
             null -> Unit
         }
     }
 
     if (state.pendingDialogVisible) {
+        // 批量下拦截看的是全部图片的汇总，不是当前这一张（spec §7.6）。
+        val batchWithCurrent = state.batch?.withPlan(state.plan)
+        val pending = batchWithCurrent?.totalPending ?: state.plan.pendingCount
+        val byKind = batchWithCurrent?.items?.mapNotNull { it.plan }
+            ?.flatMap { it.pendingByKind().entries }
+            ?.groupBy({ it.key }, { it.value })
+            ?.mapValues { (_, counts) -> counts.sum() }
+            ?: state.plan.pendingByKind()
         PendingExportDialog(
-            pendingCount = state.plan.pendingCount,
-            byKind = state.plan.pendingByKind(),
+            pendingCount = pending,
+            byKind = byKind,
             onMaskAll = { vm.confirmMaskAllAndExport(applyWatermark = true) },
             onExportAnyway = { vm.confirmExportAnyway(applyWatermark = true) },
             onDismiss = vm::dismissDialog,
@@ -77,12 +86,18 @@ fun EditorScreen(vm: EditorViewModel, onClose: () -> Unit) {
                     onDeleteSelected = vm::deleteSelected,
                 )
             }
+            val batch = state.batch
             EditorBottomBar(
                 style = state.plan.style,
                 degradeNote = state.degradeNote,
                 onStyleChange = vm::setStyle,
-                onExport = { vm.requestExport(applyWatermark = true) },
+                onExport = {
+                    if (batch != null) vm.exportBatch(applyWatermark = true)
+                    else vm.requestExport(applyWatermark = true)
+                },
                 exporting = state.exporting,
+                batchLabel = batch?.let { "${it.index + 1} / ${it.total}" },
+                onNext = if (batch != null && !batch.isLast) vm::nextImage else null,
             )
         }
     }

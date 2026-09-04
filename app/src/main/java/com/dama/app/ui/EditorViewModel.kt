@@ -24,6 +24,8 @@ import com.dama.app.export.ExportOutcome
 import com.dama.app.export.ExportRequest
 import com.dama.app.export.Exporter
 import com.dama.app.render.EraseRenderer
+import com.dama.app.ui.batch.BatchItem
+import com.dama.app.ui.batch.BatchSession
 import com.dama.app.ui.canvas.GestureRules
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -162,6 +164,80 @@ class EditorViewModel(
     }
 
     /**
+     * 批量入口（spec §7.6）。单张时不开批量会话，行为与 onImageChosen 完全一致——
+     * 「下一张」按钮只在真的有下一张时出现。
+     */
+    fun onImagesChosen(uris: List<Uri>) {
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            onImageChosen(uris.first())
+            return
+        }
+        // 私有副本只在会话开始时清一次。批量导出要在走完最后一张之后读回**每一张**的副本，
+        // 像 onImageChosen 那样逐张 clear() 会把前面几张就地删掉，导出只剩最后一张。
+        intake.clear()
+        intakeResult = null
+        undoStack.clear()
+        uiState = EditorUiState(
+            plan = MaskPlan.empty(_state.value.plan.style),
+            batch = BatchSession(
+                items = uris.map { BatchItem(it, null, "image/jpeg", null, 1f) },
+                index = 0,
+            ),
+        )
+        loadBatchCurrent()
+    }
+
+    /** 保存当前这张的编辑，推进到下一张。 */
+    fun nextImage() {
+        val batch = _state.value.batch ?: return
+        val saved = batch.withPlan(_state.value.plan)
+        if (saved.isLast) return
+        uiState = _state.value.copy(batch = saved.advance())
+        loadBatchCurrent()
+    }
+
+    /**
+     * 批量里的每一张都走和单张一样的载入 + 识别路径。
+     *
+     * 批量会话不进 SavedStateHandle：进程被杀之后回来只恢复当前这一张
+     * （restore() 那条路），批量退化成单张。这是有意的降级——把整个会话
+     * 序列化回来，用户会面对一个「我刚才编到第几张了」完全说不清的状态。
+     */
+    private fun loadBatchCurrent() {
+        val batch = _state.value.batch ?: return
+        uiState = _state.value.copy(loading = true, message = null)
+        viewModelScope.launch {
+            val loaded = runCatching {
+                val taken = intake.copyToPrivate(batch.current.uri, ioDispatcher)
+                taken to SourceImageLoader.loadForAnalysis(taken.file, taken.mimeType, ioDispatcher)
+            }.getOrNull()
+            if (loaded == null) {
+                uiState = _state.value.copy(
+                    loading = false,
+                    message = EditorMessage.Error("无法打开这张图片"),
+                )
+                return@launch
+            }
+            val (taken, image) = loaded
+            intakeResult = taken
+            undoStack.clear()
+            uiState = _state.value.copy(
+                image = image,
+                plan = MaskPlan.empty(_state.value.plan.style),
+                loading = false,
+                analyzing = true,
+                canUndo = false,
+                canRedo = false,
+                selectedManualId = null,
+                degradeNote = null,
+                batch = _state.value.batch?.withLoaded(taken.file, taken.mimeType, image.scale),
+            )
+            analyze(image)
+        }
+    }
+
+    /**
      * 识别（spec §7.1）：选中即进编辑器，候选已按规则表的默认状态打好码，
      * 不是「等你逐个确认」。分析期间画布可交互，结果到达时并入现有 plan。
      */
@@ -282,15 +358,42 @@ class EditorViewModel(
         runExport(_state.value.plan, applyWatermark)
     }
 
+    /**
+     * 批量导出：走完最后一张后一次性导出全部（spec §7.6）。
+     * 拦截按**全部图片**的待打码数之和判定，不是只看当前这张——
+     * 只看当前这张的话，前面几张里被放过的 OUTLINED 就永远没有第二次机会了。
+     */
+    fun exportBatch(applyWatermark: Boolean) {
+        val batch = _state.value.batch?.withPlan(_state.value.plan) ?: return
+        uiState = _state.value.copy(batch = batch)
+        if (batch.totalPending > 0) {
+            uiState = _state.value.copy(pendingDialogVisible = true)
+            return
+        }
+        runBatchExport(batch, applyWatermark)
+    }
+
     fun confirmMaskAllAndExport(applyWatermark: Boolean) {
-        mutate { it.maskAll() }
         uiState = _state.value.copy(pendingDialogVisible = false)
-        runExport(_state.value.plan, applyWatermark)
+        val batch = _state.value.batch
+        if (batch != null) {
+            val cleared = batch.withPlan(_state.value.plan).maskAllEverywhere()
+            uiState = _state.value.copy(
+                batch = cleared,
+                plan = cleared.current.plan ?: _state.value.plan.maskAll(),
+            )
+            runBatchExport(cleared, applyWatermark)
+        } else {
+            mutate { it.maskAll() }
+            runExport(_state.value.plan, applyWatermark)
+        }
     }
 
     fun confirmExportAnyway(applyWatermark: Boolean) {
         uiState = _state.value.copy(pendingDialogVisible = false)
-        runExport(_state.value.plan, applyWatermark)
+        val batch = _state.value.batch
+        if (batch != null) runBatchExport(batch.withPlan(_state.value.plan), applyWatermark)
+        else runExport(_state.value.plan, applyWatermark)
     }
 
     fun showPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = true) }
@@ -333,6 +436,35 @@ class EditorViewModel(
                     message = EditorMessage.Error("导出失败，请重试"),
                 )
             }
+        }
+    }
+
+    private fun runBatchExport(batch: BatchSession, applyWatermark: Boolean) {
+        uiState = _state.value.copy(exporting = true)
+        viewModelScope.launch {
+            var ok = 0
+            var failed = 0
+            batch.items.forEach { item ->
+                val file = item.file ?: return@forEach     // 还没走到的图没有副本，也没有编辑
+                val plan = item.plan ?: return@forEach
+                val outcome = exporter.export(
+                    ExportRequest(
+                        file = file,
+                        mimeType = item.mimeType,
+                        plan = plan,
+                        analysisScale = item.analysisScale,
+                        applyWatermark = applyWatermark,
+                        purposeText = _state.value.purposeText,
+                    ),
+                    dispatcher = ioDispatcher,
+                )
+                if (outcome is ExportOutcome.Success) ok++ else failed++
+            }
+            uiState = _state.value.copy(
+                exporting = false,
+                message = if (failed == 0) EditorMessage.BatchExported(ok)
+                else EditorMessage.Error("$ok 张已保存，$failed 张失败"),
+            )
         }
     }
 

@@ -67,7 +67,7 @@ class EditorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val coldStart = savedInstanceState == null
-        val shared = incomingUri(intent)
+        val shared = incomingUris(intent)
 
         setContent {
             // null = 还没读到设置。这一瞬间什么都不画：先画编辑器再切引导页会闪一下，
@@ -83,7 +83,7 @@ class EditorActivity : ComponentActivity() {
                 Surface {
                     when {
                         seen == null -> Unit
-                        seen == false && !dismissed && shared == null && coldStart -> OnboardingScreen {
+                        seen == false && !dismissed && shared.isEmpty() && coldStart -> OnboardingScreen {
                             dismissed = true
                             lifecycleScope.launch { settings.markOnboardingSeen() }
                             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
@@ -98,7 +98,7 @@ class EditorActivity : ComponentActivity() {
             lifecycleScope.launch {
                 // 看过引导的、以及从分享进来的，走原来的路由；没看过的等用户点按钮，
                 // 否则 Picker 会盖在引导页上面弹出来。
-                if (shared != null || settings.onboardingSeen.first()) route(intent)
+                if (shared.isNotEmpty() || settings.onboardingSeen.first()) route(intent)
             }
         } else {
             // 重建路径：状态由 SavedStateHandle 恢复（spec §15 第 2 条）。
@@ -120,20 +120,23 @@ class EditorActivity : ComponentActivity() {
     }
 
     private fun route(intent: Intent?) {
-        val shared = intent?.let { incomingUri(it) }
-        if (shared != null) {
-            vm.onImageChosen(shared)               // ACTION_SEND 直接跳过 Picker
+        val shared = intent?.let { incomingUris(it) }.orEmpty()
+        if (shared.isNotEmpty()) {
+            vm.onImagesChosen(shared)              // ACTION_SEND(_MULTIPLE) 直接跳过 Picker
         } else if (vm.state.value.image == null) {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
     }
 
-    private fun incomingUri(intent: Intent): Uri? = when (intent.action) {
+    /**
+     * Picker 一律是单选。多选 Picker 多一步「确认」，而批量按 spec §7.6 只从
+     * ACTION_SEND_MULTIPLE 进——用户已经在相册里选好了，不该再选一次。
+     */
+    private fun incomingUris(intent: Intent): List<Uri> = when (intent.action) {
         Intent.ACTION_SEND ->
-            IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+            listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
         Intent.ACTION_SEND_MULTIPLE ->
-            // 批量在 M5（计划 07）；首版先只处理第一张，行为可预期
-            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.firstOrNull()
-        else -> null
+            IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        else -> emptyList()
     }
 }

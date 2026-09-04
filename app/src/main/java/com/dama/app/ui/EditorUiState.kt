@@ -3,9 +3,11 @@ package com.dama.app.ui
 import android.net.Uri
 import com.dama.app.core.image.SourceImage
 import com.dama.app.core.model.MaskPlan
+import com.dama.app.ui.batch.BatchSession
 
 sealed interface EditorMessage {
     data class Exported(val uri: Uri, val downscaled: Boolean, val width: Int, val height: Int) : EditorMessage
+    data class BatchExported(val count: Int) : EditorMessage
     data class Error(val text: String) : EditorMessage
 }
 
@@ -29,6 +31,8 @@ data class EditorUiState(
     /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
     val purposeText: String? = null,
     val purposeSheetVisible: Boolean = false,
+    /** ACTION_SEND_MULTIPLE 进来的批量会话；单张时为 null，底栏也就没有「下一张」。 */
+    val batch: BatchSession? = null,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,
