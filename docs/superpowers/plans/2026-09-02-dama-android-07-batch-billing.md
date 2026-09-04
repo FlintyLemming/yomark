@@ -1629,3 +1629,96 @@ git tag m5-release-ready
 - [ ] 批量流走得通，拦截按全部图片汇总判定
 
 到这里首版可以上架。
+
+---
+
+## 执行记录（2026-09-03）
+
+Task 41–46 全部执行。环境：模拟器 `Medium_Phone` AVD / android-37.1 / arm64-v8a / playstore，
+JDK 21，AGP 8.11.1。最终自动化：**单元测试 316 条全绿；instrumented 59 条，58 通过 1 跳过**
+（跳过的是正脸召回，`androidTest/assets/faces/` 为空，M3 遗留）。
+
+### 1. `EditorViewModel` 的构造器多一个参数（Task 41、43、45 全部相关）
+
+计划里所有 `EditorViewModel(...)` 片段都没有 `savedState: SavedStateHandle`——
+那是计划 04 为「Activity 重建后恢复」加的，不能去掉。`settings` 是**新增**参数，
+不是替换。最终签名：`intake, exporter, engine, settings, savedState, ioDispatcher`。
+四个测试类（`EditorViewModelTest` / `AnalysisTest` / `RestoreTest` / 新增的
+`BatchTest`、`WatermarkTest`）的工厂都补了这一项。
+
+### 2. DataStore 的单例委托与 Robolectric 打架，测试走内部构造器
+
+计划的 `SettingsStoreTest` / `PurchaseStoreTest` 每个用例 `new` 一个 store 再靠
+`File(filesDir, "datastore").deleteRecursively()` 清场。这在 Robolectric 下不成立：
+`preferencesDataStore` 是**文件级属性委托**，`INSTANCE` 在整个进程里只创建一次，
+而同一个测试类的各个用例共用类加载器——第一个用例建的 DataStore 会带着数据
+（和一个已被删掉的目录）活到后面的用例，「默认值是 SOLID」「全新安装不是 pro」
+这类断言随执行顺序时好时坏。
+
+处置：`SettingsStore` / `PurchaseStore` 各加一个 `internal constructor(DataStore<Preferences>)`，
+公开的 `(Context)` 构造器仍在（生产路径不变，仍是单例，否则同一文件两个 DataStore 会崩）。
+测试用 `data.isolatedSettingsStore()` / `billing.isolatedPurchaseStore()` 各拿一个独立文件。
+
+### 3. 批量载入不能逐张 `intake.clear()`（Task 43）
+
+`onImageChosen` 会在换图前清空 intake 目录。批量若照抄这个路径，
+`exportBatch` 到时前面几张的私有副本已经被删掉，导出只剩最后一张。
+改成**只在 `onImagesChosen` 开会话时清一次**。
+
+批量会话本身不进 `SavedStateHandle`：进程被杀后回来退化成单张（`restore()` 那条路）。
+这是有意的降级，理由写在 `loadBatchCurrent` 的注释里。
+
+### 4. 实机清单改成了自动化测试（Task 43 Step 7）
+
+计划里的「相册选 3 张分享进来」手工清单换成 `BatchFlowTest`（androidTest）：
+素材经 `MediaStoreSink` 写入，是**本应用自己创建的**媒体文件，读回来不需要任何权限，
+因此这条测试本身也顺带守着零权限承诺。`am start` 合成的 `SEND_MULTIPLE` intent
+无法真正授予 content URI 权限（spec §15.2 早有记载），手工路线在 adb 上走不通。
+
+### 5. 新测试逮到一个真 bug（Task 45）
+
+`onImageChosen` / `onImagesChosen` / `restore` 都是整只重建 `EditorUiState`，
+把 `isPro` 一起清成 `false`——已购用户**换一张图水印就回来了**。
+`StateFlow` 不会重发相同值，所以 `observePro` 的收集器也救不回来。三处都改成显式带上购买态。
+
+### 6. Play Billing 8.0.0 与计划片段的 API 漂移（Task 44）
+
+行为契约（缓存优先 / 断连不降级 / 只认 `PRODUCT_REMOVE_WATERMARK` / 购买后必须 acknowledge）
+一条没变，调用方式改了两处：
+
+- `enablePendingPurchases()` 自 6.2 起要传 `PendingPurchasesParams`；
+- `queryProductDetailsAsync` 的回调第二参在 8.0 是 `QueryProductDetailsResult`，不再是 `List<ProductDetails>`。
+
+另加了 `enableAutoServiceReconnection()`——8.0 新增，断连后不至于永久查不到。
+
+### 7. `EXPORT_MAX_PIXELS` 的边界值容易写错（Task 46 / spec §15.7）
+
+`LargeImageExportTest` 第一版用 5657×5657，测试失败：5657² = 32,001,649 px
+已经**超过** 32,000,000 的上限，会被降采样。上限是像素数不是边长。
+改成 5656×5656（31,990,336 px）后通过，导出 5656×5656 原分辨率不 OOM。
+真机（堆比模拟器紧）上的复跑仍欠。
+
+### 8. §13 的「水印避让 0%」有一个口径例外（spec §15.8）
+
+四角全被占时按 §9.3 的设计回退到右下并压在遮罩上，此时相交比例不是 0。
+这不是缺陷也不是泄漏（水印画在所有遮罩**之后**，只会盖住黑块的一部分），
+但指标的措辞需要带上「四角还有空位时」这个前提，已写进 spec §15.8 与
+`docs/release-checklist.md`。
+
+### 9. 本机做不了的：Play Console 真机购买（Task 45 Step 4）
+
+没有可用的 Play Console 应用与测试账号。四条（建商品 / 测试账号购买 /
+飞行模式复验 / 清数据后 `queryPurchasesAsync` 恢复）原样留在
+`docs/release-checklist.md` 的「未达成 / 未验的项」里。
+代码侧的规则由 `PurchaseResolverTest`、`PurchaseStoreTest`、
+`EditorViewModelWatermarkTest` 守着。
+
+### 10. 仍未达成的出口指标（都卡在素材，不是代码）
+
+- §13 前三行（圈出率 / 默认打码召回率 / 精确率）：`androidTest/assets/samples/` 为空，
+  表里的 1.00 全部来自合成集，**不构成验收**。
+- 正脸召回 ≥ 0.98：`androidTest/assets/faces/` 为空，用例 SKIPPED（M3 遗留）。
+- 全部实测在模拟器上，中端真机未上手。
+
+因此 **M5 的「达到 §13 全部指标」这条出口没有完全达成**：可自动验证的部分全部达标，
+依赖真实素材与 Play Console 的部分逐条记在 `docs/release-checklist.md`。

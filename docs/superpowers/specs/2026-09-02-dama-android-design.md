@@ -558,6 +558,18 @@ dependencies {
 
 以 App Bundle 按 ABI 分发，用户实际只下载 arm64 那一份。作为参照，iOS 版 DAMA 是 42.2 MB。
 
+**实测（2026-09-03，计划 07 Task 46，release bundle，`bundletool get-size total --dimensions=ABI`）**：
+
+| ABI | 下发体积 |
+|---|---|
+| **arm64-v8a** | **16,995,342 B = 17.0 MB** ✅ |
+| armeabi-v7a | 15,230,577 B = 15.2 MB |
+| x86_64 | 17,790,241 B = 17.8 MB |
+| x86 | 17,993,245 B = 18.0 MB |
+
+比预算的 21.3 MB 还小 4 MB，离 §13 的 25 MB 阈值有 8 MB 余量。
+逐 artifact 的实测明细见 `docs/release-checklist.md`。
+
 ---
 
 ## §12 · 开发里程碑
@@ -695,6 +707,12 @@ dependencies {
    恢复失败（副本确实被清掉了）时静默退回 Photo Picker：新增 `EditorUiState.restoring`，
    `EditorActivity` 在重建路径上等它落定再决定要不要拉相册，避免在图正要回来的那一瞬间弹出 Picker。
 
+   **复验（2026-09-03，计划 07 Task 46，用「不保留活动」这条原文要求的方式）**：
+   `settings put global always_finish_activities 1` 开启后走完整路径——
+   引导页 → Picker 选一张含二维码的图 → 编辑器（二维码已自动成为黑块）→ 按 Home →
+   回到 app：**图与整棵 plan 原样回来**，二维码仍是黑块，没有退回 Picker。
+   这条与计划 04 的 `am kill` 复验结论一致，私有副本 + SavedStateHandle 的方案两种销毁方式都覆盖得住。
+
 3. **冷启动直接拉 Photo Picker 的实际体验。** 会不会出现闪白、双层 Activity、或返回时留下空壳 Activity。若体验不佳，退路是加一个极简首屏（一个大按钮），但那会牺牲「打开就是相册」的即时感。
 
    **实测（2026-09-03，模拟器 Medium_Phone / android-37）**：体验可接受，**维持不加首屏**。
@@ -799,9 +817,47 @@ dependencies {
 
 7. **大图导出的内存上限。** §9.2 的 32 MP 是估算值（32 MP × 4 byte ≈ 128 MB）。需在低端机上实测 OOM 边界，必要时下调。
 
+   **实测（2026-09-03，计划 07 Task 46，模拟器 Medium_Phone / android-37.1 / arm64-v8a）**：
+   **32 MP 这个上限站得住，不下调。** `LargeImageExportTest` 造一张 5656×5656
+   （31,990,336 px，刚好压在 `EXPORT_MAX_PIXELS` 之下、不触发降采样）的图走完整导出：
+   `downscaled = false`，输出 5656×5656 原分辨率，不 OOM。
+   `android:largeHeap="true"` 是必须的——导出路径上源位图（128 MB）与输出位图同时活着。
+
+   **边界值上有个容易踩的坑，测试里记一笔**：5657×5657 = 32,001,649 px 已经**超过**
+   上限，会被降采样成 2828×2828。上限是像素数不是边长，写测试时别按边长凑整。
+
+   **仍未验的是「低端机」这一半**：本次全部在模拟器上跑。真机堆上限比模拟器紧，
+   上架前应在一台中端机上复跑这条测试。若真机 OOM，下调 `SourceImageLoader.EXPORT_MAX_PIXELS`
+   并同步改 §9.2 的数值。
+
 8. **水印避让在四角全被占时的表现。** 密集截图（如整屏聊天记录全打码）下四角可能都被遮罩占据，需确认加描边压在右下的效果是否可接受。
 
+   **实测（2026-09-03，计划 07 Task 46）：可接受，维持现在的回退。**
+   造一张 1080×2400 的整屏全打码聊天记录（顶部与底部各一条通栏黑块，四角因此全被占，
+   中间 10 条左右交替的气泡全打成黑块），跑 `WatermarkDrawer.draw`：
+   四档避让全部落空后回到右下，墨色按背景亮度自动翻成浅色，压在黑块上仍然清晰可读，
+   观感上像一个正常的角标，不像画错了。
+
+   **一个必须写清楚的口径问题**：§13 的「水印与遮罩相交比例 = 0%」这条指标，
+   严格说只在**四角还有空位时**成立。四角全被占是设计上明确允许的例外——
+   §9.3 的避让顺序最后一档就是「回右下并加不透明描边」。
+   这不构成信息泄漏：水印画在所有遮罩**之后**，压上去只会盖住黑块的一部分，
+   不会露出底下的像素。`WatermarkDrawerTest` 的
+   `all four corners occupied falls back to bottom right with an outline` 与
+   `drawing never touches a masked region` 两条分别守这两种情形。
+
 9. **各 artifact 的当前版本与体积。** 本文引用的体积来自 ML Kit 官方文档，版本来自官方示例工程，两者都会随版本变化，以 release notes 为准。
+
+   **实测（2026-09-03，计划 07 Task 46，release bundle）**：见 §11 包体预算表下方的
+   「实测」一列，以及 `docs/release-checklist.md` 的下发体积明细。
+   结论：**arm64-v8a 下发 16,995,342 B = 17.0 MB，低于 §11 的 ≈21.3 MB 预算，
+   离 25 MB 阈值有 8 MB 余量。**
+
+   未压缩的原生库比预算行大得多（OCR 11.06 MB / 人脸 8.52 MB / 条码 4.95 MB，
+   预算写的是 4.0 / 6.9 / 2.4），但下发计的是压缩后体积，合计反而更小。
+   `libs.versions.toml` 里的实际版本：`text-recognition 16.0.1`、`face-detection 16.1.7`、
+   `barcode-scanning 17.3.0`、`libphonenumber 8.13.52`、`billing-ktx 8.0.0`、
+   `datastore-preferences 1.1.7`、Compose BOM `2025.06.01`。
 
 ---
 
