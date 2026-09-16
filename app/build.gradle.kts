@@ -58,8 +58,8 @@ android {
         applicationId = "com.youma.app"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.2.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
