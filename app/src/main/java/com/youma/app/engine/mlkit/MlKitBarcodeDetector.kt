@@ -56,14 +56,26 @@ class MlKitBarcodeDetector(
     override val kind = SensitiveKind.BARCODE
 
     /**
-     * `enableAllPotentialBarcodes` 是这个类的关键一行：它让检测器连**解不出内容**的条码
-     * 也一并返回。打码工具只关心「这里有一个条码」，从来不需要它的内容——
-     * 默认配置下 ML Kit 只报解码成功的条码，倾斜、轻微失焦、缩放过的二维码
-     * 会被静默丢掉（自造的 36 张评测图里丢了 6 张）。漏检是事故，误报只是麻烦。
+     * 两行配置，管的是两件相反的事，别把它们混起来看：
+     *
+     * `setBarcodeFormats` **收窄**格式到 [BarcodeFormats.ALLOWED]。不设置等于全格式开启，
+     * 而全格式里有三种没有强制校验位，会把按钮和文字解成垃圾数字再整块涂黑（见 BarcodeFormats）。
+     *
+     * `enableAllPotentialBarcodes` **放宽**到连解不出内容的条码也返回。打码工具只关心
+     * 「这里有一个条码」，从来不需要它的内容——默认配置下 ML Kit 只报解码成功的条码，
+     * 倾斜、轻微失焦、缩放过的二维码会被静默丢掉（自造的 36 张评测图里丢了 6 张）。
+     * 漏检是事故，误报只是麻烦。
+     *
+     * 收窄格式**之后**再放宽解码要求，两者不冲突：格式白名单决定「拿哪几种形状去匹配」，
+     * potential 决定「匹配上了但校验没过要不要报」。
      */
     private val client by lazy {
         BarcodeScanning.getClient(
             BarcodeScannerOptions.Builder()
+                .setBarcodeFormats(
+                    BarcodeFormats.ALLOWED.first(),
+                    *BarcodeFormats.ALLOWED.drop(1).toIntArray(),
+                )
                 .apply { if (strategy == BarcodeOption.LOOSE) enableAllPotentialBarcodes() }
                 .build()
         )
