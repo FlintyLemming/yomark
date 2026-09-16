@@ -5,7 +5,7 @@ import com.youma.app.rules.validator.Checksums
 import com.youma.app.rules.validator.KnownTlds
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。13 条：8 条默认打码、5 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。15 条：10 条默认打码、5 条仅圈出。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
  * 一直在跟 app 对着干；有校验位兜底的类型误报接近零，自动打码不打扰任何人。
@@ -80,6 +80,50 @@ object DefaultRuleSet {
         pattern = Regex("""(?<![A-Za-z0-9_-])(?:sk-|ghp_|gho_|ghs_|AKIA|eyJ)[A-Za-z0-9_\-.]{12,}"""),
         confidence = 0.9f,
         validate = { _, m -> Checksums.shannonEntropy(m.value) > 3.5 },
+    )
+
+    // ---------- 标签锚定：姓名与地址（见 LabeledFieldRule） ----------
+
+    /**
+     * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
+     *
+     * 三个分支对应三种排版：连写的汉字名、被中文识别器拆成单字再用空格拼回来的名、
+     * 拉丁名。连写分支放在最前，`张三 性别 男` 才会只取到 `张三`。
+     */
+    private val NAME_VALUE = Regex(
+        """[\u4e00-\u9fa5]{2,6}""" +
+            """|[\u4e00-\u9fa5](?:[ ][\u4e00-\u9fa5]){1,5}""" +
+            """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
+    )
+
+    private val NAME = LabeledFieldRule(
+        id = "name",
+        kind = SensitiveKind.PERSON_NAME,
+        enabledByDefault = true,
+        labels = listOf("收货人", "收件人", "联系人", "持卡人", "真实姓名", "姓名", "户名", "开户名", "Name", "Recipient"),
+        value = NAME_VALUE,
+        confidence = 0.8f,
+    )
+
+    /**
+     * 地址。**不能用姓名那套「遇数字即停」**——门牌号、楼层、邮编本来就是地址的一部分。
+     * 所以取到行尾，上限 60 字符；首尾都卡非空白，免得把标签后的空格也遮进去。
+     *
+     * 因此「收货地址 …… 电话 138……」会把电话一起遮掉。这是过遮，方向是安全的
+     * （spec §13：多遮一块只是麻烦，漏遮一块是事故），何况电话本来也该遮。
+     */
+    private val ADDRESS_VALUE = Regex("""\S.{2,58}\S""")
+
+    private val ADDRESS = LabeledFieldRule(
+        id = "address",
+        kind = SensitiveKind.POSTAL_ADDRESS,
+        enabledByDefault = true,
+        labels = listOf(
+            "收货地址", "收件地址", "寄送地址", "送货地址", "详细地址", "联系地址",
+            "家庭住址", "住址", "地址", "Address",
+        ),
+        value = ADDRESS_VALUE,
+        confidence = 0.8f,
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
@@ -190,7 +234,7 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PhoneRule(), PASSPORT, API_KEY,
+        CARD, IBAN, SSN, MAC, EMAIL, PhoneRule(), PASSPORT, API_KEY, NAME, ADDRESS,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 }

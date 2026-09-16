@@ -72,16 +72,23 @@ class OutlinedByDefaultRuleTest {
     // spec §6 的 11 条
     //   + 计划 04 按 §15 第 5 条的实测漏检补的 longnum 兜底
     //   + 2026-09-04 增补 §3 按真机漏检补的 datetime
-    @Test fun `the rule set has the eleven spec rules plus the two field-added fallbacks`() {
+    //   + 标签锚定的 name / address（见 LabeledFieldRule）——原先它们标着
+    //     「v2 需要 NER，首版不产出」，真机上表现为姓名地址完全漏检
+    @Test fun `the rule set has the eleven spec rules plus the four field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
-            "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey",
+            "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey", "name", "address",
             "url", "ip", "tracking", "longnum", "datetime",
         )
     }
 
-    @Test fun `exactly eight rules are masked by default and five are outlined`() {
+    /**
+     * 仅圈出的那五条**一条没变**：name / address 加在默认打码一侧。
+     * 标签锚定的误报率低——「收货地址」四个字后面那一段几乎必然是地址，
+     * 符合 §6「按误报率划线」。
+     */
+    @Test fun `exactly ten rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
-        assertThat(masked).hasSize(8)
+        assertThat(masked).hasSize(10)
         assertThat(outlined.map { it.id })
             .containsExactly("url", "ip", "tracking", "longnum", "datetime")
     }
