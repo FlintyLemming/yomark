@@ -14,6 +14,7 @@ mlkitFace = "16.1.7"
 mlkitBarcode = "17.3.0"
 libphonenumber = "8.13.52"
 onnxruntime = "1.30.0"
+mlkitGenaiPrompt = "1.0.0-beta4"
 billing = "8.0.0"
 junit = "4.13.2"
 truth = "1.4.4"
@@ -49,6 +50,7 @@ mlkit-barcode-scanning = { module = "com.google.mlkit:barcode-scanning", version
 libphonenumber = { module = "com.googlecode.libphonenumber:libphonenumber", version.ref = "libphonenumber" }
 onnxruntime-android = { module = "com.microsoft.onnxruntime:onnxruntime-android", version.ref = "onnxruntime" }
 onnxruntime-jvm = { module = "com.microsoft.onnxruntime:onnxruntime", version.ref = "onnxruntime" }
+mlkit-genai-prompt = { module = "com.google.mlkit:genai-prompt", version.ref = "mlkitGenaiPrompt" }
 billing-ktx = { module = "com.android.billingclient:billing-ktx", version.ref = "billing" }
 junit = { module = "junit:junit", version.ref = "junit" }
 truth = { module = "com.google.truth:truth", version.ref = "truth" }

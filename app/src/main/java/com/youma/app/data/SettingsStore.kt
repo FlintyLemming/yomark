@@ -57,6 +57,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
             textEngine = prefs[KEY_TEXT_ENGINE].toEnum(fallback.textEngine),
             barcode = prefs[KEY_BARCODE].toEnum(fallback.barcode),
             face = prefs[KEY_FACE].toEnum(fallback.face),
+            semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
     }
@@ -66,6 +67,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
             it[KEY_TEXT_ENGINE] = config.textEngine.name
             it[KEY_BARCODE] = config.barcode.name
             it[KEY_FACE] = config.face.name
+            it[KEY_SEMANTIC] = config.semantic.name
             it[KEY_RULES] = config.encodeOverrides()
         }
     }
@@ -95,5 +97,6 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_BARCODE = stringPreferencesKey("recognition_barcode")
         val KEY_FACE = stringPreferencesKey("recognition_face")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
+        val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
     }
 }

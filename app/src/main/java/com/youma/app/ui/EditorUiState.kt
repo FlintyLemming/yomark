@@ -23,6 +23,8 @@ data class EditorUiState(
     val loading: Boolean = false,
     /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
     val analyzing: Boolean = false,
+    /** 规则结果已上屏，端侧大模型的第二遍还在跑。结果会追加进 plan，只圈出。 */
+    val refining: Boolean = false,
     val exporting: Boolean = false,
     /** 长按手动框进入的选中态：出现四角手柄与删除按钮。 */
     val selectedManualId: String? = null,

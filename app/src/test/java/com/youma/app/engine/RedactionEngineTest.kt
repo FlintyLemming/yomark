@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import com.youma.app.core.geometry.Quad
 import com.youma.app.core.image.SourceImage
+import com.youma.app.core.model.AnalysisResult
 import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.SensitiveKind
@@ -154,5 +155,37 @@ class RedactionEngineTest {
         val line = TextLine(quad(), "hello", 0.8f, emptyList())
         val result = engine(recognizer = FakeRecognizer(lines = listOf(line))).analyze(image())
         assertThat(result.lines).containsExactly(line)
+    }
+
+    // ---------- 第二遍（端侧大模型） ----------
+
+    private fun at(id: String, l: Float, kind: SensitiveKind = SensitiveKind.PERSON_NAME, source: DetectorSource = DetectorSource.LLM) =
+        Candidate(id, Quad.fromRect(RectF(l, 0f, l + 10f, 10f)), kind, source, 0.5f, enabledByDefault = false)
+
+    @Test
+    fun `slow classifiers do not run during analyze`() = runTest {
+        val slow = FakeClassifier("nano", available = true, out = listOf(at("n", 50f)))
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(slow))
+        e.analyze(image())
+        assertThat(slow.classifyCalls).isEqualTo(0)
+        assertThat(e.canRefine).isTrue()
+    }
+
+    @Test
+    fun `refine returns only what the first pass did not already cover`() = runTest {
+        val slow = FakeClassifier("nano", available = true, out = listOf(at("same", 0f), at("new", 50f)))
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(slow))
+        val first = AnalysisResult(emptyList(), listOf(at("rule", 0f, SensitiveKind.PHONE, DetectorSource.RULE)))
+        // 同一块像素规则已经管了，不论模型说它是什么类型都不再叠一个框
+        assertThat(e.refine(first).map { it.id }).containsExactly("new")
+    }
+
+    @Test
+    fun `an unavailable or exploding slow classifier yields nothing`() = runTest {
+        val off = FakeClassifier("off", available = false, out = listOf(at("x", 50f)))
+        val boom = FakeClassifier("boom", available = true, out = emptyList(), boom = true)
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(off, boom))
+        assertThat(e.refine(AnalysisResult(emptyList(), emptyList()))).isEmpty()
+        assertThat(off.classifyCalls).isEqualTo(0)
     }
 }

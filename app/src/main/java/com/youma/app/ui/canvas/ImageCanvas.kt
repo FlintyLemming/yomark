@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import com.youma.app.core.geometry.Quad
 import com.youma.app.core.model.MaskItem
 import com.youma.app.core.model.MaskState
+import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
@@ -304,7 +305,8 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 
 /** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
 private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
-    val text = SensitiveKindLabels.display(item.kind)
+    // 模型猜的与规则命中区分开（spec §3）：Gemini Nano 的结果标「AI」
+    val text = SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         textSize = 26f / scale

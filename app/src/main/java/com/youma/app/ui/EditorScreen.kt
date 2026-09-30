@@ -3,17 +3,22 @@ package com.youma.app.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.canvas.ImageCanvas
@@ -93,6 +98,15 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                 onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
                 onClose = onClose,
             )
+            if (state.refining) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                Text(
+                    "Gemini Nano 正在复核，新发现的会以「AI」标签圈出",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+            }
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()
                 ImageCanvas(

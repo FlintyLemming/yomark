@@ -203,4 +203,45 @@ class EditorViewModelAnalysisTest {
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
         assertThat(vm.state.value.plan.items).hasSize(1)     // 手动打码仍然可用
     }
+
+    // ---------- 第二遍（端侧大模型） ----------
+
+    @Test
+    fun `slow model results are appended outlined after the first pass`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val nano = object : SensitivityClassifier {
+            override val id = "nano"
+            override suspend fun isAvailable() = true
+            override suspend fun classify(lines: List<TextLine>): List<Candidate> {
+                gate.await()
+                return listOf(Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
+                    SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f, enabledByDefault = false))
+            }
+        }
+        val vm = EditorViewModel(
+            intake = ImageIntake(context),
+            exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
+            engineProvider = {
+                RedactionEngine(DeadRecognizer(), emptyList(),
+                    listOf(StubClassifier(listOf(candidate("rule", true, 10f, 10f, 60f, 30f)))),
+                    CandidateMerger(), refiners = listOf(nano))
+            },
+            settings = isolatedSettingsStore(context),
+            savedState = SavedStateHandle(),
+            ioDispatcher = dispatcher,
+        )
+        vm.onImageChosen(sampleUri("nano.jpg")); advanceUntilIdle()
+
+        // 规则的结果先上屏、先打码，不等模型
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+        assertThat(vm.state.value.refining).isTrue()
+
+        gate.complete(Unit); advanceUntilIdle()
+
+        val items = vm.state.value.plan.items.associateBy { it.candidateId }
+        assertThat(items.keys).containsExactly("rule", "llm")
+        assertThat(items.getValue("llm").state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.refining).isFalse()
+        assertThat(vm.state.value.canUndo).isFalse()           // 不是用户动作
+    }
 }

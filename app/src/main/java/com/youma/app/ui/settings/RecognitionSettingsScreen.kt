@@ -28,6 +28,7 @@ import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RuleState
+import com.youma.app.engine.SemanticOption
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.rules.RuleCatalog
 
@@ -89,6 +90,19 @@ fun RecognitionSettingsScreen(
                 selected = config.face,
                 label = ::faceLabel,
                 onSelect = { onChange(config.copy(face = it)) },
+            )
+        }
+
+        item {
+            AxisSection(
+                title = "语义判定（实验）",
+                note = "规则之后，让设备上的 Gemini Nano 再看一遍整页文字，补上规则认不出的人名、地址。" +
+                    "结果只圈出、标「AI」，不自动打码。只在支持 AICore 的机型上生效（如 Pixel 9 及以后），" +
+                    "不支持时自动跳过；推理全在本机，本应用不联网。",
+                options = SemanticOption.entries,
+                selected = config.semantic,
+                label = ::semanticLabel,
+                onSelect = { onChange(config.copy(semantic = it)) },
             )
         }
 
@@ -184,6 +198,11 @@ private fun faceLabel(option: FaceOption) = when (option) {
     FaceOption.FAST -> "快速"
     FaceOption.ACCURATE -> "精确"
     FaceOption.OFF -> "关闭"
+}
+
+private fun semanticLabel(option: SemanticOption) = when (option) {
+    SemanticOption.GEMINI_NANO -> "Gemini Nano"
+    SemanticOption.OFF -> "关闭"
 }
 
 private fun ruleStateLabel(state: RuleState) = when (state) {

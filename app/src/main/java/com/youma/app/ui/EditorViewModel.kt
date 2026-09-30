@@ -11,6 +11,7 @@ import com.youma.app.core.image.ImageIntake
 import com.youma.app.core.image.IntakeResult
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.image.SourceImageLoader
+import com.youma.app.core.model.AnalysisResult
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.MaskItem
 import com.youma.app.core.model.MaskPlan
@@ -30,6 +31,8 @@ import com.youma.app.ui.batch.BatchSession
 import com.youma.app.ui.canvas.GestureRules
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -297,8 +300,10 @@ class EditorViewModel(
      */
     private suspend fun analyze(image: SourceImage, keepOnlyManual: Boolean = false) {
         val ranWith = config
-        val candidates = runCatching { engine.analyze(image).candidates }.getOrElse { emptyList() }
-        val detected = MaskPlanFactory.itemsFrom(candidates)
+        val ranOn = engine
+        refineJob?.cancel()
+        val result = runCatching { ranOn.analyze(image) }.getOrNull()
+        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty())
         // 分析结果不进撤销栈——它是初始状态，不是用户动作。
         // 用户在分析期间画的手动框排在后面，不被覆盖。
         val current = _state.value
@@ -307,10 +312,35 @@ class EditorViewModel(
             if (keepOnlyManual) current.plan.items.filter { it.kind == SensitiveKind.MANUAL }
             else current.plan.items
         analyzedWith = ranWith
+        val refining = result != null && ranOn.canRefine
         uiState = current.copy(
             analyzing = false,
+            refining = refining,
             plan = current.plan.copy(items = detected + kept),
         )
+        if (refining) refine(image, result!!, ranWith, ranOn)
+    }
+
+    private var refineJob: Job? = null
+
+    /**
+     * 第二遍：端侧大模型的语义判定（Gemini Nano）。它要几秒，所以不挡第一批结果——
+     * 规则的结果先上屏、先打码，模型的结果到了再追加进来，只圈出、标「AI」。
+     *
+     * 追加不进撤销栈：与第一批结果一样，它是初始状态，不是用户动作。
+     * 这期间换了图、换了方案，这一批就作废。
+     */
+    private fun refine(image: SourceImage, result: AnalysisResult, ranWith: RecognitionConfig, ranOn: RedactionEngine) {
+        refineJob = viewModelScope.launch {
+            val extra = ranOn.refine(result)
+            ensureActive()
+            val current = _state.value
+            if (current.image !== image || analyzedWith != ranWith) return@launch
+            uiState = current.copy(
+                refining = false,
+                plan = current.plan.copy(items = current.plan.items + MaskPlanFactory.itemsFrom(extra)),
+            )
+        }
     }
 
     // ---------- 编辑 ----------

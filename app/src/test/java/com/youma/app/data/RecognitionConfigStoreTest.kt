@@ -6,6 +6,7 @@ import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RuleState
+import com.youma.app.engine.SemanticOption
 import com.youma.app.engine.TextEngineOption
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -29,6 +30,7 @@ class RecognitionConfigStoreTest {
             textEngine = TextEngineOption.CHINESE,
             barcode = BarcodeOption.STRICT,
             face = FaceOption.OFF,
+            semantic = SemanticOption.OFF,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )
         store.setRecognitionConfig(cfg)

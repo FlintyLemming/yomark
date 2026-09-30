@@ -17,13 +17,19 @@ enum class BarcodeOption { LOOSE, STRICT, OFF }
 
 enum class FaceOption { FAST, ACCURATE, OFF }
 
+/**
+ * 语义判定：规则之后让端侧大模型再看一遍（spec §14 的 Gemini Nano 接口位）。
+ * 只在支持 AICore 的机型上生效，不支持时自动跳过；结果只圈出、不自动打码。
+ */
+enum class SemanticOption { GEMINI_NANO, OFF }
+
 /** 一条规则的三态。OFF 的规则根本不进引擎，另两态决定候选的初始 MaskState。 */
 enum class RuleState { OFF, OUTLINED, MASKED }
 
 /**
  * 识别方案（本文件对应 2026-09-04 的增补设计 §1）。
  *
- * 四根轴各自独立，刻意不提供命名预设——逐项开关的全部意义就在于变量隔离，
+ * 各根轴各自独立，刻意不提供命名预设——逐项开关的全部意义就在于变量隔离，
  * 预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  */
 data class RecognitionConfig(
@@ -34,6 +40,7 @@ data class RecognitionConfig(
     val textEngine: TextEngineOption = TextEngineOption.PADDLE,
     val barcode: BarcodeOption = BarcodeOption.LOOSE,
     val face: FaceOption = FaceOption.FAST,
+    val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
      * **只存与出厂默认不同的项。** 存全表的话，出厂默认改了之后老安装会读到
      * 一份冻结的旧全表，变成一个需要迁移的问题；只存差异则新规则天然继承新默认。
