@@ -13,6 +13,8 @@ package com.youma.app.rules
  *
  * 遮的是**值**不是字段名：把「收货人」三个字一起涂黑，用户就看不懂自己在看什么了。
  *
+ * 跑在 HanView 上：中文识别器把「收货地址」切成「收 货 地 址」时，标签照样认得出。
+ *
  * @param value 值的形状。姓名与地址差别很大（地址必须含数字，姓名遇数字就该停），
  *   所以不在这里写死，由调用方给。
  */
@@ -39,9 +41,11 @@ class LabeledField(
             ")[：:＝=]?[ 　]*"
     )
 
-    override fun findIn(text: String): List<RuleMatch> =
-        label.findAll(text)
-            .mapNotNull { l -> value.matchAt(text, l.range.last + 1) }
-            .map { RuleMatch(it.range, confidence) }
+    override fun findIn(text: String): List<RuleMatch> {
+        val view = HanView.of(text)
+        return label.findAll(view.text)
+            .mapNotNull { l -> value.matchAt(view.text, l.range.last + 1) }
+            .map { RuleMatch(view.toSource(it.range), confidence) }
             .toList()
+    }
 }

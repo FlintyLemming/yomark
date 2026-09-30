@@ -82,29 +82,54 @@ object DefaultRuleSet {
         validate = { _, m -> Checksums.shannonEntropy(m.value) > 3.5 },
     )
 
-    // ---------- 标签锚定：姓名与地址（见 LabeledField） ----------
+    /**
+     * 姓名规则拿它找锚点，所以单独拎出来、与规则表共用同一个实例。
+     * 电话规则被用户关掉时，它仍然替姓名规则找锚——关的是「遮电话」，不是「认电话」。
+     */
+    private val PHONE = PhoneRule()
+
+    // ---------- 姓名与地址：标签锚定为主，形状与邻居补漏 ----------
+
+    /** 物流轨迹里「签收人：」后面常见的非人名：「本人」「菜鸟驿站」「门卫」。 */
+    private const val NOT_A_NAME_VALUE = "本人|他人|家人|同事|邻居|门卫|保安|前台|物业|收发室|快递柜|驿站|代收"
 
     /**
      * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
      *
-     * 三个分支对应三种排版：连写的汉字名、被中文识别器拆成单字再用空格拼回来的名、
-     * 拉丁名。连写分支放在最前，`张三 性别 男` 才会只取到 `张三`。
+     * 三个分支对应三种排版：连写的汉字名、字距拉开后被空格隔开的名、拉丁名。
+     * 连写分支放在最前，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
+     * 逐字切分的行拼回来成了「张三手机」时，不把「手机」也吞进去。
+     *
+     * 值里含 NOT_A_NAME_VALUE 的词、或者紧跟着它们，整个值作废，而不是停在它们前面——
+     * 否则「菜鸟驿站」会剩下「菜鸟」两个字被当成名字。
      */
     private val NAME_VALUE = Regex(
-        """[\u4e00-\u9fa5]{2,6}""" +
+        """(?:(?!电话|手机|性别|民族|出生|地址|住址|身份|证件|联系|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5]){2,6}""" +
+            """(?!$NOT_A_NAME_VALUE)""" +
             """|[\u4e00-\u9fa5](?:[ ][\u4e00-\u9fa5]){1,5}""" +
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
+    /**
+     * 姓名 = 字段名后面的值 + 电话前面的名字。
+     *
+     * 后一种是真机漏检补的：菜鸟快递详情页的收件人一行是「沐晨冉 86-186****3392」，
+     * 没有任何字段名。见 NameBeforePhone。
+     */
     private val NAME = CompositeRule(
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
         LabeledField(
-            labels = listOf("收货人", "收件人", "联系人", "持卡人", "真实姓名", "姓名", "户名", "开户名", "Name", "Recipient"),
+            labels = listOf(
+                "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
+                "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
+                "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
+            ),
             value = NAME_VALUE,
             confidence = 0.8f,
         ),
+        NameBeforePhone(PHONE, confidence = 0.7f),
     )
 
     /**
@@ -116,18 +141,27 @@ object DefaultRuleSet {
      */
     private val ADDRESS_VALUE = Regex("""\S.{2,58}\S""")
 
+    /**
+     * 地址 = 字段名后面的值 + 长得像门牌的串。
+     *
+     * 后一种是真机漏检补的：菜鸟快递详情页只写「送至」，淘宝收货卡片什么都不写，
+     * 驿站地址夹在一句通知中间。见 AddressShape。
+     */
     private val ADDRESS = CompositeRule(
         id = "address",
         kind = SensitiveKind.POSTAL_ADDRESS,
         enabledByDefault = true,
         LabeledField(
             labels = listOf(
-                "收货地址", "收件地址", "寄送地址", "送货地址", "详细地址", "联系地址",
-                "家庭住址", "住址", "地址", "Address",
+                "收货地址", "收件地址", "寄件地址", "发货地址", "退货地址", "取件地址", "寄送地址",
+                "送货地址", "配送地址", "送达地址", "详细地址", "联系地址", "通讯地址", "家庭地址",
+                "居住地址", "户籍地址", "家庭住址", "现住址", "所在地区", "住址", "地址",
+                "配送至", "送货至", "送至", "寄至", "Address", "Ship to", "Deliver to",
             ),
             value = ADDRESS_VALUE,
             confidence = 0.8f,
         ),
+        AddressShape(confidence = 0.7f),
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
@@ -238,7 +272,7 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PhoneRule(), PASSPORT, API_KEY, NAME, ADDRESS,
+        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 }

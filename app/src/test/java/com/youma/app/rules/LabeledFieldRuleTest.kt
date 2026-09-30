@@ -40,6 +40,19 @@ class LabeledFieldRuleTest {
         assertThat(matched("name", "张三去了北京")).isEmpty()
     }
 
+    /**
+     * 物流轨迹每一单都有「签收人：本人」。这些值整个作废，
+     * 不能停在「驿站」前面把「菜鸟」两个字当成名字。
+     */
+    @Test fun `placeholder recipients are not names`() {
+        listOf("签收人：本人", "签收人：门卫", "签收人：菜鸟驿站", "签收人：丰巢快递柜", "签收人：他人代收")
+            .forEach { assertThat(matched("name", it)).isEmpty() }
+    }
+
+    @Test fun `a courier label anchors the courier name`() {
+        assertThat(matched("name", "快 递 员 王 强 138****5678")).containsExactly("王 强")
+    }
+
     // ---------- 地址 ----------
     /** 地址天然含数字（门牌号），不能用姓名那套「遇数字即停」。 */
     @Test fun `address keeps the house number`() {
@@ -47,8 +60,9 @@ class LabeledFieldRuleTest {
             .containsExactly("北京市朝阳区建国路 88 号")
     }
 
-    @Test fun `address ignores text with no label`() {
-        assertThat(matched("address", "北京市朝阳区建国路 88 号")).isEmpty()
+    /** 没有字段名、也没有门牌形状的文字不是地址（有门牌形状的见 AddressShapeTest）。 */
+    @Test fun `address ignores text with no label and no house number`() {
+        assertThat(matched("address", "我明天去北京出差")).isEmpty()
     }
 
     /**
@@ -63,6 +77,38 @@ class LabeledFieldRuleTest {
     /** 同理「邮箱地址」——这条靠汉字后顾已经挡住了，一并钉死免得回归。 */
     @Test fun `address ignores a label that is part of a longer chinese word`() {
         assertThat(matched("address", "邮箱地址 alice@example.com")).isEmpty()
+    }
+
+    // ---------- 中文识别器逐字切分 ----------
+    /**
+     * 中文识别器可能一个汉字一个 element，拼接后标签成了「收 货 地 址」。
+     * 规则要先把它拼回来，否则标签锚定在真机上整条失灵。
+     */
+    @Test fun `labels are found when the recognizer splits every character`() {
+        assertThat(matched("address", "收 货 地 址 ： 北 京 市 朝 阳 区 建 国 路 88 号"))
+            .containsExactly("北 京 市 朝 阳 区 建 国 路 88 号")
+        assertThat(matched("name", "收 件 人 张 三 13812345678")).containsExactly("张 三")
+    }
+
+    /** 拼回来之后「IP地址」仍然是一个词，词中词的挡板不能因为切分而失效。 */
+    @Test fun `split latin prefixed labels are still rejected`() {
+        assertThat(matched("address", "IP 地 址 192.168.1.10")).isEmpty()
+    }
+
+    /** 逐字切分拼回来成了「张三手机」时，名字在下一个字段名前停下。 */
+    @Test fun `a split name stops before the next field label`() {
+        assertThat(matched("name", "联 系 人 张 三 手 机 号 码")).containsExactly("张 三")
+    }
+
+    /** 菜鸟快递详情页的收件地址只有「送至」两个字领着。 */
+    @Test fun `address follows the song zhi label of a logistics page`() {
+        assertThat(matched("address", "送至 祁门路33号四方新村23幢605室"))
+            .containsExactly("祁门路33号四方新村23幢605室")
+    }
+
+    /** 「送至」在句子中间是动词，不是字段名。 */
+    @Test fun `song zhi inside a sentence is not a label`() {
+        assertThat(matched("address", "预计明天送至驿站")).isEmpty()
     }
 
     // ---------- 出厂态 ----------
