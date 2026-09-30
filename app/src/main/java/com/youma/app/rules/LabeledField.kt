@@ -1,9 +1,7 @@
 package com.youma.app.rules
 
-import com.youma.app.core.model.SensitiveKind
-
 /**
- * 标签锚定规则：先认字段名，再取紧随其后的值。
+ * 标签锚定：先认字段名，再取紧随其后的值。
  *
  * 姓名与地址没有任何形状特征——`张三` 和 `北京` 在正则眼里毫无区别，
  * 校验位、长度窗口、字符集这些手段一个都用不上。`Sensitivity.kt` 因此把
@@ -18,14 +16,11 @@ import com.youma.app.core.model.SensitiveKind
  * @param value 值的形状。姓名与地址差别很大（地址必须含数字，姓名遇数字就该停），
  *   所以不在这里写死，由调用方给。
  */
-class LabeledFieldRule(
-    override val id: String,
-    override val kind: SensitiveKind,
-    override val enabledByDefault: Boolean,
+class LabeledField(
     labels: List<String>,
     private val value: Regex,
     private val confidence: Float,
-) : Rule {
+) : Finder {
 
     /**
      * 长标签排在前面，`收货地址` 才不会被 `地址` 抢先匹配掉半截。

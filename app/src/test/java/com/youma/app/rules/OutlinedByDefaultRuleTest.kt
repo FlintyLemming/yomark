@@ -72,7 +72,7 @@ class OutlinedByDefaultRuleTest {
     // spec §6 的 11 条
     //   + 计划 04 按 §15 第 5 条的实测漏检补的 longnum 兜底
     //   + 2026-09-04 增补 §3 按真机漏检补的 datetime
-    //   + 标签锚定的 name / address（见 LabeledFieldRule）——原先它们标着
+    //   + 标签锚定的 name / address（见 LabeledField）——原先它们标着
     //     「v2 需要 NER，首版不产出」，真机上表现为姓名地址完全漏检
     @Test fun `the rule set has the eleven spec rules plus the four field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(

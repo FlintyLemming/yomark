@@ -10,7 +10,7 @@ enum class SensitiveKind {
     /** 日期与时间。出厂仅圈出——时间在截图里无处不在，默认打码会打扰所有人。 */
     DATETIME,
 
-    // PERSON_NAME / POSTAL_ADDRESS 由 LabeledFieldRule 以**标签锚定**产出，不是 NER：
+    // PERSON_NAME / POSTAL_ADDRESS 由 LabeledField 以**标签锚定**产出，不是 NER：
     // 认得出「收货人」「收货地址」这类字段名后面的值，认不出自由行文里的人名地址。
     // 完整覆盖仍然要等 NER（spec §14 的接口已留）。ORG_NAME 至今没有产出方。
     POSTAL_ADDRESS, PERSON_NAME, ORG_NAME,

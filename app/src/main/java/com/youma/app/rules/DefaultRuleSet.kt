@@ -82,7 +82,7 @@ object DefaultRuleSet {
         validate = { _, m -> Checksums.shannonEntropy(m.value) > 3.5 },
     )
 
-    // ---------- 标签锚定：姓名与地址（见 LabeledFieldRule） ----------
+    // ---------- 标签锚定：姓名与地址（见 LabeledField） ----------
 
     /**
      * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
@@ -96,13 +96,15 @@ object DefaultRuleSet {
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
-    private val NAME = LabeledFieldRule(
+    private val NAME = CompositeRule(
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
-        labels = listOf("收货人", "收件人", "联系人", "持卡人", "真实姓名", "姓名", "户名", "开户名", "Name", "Recipient"),
-        value = NAME_VALUE,
-        confidence = 0.8f,
+        LabeledField(
+            labels = listOf("收货人", "收件人", "联系人", "持卡人", "真实姓名", "姓名", "户名", "开户名", "Name", "Recipient"),
+            value = NAME_VALUE,
+            confidence = 0.8f,
+        ),
     )
 
     /**
@@ -114,16 +116,18 @@ object DefaultRuleSet {
      */
     private val ADDRESS_VALUE = Regex("""\S.{2,58}\S""")
 
-    private val ADDRESS = LabeledFieldRule(
+    private val ADDRESS = CompositeRule(
         id = "address",
         kind = SensitiveKind.POSTAL_ADDRESS,
         enabledByDefault = true,
-        labels = listOf(
-            "收货地址", "收件地址", "寄送地址", "送货地址", "详细地址", "联系地址",
-            "家庭住址", "住址", "地址", "Address",
+        LabeledField(
+            labels = listOf(
+                "收货地址", "收件地址", "寄送地址", "送货地址", "详细地址", "联系地址",
+                "家庭住址", "住址", "地址", "Address",
+            ),
+            value = ADDRESS_VALUE,
+            confidence = 0.8f,
         ),
-        value = ADDRESS_VALUE,
-        confidence = 0.8f,
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
