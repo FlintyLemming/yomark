@@ -1,7 +1,10 @@
 package com.youma.app.engine
 
-/** OCR 后端。BOTH 并行跑两个再取并集，去重交给 CandidateMerger。 */
-enum class TextEngineOption { LATIN, CHINESE, BOTH }
+/**
+ * OCR 后端。PADDLE = PP-OCRv5 mobile（ONNX Runtime，随包发行）；
+ * 其余三档是 ML Kit：BOTH 并行跑两个再取并集，去重交给 CandidateMerger。
+ */
+enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
 
 /**
  * 条码策略。
@@ -24,7 +27,11 @@ enum class RuleState { OFF, OUTLINED, MASKED }
  * 预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  */
 data class RecognitionConfig(
-    val textEngine: TextEngineOption = TextEngineOption.BOTH,
+    /**
+     * 出厂是 PP-OCR：真机截图上中文识别明显好于 ML Kit（打了星的号码、生僻字人名都认得出），
+     * 而且能给出字符级的框。ML Kit 三档留着，逐项开关的意义就在于能切回去对比。
+     */
+    val textEngine: TextEngineOption = TextEngineOption.PADDLE,
     val barcode: BarcodeOption = BarcodeOption.LOOSE,
     val face: FaceOption = FaceOption.FAST,
     /**

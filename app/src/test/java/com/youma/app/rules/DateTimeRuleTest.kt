@@ -31,6 +31,22 @@ class DateTimeRuleTest {
         assertThat(matches("耗时 12:08:07 结束")).containsExactly("12:08:07")
     }
 
+    /** 物流轨迹里不带年份的写法；PP-OCR 可能把中间的空格读丢。 */
+    @Test fun `month and day followed by a time`() {
+        assertThat(matches("待取件 09-29 12:30")).containsExactly("09-29 12:30")
+        assertThat(matches("待取件09-2912:30")).containsExactly("09-2912:30")
+    }
+
+    /** 月日后面不跟时间就不认：「3-2」这类串太容易是编号、比分。 */
+    @Test fun `month and day alone is not a date`() {
+        assertThat(matches("取件码 3-2-1234")).isEmpty()
+        assertThat(matches("比分 3-1")).isEmpty()
+    }
+
+    @Test fun `an impossible month before a time is rejected`() {
+        assertThat(matches("编号 13-45 12:30")).isEmpty()
+    }
+
     /** 一个匹配吃掉日期和时间，不能拆成两条——拆开会在同一处叠出两个候选。 */
     @Test fun `date and time are one match`() {
         assertThat(rule.findIn("付款时间 2026-09-03 12:08:07")).hasSize(1)

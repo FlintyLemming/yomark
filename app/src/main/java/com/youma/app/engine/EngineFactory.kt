@@ -5,6 +5,7 @@ import com.youma.app.engine.mlkit.MlKitBarcodeDetector
 import com.youma.app.engine.mlkit.MlKitFaceDetector
 import com.youma.app.engine.mlkit.MlKitTextRecognizer
 import com.youma.app.engine.mlkit.TextScript
+import com.youma.app.engine.ppocr.PaddleTextRecognizer
 import com.youma.app.rules.RuleCatalog
 import com.youma.app.rules.RuleClassifier
 
@@ -17,7 +18,7 @@ import com.youma.app.rules.RuleClassifier
  * v2 想加 Gemini Nano 语义判定：classifiers 里追加一项，其余不动。
  */
 fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig()) = RedactionEngine(
-    recognizer = textRecognizerFor(config.textEngine),
+    recognizer = textRecognizerFor(context, config.textEngine),
     regionDetectors = buildList {
         if (config.face != FaceOption.OFF) add(MlKitFaceDetector(config.face))
         if (config.barcode != BarcodeOption.OFF) add(MlKitBarcodeDetector(config.barcode))
@@ -25,7 +26,8 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
     classifiers = listOf(RuleClassifier(RuleCatalog.rulesFor(config))),
 )
 
-private fun textRecognizerFor(option: TextEngineOption): TextRecognizer = when (option) {
+private fun textRecognizerFor(context: Context, option: TextEngineOption): TextRecognizer = when (option) {
+    TextEngineOption.PADDLE -> PaddleTextRecognizer(context)
     TextEngineOption.LATIN -> MlKitTextRecognizer(TextScript.LATIN)
     TextEngineOption.CHINESE -> MlKitTextRecognizer(TextScript.CHINESE)
     TextEngineOption.BOTH -> CompositeTextRecognizer(

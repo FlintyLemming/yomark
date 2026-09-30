@@ -2,6 +2,8 @@ package com.youma.app.ui.settings
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -58,8 +60,8 @@ fun RecognitionSettingsScreen(
         item {
             AxisSection(
                 title = "文字识别",
-                note = "两者并跑 = 两个识别器并行跑一遍取并集，召回最高、耗时取两者的较大值。" +
-                    "拉丁识别器不认中文，中文识别器同时认拉丁。",
+                note = "PP-OCR = PaddleOCR v5 移动版，中文最准、能精确到单个字，但比 ML Kit 慢。" +
+                    "其余三档是 ML Kit：两者并跑 = 拉丁与中文识别器并行取并集；拉丁识别器不认中文。",
                 options = TextEngineOption.entries,
                 selected = config.textEngine,
                 label = ::textEngineLabel,
@@ -133,6 +135,7 @@ fun RecognitionSettingsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun <T> AxisSection(
     title: String,
@@ -144,7 +147,7 @@ private fun <T> AxisSection(
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(title, style = MaterialTheme.typography.titleMedium)
-        Row(
+        FlowRow(
             Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -165,6 +168,7 @@ private fun <T> AxisSection(
 }
 
 private fun textEngineLabel(option: TextEngineOption) = when (option) {
+    TextEngineOption.PADDLE -> "PP-OCR"
     TextEngineOption.LATIN -> "拉丁"
     TextEngineOption.CHINESE -> "中文"
     TextEngineOption.BOTH -> "两者并跑"

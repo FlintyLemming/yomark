@@ -105,6 +105,10 @@ androidComponents {
     }
 }
 
+configurations.matching { it.name.endsWith("UnitTestRuntimeClasspath") }.configureEach {
+    exclude(group = "com.microsoft.onnxruntime", module = "onnxruntime-android")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
@@ -126,6 +130,7 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.libphonenumber)
+    implementation(libs.onnxruntime.android)
     implementation(libs.billing.ktx)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
@@ -134,6 +139,9 @@ dependencies {
     testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.androidx.test.core)
+    // PP-OCR 的单测在 JVM 上跑真的 ONNX 模型：换成桌面版 onnxruntime（API 与 Android 版同一套 ai.onnxruntime），
+    // Android 版的 .so 在 JVM 上加载不了，从单测运行期 classpath 里摘掉。
+    testImplementation(libs.onnxruntime.jvm)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

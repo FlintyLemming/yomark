@@ -12,7 +12,7 @@ import com.youma.app.core.model.SensitiveKind
  * 默认打码会让用户一直在跟 app 对着干。这是 spec §6「按误报率划线，
  * 不按危害划线」的直接应用。
  *
- * 日期与紧随其后的时间**合成一个匹配**。拆成两条会在同一处叠出两个候选，
+ * 日期与紧随其后的时间**合成一个匹配**（含不带年份的「09-29 12:30」）。拆成两条会在同一处叠出两个候选，
  * 而合并只在同 kind 之间做，用户就得点两次才能放过一个时间戳。
  */
 class DateTimeRule : Rule {
@@ -32,12 +32,15 @@ class DateTimeRule : Rule {
      * `88:12` 会被时间分支的字符类挡掉，但月/日没有同样的字符类可用。
      */
     private fun inRange(value: String): Boolean {
-        val nums = NUMBER.findAll(value).map { it.value.toInt() }.toList()
-        if (value.first().isDigit() && value.length >= 8 && nums.size >= 3) {
-            val (_, month, day) = nums
-            if (month !in 1..12 || day !in 1..31) return false
+        val monthDay = MONTH_DAY_FIRST.find(value)
+        val (month, day) = when {
+            YEAR_FIRST.containsMatchIn(value) -> NUMBER.findAll(value).map { it.value.toInt() }.toList()
+                .takeIf { it.size >= 3 }?.let { it[1] to it[2] } ?: return true
+            // 不能用 NUMBER 切：「09-2912:30」里日与时粘在一起，会切出 2912
+            monthDay != null -> monthDay.groupValues[1].toInt() to monthDay.groupValues[2].toInt()
+            else -> return true
         }
-        return true
+        return month in 1..12 && day in 1..31
     }
 
     private companion object {
@@ -49,7 +52,16 @@ class DateTimeRule : Rule {
         /** 时:分(:秒)，小时与分钟用字符类卡死范围，所以 88:12 根本不成形 */
         const val TIME = """(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?"""
 
-        val PATTERN = Regex("""(?<![\d:.])(?:$DATE(?:[ T]$TIME)?|$TIME)(?![\d:])""")
+        /**
+         * 不带年份的「09-29 12:30」：物流轨迹、聊天记录里最常见的写法。
+         * 月日单独出现太容易撞上别的（比分、编号），所以只认后面跟着时间的。
+         * 时间前的空格可有可无——PP-OCR 按像素补空格，窄间隙会被当成没有，读成「09-2912:30」。
+         */
+        const val MONTH_DAY = """\d{1,2}[-/]\d{1,2}"""
+
+        val PATTERN = Regex("""(?<![\d:.])(?:$DATE(?:[ T]$TIME)?|$MONTH_DAY ?$TIME|$TIME)(?![\d:])""")
         val NUMBER = Regex("""\d+""")
+        val YEAR_FIRST = Regex("""^\d{4}""")
+        val MONTH_DAY_FIRST = Regex("""^(\d{1,2})[-/](\d{1,2})(?= ?$TIME)""")
     }
 }

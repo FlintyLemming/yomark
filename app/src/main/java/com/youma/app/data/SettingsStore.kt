@@ -86,7 +86,12 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
-        val KEY_TEXT_ENGINE = stringPreferencesKey("recognition_text_engine")
+        /**
+         * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
+         * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。
+         * 换键让所有安装都回到新的出厂值一次，之后照常记住用户的选择。
+         */
+        val KEY_TEXT_ENGINE = stringPreferencesKey("recognition_text_engine_v2")
         val KEY_BARCODE = stringPreferencesKey("recognition_barcode")
         val KEY_FACE = stringPreferencesKey("recognition_face")
         val KEY_RULES = stringPreferencesKey("recognition_rules")

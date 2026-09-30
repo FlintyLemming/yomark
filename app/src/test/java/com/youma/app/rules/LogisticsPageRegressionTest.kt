@@ -56,7 +56,7 @@ class LogisticsPageRegressionTest {
     private val expected = listOf(
         DATETIME to "16:08",
         TRACKING_NO to "773443899958908",
-        DATETIME to "12:30",
+        DATETIME to "09-29 12:30",
         POSTAL_ADDRESS to "合肥四方新村10栋101室",       // 通知里的驿站地址
         POSTAL_ADDRESS to "合肥四方新村10栋101室",       // 驿站名
         POSTAL_ADDRESS to "四方新村10栋101室",           // 驿站地址
@@ -86,7 +86,7 @@ class LogisticsPageRegressionTest {
         val found = findings(page.map(::splitEveryCharacter))
         found.forEach { (_, text) -> assertThat(text).isEqualTo(text.trim()) }
         assertThat(found.map { (kind, text) -> kind to text.replace(" ", "") })
-            .containsExactlyElementsIn(expected)
+            .containsExactlyElementsIn(expected.map { (kind, text) -> kind to text.replace(" ", "") })
     }
 
     /** 名字、电话、地址、取件码都默认打码——漏检的这几样恰恰是最不该露出去的。 */

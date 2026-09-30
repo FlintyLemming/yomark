@@ -6,9 +6,9 @@ import org.junit.Test
 
 class RecognitionConfigTest {
 
-    @Test fun `factory default runs both text engines`() {
-        // 唯一不可能比现状更差的默认：中文那条 lane 出问题，拉丁仍然产出今天的一切。
-        assertThat(RecognitionConfig().textEngine).isEqualTo(TextEngineOption.BOTH)
+    @Test fun `factory default is pp-ocr`() {
+        // 真机截图上中文识别明显好于 ML Kit，且能给出字符级的框；ML Kit 三档留作对比
+        assertThat(RecognitionConfig().textEngine).isEqualTo(TextEngineOption.PADDLE)
     }
 
     @Test fun `factory default keeps barcode loose and face fast`() {

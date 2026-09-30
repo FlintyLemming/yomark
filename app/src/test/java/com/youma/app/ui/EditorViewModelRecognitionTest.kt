@@ -110,12 +110,12 @@ class EditorViewModelRecognitionTest {
     @Test fun `switching the config re-runs recognition with the new engine`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        assertThat(ids(vm)).contains("from-${TextEngineOption.BOTH}")
+        assertThat(ids(vm)).contains("from-${TextEngineOption.PADDLE}")
 
         vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
 
         assertThat(ids(vm)).contains("from-${TextEngineOption.LATIN}")
-        assertThat(ids(vm)).doesNotContain("from-${TextEngineOption.BOTH}")
+        assertThat(ids(vm)).doesNotContain("from-${TextEngineOption.PADDLE}")
     }
 
     @Test fun `manual boxes survive the re-run`() = runTest(dispatcher) {
