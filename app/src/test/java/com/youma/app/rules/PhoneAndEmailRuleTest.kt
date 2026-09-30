@@ -55,6 +55,31 @@ class PhoneAndEmailRuleTest {
         assertThat(matched(phone, "订单号 4155552671 备注 无")).isEmpty()
     }
 
+    // ---------- 打了星的手机号（菜鸟快递详情页实测漏检） ----------
+    /**
+     * 电商、快递页面上的收件人电话几乎都打了星（「号码保护中」），
+     * libphonenumber 不认带星号的串。露出的前三后四照样能配合姓名定位到人。
+     */
+    @Test fun `phone finds a masked mainland mobile number`() {
+        assertThat(matched(phone, "沐晨冉 86-186****3392 号码保护中")).containsExactly("86-186****3392")
+        assertThat(matched(phone, "张三 186****3392")).containsExactly("186****3392")
+        assertThat(matched(phone, "+86 138 **** 5678")).containsExactly("+86 138 **** 5678")
+        assertThat(matched(phone, "186xxxx3392")).containsExactly("186xxxx3392")
+    }
+
+    /** 逐字切分拼回来的行里，号码前后紧贴着汉字。 */
+    @Test fun `phone finds a masked number glued to han characters`() {
+        assertThat(matched(phone, "沐晨冉86-186****3392号码保护中")).containsExactly("86-186****3392")
+    }
+
+    /** 同样打了星的银行卡号、身份证号，位数与开头都对不上手机号。 */
+    @Test fun `phone rejects other masked identifiers`() {
+        assertThat(matched(phone, "6222 **** **** 1234")).isEmpty()
+        assertThat(matched(phone, "130101********1234")).isEmpty()
+        assertThat(matched(phone, "密码 13****")).isEmpty()
+        assertThat(matched(phone, "186****33921")).isEmpty()
+    }
+
     @Test fun `phone is masked by default`() {
         assertThat(phone.enabledByDefault).isTrue()
         assertThat(phone.kind).isEqualTo(SensitiveKind.PHONE)
