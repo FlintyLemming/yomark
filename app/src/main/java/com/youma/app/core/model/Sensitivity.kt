@@ -10,6 +10,9 @@ enum class SensitiveKind {
     /** 日期与时间。出厂仅圈出——时间在截图里无处不在，默认打码会打扰所有人。 */
     DATETIME,
 
+    /** 驿站、快递柜的取件码。凭它就能把包裹取走，默认打码。 */
+    PICKUP_CODE,
+
     // PERSON_NAME / POSTAL_ADDRESS 不是 NER 产出的：标签锚定认字段名后面的值，
     // 另外人名认电话前面的那几个字、地址认门牌的形状（NameBeforePhone / AddressShape）。
     // 自由行文里的人名地址仍然认不出，完整覆盖要等 NER（spec §14 的接口已留）。

@@ -5,7 +5,7 @@ import com.youma.app.rules.validator.Checksums
 import com.youma.app.rules.validator.KnownTlds
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。15 条：10 条默认打码、5 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。16 条：11 条默认打码、5 条仅圈出。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
  * 一直在跟 app 对着干；有校验位兜底的类型误报接近零，自动打码不打扰任何人。
@@ -88,7 +88,7 @@ object DefaultRuleSet {
      */
     private val PHONE = PhoneRule()
 
-    // ---------- 姓名与地址：标签锚定为主，形状与邻居补漏 ----------
+    // ---------- 姓名、地址、取件码：标签锚定为主，形状与邻居补漏 ----------
 
     /** 物流轨迹里「签收人：」后面常见的非人名：「本人」「菜鸟驿站」「门卫」。 */
     private const val NOT_A_NAME_VALUE = "本人|他人|家人|同事|邻居|门卫|保安|前台|物业|收发室|快递柜|驿站|代收"
@@ -162,6 +162,24 @@ object DefaultRuleSet {
             confidence = 0.8f,
         ),
         AddressShape(confidence = 0.7f),
+    )
+
+    /**
+     * 取件码（真机漏检补的）。驿站、快递柜凭它取件，截图里露出来，
+     * 看到的人就能去把包裹拿走——危害比快递单号直接得多。
+     *
+     * 只认字段名后面的值，误报率低，所以默认打码。值至少含一位数字，
+     * 「请凭取货码及时领取」这种说明文字不会被当成值。
+     */
+    private val PICKUP_CODE = CompositeRule(
+        id = "pickup",
+        kind = SensitiveKind.PICKUP_CODE,
+        enabledByDefault = true,
+        LabeledField(
+            labels = listOf("取件码", "取货码", "提货码", "取件号", "自提码"),
+            value = Regex("""[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""),
+            confidence = 0.8f,
+        ),
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
@@ -272,7 +290,7 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS,
+        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 }
