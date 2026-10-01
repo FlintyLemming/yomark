@@ -1,10 +1,19 @@
 package com.youma.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -120,6 +129,10 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                     onCommitDrag = vm::commitDrag,
                     onDeleteSelected = vm::deleteSelected,
                 )
+                AnalyzingPill(
+                    visible = state.analyzing && state.image != null,
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                )
             }
             val batch = state.batch
             EditorBottomBar(
@@ -134,6 +147,36 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                 onNext = if (batch != null && !batch.isLast) vm::nextImage else null,
                 aiReview = state.aiReview,
                 onAiReview = vm::runAiReview,
+            )
+        }
+    }
+}
+
+/**
+ * 识别中的提示条，与画布上的扫描动效一起出现（PP-OCR 一张图约 2 秒）。
+ *
+ * 用 Box 画底色而不是 Surface：Material3 的 Surface 会吃掉触摸，
+ * 识别期间画布仍可交互（spec §7.1），提示条底下那一块也不该点不动。
+ */
+@Composable
+private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Row(
+            Modifier
+                .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f), RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircularProgressIndicator(
+                Modifier.size(14.dp),
+                color = MaterialTheme.colorScheme.inverseOnSurface,
+                strokeWidth = 2.dp,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                "正在识别敏感信息…",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.inverseOnSurface,
             )
         }
     }

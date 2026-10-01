@@ -2,14 +2,23 @@ package com.youma.app.ui.canvas
 
 import android.graphics.Color as AndroidColor
 import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PointF
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.Typeface
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,12 +37,16 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.ColorUtils
 import com.youma.app.core.geometry.Quad
+import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.MaskItem
+import com.youma.app.core.model.MaskOptions
 import com.youma.app.core.model.MaskState
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 /**
  * 画布：图像 + 遮罩 + 叠层 + 手势。
@@ -66,6 +79,29 @@ fun ImageCanvas(
             textAlign = Paint.Align.CENTER
         }
     }
+
+    // 识别中的扫描动效与结果上屏的淡入（见 ScanEffect）。这几个值只在绘制里读，
+    // 动起来只触发重绘，不触发重组；平时一帧都不占。
+    val scanning = state.analyzing
+    val veil by animateFloatAsState(
+        targetValue = if (scanning) 1f else 0f,
+        animationSpec = tween(if (scanning) ScanEffect.VEIL_IN_MS else ScanEffect.VEIL_OUT_MS),
+        label = "scanVeil",
+    )
+    val sweep = remember(image) { Animatable(0f) }
+    val reveal = remember(image) { Animatable(1f) }      // 1 = 全部显示：从重建里恢复的 plan 不该再演一遍
+    LaunchedEffect(image, scanning) {
+        if (scanning) {
+            reveal.snapTo(0f)
+            while (true) {
+                sweep.snapTo(0f)
+                sweep.animateTo(1f, tween(ScanEffect.SWEEP_MS, easing = LinearEasing))
+            }
+        } else if (reveal.value < 1f) {
+            reveal.animateTo(1f, tween(ScanEffect.REVEAL_MS, easing = FastOutSlowInEasing))
+        }
+    }
+    val scanPaints = remember { ScanPaints() }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
     // 手势循环里必须读这个「永远最新」的引用，否则长按选中后立刻拖手柄，
@@ -232,6 +268,18 @@ fun ImageCanvas(
 
             canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
+            // 识别中：浅暗幕 + 自上而下扫过的光带。画在遮罩之下，手动框始终清楚地浮在上面
+            if (veil > 0f) {
+                drawScan(canvas, image.width, image.height, sweep.value, veil, viewport.scale, density.density, scanPaints)
+            }
+            fun revealAlpha(item: MaskItem) = ScanEffect.revealAlpha(
+                manual = item.source == DetectorSource.MANUAL,
+                scanning = scanning,
+                progress = reveal.value,
+                centerY = item.quad.bounds().centerY(),
+                imageHeight = image.height,
+            )
+
             // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
             // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
             val options = state.plan.options.copy(renderScale = image.scale)
@@ -240,17 +288,24 @@ fun ImageCanvas(
             val sorted = state.plan.items.sortedByDescending { it.quad.area() }
             val maskInk = MaskedLabel.inkFor(options.solidColor)
             sorted.filter { it.state == MaskState.MASKED }.forEach {
+                val alpha = revealAlpha(it)
+                if (alpha <= 0f) return@forEach
+                // 渲染器自己管画笔（实色块强制不透明），淡入只能整块走一个半透明图层
+                val layer = if (alpha < 1f) canvas.saveLayerAlpha(layerBounds(it), (alpha * 255).roundToInt()) else null
                 registry[state.plan.style].render(canvas, image.bitmap, it.quad, options)
                 // 紧跟在自己的块后面写：更小的块盖上来时，连同底下的字一起盖住，层次不乱
                 if (MaskedLabel.applies(it, state.plan.style)) {
                     drawMaskedLabel(canvas, it, viewport.scale, maskLabelPaint, maskInk, maskLabelMinPx, maskLabelMaxPx)
                 }
+                layer?.let(canvas::restoreToCount)
             }
             sorted.filter { it.state == MaskState.OUTLINED }.forEach { item ->
-                canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale))
+                val alpha = revealAlpha(item)
+                if (alpha <= 0f) return@forEach
+                canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale).apply { this.alpha = (alpha * 255).roundToInt() })
                 // 类型小标签只在缩放比 ≥ 0.5 时绘制，避免密集截图上标签糊成一片
                 if (viewport.scale >= GestureRules.LABEL_MIN_SCALE) {
-                    drawKindLabel(canvas, item, viewport.scale)
+                    drawKindLabel(canvas, item, viewport.scale, alpha)
                 }
             }
             state.selectedManualId?.let { id ->
@@ -318,16 +373,18 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 }
 
 /** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
-private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
+private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float, alpha: Float = 1f) {
     // 模型猜的与规则命中区分开（spec §3）：Gemini Nano 的结果标「AI」
     val text = MaskedLabel.text(item)
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         textSize = 26f / scale
+        this.alpha = (alpha * 255).roundToInt()
     }
     val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
         style = Paint.Style.FILL
+        this.alpha = (alpha * 255).roundToInt()
     }
     val b = item.quad.bounds()
     val padding = 6f / scale
@@ -377,3 +434,56 @@ internal fun drawMaskedLabel(
 
 /** 量字宽用的字号：文字宽度与字号成正比，在大字号下量一次再折算，避开小字号的取整误差。 */
 private const val MEASURE_PX = 100f
+
+/** 扫描动效的画笔，跨帧复用。 */
+private class ScanPaints {
+    val veil = Paint()
+    val trail = Paint()
+    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+}
+
+/** 光带前沿那条亮线：比天蓝更浅，压在暗幕上像一道光。 */
+private const val SCAN_LINE_COLOR = 0xFFE1F5FE.toInt()
+
+/**
+ * 识别中的暗幕与光带，在图像坐标系下画，只盖住图像本身、不盖画布的留白。
+ * 拖尾高度与亮线粗细按缩放反算，放大缩小时屏幕上看起来一样。
+ */
+private fun drawScan(
+    canvas: android.graphics.Canvas,
+    width: Int,
+    height: Int,
+    progress: Float,
+    strength: Float,
+    scale: Float,
+    density: Float,
+    paints: ScanPaints,
+) {
+    val w = width.toFloat()
+    paints.veil.color = ColorUtils.setAlphaComponent(AndroidColor.BLACK, (ScanEffect.VEIL_ALPHA * strength * 255).roundToInt())
+    canvas.drawRect(0f, 0f, w, height.toFloat(), paints.veil)
+
+    val a = strength * ScanEffect.bandEnvelope(progress)
+    if (a < 0.01f) return
+    val y = progress * height
+    val trail = ScanEffect.TRAIL_DP * density / scale
+    paints.trail.shader = LinearGradient(
+        0f, y - trail, 0f, y,
+        AndroidColor.TRANSPARENT,
+        ColorUtils.setAlphaComponent(MaskOptions.SKY_BLUE, (0.55f * a * 255).roundToInt()),
+        Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(0f, (y - trail).coerceAtLeast(0f), w, y, paints.trail)
+    paints.line.color = ColorUtils.setAlphaComponent(SCAN_LINE_COLOR, (a * 255).roundToInt())
+    paints.line.strokeWidth = ScanEffect.LINE_DP * density / scale
+    canvas.drawLine(0f, y, w, y, paints.line)
+}
+
+/**
+ * 淡入时那一块的离屏图层范围。各渲染器都按四边形裁剪，只有马克笔的手绘抖动会探出边一点，
+ * 留出短边一成的余量。
+ */
+private fun layerBounds(item: MaskItem): RectF = RectF(item.quad.bounds()).apply {
+    val margin = maxOf(4f, item.quad.shortEdge() * 0.1f)
+    inset(-margin, -margin)
+}
