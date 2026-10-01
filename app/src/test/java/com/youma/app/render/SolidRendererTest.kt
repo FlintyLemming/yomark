@@ -27,7 +27,7 @@ class SolidRendererTest {
         val canvas = Canvas(bmp)
         SolidRenderer().render(canvas, bmp, Quad.fromRect(RectF(20f, 20f, 60f, 60f)), MaskOptions())
 
-        assertThat(bmp.getPixel(40, 40)).isEqualTo(Color.BLACK)
+        assertThat(bmp.getPixel(40, 40)).isEqualTo(MaskOptions.SKY_BLUE)   // 出厂是天蓝色块
         assertThat(Color.alpha(bmp.getPixel(40, 40))).isEqualTo(255)
     }
 
@@ -45,7 +45,7 @@ class SolidRendererTest {
         val diamond = Quad(PointF(50f, 10f), PointF(90f, 50f), PointF(50f, 90f), PointF(10f, 50f))
         SolidRenderer().render(Canvas(bmp), bmp, diamond, MaskOptions())
 
-        assertThat(bmp.getPixel(50, 50)).isEqualTo(Color.BLACK)   // 菱形中心
+        assertThat(bmp.getPixel(50, 50)).isEqualTo(MaskOptions.SKY_BLUE)   // 菱形中心
         assertThat(bmp.getPixel(12, 12)).isEqualTo(Color.WHITE)   // 外接框的角，不该被填
     }
 

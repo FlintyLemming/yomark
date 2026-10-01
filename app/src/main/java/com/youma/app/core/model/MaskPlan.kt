@@ -1,6 +1,5 @@
 package com.youma.app.core.model
 
-import android.graphics.Color
 import android.os.Parcelable
 import com.youma.app.core.geometry.Quad
 import kotlinx.parcelize.Parcelize
@@ -12,7 +11,12 @@ enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, EMOJI, ERASE }
 
 @Parcelize
 data class MaskOptions(
-    val solidColor: Int = Color.BLACK,
+    /**
+     * 实色块的颜色，出厂天蓝色。预览与导出是同一个渲染器，所以导出图上也是天蓝色块。
+     * 只换颜色不换安全性：SolidRenderer 强制不透明，天蓝与原来的黑块一样不可还原；
+     * 像素化太小、抹除遇到复杂背景时降级成的实色块也跟着是天蓝色。
+     */
+    val solidColor: Int = SKY_BLUE,
     /** 像素块边长 = 区域短边 / divisor，再受 12px 下限约束（spec §8）。 */
     val pixelBlockDivisor: Int = 8,
     val blurRadiusRatio: Float = 0.08f,
@@ -28,7 +32,12 @@ data class MaskOptions(
      * 不是用户可调项：两个调用方（ImageCanvas / Exporter）各自在渲染前填进来。
      */
     val renderScale: Float = 1f,
-) : Parcelable
+) : Parcelable {
+    companion object {
+        /** 天蓝色 #87CEEB（CSS / X11 的 SkyBlue）。 */
+        const val SKY_BLUE: Int = 0xFF87CEEB.toInt()
+    }
+}
 
 @Parcelize
 data class MaskItem(

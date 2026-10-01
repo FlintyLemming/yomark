@@ -57,8 +57,8 @@ class PixelateRendererTest {
 
         val bmp = checkerboard()
         renderer.render(Canvas(bmp), bmp, tiny, MaskOptions())
-        // 降级成实色块 → 区域内是纯黑
-        assertThat(bmp.getPixel(10, 5)).isEqualTo(Color.BLACK)
+        // 降级成实色块 → 区域内是实色块的颜色
+        assertThat(bmp.getPixel(10, 5)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test

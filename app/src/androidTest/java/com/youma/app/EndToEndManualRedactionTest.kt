@@ -26,6 +26,7 @@ import com.youma.app.export.Exporter
 import com.youma.app.export.MediaStoreSink
 import com.youma.app.export.WatermarkDrawer
 import com.youma.app.render.RendererRegistry
+import com.google.common.collect.Range
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -87,7 +88,12 @@ class EndToEndManualRedactionTest {
             val out = BitmapFactory.decodeStream(input)!!
             assertThat(out.width).isEqualTo(w)            // 原图分辨率，不是分析分辨率
             assertThat(out.height).isEqualTo(h)
-            assertThat(out.getPixel(600, 500)).isEqualTo(Color.BLACK)   // 秘密被遮住
+            // 秘密被天蓝色块遮住。JPEG 往返会让颜色偏一两个单位，逐通道留余量比对
+            val masked = out.getPixel(600, 500)
+            val sky = MaskOptions.SKY_BLUE
+            assertThat(Color.red(masked)).isIn(Range.closed(Color.red(sky) - 12, Color.red(sky) + 12))
+            assertThat(Color.green(masked)).isIn(Range.closed(Color.green(sky) - 12, Color.green(sky) + 12))
+            assertThat(Color.blue(masked)).isIn(Range.closed(Color.blue(sky) - 12, Color.blue(sky) + 12))
             assertThat(Color.red(out.getPixel(100, 100))).isGreaterThan(200)  // 其余不变
             out.recycle()
         }

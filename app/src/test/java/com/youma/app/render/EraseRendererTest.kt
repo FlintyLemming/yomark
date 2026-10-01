@@ -73,7 +73,7 @@ class EraseRendererTest {
         assertThat(renderer.willDegrade(bmp, quad)).isTrue()
 
         renderer.render(Canvas(bmp), bmp, quad, MaskOptions())
-        assertThat(bmp.getPixel(100, 100)).isEqualTo(Color.BLACK)
+        assertThat(bmp.getPixel(100, 100)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test fun `pixels outside the quad are untouched`() {
@@ -93,6 +93,6 @@ class EraseRendererTest {
         val bmp = flatBackground()
         val whole = Quad.fromRect(RectF(0f, 0f, 200f, 200f))
         renderer.render(Canvas(bmp), bmp, whole, MaskOptions())
-        assertThat(bmp.getPixel(100, 100)).isEqualTo(Color.BLACK)
+        assertThat(bmp.getPixel(100, 100)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 }

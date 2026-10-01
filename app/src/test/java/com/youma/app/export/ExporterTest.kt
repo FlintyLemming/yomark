@@ -100,9 +100,9 @@ class ExporterTest {
             ExportRequest(src, "image/jpeg", planWith(maskedItem(100f, 100f, 200f, 200f)), 0.25f, false)
         )
         val bmp = sink.bitmap!!
-        assertThat(bmp.getPixel(600, 600)).isEqualTo(Color.BLACK)
-        assertThat(bmp.getPixel(300, 300)).isNotEqualTo(Color.BLACK)
-        assertThat(bmp.getPixel(900, 900)).isNotEqualTo(Color.BLACK)
+        assertThat(bmp.getPixel(600, 600)).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(bmp.getPixel(300, 300)).isNotEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(bmp.getPixel(900, 900)).isNotEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test
@@ -112,7 +112,7 @@ class ExporterTest {
         exporter(sink).export(
             ExportRequest(src, "image/jpeg", planWith(maskedItem(50f, 50f, 150f, 150f, MaskState.OUTLINED)), 1f, false)
         )
-        assertThat(sink.bitmap!!.getPixel(100, 100)).isNotEqualTo(Color.BLACK)
+        assertThat(sink.bitmap!!.getPixel(100, 100)).isNotEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test
