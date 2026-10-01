@@ -295,7 +295,9 @@ class EditorViewModelAnalysisTest {
         vm.onImageChosen(sampleUri("nano-first.jpg")); advanceUntilIdle()
         vm.runAiReview(); advanceUntilIdle()
 
-        vm.onImageChosen(sampleUri("nano-second.jpg")); advanceUntilIdle()
+        vm.onImageChosen(sampleUri("nano-second.jpg"))
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.HIDDEN)   // 新图还在载入，旧图的按钮先收起
+        advanceUntilIdle()
         gate.complete(Unit); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.items.map { it.candidateId }).doesNotContain("llm")

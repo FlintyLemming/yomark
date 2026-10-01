@@ -188,7 +188,8 @@ class EditorViewModel(
     }
 
     fun onImageChosen(uri: Uri) {
-        uiState = _state.value.copy(loading = true, message = null)
+        aiReviewJob?.cancel()                             // 上一张图的复查作废，按钮随之收起
+        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.HIDDEN)
         viewModelScope.launch {
             // 换图时先清掉上一张的私有副本。清理时机从 onCleared 挪到这里：
             // onCleared 会在 Activity 重建时把副本一起删掉，恢复就无从谈起了
@@ -263,7 +264,8 @@ class EditorViewModel(
      */
     private fun loadBatchCurrent() {
         val batch = _state.value.batch ?: return
-        uiState = _state.value.copy(loading = true, message = null)
+        aiReviewJob?.cancel()
+        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.HIDDEN)
         viewModelScope.launch {
             val loaded = runCatching {
                 val taken = intake.copyToPrivate(batch.current.uri, ioDispatcher)
