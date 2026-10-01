@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.RectF
 import com.youma.app.core.geometry.Quad
 import com.youma.app.core.image.SourceImage
-import com.youma.app.core.model.AnalysisResult
 import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.SensitiveKind
@@ -172,20 +171,41 @@ class RedactionEngineTest {
     }
 
     @Test
-    fun `refine returns only what the first pass did not already cover`() = runTest {
+    fun `refine returns only what is not already covered on screen`() = runTest {
         val slow = FakeClassifier("nano", available = true, out = listOf(at("same", 0f), at("new", 50f)))
         val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(slow))
-        val first = AnalysisResult(emptyList(), listOf(at("rule", 0f, SensitiveKind.PHONE, DetectorSource.RULE)))
-        // 同一块像素规则已经管了，不论模型说它是什么类型都不再叠一个框
-        assertThat(e.refine(first).map { it.id }).containsExactly("new")
+        // 同一块像素已经有框了（规则的也好、手动画的也好），不论模型说它是什么类型都不再叠一个框
+        val covered = listOf(at("rule", 0f, SensitiveKind.PHONE, DetectorSource.RULE).quad)
+        assertThat(e.refine(emptyList(), covered)!!.map { it.id }).containsExactly("new")
     }
 
     @Test
-    fun `an unavailable or exploding slow classifier yields nothing`() = runTest {
+    fun `refine that ran and found nothing is an empty list, not a failure`() = runTest {
+        val quiet = FakeClassifier("nano", available = true, out = emptyList())
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(quiet))
+        assertThat(e.refine(emptyList(), emptyList())).isEmpty()
+    }
+
+    @Test
+    fun `an unavailable or exploding slow classifier reports that it did not run`() = runTest {
+        // 复查是用户点出来的：「没跑成」不能说成「跑了没发现」，否则用户会以为这一页是干净的
         val off = FakeClassifier("off", available = false, out = listOf(at("x", 50f)))
         val boom = FakeClassifier("boom", available = true, out = emptyList(), boom = true)
         val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(off, boom))
-        assertThat(e.refine(AnalysisResult(emptyList(), emptyList()))).isEmpty()
+        assertThat(e.refine(emptyList(), emptyList())).isNull()
         assertThat(off.classifyCalls).isEqualTo(0)
+    }
+
+    @Test
+    fun `refineReady only probes and never classifies`() = runTest {
+        val on = FakeClassifier("nano", available = true, out = listOf(at("n", 50f)))
+        val ready = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(on))
+        assertThat(ready.refineReady()).isTrue()
+        assertThat(on.classifyCalls).isEqualTo(0)
+
+        val off = FakeClassifier("off", available = false, out = emptyList())
+        val notReady = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(off))
+        assertThat(notReady.refineReady()).isFalse()
+        assertThat(engine().refineReady()).isFalse()          // 设置里关了 = 没有 refiner
     }
 }

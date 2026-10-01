@@ -10,6 +10,23 @@ sealed interface EditorMessage {
     data class Exported(val uri: Uri, val downscaled: Boolean, val width: Int, val height: Int) : EditorMessage
     data class BatchExported(val count: Int) : EditorMessage
     data class Error(val text: String) : EditorMessage
+    /** 不是出错，只是告诉用户一件事的结果（如「AI 复查没有新发现」）。 */
+    data class Notice(val text: String) : EditorMessage
+}
+
+/**
+ * 「AI 复查」（Gemini Nano 第二遍）在当前这张图上的状态。
+ *
+ * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
+ * 还会在画面上冒出一批不打码的框。现在是用户点了才跑。
+ */
+enum class AiReview {
+    /** 不出现：设置里关了、机型不支持、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
+    HIDDEN,
+    READY,
+    RUNNING,
+    /** 这张图已经复查过。再跑一遍结果一样（温度 0），按钮就不再可点。 */
+    DONE,
 }
 
 data class EditorUiState(
@@ -23,8 +40,8 @@ data class EditorUiState(
     val loading: Boolean = false,
     /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
     val analyzing: Boolean = false,
-    /** 规则结果已上屏，端侧大模型的第二遍还在跑。结果会追加进 plan，只圈出。 */
-    val refining: Boolean = false,
+    /** 端侧大模型的第二遍。只在用户点了之后跑，结果追加进 plan，只圈出。 */
+    val aiReview: AiReview = AiReview.HIDDEN,
     val exporting: Boolean = false,
     /** 长按手动框进入的选中态：出现四角手柄与删除按钮。 */
     val selectedManualId: String? = null,

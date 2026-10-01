@@ -11,7 +11,6 @@ import com.youma.app.core.image.ImageIntake
 import com.youma.app.core.image.IntakeResult
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.image.SourceImageLoader
-import com.youma.app.core.model.AnalysisResult
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.MaskItem
 import com.youma.app.core.model.MaskPlan
@@ -19,6 +18,7 @@ import com.youma.app.core.model.MaskPlanFactory
 import com.youma.app.core.model.MaskState
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.core.model.SensitiveKind
+import com.youma.app.core.model.TextLine
 import com.youma.app.data.SettingsStore
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RedactionEngine
@@ -128,7 +128,7 @@ class EditorViewModel(
      */
     private fun reanalyze(image: SourceImage) {
         undoStack.push(_state.value.plan)
-        uiState = _state.value.copy(analyzing = true).withHistoryFlags()
+        uiState = _state.value.copy(analyzing = true, aiReview = AiReview.HIDDEN).withHistoryFlags()
         viewModelScope.launch { analyze(image, keepOnlyManual = true) }
     }
 
@@ -284,6 +284,7 @@ class EditorViewModel(
                 plan = MaskPlan.empty(_state.value.plan.style),
                 loading = false,
                 analyzing = true,
+                aiReview = AiReview.HIDDEN,
                 canUndo = false,
                 canRedo = false,
                 selectedManualId = null,
@@ -301,7 +302,7 @@ class EditorViewModel(
     private suspend fun analyze(image: SourceImage, keepOnlyManual: Boolean = false) {
         val ranWith = config
         val ranOn = engine
-        refineJob?.cancel()
+        aiReviewJob?.cancel()
         val result = runCatching { ranOn.analyze(image) }.getOrNull()
         val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty())
         // 分析结果不进撤销栈——它是初始状态，不是用户动作。
@@ -312,34 +313,72 @@ class EditorViewModel(
             if (keepOnlyManual) current.plan.items.filter { it.kind == SensitiveKind.MANUAL }
             else current.plan.items
         analyzedWith = ranWith
-        val refining = result != null && ranOn.canRefine
+        reviewLines = result?.lines
         uiState = current.copy(
             analyzing = false,
-            refining = refining,
+            aiReview = AiReview.HIDDEN,
             plan = current.plan.copy(items = detected + kept),
         )
-        if (refining) refine(image, result!!, ranWith, ranOn)
+        if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn)
     }
 
-    private var refineJob: Job? = null
+    /** 最近一次识别出的整页文字，「AI 复查」要把它送给模型。只活在内存里，重建后就没有了。 */
+    private var reviewLines: List<TextLine>? = null
+
+    private var aiReviewJob: Job? = null
 
     /**
-     * 第二遍：端侧大模型的语义判定（Gemini Nano）。它要几秒，所以不挡第一批结果——
-     * 规则的结果先上屏、先打码，模型的结果到了再追加进来，只圈出、标「AI」。
+     * 「AI 复查」不再自动跑（PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒）。
+     * 这里只探测模型在不在：在，按钮才出现；机型不支持就什么都不出现。
+     */
+    private fun offerAiReview(image: SourceImage, ranWith: RecognitionConfig, ranOn: RedactionEngine) {
+        aiReviewJob = viewModelScope.launch {
+            if (!ranOn.refineReady()) return@launch
+            val current = _state.value
+            if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
+            if (current.aiReview != AiReview.HIDDEN) return@launch
+            uiState = current.copy(aiReview = AiReview.READY)
+        }
+    }
+
+    /**
+     * 用户点了「AI 复查」：端侧大模型（Gemini Nano）把整页文字再看一遍，
+     * 新发现的追加进 plan，只圈出、标「AI」。
      *
-     * 追加不进撤销栈：与第一批结果一样，它是初始状态，不是用户动作。
+     * 是用户点出来的，所以进撤销栈——不想要这批框，撤销一下就整批拿掉。
      * 这期间换了图、换了方案，这一批就作废。
      */
-    private fun refine(image: SourceImage, result: AnalysisResult, ranWith: RecognitionConfig, ranOn: RedactionEngine) {
-        refineJob = viewModelScope.launch {
-            val extra = ranOn.refine(result)
+    fun runAiReview() {
+        val current = _state.value
+        if (current.aiReview != AiReview.READY) return
+        val image = current.image ?: return
+        val lines = reviewLines ?: return
+        val ranWith = analyzedWith ?: return
+        val ranOn = engine
+        uiState = current.copy(aiReview = AiReview.RUNNING)
+        aiReviewJob = viewModelScope.launch {
+            val extra = ranOn.refine(lines, current.plan.items.map { it.quad })
             ensureActive()
-            val current = _state.value
-            if (current.image !== image || analyzedWith != ranWith) return@launch
-            uiState = current.copy(
-                refining = false,
-                plan = current.plan.copy(items = current.plan.items + MaskPlanFactory.itemsFrom(extra)),
-            )
+            val now = _state.value
+            if (now.image !== image || analyzedWith != ranWith) return@launch
+            if (extra == null) {
+                uiState = now.copy(
+                    aiReview = AiReview.READY,
+                    message = EditorMessage.Error("AI 复查没能完成，请稍后再试"),
+                )
+                return@launch
+            }
+            val known = now.plan.items.mapTo(HashSet()) { it.candidateId }
+            val added = MaskPlanFactory.itemsFrom(extra).filter { it.candidateId !in known }
+            if (added.isNotEmpty()) undoStack.push(now.plan)
+            uiState = now.copy(
+                aiReview = AiReview.DONE,
+                plan = now.plan.copy(items = now.plan.items + added),
+                message = EditorMessage.Notice(
+                    if (added.isEmpty()) "AI 复查没有发现规则漏掉的内容"
+                    else "AI 复查新圈出 ${added.size} 处，标「AI」、未打码"
+                ),
+            ).withHistoryFlags()
         }
     }
 

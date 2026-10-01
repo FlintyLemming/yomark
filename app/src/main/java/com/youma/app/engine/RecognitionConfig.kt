@@ -18,8 +18,10 @@ enum class BarcodeOption { LOOSE, STRICT, OFF }
 enum class FaceOption { FAST, ACCURATE, OFF }
 
 /**
- * 语义判定：规则之后让端侧大模型再看一遍（spec §14 的 Gemini Nano 接口位）。
- * 只在支持 AICore 的机型上生效，不支持时自动跳过；结果只圈出、不自动打码。
+ * 语义判定（设置页上叫「AI 复查」）：让端侧大模型把整页文字再看一遍（spec §14 的 Gemini Nano 接口位）。
+ *
+ * GEMINI_NANO 不是「每张图都自动跑」，而是「编辑器里给一个 AI 复查按钮」——用户点了才跑。
+ * 只在支持 AICore 的机型上出现；结果只圈出、不自动打码。枚举名是持久化格式，语义变了名字不改。
  */
 enum class SemanticOption { GEMINI_NANO, OFF }
 

@@ -43,6 +43,7 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
             }
             is EditorMessage.BatchExported -> snackbar.showMessage("已保存 ${m.count} 张到相册", vm)
             is EditorMessage.Error -> snackbar.showMessage(m.text, vm)
+            is EditorMessage.Notice -> snackbar.showMessage(m.text, vm)
             null -> Unit
         }
     }
@@ -98,10 +99,10 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                 onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
                 onClose = onClose,
             )
-            if (state.refining) {
+            if (state.aiReview == AiReview.RUNNING) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())
                 Text(
-                    "Gemini Nano 正在复核，新发现的会以「AI」标签圈出",
+                    "Gemini Nano 正在复查整页文字，新发现的会以「AI」标签圈出",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
@@ -131,6 +132,8 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                 exporting = state.exporting,
                 batchLabel = batch?.let { "${it.index + 1} / ${it.total}" },
                 onNext = if (batch != null && !batch.isLast) vm::nextImage else null,
+                aiReview = state.aiReview,
+                onAiReview = vm::runAiReview,
             )
         }
     }

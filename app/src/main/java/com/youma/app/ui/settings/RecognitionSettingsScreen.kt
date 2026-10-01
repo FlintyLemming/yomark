@@ -95,10 +95,11 @@ fun RecognitionSettingsScreen(
 
         item {
             AxisSection(
-                title = "语义判定（实验）",
-                note = "规则之后，让设备上的 Gemini Nano 再看一遍整页文字，补上规则认不出的人名、地址。" +
-                    "结果只圈出、标「AI」，不自动打码。只在支持 AICore 的机型上生效（如 Pixel 9 及以后），" +
-                    "不支持时自动跳过；推理全在本机，本应用不联网。",
+                title = "AI 复查（实验）",
+                note = "开启后，识别完成时编辑器底部会出现「AI 复查」按钮：点了才让设备上的 Gemini Nano " +
+                    "把整页文字再看一遍，补上规则认不出的人名、地址；不点不跑，不拖慢识别。" +
+                    "结果只圈出、标「AI」，不自动打码。只在支持 AICore 的机型上出现（如 Pixel 9 及以后）；" +
+                    "推理全在本机，本应用不联网。",
                 options = SemanticOption.entries,
                 selected = config.semantic,
                 label = ::semanticLabel,

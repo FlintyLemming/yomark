@@ -1,5 +1,6 @@
 package com.youma.app.engine
 
+import com.youma.app.core.geometry.Quad
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.AnalysisResult
 import com.youma.app.core.model.Candidate
@@ -21,11 +22,18 @@ class RedactionEngine(
     private val merger: CandidateMerger = CandidateMerger(),
     /**
      * 慢的判定器（端侧大模型），不进 analyze：一次推理要几秒，
-     * 挡在第一批结果前面会让「选中即打码」变成「选中后干等」。由调用方在结果上屏之后另跑 refine()。
+     * 挡在第一批结果前面会让「选中即打码」变成「选中后干等」。用户点「AI 复查」时才由调用方跑 refine()。
      */
     private val refiners: List<SensitivityClassifier> = emptyList(),
 ) {
     val canRefine: Boolean get() = refiners.isNotEmpty()
+
+    /**
+     * 慢判定器此刻能不能跑（机型支持、模型已在设备上）。只探测，不推理——
+     * 「AI 复查」按钮出不出现看它，不支持的机型上就不该摆一个点了没用的按钮。
+     */
+    suspend fun refineReady(): Boolean =
+        refiners.any { runCatching { it.isAvailable() }.getOrDefault(false) }
 
     suspend fun analyze(image: SourceImage): AnalysisResult = coroutineScope {
         // 文字链路和区域检测互不依赖，并行跑。
@@ -52,20 +60,25 @@ class RedactionEngine(
     /**
      * 第二遍：在已有结果上跑慢的判定器，只返回**新增**的候选。
      *
-     * 与已有候选大面积重叠的一律丢掉，不论类型——那块像素规则已经管了，
-     * 再叠一个框只会让用户多点一下。失败、不可用都降级为空，与 analyze 同一条约定。
+     * @param covered 画面上已经有框的地方：规则的候选，也包括用户自己画的手动框。
+     *   与其中任何一个大面积重叠的一律丢掉，不论类型——那块像素已经有人管了，
+     *   再叠一个框只会让用户多点一下。
+     * @return null = 没有一个慢判定器真的跑完（不可用，或者抛了异常）。
+     *   与 analyze 的「失败降级为空」不同：复查是用户点出来的，「没跑成」和「跑了没发现」
+     *   必须分开告诉他，否则他会以为这一页已经被模型看过、是干净的。
      */
-    suspend fun refine(result: AnalysisResult): List<Candidate> {
-        val found = refiners
+    suspend fun refine(lines: List<TextLine>, covered: List<Quad>): List<Candidate>? {
+        val runs = refiners
             .filter { runCatching { it.isAvailable() }.getOrDefault(false) }
-            .flatMap { r -> runCatching { r.classify(result.lines) }.getOrElse { emptyList() } }
-        return merger.merge(found).filter { c -> result.candidates.none { covers(it, c) } }
+            .mapNotNull { r -> runCatching { r.classify(lines) }.getOrNull() }
+        if (runs.isEmpty()) return null
+        return merger.merge(runs.flatten()).filter { c -> covered.none { covers(it, c.quad) } }
     }
 
     /** a 盖住了 b 的大半：交集超过两者中较小那个的一半。 */
-    private fun covers(a: Candidate, b: Candidate): Boolean {
-        val ra = a.quad.bounds()
-        val rb = b.quad.bounds()
+    private fun covers(a: Quad, b: Quad): Boolean {
+        val ra = a.bounds()
+        val rb = b.bounds()
         val w = minOf(ra.right, rb.right) - maxOf(ra.left, rb.left)
         val h = minOf(ra.bottom, rb.bottom) - maxOf(ra.top, rb.top)
         if (w <= 0f || h <= 0f) return false

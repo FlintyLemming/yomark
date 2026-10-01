@@ -204,44 +204,136 @@ class EditorViewModelAnalysisTest {
         assertThat(vm.state.value.plan.items).hasSize(1)     // 手动打码仍然可用
     }
 
-    // ---------- 第二遍（端侧大模型） ----------
+    // ---------- AI 复查（端侧大模型，用户点了才跑） ----------
 
-    @Test
-    fun `slow model results are appended outlined after the first pass`() = runTest(dispatcher) {
-        val gate = CompletableDeferred<Unit>()
-        val nano = object : SensitivityClassifier {
-            override val id = "nano"
-            override suspend fun isAvailable() = true
-            override suspend fun classify(lines: List<TextLine>): List<Candidate> {
-                gate.await()
-                return listOf(Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
-                    SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f, enabledByDefault = false))
-            }
+    private class Nano(
+        private val available: Boolean = true,
+        private val boom: Boolean = false,
+        private val out: List<Candidate> = listOf(
+            Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
+                SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f, enabledByDefault = false)
+        ),
+    ) : SensitivityClassifier {
+        override val id = "nano"
+        var calls = 0
+        var gate = CompletableDeferred<Unit>().apply { complete(Unit) }
+        override suspend fun isAvailable() = available
+        override suspend fun classify(lines: List<TextLine>): List<Candidate> {
+            calls++
+            gate.await()
+            if (boom) error("aicore busy")
+            return out
         }
-        val vm = EditorViewModel(
+    }
+
+    private fun vmWithNano(nano: Nano, rules: List<Candidate> = listOf(candidate("rule", true, 10f, 10f, 60f, 30f))) =
+        EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
             engineProvider = {
-                RedactionEngine(DeadRecognizer(), emptyList(),
-                    listOf(StubClassifier(listOf(candidate("rule", true, 10f, 10f, 60f, 30f)))),
+                RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(rules)),
                     CandidateMerger(), refiners = listOf(nano))
             },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
-        vm.onImageChosen(sampleUri("nano.jpg")); advanceUntilIdle()
 
-        // 规则的结果先上屏、先打码，不等模型
+    @Test
+    fun `the model does not run by itself after analysis`() = runTest(dispatcher) {
+        val nano = Nano()
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-idle.jpg")); advanceUntilIdle()
+
+        // 规则的结果就是全部；模型只探测在不在，一次都没推理
         assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
-        assertThat(vm.state.value.refining).isTrue()
+        assertThat(nano.calls).isEqualTo(0)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)
+    }
 
-        gate.complete(Unit); advanceUntilIdle()
+    @Test
+    fun `asking for an ai review appends outlined AI items and one undo removes them`() = runTest(dispatcher) {
+        val nano = Nano()
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-run.jpg")); advanceUntilIdle()
+
+        vm.runAiReview(); advanceUntilIdle()
 
         val items = vm.state.value.plan.items.associateBy { it.candidateId }
+        assertThat(nano.calls).isEqualTo(1)
         assertThat(items.keys).containsExactly("rule", "llm")
-        assertThat(items.getValue("llm").state).isEqualTo(MaskState.OUTLINED)
-        assertThat(vm.state.value.refining).isFalse()
-        assertThat(vm.state.value.canUndo).isFalse()           // 不是用户动作
+        assertThat(items.getValue("llm").state).isEqualTo(MaskState.OUTLINED)   // 只圈出，不打码
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.DONE)
+        assertThat(vm.state.value.message).isInstanceOf(EditorMessage.Notice::class.java)
+
+        // 是用户点出来的：不想要这批框，撤销一下整批拿掉
+        vm.undo()
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+    }
+
+    @Test
+    fun `the review shows as running until the model answers, and an empty answer adds nothing`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val nano = Nano(out = emptyList()).also { it.gate = gate }
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-gated.jpg")); advanceUntilIdle()
+
+        vm.runAiReview(); advanceUntilIdle()
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.RUNNING)
+
+        gate.complete(Unit); advanceUntilIdle()
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.DONE)
+        assertThat((vm.state.value.message as EditorMessage.Notice).text).contains("没有发现")
+        assertThat(vm.state.value.canUndo).isFalse()          // 什么都没加，撤销栈不该多一格
+    }
+
+    @Test
+    fun `changing the image throws away a review that is still running`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val nano = Nano().also { it.gate = gate }
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-first.jpg")); advanceUntilIdle()
+        vm.runAiReview(); advanceUntilIdle()
+
+        vm.onImageChosen(sampleUri("nano-second.jpg")); advanceUntilIdle()
+        gate.complete(Unit); advanceUntilIdle()
+
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).doesNotContain("llm")
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)   // 新图上可以重新点
+    }
+
+    @Test
+    fun `no review button when the model is not on this device`() = runTest(dispatcher) {
+        val nano = Nano(available = false)
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-none.jpg")); advanceUntilIdle()
+
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.HIDDEN)
+        vm.runAiReview(); advanceUntilIdle()                  // 按钮不在，调了也什么都不发生
+        assertThat(nano.calls).isEqualTo(0)
+    }
+
+    @Test
+    fun `a failed review says so instead of claiming the page is clean`() = runTest(dispatcher) {
+        val vm = vmWithNano(Nano(boom = true))
+        vm.onImageChosen(sampleUri("nano-boom.jpg")); advanceUntilIdle()
+
+        vm.runAiReview(); advanceUntilIdle()
+
+        assertThat(vm.state.value.message).isInstanceOf(EditorMessage.Error::class.java)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)   // 可以再点一次
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+    }
+
+    @Test
+    fun `the model does not stack a box on a manual box`() = runTest(dispatcher) {
+        val vm = vmWithNano(Nano())
+        vm.onImageChosen(sampleUri("nano-manual.jpg")); advanceUntilIdle()
+
+        // 用户已经自己把模型要指的那块（100,100)-(160,120) 盖住了
+        vm.onManualBox(Quad.fromRect(RectF(95f, 95f, 165f, 125f)))
+        vm.runAiReview(); advanceUntilIdle()
+
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).doesNotContain("llm")
     }
 }
