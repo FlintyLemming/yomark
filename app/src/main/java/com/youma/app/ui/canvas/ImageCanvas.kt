@@ -4,6 +4,7 @@ import android.graphics.Color as AndroidColor
 import android.graphics.DashPathEffect
 import android.graphics.Paint
 import android.graphics.PointF
+import android.graphics.Typeface
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -26,11 +27,10 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.youma.app.core.geometry.Quad
 import com.youma.app.core.model.MaskItem
 import com.youma.app.core.model.MaskState
-import com.youma.app.core.model.DetectorSource
-import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
 import kotlin.math.hypot
@@ -57,6 +57,15 @@ fun ImageCanvas(
     val density = LocalDensity.current
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
+    // 打码块里的类型名：字号随 sp 走（跟系统字体大小），块太小写不下就不写
+    val maskLabelMinPx = with(density) { MASK_LABEL_MIN_SP.sp.toPx() }
+    val maskLabelMaxPx = with(density) { MASK_LABEL_MAX_SP.sp.toPx() }
+    val maskLabelPaint = remember {
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = Typeface.create(Typeface.DEFAULT, MASK_LABEL_WEIGHT, false)
+            textAlign = Paint.Align.CENTER
+        }
+    }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
     // 手势循环里必须读这个「永远最新」的引用，否则长按选中后立刻拖手柄，
@@ -229,8 +238,13 @@ fun ImageCanvas(
 
             // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
             val sorted = state.plan.items.sortedByDescending { it.quad.area() }
+            val maskInk = MaskedLabel.inkFor(options.solidColor)
             sorted.filter { it.state == MaskState.MASKED }.forEach {
                 registry[state.plan.style].render(canvas, image.bitmap, it.quad, options)
+                // 紧跟在自己的块后面写：更小的块盖上来时，连同底下的字一起盖住，层次不乱
+                if (MaskedLabel.applies(it, state.plan.style)) {
+                    drawMaskedLabel(canvas, it, viewport.scale, maskLabelPaint, maskInk, maskLabelMinPx, maskLabelMaxPx)
+                }
             }
             sorted.filter { it.state == MaskState.OUTLINED }.forEach { item ->
                 canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale))
@@ -306,7 +320,7 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 /** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
 private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
     // 模型猜的与规则命中区分开（spec §3）：Gemini Nano 的结果标「AI」
-    val text = SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
+    val text = MaskedLabel.text(item)
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         textSize = 26f / scale
@@ -324,3 +338,42 @@ private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale
     canvas.drawRoundRect(rect, 4f / scale, 4f / scale, bg)
     canvas.drawText(text, rect.left + padding, rect.bottom - padding - textPaint.descent() * 0.5f, textPaint)
 }
+
+/** 打码块里的类型名，字号上下限（sp）。下限以下的字在手机上已经读不清，不如不写。 */
+private const val MASK_LABEL_MIN_SP = 8f
+private const val MASK_LABEL_MAX_SP = 13f
+
+/** 中等字重：比常规字在色块上立得住，又不像粗体那样喧宾夺主。 */
+private const val MASK_LABEL_WEIGHT = 500
+
+/**
+ * 在已打码的块正中写上它原来是什么。只在编辑器里画，导出不画（见 MaskedLabel）。
+ * 画布已经 concat 了 viewport，字号在屏幕上适配好之后再按缩放反算回图像坐标。
+ */
+internal fun drawMaskedLabel(
+    canvas: android.graphics.Canvas,
+    item: MaskItem,
+    scale: Float,
+    paint: Paint,
+    ink: Int,
+    minPx: Float,
+    maxPx: Float,
+) {
+    val text = MaskedLabel.text(item)
+    val b = item.quad.bounds()
+    paint.textSize = MEASURE_PX
+    val widthPerPx = paint.measureText(text) / MEASURE_PX
+    // 斜着的条码外接框比块本身大，高度按短边算才不会把字写出块外
+    val blockHeight = minOf(b.height(), item.quad.shortEdge())
+    val onScreen = MaskedLabel.fitTextSize(b.width() * scale, blockHeight * scale, widthPerPx, minPx, maxPx) ?: return
+    paint.textSize = onScreen / scale
+    paint.color = ink
+    val fm = paint.fontMetrics
+    val save = canvas.save()
+    canvas.clipPath(item.quad.toPath())               // 无论如何不让字露出块外
+    canvas.drawText(text, b.centerX(), b.centerY() - (fm.ascent + fm.descent) / 2f, paint)
+    canvas.restoreToCount(save)
+}
+
+/** 量字宽用的字号：文字宽度与字号成正比，在大字号下量一次再折算，避开小字号的取整误差。 */
+private const val MEASURE_PX = 100f
