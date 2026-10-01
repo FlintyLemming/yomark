@@ -1,18 +1,19 @@
 package com.youma.app.ui
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -27,10 +28,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.canvas.ImageCanvas
+import com.youma.app.ui.canvas.ScanEffect
 import com.youma.app.ui.components.EditorBottomBar
 import com.youma.app.ui.components.EditorTopBar
 import com.youma.app.ui.components.PaywallDialog
@@ -153,7 +161,10 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
 }
 
 /**
- * 识别中的提示条，与画布上的扫描动效一起出现（PP-OCR 一张图约 2 秒）。
+ * 识别中的提示条，与画布上的扫光一起出现（PP-OCR 一张图约 2 秒）。
+ *
+ * 不再放转圈的进度圈：一道与画布上同色的光从字面上掠过，告诉用户还在读，
+ * 和图上那束光是一回事。光的位置只在绘制里读，走起来只重绘、不重组。
  *
  * 用 Box 画底色而不是 Surface：Material3 的 Surface 会吃掉触摸，
  * 识别期间画布仍可交互（spec §7.1），提示条底下那一块也不该点不动。
@@ -161,26 +172,48 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
 @Composable
 private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
-        Row(
+        val sheen = rememberInfiniteTransition(label = "analyzingSheen").animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(SHEEN_MS, easing = LinearEasing)),
+            label = "sheen",
+        )
+        Box(
             Modifier
                 .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f), RoundedCornerShape(50))
-                .padding(horizontal = 14.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            CircularProgressIndicator(
-                Modifier.size(14.dp),
-                color = MaterialTheme.colorScheme.inverseOnSurface,
-                strokeWidth = 2.dp,
-            )
-            Spacer(Modifier.width(8.dp))
             Text(
                 "正在识别敏感信息…",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.inverseOnSurface,
+                modifier = Modifier
+                    // 离屏合成，SrcAtop 才只染在字形上
+                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                    .drawWithContent {
+                        drawContent()
+                        // 光带从字的左边外面走到右边外面，两头各有一段看不见的空档
+                        val band = size.width * 0.6f
+                        val x = -band + sheen.value * (size.width + band)
+                        drawRect(
+                            Brush.horizontalGradient(
+                                0f to Color.Transparent,
+                                0.35f to Color(ScanEffect.HUES[0]),
+                                0.65f to Color(ScanEffect.HUES[2]),
+                                1f to Color.Transparent,
+                                startX = x,
+                                endX = x + band,
+                            ),
+                            blendMode = BlendMode.SrcAtop,
+                        )
+                    },
             )
         }
     }
 }
+
+/** 提示条上的光掠过一次的时长。 */
+private const val SHEEN_MS = 1600
 
 private suspend fun SnackbarHostState.showMessage(text: String, vm: EditorViewModel) {
     showSnackbar(text)

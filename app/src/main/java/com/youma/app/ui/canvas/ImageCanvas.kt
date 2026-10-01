@@ -1,17 +1,14 @@
 package com.youma.app.ui.canvas
 
+import android.graphics.BlendMode
 import android.graphics.Color as AndroidColor
+import android.graphics.ComposeShader
 import android.graphics.DashPathEffect
 import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PointF
-import android.graphics.RectF
+import android.graphics.PorterDuff
 import android.graphics.Shader
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -24,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
@@ -35,12 +33,14 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.ColorUtils
 import com.youma.app.core.geometry.Quad
+import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.MaskItem
 import com.youma.app.core.model.MaskOptions
+import com.youma.app.core.model.MaskPlan
 import com.youma.app.core.model.MaskState
+import com.youma.app.core.model.MaskStyle
 import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
@@ -70,25 +70,24 @@ fun ImageCanvas(
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
 
-    // 识别中的扫描动效与结果上屏的淡入（见 ScanEffect）。这几个值只在绘制里读，
-    // 动起来只触发重绘，不触发重组；平时一帧都不占。
+    // 识别中的扫光与结果上屏的落码（见 ScanEffect）。时间轴只在绘制里读，走起来只触发重绘、
+    // 不触发重组；识别中和落码那一遍之外它是 null，一帧都不占。
     val scanning = state.analyzing
-    val veil by animateFloatAsState(
-        targetValue = if (scanning) 1f else 0f,
-        animationSpec = tween(if (scanning) ScanEffect.VEIL_IN_MS else ScanEffect.VEIL_OUT_MS),
-        label = "scanVeil",
-    )
-    val sweep = remember(image) { Animatable(0f) }
-    val reveal = remember(image) { Animatable(1f) }      // 1 = 全部显示：从重建里恢复的 plan 不该再演一遍
+    var scanTime by remember(image) { mutableStateOf<ScanTime?>(null) }
     LaunchedEffect(image, scanning) {
         if (scanning) {
-            reveal.snapTo(0f)
+            val start = withFrameMillis { it }
+            while (true) withFrameMillis { scanTime = ScanTime(it - start, null) }
+        } else {
+            // 没扫过就没有落码这一遍：从重建里恢复的 plan 直接显示，不再演一遍
+            val scanned = scanTime ?: return@LaunchedEffect
+            val resultAt = withFrameMillis { it }
             while (true) {
-                sweep.snapTo(0f)
-                sweep.animateTo(1f, tween(ScanEffect.SWEEP_MS, easing = LinearEasing))
+                val since = withFrameMillis { it - resultAt }
+                if (since >= ScanEffect.REVEAL_MS) break
+                scanTime = ScanTime(scanned.sinceScan + since, since)
             }
-        } else if (reveal.value < 1f) {
-            reveal.animateTo(1f, tween(ScanEffect.REVEAL_MS, easing = FastOutSlowInEasing))
+            scanTime = null
         }
     }
     val scanPaints = remember { ScanPaints() }
@@ -256,43 +255,13 @@ fun ImageCanvas(
             val save = canvas.save()
             canvas.concat(viewport.matrix())
 
-            canvas.drawBitmap(image.bitmap, 0f, 0f, null)
-
-            // 识别中：浅暗幕 + 自上而下扫过的光带。画在遮罩之下，手动框始终清楚地浮在上面
-            if (veil > 0f) {
-                drawScan(canvas, image.width, image.height, sweep.value, veil, viewport.scale, density.density, scanPaints)
-            }
-            fun revealAlpha(item: MaskItem) = ScanEffect.revealAlpha(
-                manual = item.source == DetectorSource.MANUAL,
-                scanning = scanning,
-                progress = reveal.value,
-                centerY = item.quad.bounds().centerY(),
-                imageHeight = image.height,
+            drawScene(
+                canvas, image, state.plan, registry, viewport.scale, density.density,
+                // 识别中，时间轴的第一帧还没到（或手里还是上一遍落码的帧）也按「识别中」画：
+                // 换方案重跑时旧结果不该闪一下
+                time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime,
+                paints = scanPaints,
             )
-
-            // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
-            // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
-            val options = state.plan.options.copy(renderScale = image.scale)
-
-            // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
-            val sorted = state.plan.items.sortedByDescending { it.quad.area() }
-            sorted.filter { it.state == MaskState.MASKED }.forEach {
-                val alpha = revealAlpha(it)
-                if (alpha <= 0f) return@forEach
-                // 渲染器自己管画笔（实色块强制不透明），淡入只能整块走一个半透明图层
-                val layer = if (alpha < 1f) canvas.saveLayerAlpha(layerBounds(it), (alpha * 255).roundToInt()) else null
-                registry[state.plan.style].render(canvas, image.bitmap, it.quad, options)
-                layer?.let(canvas::restoreToCount)
-            }
-            sorted.filter { it.state == MaskState.OUTLINED }.forEach { item ->
-                val alpha = revealAlpha(item)
-                if (alpha <= 0f) return@forEach
-                canvas.drawPath(item.quad.toPath(), outlinePaint(viewport.scale).apply { this.alpha = (alpha * 255).roundToInt() })
-                // 类型小标签只在缩放比 ≥ 0.5 时绘制，避免密集截图上标签糊成一片
-                if (viewport.scale >= GestureRules.LABEL_MIN_SCALE) {
-                    drawKindLabel(canvas, item, viewport.scale, alpha)
-                }
-            }
             state.selectedManualId?.let { id ->
                 state.plan.find(id)?.let { item ->
                     canvas.drawPath(item.quad.toPath(), selectionPaint(viewport.scale))
@@ -358,18 +327,16 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
 }
 
 /** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
-private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float, alpha: Float = 1f) {
+private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
     // 模型猜的与规则命中区分开（spec §3）：Gemini Nano 的结果标「AI」
     val text = SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
     val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         textSize = 26f / scale
-        this.alpha = (alpha * 255).roundToInt()
     }
     val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
         style = Paint.Style.FILL
-        this.alpha = (alpha * 255).roundToInt()
     }
     val b = item.quad.bounds()
     val padding = 6f / scale
@@ -381,55 +348,170 @@ private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale
     canvas.drawText(text, rect.left + padding, rect.bottom - padding - textPaint.descent() * 0.5f, textPaint)
 }
 
-/** 扫描动效的画笔，跨帧复用。 */
-private class ScanPaints {
-    val veil = Paint()
-    val trail = Paint()
-    val line = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-}
-
-/** 光带前沿那条亮线：比天蓝更浅，压在暗幕上像一道光。 */
-private const val SCAN_LINE_COLOR = 0xFFE1F5FE.toInt()
-
 /**
- * 识别中的暗幕与光带，在图像坐标系下画，只盖住图像本身、不盖画布的留白。
- * 拖尾高度与亮线粗细按缩放反算，放大缩小时屏幕上看起来一样。
+ * 图像、遮罩与扫光——画布上除了选中态和草稿框之外的全部内容。拆出来是为了让像素测试
+ * 能直接画出动效的任意一帧。
+ *
+ * 调用前画布已经 concat 了 viewport：这里一律是图像坐标，dp 尺寸按 [scale] 反算。
+ *
+ * @param time 扫光时间轴上的这一帧（见 ScanEffect）；null 表示静止，照常画全部遮罩
  */
-private fun drawScan(
+internal fun drawScene(
     canvas: android.graphics.Canvas,
-    width: Int,
-    height: Int,
-    progress: Float,
-    strength: Float,
+    image: SourceImage,
+    plan: MaskPlan,
+    registry: RendererRegistry,
     scale: Float,
     density: Float,
+    time: ScanTime?,
     paints: ScanPaints,
 ) {
-    val w = width.toFloat()
-    paints.veil.color = ColorUtils.setAlphaComponent(AndroidColor.BLACK, (ScanEffect.VEIL_ALPHA * strength * 255).roundToInt())
-    canvas.drawRect(0f, 0f, w, height.toFloat(), paints.veil)
+    canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
-    val a = strength * ScanEffect.bandEnvelope(progress)
-    if (a < 0.01f) return
-    val y = progress * height
-    val trail = ScanEffect.TRAIL_DP * density / scale
-    paints.trail.shader = LinearGradient(
-        0f, y - trail, 0f, y,
-        AndroidColor.TRANSPARENT,
-        ColorUtils.setAlphaComponent(MaskOptions.SKY_BLUE, (0.55f * a * 255).roundToInt()),
-        Shader.TileMode.CLAMP,
+    // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
+    // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
+    val options = plan.options.copy(renderScale = image.scale)
+
+    // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
+    val sorted = plan.items.sortedByDescending { it.quad.area() }
+    if (time == null) {
+        drawItems(canvas, sorted, plan.style, image, options, registry, scale)
+        return
+    }
+
+    val dp = density / scale
+    val height = image.height.toFloat()
+    val trail = ScanEffect.TRAIL_DP * dp
+    val lead = ScanEffect.LEAD_DP * dp
+    val light = LightSpec(image.width, height, trail, lead, ScanEffect.HUE_SPAN_DP * dp, ScanEffect.drift(time.sinceScan))
+    val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
+
+    // 识别中，识别出的块一律不画：换方案重跑时旧结果先退场，不与扫光混在一起。
+    // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
+    time.sinceResult?.let { since ->
+        val feather = ScanEffect.FEATHER_DP * dp
+        val front = ScanEffect.revealFront(since, height, lead, trail, feather)
+        val layer = canvas.saveLayer(null, null)
+        drawItems(canvas, detected, plan.style, image, options, registry, scale)
+        keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
+        canvas.restoreToCount(layer)
+        drawLight(canvas, light, front, strength = 1f, paints)
+    }
+    drawLight(
+        canvas, light,
+        ScanEffect.loopCenter(time.sinceScan, height, lead, trail),
+        ScanEffect.loopStrength(time.sinceScan, time.sinceResult),
+        paints,
     )
-    canvas.drawRect(0f, (y - trail).coerceAtLeast(0f), w, y, paints.trail)
-    paints.line.color = ColorUtils.setAlphaComponent(SCAN_LINE_COLOR, (a * 255).roundToInt())
-    paints.line.strokeWidth = ScanEffect.LINE_DP * density / scale
-    canvas.drawLine(0f, y, w, y, paints.line)
+    // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
+    drawItems(canvas, manual, plan.style, image, options, registry, scale)
 }
 
+/** 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。 */
+private fun drawItems(
+    canvas: android.graphics.Canvas,
+    items: List<MaskItem>,
+    style: MaskStyle,
+    image: SourceImage,
+    options: MaskOptions,
+    registry: RendererRegistry,
+    scale: Float,
+) {
+    items.filter { it.state == MaskState.MASKED }.forEach {
+        registry[style].render(canvas, image.bitmap, it.quad, options)
+    }
+    items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
+        canvas.drawPath(item.quad.toPath(), outlinePaint(scale))
+        // 类型小标签只在缩放比 ≥ 0.5 时绘制，避免密集截图上标签糊成一片
+        if (scale >= GestureRules.LABEL_MIN_SCALE) {
+            drawKindLabel(canvas, item, scale)
+        }
+    }
+}
+
+/** 扫光与落码的画笔，跨帧复用。 */
+internal class ScanPaints {
+    /** 滤色：把光下的字染上颜色；白底滤色之后还是白，看不出来。 */
+    val screen = Paint().apply { blendMode = BlendMode.SCREEN }
+
+    /** 正常叠加的一层淡光晕，光扫过空白处时也看得见。 */
+    val tint = Paint()
+
+    /** 落码图层的蒙版：只留光已经走过的部分。 */
+    val keep = Paint().apply { blendMode = BlendMode.DST_IN }
+}
+
+/** 一道光在这一帧里不变的部分：图像范围与按缩放反算好的尺寸（图像坐标）。 */
+private class LightSpec(
+    val width: Int,
+    val height: Float,
+    val trail: Float,
+    val lead: Float,
+    val hueSpan: Float,
+    val drift: Float,
+)
+
+/** 光形竖直方向的取样数。鼓包靠线性插值逼近，24 段肉眼已看不出折线。 */
+private const val LIGHT_STOPS = 24
+
 /**
- * 淡入时那一块的离屏图层范围。各渲染器都按四边形裁剪，只有马克笔的手绘抖动会探出边一点，
- * 留出短边一成的余量。
+ * 一道光：竖直方向的亮度按 ScanEffect.glow 取样，水平方向是缓缓流动的天蓝—长春花蓝—淡紫。
+ * 先滤色把光下的字染亮，再正常叠一层很淡的光晕。只画在图像范围内，不碰画布的留白。
  */
-private fun layerBounds(item: MaskItem): RectF = RectF(item.quad.bounds()).apply {
-    val margin = maxOf(4f, item.quad.shortEdge() * 0.1f)
-    inset(-margin, -margin)
+private fun drawLight(canvas: android.graphics.Canvas, spec: LightSpec, center: Float, strength: Float, paints: ScanPaints) {
+    if (strength <= 0f) return
+    val top = center - spec.trail
+    val bottom = center + spec.lead
+    val drawTop = top.coerceAtLeast(0f)
+    val drawBottom = bottom.coerceAtMost(spec.height)
+    if (drawBottom <= drawTop) return
+
+    // 渐变的各个色标只用 alpha，RGB 一律取 0：DST_IN 只看 alpha
+    val shape = LinearGradient(
+        0f, top, 0f, bottom,
+        IntArray(LIGHT_STOPS + 1) { i ->
+            val y = top + (bottom - top) * i / LIGHT_STOPS
+            AndroidColor.argb((ScanEffect.glow(y, center, spec.trail, spec.lead) * 255).roundToInt(), 0, 0, 0)
+        },
+        null, Shader.TileMode.CLAMP,
+    )
+    // 镜像平铺的颜色一个周期是两倍 hueSpan，按相位整体平移，流动起来没有接缝
+    val x0 = -spec.drift * 2f * spec.hueSpan
+    val hues = LinearGradient(x0, 0f, x0 + spec.hueSpan, 0f, ScanEffect.HUES, null, Shader.TileMode.MIRROR)
+    val shader = ComposeShader(hues, shape, PorterDuff.Mode.DST_IN)
+
+    val right = spec.width.toFloat()
+    paints.screen.shader = shader
+    paints.screen.alpha = (ScanEffect.SCREEN_ALPHA * strength * 255).roundToInt()
+    canvas.drawRect(0f, drawTop, right, drawBottom, paints.screen)
+    paints.tint.shader = shader
+    paints.tint.alpha = (ScanEffect.TINT_ALPHA * strength * 255).roundToInt()
+    canvas.drawRect(0f, drawTop, right, drawBottom, paints.tint)
+}
+
+/** 落码蒙版的取样数。 */
+private const val KEEP_STOPS = 8
+
+/**
+ * 落码图层上只留光已经走过的部分：光的中心往上 [feather] 处以上原样保留，中心以下抹掉，
+ * 中间按 ScanEffect.coverage 渐变。蒙版的范围比图像大出一圈，探出图像边的标签与描边也一样处理。
+ */
+private fun keepRevealed(
+    canvas: android.graphics.Canvas,
+    front: Float,
+    feather: Float,
+    width: Float,
+    height: Float,
+    paints: ScanPaints,
+) {
+    val top = front - feather
+    paints.keep.shader = LinearGradient(
+        0f, top, 0f, front,
+        IntArray(KEEP_STOPS + 1) { i ->
+            val y = top + feather * i / KEEP_STOPS
+            AndroidColor.argb((ScanEffect.coverage(y, front, feather) * 255).roundToInt(), 0, 0, 0)
+        },
+        null, Shader.TileMode.CLAMP,
+    )
+    canvas.drawRect(-width, -height, width * 2f, height * 2f, paints.keep)
 }
