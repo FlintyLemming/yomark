@@ -145,6 +145,8 @@ dependencies {
     implementation(libs.mlkit.barcode.scanning)
     implementation(libs.kotlinx.coroutines.play.services)
     implementation(libs.libphonenumber)
+    // 人名的字面识别（PersonNameRecognizer）。portable 版把预编译好的词典打在 jar 里，约 8 MB，不联网
+    implementation(libs.hanlp)
     implementation(libs.onnxruntime.android)
     implementation(libs.mlkit.genai.prompt)
     implementation(libs.billing.ktx)

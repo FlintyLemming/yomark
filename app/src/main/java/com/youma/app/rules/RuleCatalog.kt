@@ -1,5 +1,6 @@
 package com.youma.app.rules
 
+import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RuleState
 
@@ -30,6 +31,14 @@ object RuleCatalog {
             RuleState.OUTLINED -> rule.withDefaultState(false)
         }
     }
+
+    /**
+     * 设置页上这一行的名字。默认就是类型名；同一类型有两条规则时得分得开——
+     * 两行都叫「人名」，用户不知道关的是哪一个。
+     */
+    fun label(rule: Rule): String = LABELS[rule.id] ?: SensitiveKindLabels.display(rule.kind)
+
+    private val LABELS = mapOf("name-text" to "人名（无字段名）")
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =
         if (enabledByDefault == masked) this else StateOverride(this, masked)

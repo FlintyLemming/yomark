@@ -23,7 +23,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
@@ -132,7 +131,7 @@ fun RecognitionSettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    SensitiveKindLabels.display(rule.kind),
+                    RuleCatalog.label(rule),
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.weight(1f),
                 )

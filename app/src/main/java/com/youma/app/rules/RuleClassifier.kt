@@ -4,6 +4,8 @@ import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.DetectorSource
 import com.youma.app.core.model.TextLine
 import com.youma.app.engine.SensitivityClassifier
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * 判定层的规则实现（spec §4.3）。
@@ -30,7 +32,11 @@ class RuleClassifier(
     /** 规则不依赖任何模型或网络，永远可用。 */
     override suspend fun isAvailable(): Boolean = true
 
-    override suspend fun classify(lines: List<TextLine>): List<Candidate> {
+    /**
+     * 放到后台线程跑：调用方是 viewModelScope（主线程），以前全是正则、几毫秒就完，
+     * 加了 HanLP 的人名识别之后，第一次分词要等词典读完，留在主线程会卡住界面。
+     */
+    override suspend fun classify(lines: List<TextLine>): List<Candidate> = withContext(Dispatchers.Default) {
         val out = ArrayList<Candidate>()
         lines.forEachIndexed { lineIndex, line ->
             if (line.confidence < minLineConfidence) return@forEachIndexed
@@ -49,7 +55,7 @@ class RuleClassifier(
                 }
             }
         }
-        return out
+        out
     }
 
     companion object {

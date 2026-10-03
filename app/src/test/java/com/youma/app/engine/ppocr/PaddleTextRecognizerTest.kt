@@ -73,9 +73,13 @@ class PaddleTextRecognizerTest {
     /** 字符级的框：名字与紧挨着它的号码各遮各的，框互不重叠。 */
     @Test fun `the name box stops where the number starts`(): Unit = runBlocking {
         val out = RuleClassifier(DefaultRuleSet.rules).classify(lines.filter { it.text.startsWith("王小明") })
-        val name = out.single { it.kind == SensitiveKind.PERSON_NAME }.quad.bounds()
+        // 电话锚定的 name 与字面识别的 name-text 都认出了名字：两个框都得在号码前面停下
+        val names = out.filter { it.kind == SensitiveKind.PERSON_NAME }.map { it.quad.bounds() }
         val phone = out.single { it.kind == SensitiveKind.PHONE }.quad.bounds()
-        assertThat(name.right).isAtMost(phone.left + 1f)
-        assertThat(phone.width()).isGreaterThan(name.width())
+        assertThat(names).isNotEmpty()
+        names.forEach { name ->
+            assertThat(name.right).isAtMost(phone.left + 1f)
+            assertThat(phone.width()).isGreaterThan(name.width())
+        }
     }
 }

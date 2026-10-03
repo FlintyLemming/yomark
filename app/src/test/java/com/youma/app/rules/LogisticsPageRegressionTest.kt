@@ -70,11 +70,15 @@ class LogisticsPageRegressionTest {
     private fun splitEveryCharacter(line: String): String =
         Regex("""[\u4e00-\u9fff]|[^\s\u4e00-\u9fff]+""").findAll(line).joinToString(" ") { it.value }
 
+    /**
+     * 同一行里两条规则认出同一处（name 与 name-text 都认出名字）只算一处——
+     * 合并时它们按同类型去重，画面上也只有一个框。
+     */
     private fun findings(lines: List<String>): List<Pair<SensitiveKind, String>> =
         lines.flatMap { line ->
             DefaultRuleSet.rules.flatMap { rule ->
                 rule.findIn(line).map { rule.kind to line.substring(it.range) }
-            }
+            }.distinct()
         }
 
     @Test fun `every sensitive item on the page is found and nothing else`() {
@@ -114,9 +118,13 @@ class LogisticsPageRegressionTest {
 
         val out = RuleClassifier(DefaultRuleSet.rules).classify(listOf(line))
 
-        val name = out.single { it.kind == PERSON_NAME }.quad.bounds()
-        assertThat(name.left).isEqualTo(elements[0].quad.bounds().left)
-        assertThat(name.right).isEqualTo(elements[2].quad.bounds().right)
+        // name 与 name-text 各出一个，两个框都得正好盖住三个字
+        val names = out.filter { it.kind == PERSON_NAME }.map { it.quad.bounds() }
+        assertThat(names).isNotEmpty()
+        names.forEach { name ->
+            assertThat(name.left).isEqualTo(elements[0].quad.bounds().left)
+            assertThat(name.right).isEqualTo(elements[2].quad.bounds().right)
+        }
         assertThat(out.single { it.kind == PHONE }.quad.bounds()).isEqualTo(elements[3].quad.bounds())
     }
 }
