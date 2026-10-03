@@ -72,8 +72,8 @@ fun RecognitionSettingsScreen(
         item {
             AxisSection(
                 title = "条码",
-                note = "宽松会把解不出内容的疑似条码也框出来（布料印花、格纹容易撞上），" +
-                    "但只圈不打码；严格只认解得出内容的，倾斜或失焦的收款码可能整个漏掉。",
+                note = "宽松会把解不出内容的疑似条码也框出来，但只圈不打码；彩色照片会被筛掉，" +
+                    "灰调纹理、两色格子仍可能撞上。严格只认解得出内容的，倾斜或失焦的收款码可能整个漏掉。",
                 options = BarcodeOption.entries,
                 selected = config.barcode,
                 label = ::barcodeLabel,

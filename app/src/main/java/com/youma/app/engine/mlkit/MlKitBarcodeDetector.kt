@@ -12,7 +12,9 @@ import com.youma.app.engine.RegionDetector
 import com.google.mlkit.vision.barcode.BarcodeScannerOptions
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 
 /**
  * 条码候选的构造（2026-09-04 增补设计 §1）。
@@ -25,7 +27,8 @@ object BarcodeCandidates {
     /**
      * @param decodable 内容解得出来。解不出的（potential）多半只是布料印花、
      *   格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的。
-     *   仍然报出来（漏检是事故），但只圈不打码，交给导出拦截兜底。
+     *   彩色照片在进这里之前已经被 [TwoInks] 筛掉；剩下的仍然报出来（漏检是事故），
+     *   但只圈不打码，交给导出拦截兜底。
      */
     fun from(index: Int, quad: Quad, decodable: Boolean) = Candidate(
         id = "barcode-$index",
@@ -68,6 +71,9 @@ class MlKitBarcodeDetector(
      *
      * 收窄格式**之后**再放宽解码要求，两者不冲突：格式白名单决定「拿哪几种形状去匹配」，
      * potential 决定「匹配上了但校验没过要不要报」。
+     *
+     * 放宽之后 ML Kit 会把彩色照片（真机上是一张酒店缩略图）也当疑似条码报上来，
+     * 所以 detect 里对解不出的那部分再加一道像素判断，见 [TwoInks]。
      */
     private val client by lazy {
         BarcodeScanning.getClient(
@@ -84,18 +90,27 @@ class MlKitBarcodeDetector(
     override suspend fun detect(image: SourceImage): List<Candidate> {
         val input = InputImage.fromBitmap(image.bitmap, 0)
         val barcodes = client.process(input).await()
-        return barcodes.mapIndexedNotNull { i, code ->
-            val quad = code.cornerPoints?.takeIf { it.size >= 4 }?.let {
-                Quad(
-                    PointF(it[0].x.toFloat(), it[0].y.toFloat()),
-                    PointF(it[1].x.toFloat(), it[1].y.toFloat()),
-                    PointF(it[2].x.toFloat(), it[2].y.toFloat()),
-                    PointF(it[3].x.toFloat(), it[3].y.toFloat()),
-                )
-            } ?: code.boundingBox?.let { Quad.fromRect(RectF(it)) } ?: return@mapIndexedNotNull null
+        // 疑似条码要逐像素看一遍（TwoInks），不放在主线程上
+        return withContext(Dispatchers.Default) {
+            barcodes.mapIndexedNotNull { i, code ->
+                val quad = code.cornerPoints?.takeIf { it.size >= 4 }?.let {
+                    Quad(
+                        PointF(it[0].x.toFloat(), it[0].y.toFloat()),
+                        PointF(it[1].x.toFloat(), it[1].y.toFloat()),
+                        PointF(it[2].x.toFloat(), it[2].y.toFloat()),
+                        PointF(it[3].x.toFloat(), it[3].y.toFloat()),
+                    )
+                } ?: code.boundingBox?.let { Quad.fromRect(RectF(it)) } ?: return@mapIndexedNotNull null
 
-            // rawValue 只在这里做一次「有没有」的判断，绝不读出来、更不落盘。
-            BarcodeCandidates.from(i, quad, decodable = code.rawValue != null)
+                // rawValue 只在这里做一次「有没有」的判断，绝不读出来、更不落盘。
+                val decodable = code.rawValue != null
+                // 解不出内容的，像素上不是两种墨色（彩色照片）就整个丢掉，连框都不画。
+                // 判不了（读像素出错）就留着：这一步只许少报误报，不许让整个条码检测失败。
+                if (!decodable && !runCatching { TwoInks.looksPrinted(image.bitmap, quad) }.getOrDefault(true)) {
+                    return@mapIndexedNotNull null
+                }
+                BarcodeCandidates.from(i, quad, decodable)
+            }
         }
     }
 }

@@ -11,7 +11,8 @@ enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
  *
  * LOOSE 连解不出内容的疑似条码也报（`enableAllPotentialBarcodes`）——
  * 漏检是事故，倾斜的收款码在 STRICT 下会被静默丢掉（自造 36 张评测图里丢 6 张）。
- * 代价是布料印花、格纹这类有规律纹理会被判成疑似条码，所以那部分只圈不打码。
+ * 代价是布料印花、格纹这类有规律纹理会被判成疑似条码。彩色照片在像素上就筛掉了
+ * （`TwoInks`：不是两种墨色印出来的），剩下的只圈不打码。
  */
 enum class BarcodeOption { LOOSE, STRICT, OFF }
 
