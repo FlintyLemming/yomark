@@ -160,6 +160,9 @@ dependencies {
     // PP-OCR 的单测在 JVM 上跑真的 ONNX 模型：换成桌面版 onnxruntime（API 与 Android 版同一套 ai.onnxruntime），
     // Android 版的 .so 在 JVM 上加载不了，从单测运行期 classpath 里摘掉。
     testImplementation(libs.onnxruntime.jvm)
+    // 设置页的系统栏避让在 Robolectric 上测：喂一组 insets，量标题栏与最后一行落在哪
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)

@@ -1,3 +1,13 @@
 <resources>
-    <style name="Theme.Youma" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+      界面只有浅色一套：系统栏透明、图标深色。运行时 EditorActivity 用 enableEdgeToEdge 再设一遍；
+      写在主题里是为了冷启动的启动窗口那一下也对——父主题的状态栏是深灰底配白色图标，
+      Android 15 起底色被系统换成透明，白色图标就落在浅色窗口背景上了。
+    -->
+    <style name="Theme.Youma" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+    </style>
 </resources>

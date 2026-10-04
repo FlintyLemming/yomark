@@ -11,9 +11,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.LinearProgressIndicator
@@ -105,7 +109,12 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
         return
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbar) }) { padding ->
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
+        // 边到边（见 EditorActivity）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
+        // 输入法不算进来：用途水印的输入框在对话框里，编辑器不该跟着键盘挤。
+        contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
+    ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,

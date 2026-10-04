@@ -1,27 +1,38 @@
 package com.youma.app.ui.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
@@ -38,7 +49,12 @@ import com.youma.app.rules.RuleCatalog
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，EditorViewModel 收到就重跑当前这张图。
+ *
+ * 应用是边到边的（见 EditorActivity），系统栏让不让开由各屏自己管：标题栏垫在状态栏下面、
+ * 固定在顶上，列表滚上去时从它底下穿过；列表一直画到屏幕底边，最后一行下面留出导航条的高度。
+ * 横屏时左右再让开挖孔与三键导航。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecognitionSettingsScreen(
     config: RecognitionConfig,
@@ -46,17 +62,36 @@ fun RecognitionSettingsScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(modifier.fillMaxSize()) {
-        item {
-            Row(
-                Modifier.fillMaxWidth().padding(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
-                Text("识别设置", style = MaterialTheme.typography.titleLarge)
-            }
-        }
+    // 设置页不是单独的 Activity：不拦下系统返回，返回手势会把编辑器连同手上这张图一起关掉。
+    BackHandler(onBack = onBack)
 
+    val scroll = TopAppBarDefaults.pinnedScrollBehavior()
+    Scaffold(
+        modifier = modifier.nestedScroll(scroll.nestedScrollConnection),
+        topBar = {
+            TopAppBar(
+                title = { Text("识别设置") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+                },
+                windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
+                scrollBehavior = scroll,
+            )
+        },
+        contentWindowInsets = WindowInsets.safeDrawing,
+    ) { padding ->
+        SettingsList(config, onChange, contentPadding = padding, modifier = Modifier.fillMaxSize())
+    }
+}
+
+@Composable
+private fun SettingsList(
+    config: RecognitionConfig,
+    onChange: (RecognitionConfig) -> Unit,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(modifier, contentPadding = contentPadding) {
         item {
             AxisSection(
                 title = "文字识别",
