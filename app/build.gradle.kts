@@ -62,13 +62,29 @@ android {
         applicationId = "com.youma.app"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.3.2"
+        versionCode = 7
+        versionName = "0.3.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // 固定签名：CI 从 Secrets 解出 keystore 并通过环境变量传进来。
+    // 没有这些变量（本地构建、拿不到 Secrets 的 fork）就沿用默认的 debug 签名。
+    // 不固定的话，每台 CI 机器都会现生成一个 debug keystore，各版 APK 签名不同，无法覆盖安装。
+    val fixedSigning = System.getenv("SIGNING_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }?.let { path ->
+        signingConfigs.create("fixed") {
+            storeFile = file(path)
+            storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+            keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+            keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
+        debug {
+            if (fixedSigning != null) signingConfig = fixedSigning
+        }
         release {
+            if (fixedSigning != null) signingConfig = fixedSigning
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
