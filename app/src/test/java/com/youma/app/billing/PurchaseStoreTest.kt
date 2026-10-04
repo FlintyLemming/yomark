@@ -31,4 +31,16 @@ class PurchaseStoreTest {
         store.setPro(false)
         assertThat(store.isPro.first()).isFalse()
     }
+
+    @Test fun `a fresh install has not redeemed a code`() = runTest {
+        assertThat(store().isRedeemed.first()).isFalse()
+    }
+
+    @Test fun `redeeming is stored apart from the play purchase`() = runTest {
+        val store = store()
+        store.setRedeemed()
+        store.setPro(false)
+        assertThat(store.isRedeemed.first()).isTrue()
+        assertThat(store.isPro.first()).isFalse()
+    }
 }
