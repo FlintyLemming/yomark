@@ -1,0 +1,115 @@
+<!doctype html>
+<!-- README 头图。node docs/readme/src/render.cjs hero 渲染成 docs/readme/hero.png -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;900&family=Inter:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101014;
+    --ink-2: #1a1a20;
+    --line: #2a2a32;
+    --paper: #ffffff;
+    --mute: #8e8e99;
+    --sky: #87ceeb;
+    --amber: #ffb300;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--paper);
+    position: relative;
+  }
+
+  /* 一点天蓝的光，落在手机后面；不铺渐变底 */
+  .glow {
+    position: absolute; left: 60px; top: 120px; width: 620px; height: 620px;
+    background: radial-gradient(closest-side, rgba(135, 206, 235, 0.22), rgba(135, 206, 235, 0));
+    filter: blur(10px);
+  }
+
+  /* 细网格，像裁切垫 */
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
+    background-size: 40px 40px;
+    mask-image: linear-gradient(to right, #000 0%, #000 45%, transparent 70%);
+  }
+
+  /* 2D 旋转，不用 3D 透视：透视会把截图栅格化得发糊 */
+  .stage { position: absolute; left: 0; top: 0; width: 730px; height: 640px; overflow: hidden; }
+  .phone {
+    position: absolute;
+    width: 270px; height: 600px;
+    border-radius: 40px;
+    padding: 9px;
+    background: #050507;
+    transform: rotate(-20deg);
+    box-shadow:
+      0 0 0 1.5px #3a3a44,
+      24px 40px 70px rgba(0, 0, 0, 0.6);
+  }
+  .phone img {
+    display: block; width: 100%; height: 100%;
+    border-radius: 31px; object-fit: cover; object-position: top;
+  }
+  .phone.back { left: 330px; top: -70px; }
+  .phone.front { left: 120px; top: 110px; }
+
+  .brand {
+    position: absolute; right: 96px; top: 0; bottom: 0; width: 430px;
+    display: flex; flex-direction: column; justify-content: center;
+  }
+  .lockup { display: flex; align-items: center; gap: 26px; }
+  /* 与启动图标、导出水印同构：圆角方块上一条横杠 */
+  .mark {
+    width: 96px; height: 96px; border-radius: 22px; position: relative;
+    background: var(--paper);
+    flex: none;
+  }
+  .mark::after {
+    content: ''; position: absolute;
+    left: 22%; right: 22%; top: 41%; bottom: 41%;
+    background: var(--ink); border-radius: 4px;
+  }
+  .word { font-weight: 900; font-size: 96px; line-height: 1; letter-spacing: 4px; }
+  .latin {
+    margin-top: 26px;
+    font-family: 'Inter', sans-serif; font-weight: 600;
+    font-size: 15px; letter-spacing: 5px; text-transform: uppercase; color: var(--mute);
+  }
+  .rule { margin: 34px 0 30px; width: 56px; height: 6px; border-radius: 2px; background: var(--sky); }
+  .tag { font-size: 30px; font-weight: 500; line-height: 1.45; color: #ececf1; }
+  .tag .bar {
+    display: inline-block; width: 3.1em; height: 0.82em; vertical-align: -0.06em;
+    background: var(--sky); border-radius: 2px; margin: 0 0.06em 0 0.12em;
+  }
+  .facts { margin-top: 22px; font-size: 17px; color: var(--mute); letter-spacing: 1px; }
+  .facts span + span::before { content: '·'; margin: 0 10px; color: #55555f; }
+</style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="glow"></div>
+
+  <div class="stage">
+    <div class="phone back"><img src="../shots/editor-purpose.png" alt=""></div>
+    <div class="phone front"><img src="../shots/editor.png" alt=""></div>
+  </div>
+
+  <div class="brand">
+    <div class="lockup">
+      <div class="mark"></div>
+      <div class="word">有码</div>
+    </div>
+    <div class="latin">Youma · Android</div>
+    <div class="rule"></div>
+    <p class="tag">截图里的<span class="bar"></span><br>发出去之前先遮住。</p>
+    <p class="facts"><span>本机识别</span><span>不联网</span><span>导出不带元数据</span></p>
+  </div>
+</body>
+</html>
