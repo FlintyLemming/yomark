@@ -1,0 +1,72 @@
+<!doctype html>
+<!-- README 截图用的样图：照着快递详情页排的版，人名、地址、号码全是编的。
+     node docs/readme/src/render.cjs order-page 渲染成 app/src/test/resources/readme/order-page.png -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1680px; }
+  body {
+    font-family: 'Noto Sans SC', sans-serif;
+    background: #f2f3f5;
+    color: #1f2329;
+    font-size: 40px;
+  }
+  .status { height: 96px; display: flex; align-items: center; justify-content: space-between; padding: 0 56px; font-size: 38px; font-weight: 500; background: #fff; }
+  .status .dots { display: flex; gap: 14px; align-items: center; }
+  .status .bat { width: 64px; height: 30px; border: 3px solid #1f2329; border-radius: 8px; position: relative; }
+  .status .bat::after { content: ''; position: absolute; inset: 4px 14px 4px 4px; background: #1f2329; border-radius: 3px; }
+  .bar { height: 132px; display: flex; align-items: center; padding: 0 48px; gap: 36px; background: #fff; font-size: 46px; font-weight: 700; }
+  .bar .back { width: 30px; height: 30px; border-left: 6px solid #1f2329; border-bottom: 6px solid #1f2329; transform: rotate(45deg); margin-left: 12px; }
+  .card { background: #fff; border-radius: 36px; margin: 28px 32px 0; padding: 40px 48px; }
+  .state { display: flex; align-items: baseline; gap: 40px; }
+  .state b { color: #ff6a00; font-size: 60px; font-weight: 700; }
+  .state span { color: #ff6a00; font-size: 42px; }
+  .note { color: #8a8f99; font-size: 36px; line-height: 1.6; margin-top: 24px; }
+  .code { display: flex; align-items: center; margin-top: 32px; gap: 48px; }
+  .code .k { font-size: 38px; color: #5c6370; }
+  .code .v { font-size: 92px; font-weight: 500; letter-spacing: 2px; }
+  .btn { font-size: 34px; color: #5c6370; border: 2px solid #d5d8de; border-radius: 40px; padding: 8px 28px; margin-left: auto; }
+  .row { display: flex; align-items: center; gap: 36px; padding: 22px 0; }
+  .row + .row { border-top: 2px solid #f0f1f3; }
+  .row .k { color: #8a8f99; font-size: 36px; width: 150px; flex: none; }
+  .row .v { font-size: 40px; }
+  .row .tag { font-size: 30px; color: #8a8f99; }
+  .shop { font-weight: 700; font-size: 42px; padding-bottom: 28px; }
+  .item { display: flex; gap: 32px; align-items: center; }
+  .thumb { width: 130px; height: 130px; border-radius: 20px; background: linear-gradient(135deg, #c9e7c4, #8fcf9c); flex: none; }
+  .item .t { font-size: 38px; line-height: 1.5; }
+  .item .p { margin-left: auto; font-size: 40px; font-weight: 500; }
+  .meta { margin-top: 16px; }
+  .meta .row .k { width: 170px; }
+  .meta .row .v { font-size: 36px; color: #3a3f47; }
+</style>
+</head>
+<body>
+  <div class="status"><span>16:08</span><span class="dots"><span class="bat"></span></span></div>
+  <div class="bar"><span class="back"></span><span>包裹详情</span></div>
+
+  <div class="card">
+    <div class="state"><b>待取件</b><span>09-29 12:30</span></div>
+    <p class="note">您的快件已暂存至阳光新村驿站，请凭取件码及时领取。</p>
+    <div class="code"><span class="k">取件码</span><span class="v">3-2-1234</span><span class="btn">复制</span></div>
+  </div>
+
+  <div class="card">
+    <div class="row"><span class="k">顺达快递</span><span class="v">773512046683217</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">送至</span><span class="v">长江路88号阳光新村5幢302室</span></div>
+    <div class="row"><span class="k">收件人</span><span class="v">王小明</span><span class="v">86-139****5678</span><span class="tag">号码保护中</span></div>
+  </div>
+
+  <div class="card">
+    <div class="shop">青柠生活旗舰店</div>
+    <div class="item"><div class="thumb"></div><div class="t">挂耳咖啡 · 中度烘焙<br><span style="color:#8a8f99;font-size:34px">20 袋装 x1</span></div><div class="p">¥59.9</div></div>
+    <div class="meta">
+      <div class="row"><span class="k">订单编号</span><span class="v">2026092912304518839201746355</span></div>
+      <div class="row"><span class="k">联系邮箱</span><span class="v">wangxm@example.com</span></div>
+    </div>
+  </div>
+</body>
+</html>

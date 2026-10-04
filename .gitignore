@@ -8,3 +8,6 @@ build/
 .externalNativeBuild
 .cxx
 local.properties
+
+# README 截图的中间产物，由 ReadmeScreenshots 生成
+docs/readme/shots/

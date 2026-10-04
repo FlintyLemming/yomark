@@ -1,0 +1,77 @@
+<!doctype html>
+<!-- README 的六种遮法对照。node docs/readme/src/render.cjs styles 渲染成 docs/readme/styles.png -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101014;
+    --paper: #ffffff;
+    --mute: #8e8e99;
+    --sky: #87ceeb;
+    --amber: #ffb300;
+    /* 截图缩放：原图 1236px 宽 */
+    --k: 0.44;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1280px; height: 500px; overflow: hidden; }
+  body {
+    background: var(--ink);
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--paper);
+    display: flex; justify-content: center; gap: 72px;
+    padding-top: 48px;
+  }
+  .col { width: 520px; }
+  .head { display: flex; align-items: baseline; gap: 14px; margin-bottom: 30px; }
+  .head h2 { font-size: 30px; font-weight: 900; letter-spacing: 2px; }
+  .head p { font-size: 16px; color: var(--mute); }
+  .head::before {
+    content: ''; width: 34px; height: 12px; border-radius: 2px; align-self: center;
+    background: var(--sky);
+  }
+  .col.leaky .head::before { background: transparent; border: 2px dashed var(--amber); }
+
+  /* 每一栏整体斜一点，像摊在桌上的几张小票 */
+  .stack { transform: rotate(-3deg); transform-origin: left top; }
+  .col.leaky .stack { transform: rotate(-3deg) translateY(10px); }
+  .row { display: flex; align-items: center; gap: 18px; margin-bottom: 16px; }
+  .label { width: 64px; flex: none; text-align: right; }
+  .label b { display: block; font-size: 18px; font-weight: 500; }
+  .label small { display: block; margin-top: 2px; font-size: 12px; color: var(--mute); white-space: nowrap; }
+  .col.leaky .label small { color: var(--amber); }
+  .tile {
+    position: relative; overflow: hidden; flex: none;
+    width: calc(1040px * var(--k)); height: calc(230px * var(--k));
+    border-radius: 12px; background: var(--paper);
+    box-shadow: 0 0 0 1px #2c2c34, 10px 16px 30px rgba(0, 0, 0, 0.45);
+  }
+  .tile img {
+    position: absolute; left: calc(-60px * var(--k));
+    width: calc(1236px * var(--k));
+  }
+  /* 截图里图片的位置：带说明文字的样式底栏高一行，图上移 39px */
+  .tile img.y0 { top: calc(-1232px * var(--k)); }
+  .tile img.y39 { top: calc(-1193px * var(--k)); }
+</style>
+</head>
+<body>
+  <section class="col">
+    <div class="head"><h2>遮得住</h2><p>不可还原</p></div>
+    <div class="stack">
+      <div class="row"><div class="label"><b>色块</b></div><div class="tile"><img class="y0" src="../shots/editor.png" alt=""></div></div>
+      <div class="row"><div class="label"><b>表情</b></div><div class="tile"><img class="y0" src="../shots/editor-emoji.png" alt=""></div></div>
+      <div class="row"><div class="label"><b>抹除</b></div><div class="tile"><img class="y0" src="../shots/editor-erase.png" alt=""></div></div>
+    </div>
+  </section>
+  <section class="col leaky">
+    <div class="head"><h2>看起来遮了</h2><p>app 里会标出来</p></div>
+    <div class="stack">
+      <div class="row"><div class="label"><b>马赛克</b><small>可逐字还原</small></div><div class="tile"><img class="y39" src="../shots/editor-pixelate.png" alt=""></div></div>
+      <div class="row"><div class="label"><b>模糊</b><small>可还原</small></div><div class="tile"><img class="y39" src="../shots/editor-blur.png" alt=""></div></div>
+      <div class="row"><div class="label"><b>马克笔</b><small>只做标记</small></div><div class="tile"><img class="y39" src="../shots/editor-marker.png" alt=""></div></div>
+    </div>
+  </section>
+</body>
+</html>
