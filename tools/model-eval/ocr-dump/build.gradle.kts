@@ -20,6 +20,7 @@ sourceSets {
                 "com/youma/app/rules/Rule.kt", "com/youma/app/rules/DefaultRuleSet.kt",
                 "com/youma/app/rules/PhoneRule.kt", "com/youma/app/rules/NameBeforePhone.kt",
                 "com/youma/app/rules/LabeledField.kt", "com/youma/app/rules/HanView.kt",
+                "com/youma/app/rules/PersonNameRecognizer.kt",
                 "com/youma/app/rules/AddressShape.kt", "com/youma/app/rules/DateTimeRule.kt",
                 "com/youma/app/rules/validator/Checksums.kt", "com/youma/app/rules/validator/KnownTlds.kt",
             )
