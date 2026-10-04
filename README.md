@@ -43,7 +43,7 @@
 
 - 导出时在原图分辨率上重新绘制、重新编码。EXIF 里的位置、机型、拍摄时间一律不带出去。
 - 用途水印：在整张图上平铺一行字，比如「仅供快递取件使用」，颜色、角度、透明度、疏密都可以调。证件照发出去之前加一行，以后被挪作他用时一眼就能认出来。
-- 免费版导出的图片右下角有一个「有码 Youma」小水印，会自动避开打码区域。一次性买断可以去掉。付费只去掉这个水印，免费版的其他功能都不受限。
+- 免费版导出的图片右下角有一个「有码 Youma」小水印，会自动避开打码区域。一次性买断或输入兑换码可以去掉。付费只去掉这个水印，免费版的其他功能都不受限。
 
 ## 权限与网络
 
@@ -66,6 +66,12 @@ ML Kit 会通过依赖把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest�
 - **人脸与条码**：用 ML Kit 的 bundled 版本，模型同样随包分发。
 - **AI 复查**：在支持 AICore 的机型上，编辑器里会出现这个按钮。点了才会让 Gemini Nano 在本机把整页文字再读一遍；新发现的内容只圈出，不会自动遮住。
 
+## 下载
+
+在 [Releases](https://github.com/FlintyLemming/youma/releases) 里下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。目前发布的是 debug 签名的包。
+
+每次推送后，GitHub Actions 也会打一份 debug APK，可以在对应运行的 Artifacts 里下载。推送 `v*` 标签，或者在 Actions 页面手动触发并填写版本号，单元测试通过后会发布一个 Release，说明取自 `docs/release-notes/<版本号>.md`。
+
 ## 构建
 
 需要 JDK 21 和 Android SDK 36。最低支持 Android 10（minSdk 29）：从这一版开始，应用读写自己创建的图片不需要存储权限，这是零权限的前提。
@@ -75,8 +81,6 @@ ML Kit 会通过依赖把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest�
 ./gradlew :app:testDebugUnitTest          # Robolectric；PP-OCR 用桌面版 ONNX Runtime 跑真模型
 ./gradlew :app:connectedDebugAndroidTest  # 需要连着设备或模拟器
 ```
-
-每次推送后，GitHub Actions 都会打一份 debug APK，可以在对应运行的 Artifacts 里下载。
 
 ## 目录
 
@@ -88,7 +92,7 @@ app/src/main/java/com/youma/app/
   render/    六种遮法的渲染器，预览和导出共用一套
   export/    原图重绘、品牌水印、用途水印、写入相册
   ui/        首页、编辑器、识别设置（Jetpack Compose）
-  billing/   去水印的一次性购买
+  billing/   去水印的一次性购买与兑换码
 docs/        设计文档、模型调研、上架验收记录
 tools/       模型评测和测试语料的生成脚本
 ```
