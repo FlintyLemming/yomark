@@ -25,6 +25,7 @@ import com.youma.app.engine.RedactionEngine
 import com.youma.app.export.ExportOutcome
 import com.youma.app.export.ExportRequest
 import com.youma.app.export.Exporter
+import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.render.EraseRenderer
 import com.youma.app.ui.batch.BatchItem
 import com.youma.app.ui.batch.BatchSession
@@ -32,6 +33,7 @@ import com.youma.app.ui.canvas.GestureRules
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -87,9 +89,17 @@ class EditorViewModel(
     /** 用户这次会话里已经自己选过样式。选过之后就不再被「上次样式」的异步恢复覆盖。 */
     private var styleChosenByUser = false
 
+    /** 用途水印外观同理：用户这次调过，就不再被持久化值的异步恢复覆盖。 */
+    private var purposeStyleTouched = false
+    private var purposeStyleSave: Job? = null
+
+    /** 这次会话里最后一次非空的用途水印文案。只在内存里，不落盘。 */
+    private var lastPurposeText: String? = null
+
     init {
         // 恢复出来的 plan 自带上一次会话的样式，比设置里的「上次样式」更贴近用户当下的上下文。
         if (!restore()) restoreLastStyle()
+        restorePurposeStyle()
         observeRecognitionConfig()
     }
 
@@ -141,6 +151,15 @@ class EditorViewModel(
         }
     }
 
+    /** 与 restoreLastStyle 同理：持久化的外观晚到时，不覆盖用户这次已经调过的。 */
+    private fun restorePurposeStyle() {
+        viewModelScope.launch {
+            val style = settings.purposeWatermarkStyle.first()
+            if (purposeStyleTouched) return@launch
+            _state.value = _state.value.copy(purposeStyle = style)
+        }
+    }
+
     // ---------- 载入 ----------
 
     /**
@@ -173,7 +192,10 @@ class EditorViewModel(
                 return@launch
             }
             intakeResult = IntakeResult(file, mime)
-            uiState = EditorUiState(image = image, plan = plan, isPro = _state.value.isPro)
+            uiState = EditorUiState(
+                image = image, plan = plan,
+                isPro = _state.value.isPro, purposeStyle = _state.value.purposeStyle,
+            )
         }
         return true
     }
@@ -206,6 +228,7 @@ class EditorViewModel(
                     analyzing = true,
                     // 换图是换一张图，不是换一个人：购买态必须活过每一次 EditorUiState 重建。
                     isPro = _state.value.isPro,
+                    purposeStyle = _state.value.purposeStyle,
                 )
                 analyze(image)
             }.onFailure {
@@ -235,6 +258,7 @@ class EditorViewModel(
         uiState = EditorUiState(
             plan = MaskPlan.empty(_state.value.plan.style),
             isPro = _state.value.isPro,
+            purposeStyle = _state.value.purposeStyle,
             batch = BatchSession(
                 items = uris.map { BatchItem(it, null, "image/jpeg", null, 1f) },
                 index = 0,
@@ -533,11 +557,52 @@ class EditorViewModel(
     fun showPaywall() { _state.value = _state.value.copy(paywallVisible = true) }
     fun dismissPaywall() { _state.value = _state.value.copy(paywallVisible = false) }
 
-    fun showPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = true) }
-    fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false) }
-    fun setPurposeText(text: String?) {
-        _state.value = _state.value.copy(purposeText = text, purposeSheetVisible = false)
+    // ---------- 用途水印 ----------
+
+    /**
+     * 打开调节面板即打开水印：还没设文案时先填上默认措辞，画布上马上就能看到效果，
+     * 用户改中间那几个字即可。不想要就点面板上的「移除」。
+     */
+    fun showPurposeSheet() {
+        val s = _state.value
+        _state.value = s.copy(
+            purposeSheetVisible = true,
+            purposeText = s.purposeText ?: lastPurposeText ?: DEFAULT_PURPOSE_TEXT,
+        )
     }
+
+    /** 收起面板，水印保持现状。 */
+    fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false) }
+
+    /** 边打字边生效。清空就等于暂时不加，面板不收，接着打字又回来。 */
+    fun setPurposeText(text: String?) {
+        val t = text?.takeIf { it.isNotBlank() }
+        if (t != null) lastPurposeText = t
+        _state.value = _state.value.copy(purposeText = t)
+    }
+
+    /** 移除水印并收起面板。文案记在内存里，这次会话里再打开面板还是它。 */
+    fun removePurposeWatermark() {
+        _state.value = _state.value.copy(purposeText = null, purposeSheetVisible = false)
+    }
+
+    /**
+     * 拖滑条时每一帧都会进来：状态即时更新给画布预览，落盘做一次去抖，
+     * 不让 DataStore 跟着滑条每帧写一次。
+     */
+    fun setPurposeStyle(style: PurposeWatermarkStyle) {
+        val next = style.normalized()
+        purposeStyleTouched = true
+        if (next == _state.value.purposeStyle) return
+        _state.value = _state.value.copy(purposeStyle = next)
+        purposeStyleSave?.cancel()
+        purposeStyleSave = viewModelScope.launch {
+            delay(PURPOSE_STYLE_SAVE_DEBOUNCE_MS)
+            settings.setPurposeWatermarkStyle(next)
+        }
+    }
+
+    fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
         uiState = _state.value.copy(pendingDialogVisible = false)
@@ -566,6 +631,7 @@ class EditorViewModel(
                     analysisScale = image.scale,
                     applyWatermark = applyWatermark(),
                     purposeText = _state.value.purposeText,
+                    purposeStyle = _state.value.purposeStyle,
                 ),
                 dispatcher = ioDispatcher,
             )
@@ -598,6 +664,7 @@ class EditorViewModel(
                         analysisScale = item.analysisScale,
                         applyWatermark = applyWatermark(),
                         purposeText = _state.value.purposeText,
+                        purposeStyle = _state.value.purposeStyle,
                     ),
                     dispatcher = ioDispatcher,
                 )
@@ -629,6 +696,8 @@ class EditorViewModel(
         const val KEY_FILE = "intake.file"
         const val KEY_MIME = "intake.mime"
         const val KEY_PLAN = "plan"
+        const val DEFAULT_PURPOSE_TEXT = "仅供办理 XX 使用"
+        const val PURPOSE_STYLE_SAVE_DEBOUNCE_MS = 400L
     }
 
     @VisibleForTesting

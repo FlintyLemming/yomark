@@ -13,6 +13,7 @@ import com.youma.app.core.image.ImageIntake
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.TextLine
+import com.youma.app.data.SettingsStore
 import com.youma.app.data.isolatedSettingsStore
 import com.youma.app.engine.CandidateMerger
 import com.youma.app.engine.RedactionEngine
@@ -20,11 +21,13 @@ import com.youma.app.engine.SensitivityClassifier
 import com.youma.app.engine.TextRecognizer
 import com.youma.app.export.Exporter
 import com.youma.app.export.ImageSink
+import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.export.WatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -58,7 +61,7 @@ class EditorViewModelWatermarkTest {
 
     private lateinit var sink: CapturingSink
 
-    private fun vm(): EditorViewModel {
+    private fun vm(settings: SettingsStore = isolatedSettingsStore(context)): EditorViewModel {
         sink = CapturingSink()
         val engine = RedactionEngine(
             object : TextRecognizer {
@@ -77,7 +80,7 @@ class EditorViewModelWatermarkTest {
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
             engineProvider = { engine },
-            settings = isolatedSettingsStore(context),
+            settings = settings,
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
@@ -131,5 +134,65 @@ class EditorViewModelWatermarkTest {
 
         pro.value = true; advanceUntilIdle()
         assertThat(vm.state.value.isPro).isTrue()
+    }
+
+    // ---------- 用途水印 ----------
+
+    @Test
+    fun `opening the panel turns the watermark on with a default text so the preview shows at once`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(whiteUri("open.png")); advanceUntilIdle()
+        vm.showPurposeSheet()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        assertThat(vm.state.value.purposeText).isNotEmpty()
+    }
+
+    @Test
+    fun `clearing the text turns it off, and reopening brings back the last text`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.showPurposeSheet()
+        vm.setPurposeText("仅供办理签证使用")
+        vm.setPurposeText("")
+        assertThat(vm.state.value.purposeText).isNull()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()      // 打字途中清空不收面板
+
+        vm.removePurposeWatermark()
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        vm.showPurposeSheet()
+        assertThat(vm.state.value.purposeText).isEqualTo("仅供办理签证使用")
+    }
+
+    @Test
+    fun `the tuned style is what the export draws`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.observePro(MutableStateFlow(true)); advanceUntilIdle()     // 去掉品牌水印，只看用途水印
+        vm.onImageChosen(whiteUri("styled.png")); advanceUntilIdle()
+        vm.showPurposeSheet()
+        vm.setPurposeText("仅供办理签证使用")
+        vm.setPurposeStyle(PurposeWatermarkStyle(color = PurposeWatermarkStyle.PALETTE[3], opacity = 0.6f))
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
+        vm.requestExport(); advanceUntilIdle()
+
+        val bmp = sink.last!!
+        var reddish = 0
+        for (x in 0 until bmp.width step 3) for (y in 0 until bmp.height step 3) {
+            val c = bmp.getPixel(x, y)
+            if (Color.red(c) > Color.blue(c) + 40) reddish++
+        }
+        assertThat(reddish).isGreaterThan(50)
+    }
+
+    @Test
+    fun `the style is remembered for next time and survives picking another image`() = runTest(dispatcher) {
+        val settings = isolatedSettingsStore(context)
+        val vm = vm(settings)
+        advanceUntilIdle()
+        val tuned = PurposeWatermarkStyle(angle = 15f, opacity = 0.3f, density = 1.5f)
+        vm.setPurposeStyle(tuned)
+        vm.onImageChosen(whiteUri("next.png")); advanceUntilIdle()
+
+        assertThat(vm.state.value.purposeStyle).isEqualTo(tuned)
+        assertThat(settings.purposeWatermarkStyle.first()).isEqualTo(tuned)
+        assertThat(vm(settings).also { advanceUntilIdle() }.state.value.purposeStyle).isEqualTo(tuned)
     }
 }

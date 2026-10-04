@@ -4,6 +4,7 @@ import android.net.Uri
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.MaskPlan
 import com.youma.app.engine.RecognitionConfig
+import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.ui.batch.BatchSession
 
 sealed interface EditorMessage {
@@ -50,6 +51,9 @@ data class EditorUiState(
     val degradeNote: String? = null,
     /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
     val purposeText: String? = null,
+    /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
+    val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
+    /** 用途水印调节面板开着：它顶替底栏，画布留在上面实时预览。 */
     val purposeSheetVisible: Boolean = false,
     /** ACTION_SEND_MULTIPLE 进来的批量会话；单张时为 null，底栏也就没有「下一张」。 */
     val batch: BatchSession? = null,

@@ -6,6 +6,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.youma.app.core.model.MaskStyle
@@ -13,6 +15,7 @@ import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.TextEngineOption
+import com.youma.app.export.PurposeWatermarkStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -22,6 +25,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  * 本地设置（spec §12 M5 的「记住上次样式」）。
  *
  * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。
+ * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
  * MaskPlan.style 是全局单值，所以样式只需要存一个枚举名。
  */
 class SettingsStore internal constructor(private val store: DataStore<Preferences>) {
@@ -43,6 +47,32 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
     suspend fun markOnboardingSeen() {
         store.edit { it[KEY_ONBOARDING] = true }
+    }
+
+    /** 读回来一律 normalized()：手改过的或旧版本写的越界值收回范围内，不让水印变成不透明的。 */
+    val purposeWatermarkStyle: Flow<PurposeWatermarkStyle> = store.data.map { prefs ->
+        val fallback = PurposeWatermarkStyle()
+        PurposeWatermarkStyle(
+            color = prefs[KEY_PURPOSE_COLOR] ?: fallback.color,
+            angle = prefs[KEY_PURPOSE_ANGLE] ?: fallback.angle,
+            opacity = prefs[KEY_PURPOSE_OPACITY] ?: fallback.opacity,
+            density = prefs[KEY_PURPOSE_DENSITY] ?: fallback.density,
+        ).normalized()
+    }
+
+    suspend fun setPurposeWatermarkStyle(style: PurposeWatermarkStyle) {
+        val s = style.normalized()
+        store.edit {
+            it[KEY_PURPOSE_COLOR] = s.color
+            it[KEY_PURPOSE_ANGLE] = s.angle
+            it[KEY_PURPOSE_OPACITY] = s.opacity
+            it[KEY_PURPOSE_DENSITY] = s.density
+        }
+    }
+
+    @VisibleForTesting
+    internal suspend fun writeRawPurposeOpacityForTest(raw: Float) {
+        store.edit { it[KEY_PURPOSE_OPACITY] = raw }
     }
 
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
@@ -88,6 +118,10 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
+        val KEY_PURPOSE_COLOR = intPreferencesKey("purpose_watermark_color")
+        val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")
+        val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
+        val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。

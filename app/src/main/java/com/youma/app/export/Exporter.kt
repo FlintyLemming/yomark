@@ -25,6 +25,8 @@ data class ExportRequest(
     val applyWatermark: Boolean,
     /** 用途水印文案（「仅供办理 XX 使用」）。与品牌水印无关，不受购买态影响。 */
     val purposeText: String? = null,
+    /** 用途水印的颜色、角度、透明度、密度。 */
+    val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
 )
 
 sealed interface ExportOutcome {
@@ -72,7 +74,9 @@ class Exporter(
                 }
 
             // 顺序不能反：品牌水印必须画在最上层，否则用途水印的斜纹会压在它上面影响可读性。
-            request.purposeText?.let { purposeWatermark.draw(canvas, bitmap.width, bitmap.height, it) }
+            request.purposeText?.let {
+                purposeWatermark.draw(canvas, bitmap.width, bitmap.height, it, request.purposeStyle)
+            }
             if (request.applyWatermark) watermark.draw(canvas, bitmap, maskedBounds)
 
             val png = request.mimeType.equals("image/png", ignoreCase = true)
