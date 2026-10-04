@@ -3,7 +3,9 @@ package com.youma.app.ui.canvas
 import com.youma.app.core.model.MaskOptions
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.ceil
 import kotlin.math.cos
+import kotlin.math.sqrt
 
 /**
  * 识别期间的扫光，与结果上屏时的「落码」。
@@ -14,9 +16,10 @@ import kotlin.math.cos
  *   一层很淡的光晕。看上去是光在逐行读这一页，而不是一把激光枪；
  * - 识别期间整张图压一层暗幕。白底截图占大多数，滤色在纯白上什么也染不出，光在亮底上几乎看不见；
  *   压暗之后光才显得出来；
- * - 结果到了，光再扫最后一遍，打码块紧跟在光的后面自上而下渐显：每一块先被光照亮，再从半透明
- *   慢慢盖实。暗幕跟着同一道光自上而下揭开，光走过的地方回到原本的亮度。盖实之前那一下，
- *   底下原来是什么用户看得见——块里因此不再写类型名。
+ * - 结果到了，还在半路的那道光不掐断，提速到落码那一遍的速度把这一趟走完；紧接着光再扫最后一遍，
+ *   打码块紧跟在光的后面自上而下渐显：每一块先被光照亮，再从半透明慢慢盖实。暗幕跟着同一道光
+ *   自上而下揭开，光走过的地方回到原本的亮度。盖实之前那一下，底下原来是什么用户看得见——块里
+ *   因此不再写类型名。
  *
  * 只是编辑器里的过渡：不改 plan、不进撤销栈、不进导出。时长、轨迹与光的形状全在这里，画布只管落笔。
  * 长度一律是图像坐标，由画布按缩放把 dp 反算好了再传进来。
@@ -29,8 +32,8 @@ internal object ScanEffect {
     /** 识别开始时光的淡入时长。 */
     const val FADE_IN_MS = 320L
 
-    /** 结果到达时，还在半路的那道循环光的退场时长。 */
-    const val LOOP_FADE_MS = 240L
+    /** 结果到达后，还在半路的那道循环光由原速提到落码速度所用的时长。 */
+    const val SPEED_UP_MS = 400L
 
     /** 落码那一遍的时长。 */
     const val REVEAL_MS = 1400L
@@ -62,21 +65,66 @@ internal object ScanEffect {
     val HUES: IntArray = intArrayOf(MaskOptions.SKY_BLUE, 0xFFA5B4FC.toInt(), 0xFFC4B5FD.toInt())
 
     /**
-     * 识别中循环的那道光，此刻中心的纵坐标。
+     * 循环光这一趟里的位置为 [phaseMs]（0..[PASS_MS]）时，中心的纵坐标。
      *
      * 每一趟都从图像上方整道光完全藏着的位置出发、到下方整道光完全离开为止，
      * 从底部跳回顶部的那一下因此看不见，用不着再靠淡入淡出遮掩。
      */
-    fun loopCenter(sinceScanMs: Long, height: Float, lead: Float, trail: Float): Float {
-        val p = (sinceScanMs.coerceAtLeast(0L) % PASS_MS).toFloat() / PASS_MS
+    fun loopCenter(phaseMs: Float, height: Float, lead: Float, trail: Float): Float {
+        val p = (phaseMs / PASS_MS).coerceIn(0f, 1f)
         return -lead + travel(p) * (height + lead + trail)
     }
 
-    /** 循环光的强度：识别开始时淡入，结果到达后退场，把位置让给落码那一遍。 */
-    fun loopStrength(sinceScanMs: Long, sinceResultMs: Long?): Float {
-        val fadeIn = smooth(sinceScanMs.toFloat() / FADE_IN_MS)
-        val fadeOut = if (sinceResultMs == null) 1f else 1f - smooth(sinceResultMs.toFloat() / LOOP_FADE_MS)
-        return fadeIn * fadeOut
+    /**
+     * 循环光此刻走到这一趟里的哪儿（0..[PASS_MS]）。识别中按原速一趟接一趟地走；
+     * 结果到达后不掐断，提速把这一趟走完，离开图像之后为 null，把场子让给落码那一遍。
+     */
+    fun loopPhase(sinceScanMs: Long, sinceResultMs: Long?): Float? {
+        if (sinceResultMs == null) return (sinceScanMs.coerceAtLeast(0L) % PASS_MS).toFloat()
+        val atResult = phaseAtResult(sinceScanMs - sinceResultMs)
+        if (sinceResultMs >= finishMs(sinceScanMs - sinceResultMs)) return null
+        return (atResult + hurried(sinceResultMs.toFloat())).coerceAtMost(PASS_MS.toFloat())
+    }
+
+    /** 循环光的强度：识别开始时淡入，之后一直是满的，结果到达后也不退场。 */
+    fun loopStrength(sinceScanMs: Long): Float = smooth(sinceScanMs.toFloat() / FADE_IN_MS)
+
+    /** 结果在识别开始后 [scanAtResultMs] 到达时，那道循环光提速走完这一趟要多久。 */
+    fun finishMs(scanAtResultMs: Long): Long {
+        val left = PASS_MS - phaseAtResult(scanAtResultMs)
+        val r = SPEED_UP_MS.toFloat()
+        val ramp = hurried(r)
+        val t = if (left <= ramp) {
+            // t + a·t² = left
+            val a = (FAST - 1f) / (2f * r)
+            (-1f + sqrt(1f + 4f * a * left)) / (2f * a)
+        } else {
+            r + (left - ramp) / FAST
+        }
+        return ceil(t).toLong()
+    }
+
+    /** 落码那一遍开始以来过了多久；循环光还没走完那一趟时为 null。 */
+    fun revealMs(sinceScanMs: Long, sinceResultMs: Long?): Long? {
+        if (sinceResultMs == null) return null
+        return (sinceResultMs - finishMs(sinceScanMs - sinceResultMs)).takeIf { it >= 0L }
+    }
+
+    /** 结果在识别开始后 [scanAtResultMs] 到达时，从那一刻到落码结束一共多久。 */
+    fun settleMs(scanAtResultMs: Long): Long = finishMs(scanAtResultMs) + REVEAL_MS
+
+    /** 落码那一遍相对循环光的速度：同样一趟路，[REVEAL_MS] 走完而不是 [PASS_MS]。 */
+    private val FAST = PASS_MS.toFloat() / REVEAL_MS
+
+    private fun phaseAtResult(scanAtResultMs: Long): Float = (scanAtResultMs.coerceAtLeast(0L) % PASS_MS).toFloat()
+
+    /**
+     * 结果到达后过了 [t] 毫秒，循环光在这一趟里走过了多少：速度在 [SPEED_UP_MS] 内
+     * 由原速线性提到 [FAST] 倍，之后保持。按这一趟里的时间算，沿用同一条缓动，落码那一遍也是。
+     */
+    private fun hurried(t: Float): Float {
+        val r = SPEED_UP_MS.toFloat()
+        return if (t <= r) t + (FAST - 1f) * t * t / (2f * r) else r * (1f + FAST) / 2f + FAST * (t - r)
     }
 
     /**
@@ -105,7 +153,7 @@ internal object ScanEffect {
     fun glow(y: Float, center: Float, trail: Float, lead: Float): Float =
         if (y <= center) bump((center - y) / trail) else bump((y - center) / lead)
 
-    /** 光里颜色流动的相位（0..1）。只跟识别开始以来的时间走，落码时接着流，不跳。 */
+    /** 光里颜色流动的相位（0..1）。只跟识别开始以来的时间走，提速与落码时接着流，不跳。 */
     fun drift(sinceScanMs: Long): Float = (sinceScanMs.coerceAtLeast(0L) % DRIFT_MS).toFloat() / DRIFT_MS
 
     /** 匀速里掺一半正弦缓动：起止柔和，中段又不至于冲得太快。 */
@@ -129,7 +177,7 @@ internal object ScanEffect {
 
 /**
  * 扫光时间轴上的一帧：识别开始、结果到达（还在识别为 null）以来各过了多少毫秒。
- * 画布在识别中和落码那一遍里逐帧更新它，其余时候为 null——一帧都不占。
+ * 画布在识别中、结果到达后循环光提速走完那一趟、和落码那一遍里逐帧更新它，其余时候为 null——一帧都不占。
  */
 internal data class ScanTime(val sinceScan: Long, val sinceResult: Long?) {
     companion object {

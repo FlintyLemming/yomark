@@ -83,10 +83,11 @@ fun ImageCanvas(
         } else {
             // 没扫过就没有落码这一遍：从重建里恢复的 plan 直接显示，不再演一遍
             val scanned = scanTime ?: return@LaunchedEffect
+            val settle = ScanEffect.settleMs(scanned.sinceScan)
             val resultAt = withFrameMillis { it }
             while (true) {
                 val since = withFrameMillis { it - resultAt }
-                if (since >= ScanEffect.REVEAL_MS) break
+                if (since >= settle) break
                 scanTime = ScanTime(scanned.sinceScan + since, since)
             }
             scanTime = null
@@ -433,12 +434,13 @@ internal fun drawScene(
     val light = LightSpec(image.width, height, trail, lead, ScanEffect.HUE_SPAN_DP * dp, ScanEffect.drift(time.sinceScan))
     val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
     val feather = ScanEffect.FEATHER_DP * dp
-    val front = time.sinceResult?.let { ScanEffect.revealFront(it, height, lead, trail, feather) }
+    // 结果到达后，循环光先提速走完手头这一趟，落码那一遍紧接着从顶上开始
+    val front = ScanEffect.revealMs(time.sinceScan, time.sinceResult)?.let { ScanEffect.revealFront(it, height, lead, trail, feather) }
 
     // 暗幕压在原图上、打码块底下：落码时块与原图的亮度一起自上而下回来
     drawScrim(canvas, image.width.toFloat(), height, time.sinceScan, front, feather, paints)
 
-    // 识别中，识别出的块一律不画：换方案重跑时旧结果先退场，不与扫光混在一起。
+    // 识别中（以及结果到了、循环光还在走完那一趟时），识别出的块一律不画：换方案重跑时旧结果先退场，不与扫光混在一起。
     // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
     if (front != null) {
         val layer = canvas.saveLayer(null, null)
@@ -447,12 +449,14 @@ internal fun drawScene(
         canvas.restoreToCount(layer)
         drawLight(canvas, light, front, strength = 1f, paints)
     }
-    drawLight(
-        canvas, light,
-        ScanEffect.loopCenter(time.sinceScan, height, lead, trail),
-        ScanEffect.loopStrength(time.sinceScan, time.sinceResult),
-        paints,
-    )
+    ScanEffect.loopPhase(time.sinceScan, time.sinceResult)?.let { phase ->
+        drawLight(
+            canvas, light,
+            ScanEffect.loopCenter(phase, height, lead, trail),
+            ScanEffect.loopStrength(time.sinceScan),
+            paints,
+        )
+    }
     // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
     drawItems(canvas, manual, plan.style, image, options, registry, scale, labels)
 }

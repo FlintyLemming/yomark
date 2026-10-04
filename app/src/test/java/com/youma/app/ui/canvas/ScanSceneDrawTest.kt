@@ -64,7 +64,13 @@ class ScanSceneDrawTest {
 
     /** 识别中，循环光的中心第一次走到 [y] 的时刻（已经淡入完）。 */
     private fun loopReaching(y: Float): Long =
-        (ScanEffect.PASS_MS..2 * ScanEffect.PASS_MS).first { ScanEffect.loopCenter(it, 1000f, lead, trail) >= y }
+        (ScanEffect.PASS_MS..2 * ScanEffect.PASS_MS).first { ScanEffect.loopCenter(ScanEffect.loopPhase(it, null)!!, 1000f, lead, trail) >= y }
+
+    /** 结果在识别开始后 10 秒到达；循环光提速走完那一趟之后，落码那一遍过了 [since] 毫秒。 */
+    private fun revealing(since: Long): ScanTime {
+        val afterResult = ScanEffect.finishMs(10_000L) + since
+        return ScanTime(10_000L + afterResult, afterResult)
+    }
 
     @Test
     fun `while recognition runs only the manual boxes are drawn`() {
@@ -77,7 +83,7 @@ class ScanSceneDrawTest {
     @Test
     fun `the reveal lays blocks down behind the light, top first`() {
         val since = revealReaching(500f)
-        val frame = render(ScanTime(10_000L + since, since))
+        val frame = render(revealing(since))
         // 光早已走过上面那块：盖实了，光尾也离开了，就是原本的天蓝
         assertThat(frame.at(top)).isEqualTo(MaskOptions.SKY_BLUE)
         // 光走过的地方暗幕已经揭开，回到原本的亮度
@@ -95,9 +101,26 @@ class ScanSceneDrawTest {
         // 渐显区正中：块已经出现，但还没盖实
         val y = bottom.quad.bounds().centerY()
         val since = revealReaching(y + feather / 2)
-        val pixel = render(ScanTime(10_000L + since, since)).at(bottom)
+        val pixel = render(revealing(since)).at(bottom)
         assertThat(pixel).isNotEqualTo(Color.WHITE)
         assertThat(pixel).isNotEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    @Test
+    fun `results wait under the scrim while the light in flight finishes its pass`() {
+        // 结果到达时光正走到一趟的一半：它接着往下走，块还没开始落
+        val scanAt = 10_000L + ScanEffect.PASS_MS / 2
+        val since = ScanEffect.finishMs(scanAt) / 2
+        val frame = render(ScanTime(scanAt + since, since))
+        val dimmed = frame.getPixel(115, 990)
+        assertThat(Color.red(dimmed)).isLessThan(128)
+        assertThat(frame.at(top)).isEqualTo(frame.getPixel(115, top.quad.bounds().centerY().toInt()))
+        assertThat(frame.at(bottom)).isNotEqualTo(MaskOptions.SKY_BLUE)
+        // 光还在图上
+        val center = ScanEffect.loopCenter(ScanEffect.loopPhase(scanAt + since, since)!!, 1000f, lead, trail)
+        assertThat(center).isGreaterThan(0f)
+        assertThat(center).isLessThan(1000f)
+        assertThat(frame.getPixel(115, center.toInt())).isNotEqualTo(dimmed)
     }
 
     @Test
@@ -150,7 +173,7 @@ class ScanSceneDrawTest {
 
     @Test
     fun `the page brightness comes back once the reveal is over`() {
-        val frame = render(ScanTime(10_000L + ScanEffect.REVEAL_MS, ScanEffect.REVEAL_MS))
+        val frame = render(revealing(ScanEffect.REVEAL_MS))
         assertThat(frame.getPixel(115, 990)).isEqualTo(Color.WHITE)
         assertThat(frame.at(bottom)).isEqualTo(MaskOptions.SKY_BLUE)
     }

@@ -11,7 +11,7 @@ class ScanEffectTest {
     private val lead = 36f
     private val feather = 110f
 
-    private fun loop(ms: Long) = ScanEffect.loopCenter(ms, height, lead, trail)
+    private fun loop(ms: Long) = ScanEffect.loopCenter(ScanEffect.loopPhase(ms, null)!!, height, lead, trail)
     private fun front(ms: Long) = ScanEffect.revealFront(ms, height, lead, trail, feather)
     private fun lightOnImage(center: Float) = (0..1000 step 10).maxOf { ScanEffect.glow(it.toFloat(), center, trail, lead) }
 
@@ -34,14 +34,45 @@ class ScanEffectTest {
     }
 
     @Test
-    fun `the looping light fades in when recognition starts and bows out when results arrive`() {
-        assertThat(ScanEffect.loopStrength(0L, null)).isEqualTo(0f)
-        assertThat(ScanEffect.loopStrength(ScanEffect.FADE_IN_MS, null)).isEqualTo(1f)
-        assertThat(ScanEffect.loopStrength(10_000L, null)).isEqualTo(1f)
-        val halfway = ScanEffect.loopStrength(10_000L, ScanEffect.LOOP_FADE_MS / 2)
-        assertThat(halfway).isGreaterThan(0f)
-        assertThat(halfway).isLessThan(1f)
-        assertThat(ScanEffect.loopStrength(10_000L, ScanEffect.LOOP_FADE_MS)).isEqualTo(0f)
+    fun `the looping light fades in when recognition starts and stays on`() {
+        assertThat(ScanEffect.loopStrength(0L)).isEqualTo(0f)
+        assertThat(ScanEffect.loopStrength(ScanEffect.FADE_IN_MS)).isEqualTo(1f)
+        assertThat(ScanEffect.loopStrength(10_000L)).isEqualTo(1f)
+    }
+
+    @Test
+    fun `when results arrive the light in flight speeds up and finishes its pass instead of vanishing`() {
+        val scanAt = 10_000L + ScanEffect.PASS_MS / 3   // 结果到达时光正走到一趟的三分之一
+        val finish = ScanEffect.finishMs(scanAt)
+        val phase = { since: Long -> ScanEffect.loopPhase(scanAt + since, since) }
+        // 那一刻光原地接着走，不跳
+        assertThat(phase(0L)).isEqualTo(ScanEffect.loopPhase(scanAt, null))
+        // 一直往下走，越走越快，最后提到落码那一遍的速度
+        var prev = phase(0L)!!
+        var prevStep = 0f
+        for (since in 20L until finish step 20L) {
+            val p = phase(since)!!
+            assertThat(p).isGreaterThan(prev)
+            assertThat(p - prev).isAtLeast(prevStep - 1e-3f)
+            prevStep = p - prev
+            prev = p
+        }
+        assertThat(prevStep / 20f).isWithin(1e-3f).of(ScanEffect.PASS_MS.toFloat() / ScanEffect.REVEAL_MS)
+        // 比按原速走完要快
+        assertThat(finish).isLessThan(ScanEffect.PASS_MS * 2 / 3)
+        // 走完这一趟、整道光离开图像之后才轮到落码，光不再从顶上重来
+        assertThat(lightOnImage(ScanEffect.loopCenter(phase(finish - 1)!!, height, lead, trail))).isWithin(1e-3f).of(0f)
+        assertThat(phase(finish)).isNull()
+        assertThat(ScanEffect.revealMs(scanAt + finish - 1, finish - 1)).isNull()
+        assertThat(ScanEffect.revealMs(scanAt + finish, finish)).isEqualTo(0L)
+        assertThat(ScanEffect.settleMs(scanAt)).isEqualTo(finish + ScanEffect.REVEAL_MS)
+    }
+
+    @Test
+    fun `a light about to leave the image needs only a moment to finish`() {
+        assertThat(ScanEffect.finishMs(ScanEffect.PASS_MS - 1)).isAtMost(1L)
+        // 刚出发的那道光提速走完一整趟，也不比落码那一遍慢多少
+        assertThat(ScanEffect.finishMs(0L)).isAtMost(ScanEffect.REVEAL_MS + ScanEffect.SPEED_UP_MS)
     }
 
     @Test
