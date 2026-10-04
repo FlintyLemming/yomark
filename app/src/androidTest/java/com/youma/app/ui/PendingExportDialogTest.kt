@@ -2,7 +2,6 @@ package com.youma.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.youma.app.core.model.SensitiveKind
@@ -49,13 +48,23 @@ class PendingExportDialogTest {
     }
 
     @Test
-    fun there_is_no_do_not_show_again_option() {
-        // spec §7.4：首版刻意不给关。这条测试守着这个决定。
+    fun buttons_report_whether_do_not_show_again_was_ticked() {
+        var stop: Boolean? = null
         compose.setContent {
-            PendingExportDialog(1, mapOf(SensitiveKind.URL to 1), {}, {}, {})
+            PendingExportDialog(1, mapOf(SensitiveKind.URL to 1), {}, { stop = it }, {})
         }
-        compose.onAllNodesWithText("不再提示").fetchSemanticsNodes().let {
-            assertThat(it).isEmpty()
+        compose.onNodeWithText("不再提示").performClick()
+        compose.onNodeWithText("仍然导出").performClick()
+        assertThat(stop).isTrue()
+    }
+
+    @Test
+    fun do_not_show_again_starts_unticked() {
+        var stop: Boolean? = null
+        compose.setContent {
+            PendingExportDialog(1, mapOf(SensitiveKind.URL to 1), { stop = it }, {}, {})
         }
+        compose.onNodeWithText("全部打码").performClick()
+        assertThat(stop).isFalse()
     }
 }

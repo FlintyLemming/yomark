@@ -1,5 +1,6 @@
 package com.youma.app.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -12,6 +13,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -47,7 +50,7 @@ import com.youma.app.ui.components.EditorBottomBar
 import com.youma.app.ui.components.EditorTopBar
 import com.youma.app.ui.components.PaywallDialog
 import com.youma.app.ui.components.PendingExportDialog
-import com.youma.app.ui.components.PurposeWatermarkSheet
+import com.youma.app.ui.components.PurposeWatermarkPanel
 
 @Composable
 fun EditorScreen(
@@ -100,25 +103,19 @@ fun EditorScreen(
         )
     }
 
-    if (state.purposeSheetVisible) {
-        PurposeWatermarkSheet(
-            initial = state.purposeText,
-            onConfirm = vm::setPurposeText,
-            onDismiss = vm::dismissPurposeSheet,
-        )
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
-        // 输入法不算进来：用途水印的输入框在对话框里，编辑器不该跟着键盘挤。
+        // 输入法不在这里：只有用途水印面板里有输入框，由面板自己让开（见下方 imePadding）。
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
     ) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding)) {
+        // consumeWindowInsets：面板的 imePadding 只补输入法比导航栏多出来的那一截，不重复算导航栏
+        Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
                 onPurpose = vm::showPurposeSheet,
+                purposeOn = state.purposeText != null,
                 // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                 onSettings = onSettings,
                 // 已购用户不该再看见购买入口
@@ -145,7 +142,20 @@ fun EditorScreen(
                 )
             }
             val batch = state.batch
-            EditorBottomBar(
+            if (state.purposeSheetVisible) {
+                // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
+                BackHandler(onBack = vm::dismissPurposeSheet)
+                PurposeWatermarkPanel(
+                    text = state.purposeText,
+                    style = state.purposeStyle,
+                    onTextChange = vm::setPurposeText,
+                    onStyleChange = vm::setPurposeStyle,
+                    onReset = vm::resetPurposeStyle,
+                    onRemove = vm::removePurposeWatermark,
+                    onDone = vm::dismissPurposeSheet,
+                    modifier = Modifier.imePadding(),
+                )
+            } else EditorBottomBar(
                 style = state.plan.style,
                 degradeNote = state.degradeNote,
                 onStyleChange = vm::setStyle,

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -28,6 +29,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -36,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
@@ -69,7 +72,7 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "文字识别",
-                    note = "PP-OCR 认中文最准，但慢一些。另外三项用 ML Kit：「英文」不认中文，「中英」两个都跑，更慢。",
+                    note = "PP-OCR 中文最准，速度稍慢。其余三项为 ML Kit：「英文」不支持中文，「中英」最慢。",
                     options = TextEngineOption.entries,
                     selected = config.textEngine,
                     label = ::textEngineLabel,
@@ -80,8 +83,8 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "条码",
-                    note = "宽松：读不出内容的疑似条码也圈出来（不打码），偶尔会误圈花纹。" +
-                        "严格：只认能读出内容的，歪斜或模糊的码可能漏掉。",
+                    note = "严格：只认能解码的条码，歪斜、模糊的可能漏掉。" +
+                        "宽松：无法解码的疑似条码也圈出（不打码），可能误圈花纹。",
                     options = BarcodeOption.entries,
                     selected = config.barcode,
                     label = ::barcodeLabel,
@@ -92,7 +95,7 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "人脸",
-                    note = "精确：漏得少，但更慢。只找人脸在哪，不识别是谁。",
+                    note = "精确：漏检更少，速度更慢。仅定位人脸，不识别身份。",
                     options = FaceOption.entries,
                     selected = config.face,
                     label = ::faceLabel,
@@ -103,8 +106,8 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "AI 复查（实验）",
-                    note = "编辑页会多一个「AI 复查」按钮，点了才用手机上的 Gemini Nano 补找人名和地址。" +
-                        "找到的只圈出，不打码。仅部分机型可用（如 Pixel 9 及以后），不联网。",
+                    note = "编辑页显示「AI 复查」按钮，由端侧 Gemini Nano 补查人名和地址，结果只圈出。" +
+                        "离线运行，仅支持部分机型（如 Pixel 9 及以后）。",
                     options = SemanticOption.entries,
                     selected = config.semantic,
                     label = ::semanticLabel,
@@ -119,7 +122,7 @@ fun RecognitionSettingsScreen(
                     headlineContent = { Text("规则") },
                     supportingContent = {
                         Text(
-                            "每类信息单独设为打码、圈出或关闭" +
+                            "按类型设为打码、圈出或关闭" +
                                 if (changed > 0) "，已改 $changed 项" else "",
                         )
                     },
@@ -131,7 +134,7 @@ fun RecognitionSettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("全部恢复默认") },
-                    supportingContent = { Text("本页和规则都恢复默认") },
+                    supportingContent = { Text("识别设置和规则全部恢复出厂值") },
                     modifier = Modifier.clickable { onChange(RecognitionConfig()) },
                 )
             }
@@ -140,13 +143,17 @@ fun RecognitionSettingsScreen(
 }
 
 /**
- * 规则（识别设置的二级页）。每条三态：关 / 仅圈出 / 打码。
- * 右上角的「恢复默认」只管规则，不动一级页的四根轴。
+ * 规则（识别设置的二级页）。顶上是导出前提醒的开关，下面每条规则三态：关 / 仅圈出 / 打码。
+ * 右上角的「恢复默认」只管规则，不动一级页的四根轴，也不动提醒开关。
+ *
+ * 提醒开关放这一页，是因为它兜的正是「圈出」这一态：关掉它，圈出的内容导出时就没人再问了。
  */
 @Composable
 fun RuleSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
+    exportReminder: Boolean,
+    onExportReminderChange: (Boolean) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -163,12 +170,17 @@ fun RuleSettingsScreen(
     ) { padding ->
         LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
             item {
-                Text(
-                    "「圈出」的内容不会自动打码，导出前会提醒你。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                ListItem(
+                    headlineContent = { Text("导出前提醒") },
+                    supportingContent = { Text("有圈出但未打码的内容时，导出前提示") },
+                    trailingContent = { Switch(checked = exportReminder, onCheckedChange = null) },
+                    modifier = Modifier.toggleable(
+                        value = exportReminder,
+                        role = Role.Switch,
+                        onValueChange = onExportReminderChange,
+                    ),
                 )
+                HorizontalDivider(Modifier.padding(bottom = 8.dp))
             }
 
             items(RuleCatalog.all, key = { it.id }) { rule ->

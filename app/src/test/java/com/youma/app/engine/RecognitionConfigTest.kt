@@ -11,8 +11,8 @@ class RecognitionConfigTest {
         assertThat(RecognitionConfig().textEngine).isEqualTo(TextEngineOption.PADDLE)
     }
 
-    @Test fun `factory default keeps barcode loose and face fast`() {
-        assertThat(RecognitionConfig().barcode).isEqualTo(BarcodeOption.LOOSE)
+    @Test fun `factory default keeps barcode strict and face fast`() {
+        assertThat(RecognitionConfig().barcode).isEqualTo(BarcodeOption.STRICT)
         assertThat(RecognitionConfig().face).isEqualTo(FaceOption.FAST)
     }
 

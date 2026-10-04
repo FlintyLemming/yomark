@@ -43,6 +43,7 @@ import com.youma.app.core.model.MaskPlan
 import com.youma.app.core.model.MaskState
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.core.model.SensitiveKindLabels
+import com.youma.app.export.PurposeWatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
 import kotlin.math.hypot
@@ -92,6 +93,7 @@ fun ImageCanvas(
         }
     }
     val scanPaints = remember { ScanPaints() }
+    val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
     // 手势循环里必须读这个「永远最新」的引用，否则长按选中后立刻拖手柄，
@@ -100,6 +102,9 @@ fun ImageCanvas(
 
     var viewSize by remember { mutableStateOf(0 to 0) }
     var viewport by remember(image) { mutableStateOf(Viewport(1f, 0f, 0f)) }
+    // viewport 是按哪个画布尺寸摆的。用途水印面板顶替底栏、输入法弹起时画布会变矮，
+    // 这时要重新摆，否则图的下半截就被挤出画布，调水印时看不到效果。
+    var laidOutFor by remember(image) { mutableStateOf(0 to 0) }
     var draftQuad by remember { mutableStateOf<Quad?>(null) }
     // 双击自己数时间戳，不叠第二层 detectTapGestures：
     // 两层 pointerInput 里第二层根本收不到本层已在处理的手势（实机验证过），
@@ -247,8 +252,14 @@ fun ImageCanvas(
             }
     ) {
         viewSize = size.width.toInt() to size.height.toInt()
-        if (viewport.scale == 1f && viewport.offsetX == 0f && viewport.offsetY == 0f) {
-            viewport = Viewport.fit(image.width, image.height, viewSize.first, viewSize.second)
+        if (viewSize != laidOutFor) {
+            val (w, h) = viewSize
+            val fit = Viewport.fit(image.width, image.height, w, h)
+            val (oldW, oldH) = laidOutFor
+            // 原本就是整图适配（或第一次摆）就按新尺寸重新适配；用户放大过的保留缩放，只收回边界
+            val wasFit = oldW == 0 || viewport == Viewport.fit(image.width, image.height, oldW, oldH)
+            viewport = if (wasFit) fit else viewport.clamped(image.width, image.height, w, h, fit.scale)
+            laidOutFor = viewSize
         }
 
         drawIntoCanvas { compose ->
@@ -263,6 +274,11 @@ fun ImageCanvas(
                 time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime,
                 paints = scanPaints,
             )
+            // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
+            // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
+            state.purposeText?.let {
+                purposeWatermark.draw(canvas, image.width, image.height, it, state.purposeStyle)
+            }
             state.selectedManualId?.let { id ->
                 state.plan.find(id)?.let { item ->
                     canvas.drawPath(item.quad.toPath(), selectionPaint(viewport.scale))
