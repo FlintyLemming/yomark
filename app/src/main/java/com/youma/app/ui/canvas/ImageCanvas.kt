@@ -8,6 +8,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.PorterDuff
+import android.graphics.RectF
 import android.graphics.Shader
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -326,11 +327,13 @@ private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     pathEffect = DashPathEffect(floatArrayOf(10f / scale, 6f / scale), 0f)
 }
 
-/** 琥珀色小标签，贴在圈出框的左上角外侧。字号按缩放反算，视觉大小恒定。 */
-private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale: Float) {
-    // 模型猜的与规则命中区分开（spec §3）：Gemini Nano 的结果标「AI」
-    val text = SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
-    val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+/** 类型小标签的文字：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */
+private fun kindLabelText(item: MaskItem) =
+    SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
+
+/** 琥珀色小标签的画笔与尺寸。字号按缩放反算，视觉大小恒定。 */
+private class LabelPaints(val scale: Float) {
+    val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = AndroidColor.BLACK
         textSize = 26f / scale
     }
@@ -338,14 +341,40 @@ private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, scale
         color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
         style = Paint.Style.FILL
     }
-    val b = item.quad.bounds()
     val padding = 6f / scale
-    val w = textPaint.measureText(text) + padding * 2
-    val h = textPaint.textSize + padding * 2
-    val top = (b.top - h - 2f / scale).coerceAtLeast(0f)
-    val rect = android.graphics.RectF(b.left, top, b.left + w, top + h)
-    canvas.drawRoundRect(rect, 4f / scale, 4f / scale, bg)
-    canvas.drawText(text, rect.left + padding, rect.bottom - padding - textPaint.descent() * 0.5f, textPaint)
+    val height = text.textSize + padding * 2
+    fun width(label: String) = text.measureText(label) + padding * 2
+}
+
+/**
+ * 给所有圈出框的类型标签找位置（见 LabelLayout）：贴在框四周，避开画面上所有的框
+ * 和先摆好的标签。从上到下、从左到右依次摆，同一个 plan 每帧摆出来都一样，不会跳。
+ *
+ * 缩放比 < 0.5 时不画标签，返回空：避免密集截图上标签糊成一片。
+ */
+internal fun layoutKindLabels(items: List<MaskItem>, image: SourceImage, scale: Float): Map<String, RectF> {
+    if (scale < GestureRules.LABEL_MIN_SCALE) return emptyMap()
+    val outlined = items.withIndex()
+        .filter { it.value.state == MaskState.OUTLINED }
+        .sortedWith(compareBy({ it.value.quad.bounds().top }, { it.value.quad.bounds().left }))
+    if (outlined.isEmpty()) return emptyMap()
+    val paints = LabelPaints(scale)
+    val rects = LabelLayout.place(
+        boxes = items.map { it.quad.bounds() },
+        requests = outlined.map { LabelLayout.Request(it.index, paints.width(kindLabelText(it.value)), paints.height) },
+        area = RectF(0f, 0f, image.width.toFloat(), image.height.toFloat()),
+        gap = 2f / scale,
+    )
+    return outlined.zip(rects) { item, rect -> item.value.candidateId to rect }.toMap()
+}
+
+private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, rect: RectF, paints: LabelPaints) {
+    val scale = paints.scale
+    canvas.drawRoundRect(rect, 4f / scale, 4f / scale, paints.bg)
+    canvas.drawText(
+        kindLabelText(item), rect.left + paints.padding,
+        rect.bottom - paints.padding - paints.text.descent() * 0.5f, paints.text,
+    )
 }
 
 /**
@@ -374,8 +403,10 @@ internal fun drawScene(
 
     // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
     val sorted = plan.items.sortedByDescending { it.quad.area() }
+    // 标签按整张 plan 一起摆：识别中/落码时打码块分两批画，标签之间也得互相避让
+    val labels = layoutKindLabels(sorted, image, scale)
     if (time == null) {
-        drawItems(canvas, sorted, plan.style, image, options, registry, scale)
+        drawItems(canvas, sorted, plan.style, image, options, registry, scale, labels)
         return
     }
 
@@ -392,7 +423,7 @@ internal fun drawScene(
         val feather = ScanEffect.FEATHER_DP * dp
         val front = ScanEffect.revealFront(since, height, lead, trail, feather)
         val layer = canvas.saveLayer(null, null)
-        drawItems(canvas, detected, plan.style, image, options, registry, scale)
+        drawItems(canvas, detected, plan.style, image, options, registry, scale, labels)
         keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
         canvas.restoreToCount(layer)
         drawLight(canvas, light, front, strength = 1f, paints)
@@ -404,7 +435,7 @@ internal fun drawScene(
         paints,
     )
     // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
-    drawItems(canvas, manual, plan.style, image, options, registry, scale)
+    drawItems(canvas, manual, plan.style, image, options, registry, scale, labels)
 }
 
 /** 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。 */
@@ -416,16 +447,18 @@ private fun drawItems(
     options: MaskOptions,
     registry: RendererRegistry,
     scale: Float,
+    labels: Map<String, RectF>,
 ) {
     items.filter { it.state == MaskState.MASKED }.forEach {
         registry[style].render(canvas, image.bitmap, it.quad, options)
     }
     items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
         canvas.drawPath(item.quad.toPath(), outlinePaint(scale))
-        // 类型小标签只在缩放比 ≥ 0.5 时绘制，避免密集截图上标签糊成一片
-        if (scale >= GestureRules.LABEL_MIN_SCALE) {
-            drawKindLabel(canvas, item, scale)
-        }
+    }
+    // 标签在全部描边之后画：贴在别的框外侧的标签不会被后画的描边划过
+    val labelPaints = LabelPaints(scale)
+    items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
+        labels[item.candidateId]?.let { drawKindLabel(canvas, item, it, labelPaints) }
     }
 }
 
