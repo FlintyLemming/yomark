@@ -24,6 +24,11 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write   # 发 Release 用
+    env:
+      # keystore 文件路径由下面的 Decode 步骤写进 SIGNING_KEYSTORE_FILE
+      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -36,6 +41,19 @@ jobs:
 
       - name: Install Android SDK packages
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" > /dev/null
+
+      # 用 Secrets 里的固定 keystore 签名，各版 APK 才能互相覆盖安装。
+      # 没配 Secrets 时跳过，Gradle 退回 debug 签名（发版那步会拦下）。
+      - name: Decode signing keystore
+        env:
+          SIGNING_KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_BASE64" ]; then
+            echo "::warning::未配置 SIGNING_KEYSTORE_BASE64，这次用临时 debug 签名，APK 无法覆盖安装其他版本"
+            exit 0
+          fi
+          echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/youma-release.jks"
+          echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/youma-release.jks" >> "$GITHUB_ENV"
 
       - name: Build debug APKs
         run: ./gradlew --no-daemon :app:assembleDebug :app:assertDebugNoRuntimePermissions
@@ -70,6 +88,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag || github.ref_name }}
         run: |
+          # 临时签名的包装不上已有版本，不能拿去发版
+          if [ -z "${SIGNING_KEYSTORE_FILE:-}" ]; then
+            echo "::error::没有固定签名（缺 SIGNING_* Secrets），拒绝发版"
+            exit 1
+          fi
           mkdir dist
           for abi in arm64-v8a x86_64; do
             cp "app/build/outputs/apk/debug/app-$abi-debug.apk" "dist/youma-$TAG-$abi.apk"
