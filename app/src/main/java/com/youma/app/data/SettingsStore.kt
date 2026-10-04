@@ -45,6 +45,17 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_ONBOARDING] = true }
     }
 
+    /**
+     * 导出前提醒：还有圈出但没打码的内容时先弹对话框。出厂开着。
+     *
+     * 不放进 RecognitionConfig：它不影响识别，放进去的话一拨开关编辑器就会重跑识别。
+     */
+    val pendingExportReminder: Flow<Boolean> = store.data.map { it[KEY_EXPORT_REMINDER] ?: true }
+
+    suspend fun setPendingExportReminder(on: Boolean) {
+        store.edit { it[KEY_EXPORT_REMINDER] = on }
+    }
+
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -88,13 +99,15 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
+        val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。
          * 换键让所有安装都回到新的出厂值一次，之后照常记住用户的选择。
          */
         val KEY_TEXT_ENGINE = stringPreferencesKey("recognition_text_engine_v2")
-        val KEY_BARCODE = stringPreferencesKey("recognition_barcode")
+        /** v2：出厂条码从 LOOSE 改成 STRICT，换键的理由同 KEY_TEXT_ENGINE。 */
+        val KEY_BARCODE = stringPreferencesKey("recognition_barcode_v2")
         val KEY_FACE = stringPreferencesKey("recognition_face")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")

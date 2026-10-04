@@ -9,12 +9,12 @@ enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
 /**
  * 条码策略。
  *
- * LOOSE 连解不出内容的疑似条码也报（`enableAllPotentialBarcodes`）——
- * 漏检是事故，倾斜的收款码在 STRICT 下会被静默丢掉（自造 36 张评测图里丢 6 张）。
- * 代价是布料印花、格纹这类有规律纹理会被判成疑似条码。彩色照片在像素上就筛掉了
- * （`TwoInks`：不是两种墨色印出来的），剩下的只圈不打码。
+ * LOOSE 连解不出内容的疑似条码也报（`enableAllPotentialBarcodes`），倾斜的收款码不会被
+ * 静默丢掉（STRICT 在自造 36 张评测图里丢 6 张）。代价是布料印花、格纹这类有规律纹理
+ * 会被判成疑似条码。彩色照片在像素上就筛掉了（`TwoInks`：不是两种墨色印出来的），剩下的只圈不打码。
  */
-enum class BarcodeOption { LOOSE, STRICT, OFF }
+/** 声明顺序就是设置页上的排列顺序，出厂项排第一；持久化存的是名字，调换顺序不影响老安装。 */
+enum class BarcodeOption { STRICT, LOOSE, OFF }
 
 enum class FaceOption { FAST, ACCURATE, OFF }
 
@@ -41,7 +41,8 @@ data class RecognitionConfig(
      * 而且能给出字符级的框。ML Kit 三档留着，逐项开关的意义就在于能切回去对比。
      */
     val textEngine: TextEngineOption = TextEngineOption.PADDLE,
-    val barcode: BarcodeOption = BarcodeOption.LOOSE,
+    /** 出厂是 STRICT（2026-10-04 起）：不误圈花纹，代价是歪斜、模糊的码可能漏掉。 */
+    val barcode: BarcodeOption = BarcodeOption.STRICT,
     val face: FaceOption = FaceOption.FAST,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**

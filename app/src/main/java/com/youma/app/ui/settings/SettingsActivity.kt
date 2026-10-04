@@ -24,7 +24,7 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableLightEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setRecognitionConfigContent { config, onChange ->
+        setRecognitionConfigContent(SettingsStore(applicationContext)) { config, onChange ->
             RecognitionSettingsScreen(
                 config = config,
                 onChange = onChange,
@@ -35,14 +35,24 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-/** 识别设置的二级页：逐条规则。 */
+/** 识别设置的二级页：导出前提醒与逐条规则。 */
 class RuleSettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableLightEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setRecognitionConfigContent { config, onChange ->
-            RuleSettingsScreen(config = config, onChange = onChange, onNavigateUp = ::finish)
+        val store = SettingsStore(applicationContext)
+        setRecognitionConfigContent(store) { config, onChange ->
+            val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
+            reminder?.let { on ->
+                RuleSettingsScreen(
+                    config = config,
+                    onChange = onChange,
+                    exportReminder = on,
+                    onExportReminderChange = { next -> lifecycleScope.launch { store.setPendingExportReminder(next) } },
+                    onNavigateUp = ::finish,
+                )
+            }
         }
     }
 }
@@ -54,9 +64,9 @@ class RuleSettingsActivity : ComponentActivity() {
  * 还没读到（null）的那一下只画空底色。DataStore 在进程里读过一次就有缓存，实际看不出来。
  */
 private fun ComponentActivity.setRecognitionConfigContent(
+    store: SettingsStore,
     screen: @Composable (RecognitionConfig, (RecognitionConfig) -> Unit) -> Unit,
 ) {
-    val store = SettingsStore(applicationContext)
     setContent {
         val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
         MaterialTheme {

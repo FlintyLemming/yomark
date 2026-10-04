@@ -46,8 +46,8 @@ class RecognitionSettingsScreenTest {
     @Test fun pickingABarcodeStrategyEmitsTheNewConfig() {
         var latest: RecognitionConfig? = null
         screen(onChange = { latest = it })
-        compose.onNodeWithText("严格").performClick()
-        assertThat(latest?.barcode).isEqualTo(BarcodeOption.STRICT)
+        compose.onNodeWithText("宽松").performClick()
+        assertThat(latest?.barcode).isEqualTo(BarcodeOption.LOOSE)
     }
 
     @Test fun rulesLiveOnTheirOwnPage() {
@@ -61,9 +61,26 @@ class RecognitionSettingsScreenTest {
         var latest: RecognitionConfig? = null
         val config = RecognitionConfig(textEngine = TextEngineOption.LATIN)
             .withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
-        compose.setContent { RuleSettingsScreen(config, onChange = { latest = it }, onNavigateUp = {}) }
+        compose.setContent {
+            RuleSettingsScreen(
+                config, onChange = { latest = it },
+                exportReminder = true, onExportReminderChange = {}, onNavigateUp = {},
+            )
+        }
         compose.onNodeWithText("恢复默认").performClick()
         assertThat(latest).isEqualTo(RecognitionConfig(textEngine = TextEngineOption.LATIN))
+    }
+
+    @Test fun theExportReminderSwitchSitsOnTopOfTheRulesPage() {
+        var latest: Boolean? = null
+        compose.setContent {
+            RuleSettingsScreen(
+                RecognitionConfig(), onChange = {},
+                exportReminder = true, onExportReminderChange = { latest = it }, onNavigateUp = {},
+            )
+        }
+        compose.onNodeWithText("导出前提醒").performClick()
+        assertThat(latest).isFalse()
     }
 
     // 规则行的三态覆盖逻辑由 RecognitionConfigTest 的单测守（withRule 的「只存差异」不变量），

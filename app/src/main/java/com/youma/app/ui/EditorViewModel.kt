@@ -87,10 +87,14 @@ class EditorViewModel(
     /** 用户这次会话里已经自己选过样式。选过之后就不再被「上次样式」的异步恢复覆盖。 */
     private var styleChosenByUser = false
 
+    /** 导出前提醒的开关。设置还没读到时按开着算——宁可多问一次。 */
+    private var exportReminder = true
+
     init {
         // 恢复出来的 plan 自带上一次会话的样式，比设置里的「上次样式」更贴近用户当下的上下文。
         if (!restore()) restoreLastStyle()
         observeRecognitionConfig()
+        viewModelScope.launch { settings.pendingExportReminder.collect { exportReminder = it } }
     }
 
     /**
@@ -474,11 +478,11 @@ class EditorViewModel(
     // ---------- 导出 ----------
 
     /**
-     * 导出拦截（spec §7.4）：pendingCount > 0 时**无例外**先弹对话框。
-     * 这是分层默认的唯一安全网，不提供「不再提示」。
+     * 导出拦截（spec §7.4）：pendingCount > 0 时先弹对话框。
+     * 用户可以在对话框里勾「不再提示」，或在规则页关掉；关了就直接导出，圈出的照原样留着。
      */
     fun requestExport() {
-        if (_state.value.plan.pendingCount > 0) {
+        if (exportReminder && _state.value.plan.pendingCount > 0) {
             uiState = _state.value.copy(pendingDialogVisible = true)
             return
         }
@@ -493,14 +497,16 @@ class EditorViewModel(
     fun exportBatch() {
         val batch = _state.value.batch?.withPlan(_state.value.plan) ?: return
         uiState = _state.value.copy(batch = batch)
-        if (batch.totalPending > 0) {
+        if (exportReminder && batch.totalPending > 0) {
             uiState = _state.value.copy(pendingDialogVisible = true)
             return
         }
         runBatchExport(batch)
     }
 
-    fun confirmMaskAllAndExport() {
+    /** @param stopReminding 对话框里勾了「不再提示」。 */
+    fun confirmMaskAllAndExport(stopReminding: Boolean = false) {
+        if (stopReminding) stopExportReminder()
         uiState = _state.value.copy(pendingDialogVisible = false)
         val batch = _state.value.batch
         if (batch != null) {
@@ -516,11 +522,18 @@ class EditorViewModel(
         }
     }
 
-    fun confirmExportAnyway() {
+    fun confirmExportAnyway(stopReminding: Boolean = false) {
+        if (stopReminding) stopExportReminder()
         uiState = _state.value.copy(pendingDialogVisible = false)
         val batch = _state.value.batch
         if (batch != null) runBatchExport(batch.withPlan(_state.value.plan))
         else runExport(_state.value.plan)
+    }
+
+    /** 本地先改掉，不等 DataStore 回流：紧接着的下一次导出就不该再问。 */
+    private fun stopExportReminder() {
+        exportReminder = false
+        viewModelScope.launch { settings.setPendingExportReminder(false) }
     }
 
     /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
