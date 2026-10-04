@@ -1,6 +1,7 @@
 name: Android APK
 
 # 每次推送都打一份可直接安装的 debug APK；也可以在 Actions 页手动触发。
+# 推 v* 标签时额外发一个 GitHub Release，附上这次打出的 APK，说明取自标签注释。
 on:
   push:
   workflow_dispatch:
@@ -13,6 +14,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: write   # 发 Release 用
     steps:
       - uses: actions/checkout@v4
 
@@ -51,3 +54,19 @@ jobs:
         with:
           name: unit-test-report
           path: app/build/reports/tests/testDebugUnitTest/
+
+      # 放在单元测试之后：测试不过不发版
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # checkout 拿到的标签可能被拍平成轻量标签，重新取一次才读得到注释
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          git tag -l --format='%(contents)' "$TAG" > notes.md
+          mkdir dist
+          for abi in arm64-v8a x86_64; do
+            cp "app/build/outputs/apk/debug/app-$abi-debug.apk" "dist/youma-$TAG-$abi.apk"
+          done
+          gh release create "$TAG" dist/*.apk --title "$TAG" --notes-file notes.md --verify-tag
