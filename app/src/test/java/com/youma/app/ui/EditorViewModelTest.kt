@@ -19,6 +19,7 @@ import com.youma.app.core.model.SensitiveKind
 import com.youma.app.core.image.SourceImage
 import com.youma.app.core.model.Candidate
 import com.youma.app.core.model.TextLine
+import com.youma.app.data.SettingsStore
 import com.youma.app.data.isolatedSettingsStore
 import com.youma.app.engine.CandidateMerger
 import com.youma.app.engine.RedactionEngine
@@ -30,6 +31,7 @@ import com.youma.app.export.WatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -59,6 +61,7 @@ class EditorViewModelTest {
     }
 
     private lateinit var sink: RecordingSink
+    private lateinit var settings: SettingsStore
 
     @Before fun setUp() { Dispatchers.setMain(dispatcher) }
     @After fun tearDown() { Dispatchers.resetMain() }
@@ -69,7 +72,7 @@ class EditorViewModelTest {
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
             engineProvider = { emptyEngine() },
-            settings = isolatedSettingsStore(context),
+            settings = isolatedSettingsStore(context).also { settings = it },
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
@@ -245,6 +248,36 @@ class EditorViewModelTest {
         vm.confirmExportAnyway(); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
+        assertThat(sink.writes).isEqualTo(1)
+    }
+
+    @Test
+    fun `do not show again exports this time and skips the dialog next time`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
+        vm.requestExport(); advanceUntilIdle()
+
+        vm.confirmExportAnyway(stopReminding = true); advanceUntilIdle()
+        assertThat(sink.writes).isEqualTo(1)
+        assertThat(settings.pendingExportReminder.first()).isFalse()
+
+        vm.requestExport(); advanceUntilIdle()
+        assertThat(vm.state.value.pendingDialogVisible).isFalse()
+        assertThat(sink.writes).isEqualTo(2)
+        assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
+    }
+
+    @Test
+    fun `with the reminder turned off in settings pending items export without asking`() = runTest(dispatcher) {
+        val vm = vm()
+        settings.setPendingExportReminder(false)
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
+
+        vm.requestExport(); advanceUntilIdle()
+
+        assertThat(vm.state.value.pendingDialogVisible).isFalse()
         assertThat(sink.writes).isEqualTo(1)
     }
 

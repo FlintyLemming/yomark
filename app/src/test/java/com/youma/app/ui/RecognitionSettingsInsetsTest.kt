@@ -69,7 +69,7 @@ class RecognitionSettingsInsetsTest {
 
     /** 列表可以从导航条底下滚过去，但滚到底时最后一行得整个露在它上面。 */
     @Test fun `the last rule scrolls clear of the navigation bar`() {
-        show { RuleSettingsScreen(RecognitionConfig(), {}, {}) }
+        show { RuleSettingsScreen(RecognitionConfig(), {}, exportReminder = true, onExportReminderChange = {}, onNavigateUp = {}) }
         val last = RuleCatalog.all.last()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey(last.id)
         val row = compose.onNodeWithText(RuleCatalog.label(last)).getUnclippedBoundsInRoot()
@@ -87,7 +87,7 @@ class RecognitionSettingsInsetsTest {
     }
 
     @Test fun `the rules page leaves system back to the activity`() {
-        show { RuleSettingsScreen(RecognitionConfig(), {}, {}) }
+        show { RuleSettingsScreen(RecognitionConfig(), {}, exportReminder = true, onExportReminderChange = {}, onNavigateUp = {}) }
         assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
     }
 }

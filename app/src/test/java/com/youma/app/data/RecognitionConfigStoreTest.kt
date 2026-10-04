@@ -28,7 +28,7 @@ class RecognitionConfigStoreTest {
         val store = store()
         val cfg = RecognitionConfig(
             textEngine = TextEngineOption.CHINESE,
-            barcode = BarcodeOption.STRICT,
+            barcode = BarcodeOption.LOOSE,
             face = FaceOption.OFF,
             semantic = SemanticOption.OFF,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),

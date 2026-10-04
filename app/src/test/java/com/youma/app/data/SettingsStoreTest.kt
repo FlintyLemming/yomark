@@ -66,4 +66,12 @@ class SettingsStoreTest {
         store.markOnboardingSeen()
         assertThat(store.onboardingSeen.first()).isTrue()
     }
+
+    @Test
+    fun `export reminder is on by default and remembers being turned off`() = runTest {
+        val store = store()
+        assertThat(store.pendingExportReminder.first()).isTrue()
+        store.setPendingExportReminder(false)
+        assertThat(store.pendingExportReminder.first()).isFalse()
+    }
 }
