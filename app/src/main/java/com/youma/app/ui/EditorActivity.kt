@@ -78,6 +78,7 @@ class EditorActivity : ComponentActivity() {
                         onBuyClicked = {
                             lifecycleScope.launch { billing.launchPurchase(this@EditorActivity) }
                         },
+                        onRedeem = billing::redeem,
                         onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNavigateUp = ::navigateUpToHome,
                     )

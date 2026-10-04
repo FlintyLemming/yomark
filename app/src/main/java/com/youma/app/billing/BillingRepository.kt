@@ -15,9 +15,11 @@ import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
@@ -40,8 +42,12 @@ class BillingRepository(
     private val scope: CoroutineScope,
 ) {
 
-    private val _isPro = MutableStateFlow(false)
-    val isPro: StateFlow<Boolean> = _isPro.asStateFlow()
+    /** Play 购买态。查询结果可以把它改回 false（退款/撤单）。 */
+    private val _purchased = MutableStateFlow(false)
+    /** 兑换码解锁态。只会变 true，Play 查询碰不到它。 */
+    private val _redeemed = MutableStateFlow(false)
+    val isPro: StateFlow<Boolean> = combine(_purchased, _redeemed) { purchased, redeemed -> purchased || redeemed }
+        .stateIn(scope, SharingStarted.Eagerly, false)
 
     private val listener = PurchasesUpdatedListener { result, purchases ->
         if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
@@ -58,7 +64,10 @@ class BillingRepository(
 
     /** 启动时调用：先用缓存点亮 UI，再尝试联网校验。 */
     fun start() {
-        scope.launch { _isPro.value = store.isPro.first() }
+        scope.launch {
+            _purchased.value = store.isPro.first()
+            if (store.isRedeemed.first()) _redeemed.value = true
+        }
         client.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
                 if (result.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -79,7 +88,18 @@ class BillingRepository(
         val outcome = queryOwned()
         val resolved = PurchaseResolver.resolve(cached, outcome)
         if (resolved != cached) store.setPro(resolved)
-        _isPro.value = resolved
+        _purchased.value = resolved
+    }
+
+    /**
+     * 兑换码解锁：纯本地校验，不联网。码对了立刻点亮 UI，并把兑换态写进缓存。
+     * @return 码是否正确
+     */
+    fun redeem(code: String): Boolean {
+        if (!RedeemCode.matches(code)) return false
+        _redeemed.value = true
+        scope.launch { store.setRedeemed() }
+        return true
     }
 
     private suspend fun queryOwned(): QueryOutcome = suspendCancellableCoroutine { cont ->
@@ -112,7 +132,7 @@ class BillingRepository(
         if (purchases.none { it.isOurProduct() }) return
         purchases.forEach { acknowledgeIfNeeded(it) }
         store.setPro(true)
-        _isPro.value = true
+        _purchased.value = true
     }
 
     suspend fun launchPurchase(activity: Activity): Result<Unit> = runCatching {

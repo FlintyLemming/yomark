@@ -58,6 +58,7 @@ fun EditorScreen(
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     onBuyClicked: () -> Unit = {},
+    onRedeem: (String) -> Boolean = { false },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val registry = remember { RendererRegistry.default() }
@@ -95,7 +96,11 @@ fun EditorScreen(
     }
 
     if (state.paywallVisible) {
-        PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
+        PaywallDialog(
+            onBuy = onBuyClicked,
+            onRedeem = { code -> onRedeem(code).also { if (it) vm.dismissPaywall() } },
+            onDismiss = vm::dismissPaywall,
+        )
     }
 
     Scaffold(
