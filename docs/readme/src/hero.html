@@ -1,105 +1,121 @@
 <!doctype html>
-<!-- README 头图。node docs/readme/src/render.cjs hero 渲染成 docs/readme/hero.png -->
+<!-- README 头图。node docs/readme/src/render.cjs hero 渲染成 docs/readme/hero.png
+     右侧的两张卡片是同一份样图（order-page.html 的内容），左边原样，右边把默认打码的字段盖上色块、
+     默认只圈出的字段画上虚线框。颜色与形状照编辑器里的来：色块 #87CEEB，虚线框和类型标签 #FFB300。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;900&family=Inter:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Inter:wght@500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #101014;
-    --ink-2: #1a1a20;
-    --line: #2a2a32;
-    --paper: #ffffff;
-    --mute: #8e8e99;
+    --text: #1f2329;
+    --mute: #6b7280;
+    --faint: #9aa0aa;
+    --line: #e6e8ec;
     --sky: #87ceeb;
     --amber: #ffb300;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 1280px; height: 640px; overflow: hidden; }
   body {
-    background: var(--ink);
-    font-family: 'Noto Sans SC', sans-serif;
-    color: var(--paper);
     position: relative;
+    background: linear-gradient(135deg, #f7f8fa 0%, #f1f4f8 55%, #e9f1f8 100%);
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--text);
   }
 
-  /* 一点天蓝的光，落在手机后面；不铺渐变底 */
+  /* 卡片背后一点天蓝的光 */
   .glow {
-    position: absolute; left: 60px; top: 120px; width: 620px; height: 620px;
-    background: radial-gradient(closest-side, rgba(135, 206, 235, 0.22), rgba(135, 206, 235, 0));
-    filter: blur(10px);
+    position: absolute; left: 700px; top: 40px; width: 560px; height: 560px;
+    background: radial-gradient(closest-side, rgba(135, 206, 235, 0.35), rgba(135, 206, 235, 0));
+    filter: blur(20px);
   }
 
-  /* 细网格，像裁切垫 */
-  .grid {
-    position: absolute; inset: 0;
-    background-image:
-      linear-gradient(to right, rgba(255,255,255,0.035) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255,255,255,0.035) 1px, transparent 1px);
-    background-size: 40px 40px;
-    mask-image: linear-gradient(to right, #000 0%, #000 45%, transparent 70%);
-  }
-
-  /* 2D 旋转，不用 3D 透视：透视会把截图栅格化得发糊 */
-  .stage { position: absolute; left: 0; top: 0; width: 730px; height: 640px; overflow: hidden; }
-  .phone {
-    position: absolute;
-    width: 270px; height: 600px;
-    border-radius: 40px;
-    padding: 9px;
-    background: #050507;
-    transform: rotate(-20deg);
-    box-shadow:
-      0 0 0 1.5px #3a3a44,
-      24px 40px 70px rgba(0, 0, 0, 0.6);
-  }
-  .phone img {
-    display: block; width: 100%; height: 100%;
-    border-radius: 31px; object-fit: cover; object-position: top;
-  }
-  .phone.back { left: 330px; top: -70px; }
-  .phone.front { left: 120px; top: 110px; }
-
+  /* ---------- 左：品牌 ---------- */
   .brand {
-    position: absolute; right: 96px; top: 0; bottom: 0; width: 430px;
+    position: absolute; left: 96px; top: 0; bottom: 0; width: 500px;
     display: flex; flex-direction: column; justify-content: center;
   }
-  .lockup { display: flex; align-items: center; gap: 26px; }
-  /* 与启动图标、导出水印同构：圆角方块上一条横杠 */
+  .lockup { display: flex; align-items: center; gap: 24px; }
+  /* 与启动图标同构：深色圆角方块上一条白色横杠（ic_launcher_foreground） */
   .mark {
-    width: 96px; height: 96px; border-radius: 22px; position: relative;
-    background: var(--paper);
-    flex: none;
+    position: relative; flex: none;
+    width: 92px; height: 92px; border-radius: 24px; background: var(--ink);
+    box-shadow: 0 10px 24px rgba(16, 16, 20, 0.18);
   }
   .mark::after {
     content: ''; position: absolute;
-    left: 22%; right: 22%; top: 41%; bottom: 41%;
-    background: var(--ink); border-radius: 4px;
+    left: 28%; right: 28%; top: 39%; bottom: 39%;
+    background: #fff; border-radius: 3px;
   }
-  .word { font-weight: 900; font-size: 96px; line-height: 1; letter-spacing: 4px; }
+  .word { font-size: 88px; font-weight: 900; line-height: 1; letter-spacing: 6px; color: var(--ink); }
   .latin {
-    margin-top: 26px;
+    margin-top: 22px;
     font-family: 'Inter', sans-serif; font-weight: 600;
-    font-size: 15px; letter-spacing: 5px; text-transform: uppercase; color: var(--mute);
+    font-size: 14px; letter-spacing: 5px; text-transform: uppercase; color: var(--faint);
   }
-  .rule { margin: 34px 0 30px; width: 56px; height: 6px; border-radius: 2px; background: var(--sky); }
-  .tag { font-size: 30px; font-weight: 500; line-height: 1.45; color: #ececf1; }
-  .tag .bar {
-    display: inline-block; width: 3.1em; height: 0.82em; vertical-align: -0.06em;
-    background: var(--sky); border-radius: 2px; margin: 0 0.06em 0 0.12em;
+  .tag { margin-top: 40px; font-size: 30px; font-weight: 500; line-height: 1.55; color: var(--text); }
+  .pills { display: flex; gap: 10px; margin-top: 32px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 999px;
+    background: #fff; border: 1px solid var(--line);
+    font-size: 15px; color: #374151;
+    box-shadow: 0 1px 2px rgba(16, 16, 20, 0.04);
   }
-  .facts { margin-top: 22px; font-size: 17px; color: var(--mute); letter-spacing: 1px; }
-  .facts span + span::before { content: '·'; margin: 0 10px; color: #55555f; }
+  .pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--sky); }
+
+  /* ---------- 右：原图 → 识别后 ---------- */
+  .card {
+    position: absolute; width: 430px;
+    background: #fff; border-radius: 18px;
+    border: 1px solid rgba(16, 16, 20, 0.06);
+    padding: 22px 24px 10px;
+    font-size: 16px;
+  }
+  .card.before { left: 640px; top: 60px; box-shadow: 0 2px 6px rgba(16, 16, 20, 0.05), 0 16px 40px rgba(16, 16, 20, 0.08); }
+  .card.after  { left: 764px; top: 248px; box-shadow: 0 4px 10px rgba(16, 16, 20, 0.08), 0 30px 60px rgba(16, 16, 20, 0.18); }
+  .chip {
+    position: absolute; top: -13px; right: 20px;
+    padding: 4px 11px; border-radius: 999px;
+    font-size: 12px; font-weight: 500; letter-spacing: 1px; line-height: 1.4;
+    background: #fff; color: var(--mute); border: 1px solid var(--line);
+  }
+  .card.after .chip { background: var(--ink); color: #fff; border-color: var(--ink); }
+
+  .state { display: flex; align-items: baseline; gap: 14px; padding-bottom: 14px; }
+  .state b { color: #ff6a00; font-size: 22px; font-weight: 700; }
+  .state span { color: #ff6a00; font-size: 15px; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 11px 0; border-top: 1px solid #f0f1f3; }
+  .k { color: #8a8f99; font-size: 14px; width: 64px; flex: none; }
+  .v { color: var(--text); letter-spacing: 0.2px; }
+  .v.big { font-size: 24px; font-weight: 500; letter-spacing: 1px; }
+  .btn { margin-left: auto; font-size: 12px; color: #5c6370; border: 1px solid #d5d8de; border-radius: 999px; padding: 2px 10px; }
+  .hint { font-size: 12px; color: #8a8f99; margin-left: auto; }
+
+  /* 识别后：色块盖住、虚线框圈出。与应用里一致：实色块不透明，框带类型标签。 */
+  .after .mask { color: transparent; background: var(--sky); box-shadow: 0 0 0 3px var(--sky); }
+  .after .outline { position: relative; outline: 2px dashed var(--amber); outline-offset: 3px; }
+  .after .outline::before {
+    content: attr(data-label);
+    position: absolute; left: -5px; top: -19px;
+    padding: 1px 4px; background: var(--amber); color: #000;
+    font-size: 10px; font-weight: 500; line-height: 12px; letter-spacing: 0.5px; white-space: nowrap;
+  }
+
+  /* 两张卡片之间的箭头 */
+  .arrow {
+    position: absolute; left: 742px; top: 226px; width: 46px; height: 46px; border-radius: 50%;
+    background: var(--ink); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(16, 16, 20, 0.25);
+  }
+  .arrow svg { width: 20px; height: 20px; }
 </style>
 </head>
 <body>
-  <div class="grid"></div>
   <div class="glow"></div>
-
-  <div class="stage">
-    <div class="phone back"><img src="../shots/editor-purpose.png" alt=""></div>
-    <div class="phone front"><img src="../shots/editor.png" alt=""></div>
-  </div>
 
   <div class="brand">
     <div class="lockup">
@@ -107,9 +123,40 @@
       <div class="word">有码</div>
     </div>
     <div class="latin">Youma · Android</div>
-    <div class="rule"></div>
-    <p class="tag">截图里的<span class="bar"></span><br>发出去之前先遮住。</p>
-    <p class="facts"><span>本机识别</span><span>不联网</span><span>导出不带元数据</span></p>
+    <p class="tag">截图里的敏感信息，<br>发出去之前先遮住。</p>
+    <div class="pills">
+      <span class="pill">本机识别</span>
+      <span class="pill">不联网</span>
+      <span class="pill">零权限</span>
+    </div>
+  </div>
+
+  <div class="card before">
+    <span class="chip">原图</span>
+    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
+    <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span><span class="hint">号码保护中</span></div>
+    <div class="row"><span class="k">订单编号</span><span class="v outline" data-label="长数字串">2026092912304518839201746355</span></div>
+    <div class="row"><span class="k">联系邮箱</span><span class="v mask">wangxm@example.com</span></div>
+  </div>
+
+  <div class="card after">
+    <span class="chip">识别后</span>
+    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
+    <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span><span class="hint">号码保护中</span></div>
+    <div class="row"><span class="k">订单编号</span><span class="v outline" data-label="长数字串">2026092912304518839201746355</span></div>
+    <div class="row"><span class="k">联系邮箱</span><span class="v mask">wangxm@example.com</span></div>
+  </div>
+
+  <div class="arrow">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 7l10 10M17 8v9H8"/>
+    </svg>
   </div>
 </body>
 </html>

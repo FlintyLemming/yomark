@@ -36,12 +36,12 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * README 里的截图。不是测试，平时跳过；要重拍时：
+ * README 里六种打码样式对照图（docs/readme/styles.png）用的截图。不是测试，平时跳过；要重拍时：
  *
  *     YOUMA_SHOTS_DIR=$PWD/docs/readme/shots ./gradlew :app:testDebugUnitTest --tests '*ReadmeScreenshots*'
- *     node docs/readme/src/render.cjs hero && node docs/readme/src/render.cjs styles
+ *     node docs/readme/src/render.cjs styles
  *
- * 截图本身不进仓库，只有合成好的 docs/readme/hero.png 和 styles.png 进。
+ * 截图本身不进仓库，只有合成好的 styles.png 进。头图 hero.png 直接用样图的内容排版，不依赖这里的截图。
  *
  * 编辑器走的是真东西：随包的 PP-OCR 模型、默认规则表、真的 EditorViewModel。
  * 样图 readme/order-page.png 由 docs/readme/src/order-page.html 渲染，照着快递详情页排的版，人名、地址、号码全是编的。
@@ -131,15 +131,5 @@ class ReadmeScreenshots {
             settle()
             shoot("editor-${style.name.lowercase()}")
         }
-    }
-
-    @Test fun purposeWatermark() {
-        val vm = openSample()
-        compose.runOnUiThread {
-            vm.showPurposeSheet()
-            vm.setPurposeText("仅供快递取件使用")
-        }
-        settle()
-        shoot("editor-purpose")
     }
 }
