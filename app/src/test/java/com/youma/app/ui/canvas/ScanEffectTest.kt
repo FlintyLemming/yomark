@@ -56,6 +56,26 @@ class ScanEffectTest {
     }
 
     @Test
+    fun `the scrim fades in with the light and stays even while recognition runs`() {
+        assertThat(ScanEffect.scrim(500f, 0L, null, feather)).isEqualTo(0f)
+        listOf(0f, 500f, 1000f).forEach { y ->
+            assertThat(ScanEffect.scrim(y, ScanEffect.FADE_IN_MS, null, feather)).isEqualTo(ScanEffect.SCRIM_ALPHA)
+        }
+    }
+
+    @Test
+    fun `the scrim lifts exactly where results have been revealed`() {
+        val f = front(ScanEffect.REVEAL_MS / 2)
+        listOf(f - feather - 1f, f - feather / 2, f, f + 100f).forEach { y ->
+            val scrim = ScanEffect.scrim(y, 10_000L, f, feather)
+            val revealed = ScanEffect.coverage(y, f, feather)
+            assertThat(scrim).isWithin(1e-6f).of(ScanEffect.SCRIM_ALPHA * (1f - revealed))
+        }
+        // 落码结束时整张图都已揭开
+        assertThat(ScanEffect.scrim(1000f, 10_000L, front(ScanEffect.REVEAL_MS), feather)).isEqualTo(0f)
+    }
+
+    @Test
     fun `results reveal top to bottom and never run backwards`() {
         val mid = front(ScanEffect.REVEAL_MS / 2)
         assertThat(ScanEffect.coverage(100f, mid, feather)).isAtLeast(ScanEffect.coverage(500f, mid, feather))

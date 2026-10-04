@@ -45,7 +45,7 @@ object RuleCatalog {
      */
     fun note(rule: Rule): String? = NOTES[rule.id]
 
-    private val NOTES = mapOf("name" to "凭字面猜出的只圈不打码")
+    private val NOTES = mapOf("name" to "仅凭字面猜出的人名只圈出，不打码")
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =
         if (enabledByDefault == masked) this else StateOverride(this, masked)

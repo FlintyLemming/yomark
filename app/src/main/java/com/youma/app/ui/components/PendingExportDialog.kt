@@ -26,7 +26,7 @@ fun PendingExportDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("还有 $pendingCount 处已识别的内容未打码") },
+        title = { Text("还有 $pendingCount 处没打码") },
         text = {
             Text(byKind.entries.joinToString("、") { (kind, n) -> SensitiveKindLabels.plural(kind, n) })
         },

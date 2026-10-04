@@ -17,7 +17,7 @@ class StyleBarTest {
     @Test
     fun all_six_styles_are_offered() {
         compose.setContent { StyleBar(MaskStyle.SOLID, {}, null) }
-        listOf("实色块", "像素化", "模糊", "马克笔", "Emoji", "抹除").forEach {
+        listOf("色块", "马赛克", "模糊", "马克笔", "表情", "抹除").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -26,25 +26,25 @@ class StyleBarTest {
     fun selecting_a_style_fires_the_callback() {
         var picked: MaskStyle? = null
         compose.setContent { StyleBar(MaskStyle.SOLID, { picked = it }, null) }
-        compose.onNodeWithText("像素化").performClick()
+        compose.onNodeWithText("马赛克").performClick()
         assertThat(picked).isEqualTo(MaskStyle.PIXELATE)
     }
 
     @Test
     fun blur_shows_the_not_secure_warning() {
         compose.setContent { StyleBar(MaskStyle.BLUR, {}, null) }
-        compose.onNodeWithText("模糊是外观优先，非安全手段——可能被还原").assertIsDisplayed()
+        compose.onNodeWithText("模糊能被还原，不适合遮挡敏感信息").assertIsDisplayed()
     }
 
     @Test
     fun marker_shows_the_annotation_only_warning() {
         compose.setContent { StyleBar(MaskStyle.MARKER, {}, null) }
-        compose.onNodeWithText("马克笔仅标记、不遮蔽，底下的内容仍然可见").assertIsDisplayed()
+        compose.onNodeWithText("马克笔只做标记，盖不住下面的内容").assertIsDisplayed()
     }
 
     @Test
     fun erase_degradation_note_is_shown_when_present() {
-        compose.setContent { StyleBar(MaskStyle.ERASE, {}, "3 处背景过于复杂，抹除已自动降级为实色块") }
-        compose.onNodeWithText("3 处背景过于复杂，抹除已自动降级为实色块").assertIsDisplayed()
+        compose.setContent { StyleBar(MaskStyle.ERASE, {}, "3 处背景太复杂，已改用色块") }
+        compose.onNodeWithText("3 处背景太复杂，已改用色块").assertIsDisplayed()
     }
 }

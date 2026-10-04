@@ -2,13 +2,18 @@ package com.youma.app.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,8 +24,7 @@ import androidx.compose.ui.unit.dp
 /**
  * 首次安装的一屏引导（spec §12 M5）。只出现一次。
  *
- * 内容就是产品的核心承诺本身——对一个隐私工具来说，
- * 权限列表上的空白就是最有力的产品说明。
+ * 一句话说清是干什么的，再列三条承诺，每条一行，不展开解释。
  */
 @Composable
 fun OnboardingScreen(onStart: () -> Unit) {
@@ -30,16 +34,16 @@ fun OnboardingScreen(onStart: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.Start,
     ) {
-        Text("有码 Youma", style = MaterialTheme.typography.displaySmall)
+        Text("有码", style = MaterialTheme.typography.displaySmall)
         Text(
-            "给截图打码，不把它交给任何人。",
+            "自动找出截图里的手机号、地址、人脸并打码。",
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
         )
 
-        Promise("不申请任何权限", "选图走系统相册选择器，写回相册用的是你自己创建的文件。")
-        Promise("识别与编辑全程不联网", "文字、人脸、条码三个模型都编译在安装包里，飞行模式照常工作。")
-        Promise("导出自动清除元数据", "重新编码输出，GPS、设备型号、拍摄时间一概不带。")
+        Promise("不需要任何权限")
+        Promise("不联网，图片不离开手机")
+        Promise("导出时去掉位置、机型等隐藏信息")
 
         Button(
             onClick = onStart,
@@ -49,9 +53,17 @@ fun OnboardingScreen(onStart: () -> Unit) {
 }
 
 @Composable
-private fun Promise(title: String, detail: String) {
-    Column(Modifier.fillMaxWidth().padding(bottom = 20.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall)
-        Text(detail, style = MaterialTheme.typography.bodyMedium)
+private fun Promise(text: String) {
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(start = 12.dp))
     }
 }

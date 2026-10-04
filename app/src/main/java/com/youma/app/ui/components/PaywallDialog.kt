@@ -19,14 +19,11 @@ fun PaywallDialog(onBuy: () -> Unit, onDismiss: () -> Unit) {
         title = { Text("去除水印") },
         text = {
             Column {
-                Text("一次性买断，不是订阅。")
-                Text(
-                    "免费版的隐私能力一项都不缺：完整识别、三态编辑、六种打码样式、" +
-                        "原图分辨率导出、元数据清除。付费去掉的只是导出图右下角的「有码 Youma」水印。"
-                )
+                Text("一次付费，永久有效，不是订阅。")
+                Text("付费只去掉导出图片右下角的「有码 Youma」水印，其他功能免费版都有。")
             }
         },
         confirmButton = { TextButton(onClick = onBuy) { Text("购买") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("以后再说") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }

@@ -16,9 +16,9 @@ class OnboardingScreenTest {
     @Test
     fun states_the_three_core_promises() {
         compose.setContent { OnboardingScreen(onStart = {}) }
-        compose.onNodeWithText("不申请任何权限").assertIsDisplayed()
-        compose.onNodeWithText("识别与编辑全程不联网").assertIsDisplayed()
-        compose.onNodeWithText("导出自动清除元数据").assertIsDisplayed()
+        compose.onNodeWithText("不需要任何权限").assertIsDisplayed()
+        compose.onNodeWithText("不联网，图片不离开手机").assertIsDisplayed()
+        compose.onNodeWithText("导出时去掉位置、机型等隐藏信息").assertIsDisplayed()
     }
 
     @Test

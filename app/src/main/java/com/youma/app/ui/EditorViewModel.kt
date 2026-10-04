@@ -211,7 +211,7 @@ class EditorViewModel(
             }.onFailure {
                 uiState = _state.value.copy(
                     loading = false,
-                    message = EditorMessage.Error("无法打开这张图片"),
+                    message = EditorMessage.Error("打不开这张图片"),
                 )
             }
         }
@@ -271,7 +271,7 @@ class EditorViewModel(
             if (loaded == null) {
                 uiState = _state.value.copy(
                     loading = false,
-                    message = EditorMessage.Error("无法打开这张图片"),
+                    message = EditorMessage.Error("打不开这张图片"),
                 )
                 return@launch
             }
@@ -363,7 +363,7 @@ class EditorViewModel(
             if (extra == null) {
                 uiState = now.copy(
                     aiReview = AiReview.READY,
-                    message = EditorMessage.Error("AI 复查没能完成，请稍后再试"),
+                    message = EditorMessage.Error("AI 复查失败，请重试"),
                 )
                 return@launch
             }
@@ -374,8 +374,8 @@ class EditorViewModel(
                 aiReview = AiReview.DONE,
                 plan = now.plan.copy(items = now.plan.items + added),
                 message = EditorMessage.Notice(
-                    if (added.isEmpty()) "AI 复查没有发现规则漏掉的内容"
-                    else "AI 复查新圈出 ${added.size} 处，标「AI」、未打码"
+                    if (added.isEmpty()) "AI 复查没有发现新内容"
+                    else "AI 复查找到 ${added.size} 处，已圈出，没有打码"
                 ),
             ).withHistoryFlags()
         }
@@ -458,7 +458,7 @@ class EditorViewModel(
         if (masked.isEmpty()) return null
         val degrading = masked.count { eraser.willDegrade(image.bitmap, it.quad, image.scale) }
         return if (degrading == 0) null
-        else "$degrading 处背景过于复杂，抹除已自动降级为实色块"
+        else "$degrading 处背景太复杂，已改用色块"
     }
 
     fun undo() {

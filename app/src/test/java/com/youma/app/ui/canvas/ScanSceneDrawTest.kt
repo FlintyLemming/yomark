@@ -22,7 +22,7 @@ import org.robolectric.annotation.GraphicsMode
 
 /**
  * 直接画出扫光与落码的某一帧，按像素核对：识别中藏、落码自上而下、手动框始终在、
- * 光只染字不染纸、光不出图像。
+ * 识别中压暗、落码时亮度跟着揭开、白底上看得见光、光不出图像。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 模式下 getPixel 恒为 0，断言会假通过
@@ -80,8 +80,12 @@ class ScanSceneDrawTest {
         val frame = render(ScanTime(10_000L + since, since))
         // 光早已走过上面那块：盖实了，光尾也离开了，就是原本的天蓝
         assertThat(frame.at(top)).isEqualTo(MaskOptions.SKY_BLUE)
-        // 光还没到下面那块：原样
-        assertThat(frame.at(bottom)).isEqualTo(Color.WHITE)
+        // 光走过的地方暗幕已经揭开，回到原本的亮度
+        assertThat(frame.getPixel(115, 115)).isEqualTo(Color.WHITE)
+        // 光还没到下面那块：没有块，和旁边的空白一样还压着暗幕
+        val y = bottom.quad.bounds().centerY().toInt()
+        assertThat(frame.at(bottom)).isEqualTo(frame.getPixel(115, y))
+        assertThat(Color.red(frame.at(bottom))).isLessThan(128)
         // 手动框一直在，并且浮在光上面
         assertThat(frame.at(manual)).isEqualTo(MaskOptions.SKY_BLUE)
     }
@@ -103,7 +107,25 @@ class ScanSceneDrawTest {
     }
 
     @Test
-    fun `the light colours the ink and leaves the paper light`() {
+    fun `the page is dimmed while recognition runs`() {
+        val frame = render(ScanTime(ScanEffect.FADE_IN_MS, null))
+        // 光此刻还藏在图像上方，整张图是一片均匀的暗
+        val dimmed = frame.getPixel(115, 500)
+        assertThat(Color.red(dimmed)).isLessThan(128)
+        assertThat(frame.getPixel(115, 900)).isEqualTo(dimmed)
+        // 识别出的块不画，只剩暗下来的纸
+        assertThat(frame.at(top)).isEqualTo(dimmed)
+        // 手动框浮在暗幕上面，颜色不变
+        assertThat(frame.at(manual)).isEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    @Test
+    fun `the scrim fades in with the light instead of snapping on`() {
+        assertThat(render(ScanTime.START).getPixel(115, 500)).isEqualTo(Color.WHITE)
+    }
+
+    @Test
+    fun `the light shows up on a white page`() {
         // 左半黑（字）右半白（纸）
         val source = image { bmp ->
             bmp.eraseColor(Color.WHITE)
@@ -116,12 +138,21 @@ class ScanSceneDrawTest {
         // 字被染成明显的蓝紫色
         assertThat(Color.blue(ink)).isGreaterThan(150)
         assertThat(Color.blue(ink)).isGreaterThan(Color.red(ink))
-        // 纸只是一层淡淡的光晕
-        listOf(Color.red(paper), Color.green(paper), Color.blue(paper)).forEach { assertThat(it).isGreaterThan(200) }
-        assertThat(paper).isNotEqualTo(Color.WHITE)
-        // 光够不着的地方原样
+        // 纸压暗之后，光在上面看得出来：比光外的纸亮得多，也明显偏蓝
+        val unlit = frame.getPixel(90, 700)
+        assertThat(Color.blue(paper) - Color.blue(unlit)).isGreaterThan(60)
+        assertThat(Color.blue(paper)).isGreaterThan(Color.red(paper))
+        // 光够不着的地方只是压暗，不染色
         assertThat(frame.getPixel(30, 700)).isEqualTo(Color.BLACK)
-        assertThat(frame.getPixel(90, 700)).isEqualTo(Color.WHITE)
+        assertThat(Color.red(unlit)).isEqualTo(Color.blue(unlit))
+        assertThat(Color.red(unlit)).isLessThan(128)
+    }
+
+    @Test
+    fun `the page brightness comes back once the reveal is over`() {
+        val frame = render(ScanTime(10_000L + ScanEffect.REVEAL_MS, ScanEffect.REVEAL_MS))
+        assertThat(frame.getPixel(115, 990)).isEqualTo(Color.WHITE)
+        assertThat(frame.at(bottom)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test
@@ -134,6 +165,7 @@ class ScanSceneDrawTest {
         drawScene(canvas, source, plan, RendererRegistry.default(), scale, density, ScanTime(loopReaching(y + 1f), null), ScanPaints())
         assertThat(out.getPixel(20, y)).isEqualTo(Color.GRAY)
         assertThat(out.getPixel(180, y)).isEqualTo(Color.GRAY)
+        assertThat(out.getPixel(20, 700)).isEqualTo(Color.GRAY)          // 暗幕也不出图像
         assertThat(out.getPixel(100, y)).isNotEqualTo(Color.WHITE)       // 图像上确实有光
     }
 }

@@ -10,10 +10,13 @@ import kotlin.math.cos
  *
  * 上一版是浅暗幕加一道硬亮线反复扫，像扫码枪、像手机管家的病毒扫描，显得土。这一版：
  *
- * - 页面不压暗，也不画线。一束天蓝渐到淡紫的柔光自上而下扫过：光下的字被染上颜色（滤色混合，
- *   白底不受影响），空白处只留一层很淡的光晕。看上去是光在逐行读这一页，而不是一把激光枪；
+ * - 不画线。一束天蓝渐到淡紫的柔光自上而下扫过：光下的字被染上颜色（滤色混合），空白处只留
+ *   一层很淡的光晕。看上去是光在逐行读这一页，而不是一把激光枪；
+ * - 识别期间整张图压一层暗幕。白底截图占大多数，滤色在纯白上什么也染不出，光在亮底上几乎看不见；
+ *   压暗之后光才显得出来；
  * - 结果到了，光再扫最后一遍，打码块紧跟在光的后面自上而下渐显：每一块先被光照亮，再从半透明
- *   慢慢盖实。盖实之前那一下，底下原来是什么用户看得见——块里因此不再写类型名。
+ *   慢慢盖实。暗幕跟着同一道光自上而下揭开，光走过的地方回到原本的亮度。盖实之前那一下，
+ *   底下原来是什么用户看得见——块里因此不再写类型名。
  *
  * 只是编辑器里的过渡：不改 plan、不进撤销栈、不进导出。时长、轨迹与光的形状全在这里，画布只管落笔。
  * 长度一律是图像坐标，由画布按缩放把 dp 反算好了再传进来。
@@ -52,6 +55,9 @@ internal object ScanEffect {
     const val SCREEN_ALPHA = 0.9f
     const val TINT_ALPHA = 0.22f
 
+    /** 识别期间压在图上的暗幕的最大不透明度。 */
+    const val SCRIM_ALPHA = 0.6f
+
     /** 光里流动的颜色：天蓝（与打码块同色）、长春花蓝、淡紫。 */
     val HUES: IntArray = intArrayOf(MaskOptions.SKY_BLUE, 0xFFA5B4FC.toInt(), 0xFFC4B5FD.toInt())
 
@@ -84,6 +90,16 @@ internal object ScanEffect {
 
     /** 识别结果在纵坐标 y 处显现了多少：光的中心以下还没有，中心往上 [feather] 处盖实。 */
     fun coverage(y: Float, front: Float, feather: Float): Float = smooth((front - y) / feather)
+
+    /**
+     * 暗幕在纵坐标 y 处的不透明度（0..[SCRIM_ALPHA]）。识别开始时与光一起淡入；
+     * 落码那一遍（[front] 非 null）里，光走过的地方按 [coverage] 揭开，与打码块的显现严格同步。
+     */
+    fun scrim(y: Float, sinceScanMs: Long, front: Float?, feather: Float): Float {
+        val fadeIn = smooth(sinceScanMs.toFloat() / FADE_IN_MS)
+        val lifted = if (front == null) 0f else coverage(y, front, feather)
+        return SCRIM_ALPHA * fadeIn * (1f - lifted)
+    }
 
     /** 光在纵坐标 y 处的亮度：中心为 1，往上沿长尾、往下沿前沿平滑地落到 0。 */
     fun glow(y: Float, center: Float, trail: Float, lead: Float): Float =

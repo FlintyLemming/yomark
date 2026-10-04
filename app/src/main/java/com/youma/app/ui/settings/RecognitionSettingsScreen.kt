@@ -69,8 +69,7 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "文字识别",
-                    note = "PP-OCR = PaddleOCR v5 移动版，中文最准、能精确到单个字，但比 ML Kit 慢。" +
-                        "其余三档是 ML Kit：两者并跑 = 拉丁与中文识别器并行取并集；拉丁识别器不认中文。",
+                    note = "PP-OCR 认中文最准，但慢一些。另外三项用 ML Kit：「英文」不认中文，「中英」两个都跑，更慢。",
                     options = TextEngineOption.entries,
                     selected = config.textEngine,
                     label = ::textEngineLabel,
@@ -81,8 +80,8 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "条码",
-                    note = "宽松会把解不出内容的疑似条码也框出来，但只圈不打码；彩色照片会被筛掉，" +
-                        "灰调纹理、两色格子仍可能撞上。严格只认解得出内容的，倾斜或失焦的收款码可能整个漏掉。",
+                    note = "宽松：读不出内容的疑似条码也圈出来（不打码），偶尔会误圈花纹。" +
+                        "严格：只认能读出内容的，歪斜或模糊的码可能漏掉。",
                     options = BarcodeOption.entries,
                     selected = config.barcode,
                     label = ::barcodeLabel,
@@ -93,7 +92,7 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "人脸",
-                    note = "精确模式召回更高、更慢。两种模式都只取边界框，不做任何身份特征提取。",
+                    note = "精确：漏得少，但更慢。只找人脸在哪，不识别是谁。",
                     options = FaceOption.entries,
                     selected = config.face,
                     label = ::faceLabel,
@@ -104,10 +103,8 @@ fun RecognitionSettingsScreen(
             item {
                 AxisSection(
                     title = "AI 复查（实验）",
-                    note = "开启后，识别完成时编辑器底部会出现「AI 复查」按钮：点了才让设备上的 Gemini Nano " +
-                        "把整页文字再看一遍，补上规则认不出的人名、地址；不点不跑，不拖慢识别。" +
-                        "结果只圈出、标「AI」，不自动打码。只在支持 AICore 的机型上出现（如 Pixel 9 及以后）；" +
-                        "推理全在本机，本应用不联网。",
+                    note = "编辑页会多一个「AI 复查」按钮，点了才用手机上的 Gemini Nano 补找人名和地址。" +
+                        "找到的只圈出，不打码。仅部分机型可用（如 Pixel 9 及以后），不联网。",
                     options = SemanticOption.entries,
                     selected = config.semantic,
                     label = ::semanticLabel,
@@ -122,8 +119,8 @@ fun RecognitionSettingsScreen(
                     headlineContent = { Text("规则") },
                     supportingContent = {
                         Text(
-                            "${RuleCatalog.all.size} 条，逐条选择打码、仅圈出或关闭" +
-                                if (changed > 0) "；已改动 $changed 条" else "",
+                            "每类信息单独设为打码、圈出或关闭" +
+                                if (changed > 0) "，已改 $changed 项" else "",
                         )
                     },
                     trailingContent = { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null) },
@@ -134,7 +131,7 @@ fun RecognitionSettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("全部恢复默认") },
-                    supportingContent = { Text("识别方案与全部规则回到出厂设置") },
+                    supportingContent = { Text("本页和规则都恢复默认") },
                     modifier = Modifier.clickable { onChange(RecognitionConfig()) },
                 )
             }
@@ -167,7 +164,7 @@ fun RuleSettingsScreen(
         LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
             item {
                 Text(
-                    "「仅圈出」的项不会自动打码，但导出前必然弹窗告知——这是分层默认的安全网。",
+                    "「圈出」的内容不会自动打码，导出前会提醒你。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
@@ -272,9 +269,9 @@ private fun <T> AxisSection(
 
 private fun textEngineLabel(option: TextEngineOption) = when (option) {
     TextEngineOption.PADDLE -> "PP-OCR"
-    TextEngineOption.LATIN -> "拉丁"
+    TextEngineOption.LATIN -> "英文"
     TextEngineOption.CHINESE -> "中文"
-    TextEngineOption.BOTH -> "两者并跑"
+    TextEngineOption.BOTH -> "中英"
 }
 
 private fun barcodeLabel(option: BarcodeOption) = when (option) {
@@ -296,6 +293,6 @@ private fun semanticLabel(option: SemanticOption) = when (option) {
 
 private fun ruleStateLabel(state: RuleState) = when (state) {
     RuleState.OFF -> "关"
-    RuleState.OUTLINED -> "仅圈出"
+    RuleState.OUTLINED -> "圈出"
     RuleState.MASKED -> "打码"
 }

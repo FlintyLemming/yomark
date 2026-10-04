@@ -107,6 +107,6 @@ class PersonNameRecognizerTest {
     @Test fun `the settings row is one plain name row with a note`() {
         assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
         assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
-        assertThat(RuleCatalog.note(rule)).contains("只圈不打码")
+        assertThat(RuleCatalog.note(rule)).contains("只圈出，不打码")
     }
 }

@@ -63,7 +63,7 @@ fun EditorScreen(
     LaunchedEffect(state.message) {
         when (val m = state.message) {
             is EditorMessage.Exported -> {
-                val extra = if (m.downscaled) "（原图过大，已压缩至 ${m.width}×${m.height}）" else ""
+                val extra = if (m.downscaled) "（图片太大，已缩小到 ${m.width}×${m.height}）" else ""
                 snackbar.showMessage("已保存到相册$extra", vm)
             }
             is EditorMessage.BatchExported -> snackbar.showMessage("已保存 ${m.count} 张到相册", vm)
@@ -120,15 +120,8 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
             )
-            if (state.aiReview == AiReview.RUNNING) {
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-                Text(
-                    "Gemini Nano 正在复查整页文字，新发现的会以「AI」标签圈出",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
-                )
-            }
+            // 底栏的按钮已经写着「复查中…」，这里只给一条进度，不再重复说一遍
+            if (state.aiReview == AiReview.RUNNING) LinearProgressIndicator(Modifier.fillMaxWidth())
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()
                 ImageCanvas(
@@ -188,7 +181,7 @@ private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(
-                "正在识别敏感信息…",
+                "识别中…",
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 modifier = Modifier

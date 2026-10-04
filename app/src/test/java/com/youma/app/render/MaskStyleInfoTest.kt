@@ -23,7 +23,7 @@ class MaskStyleInfoTest {
 
     @Test fun `blur is cosmetic and says so`() {
         assertThat(MaskStyleInfo.safety(MaskStyle.BLUR)).isEqualTo(MaskSafety.COSMETIC)
-        assertThat(MaskStyleInfo.note(MaskStyle.BLUR)).contains("非安全")
+        assertThat(MaskStyleInfo.note(MaskStyle.BLUR)).contains("不适合遮挡")
     }
 
     /**
@@ -33,7 +33,7 @@ class MaskStyleInfoTest {
      */
     @Test fun `pixelate is cosmetic too and says why`() {
         assertThat(MaskStyleInfo.safety(MaskStyle.PIXELATE)).isEqualTo(MaskSafety.COSMETIC)
-        assertThat(MaskStyleInfo.note(MaskStyle.PIXELATE)).contains("非安全")
+        assertThat(MaskStyleInfo.note(MaskStyle.PIXELATE)).contains("不适合遮挡")
     }
 
     @Test fun `the two cosmetic styles do not share one warning`() {
@@ -43,7 +43,7 @@ class MaskStyleInfoTest {
 
     @Test fun `marker is annotation only and says so`() {
         assertThat(MaskStyleInfo.safety(MaskStyle.MARKER)).isEqualTo(MaskSafety.ANNOTATION_ONLY)
-        assertThat(MaskStyleInfo.note(MaskStyle.MARKER)).contains("不遮蔽")
+        assertThat(MaskStyleInfo.note(MaskStyle.MARKER)).contains("盖不住")
     }
 
     @Test fun `irreversible styles carry no warning note`() {

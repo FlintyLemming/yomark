@@ -416,12 +416,15 @@ internal fun drawScene(
     val lead = ScanEffect.LEAD_DP * dp
     val light = LightSpec(image.width, height, trail, lead, ScanEffect.HUE_SPAN_DP * dp, ScanEffect.drift(time.sinceScan))
     val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
+    val feather = ScanEffect.FEATHER_DP * dp
+    val front = time.sinceResult?.let { ScanEffect.revealFront(it, height, lead, trail, feather) }
+
+    // 暗幕压在原图上、打码块底下：落码时块与原图的亮度一起自上而下回来
+    drawScrim(canvas, image.width.toFloat(), height, time.sinceScan, front, feather, paints)
 
     // 识别中，识别出的块一律不画：换方案重跑时旧结果先退场，不与扫光混在一起。
     // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
-    time.sinceResult?.let { since ->
-        val feather = ScanEffect.FEATHER_DP * dp
-        val front = ScanEffect.revealFront(since, height, lead, trail, feather)
+    if (front != null) {
         val layer = canvas.saveLayer(null, null)
         drawItems(canvas, detected, plan.style, image, options, registry, scale, labels)
         keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
@@ -472,6 +475,9 @@ internal class ScanPaints {
 
     /** 落码图层的蒙版：只留光已经走过的部分。 */
     val keep = Paint().apply { blendMode = BlendMode.DST_IN }
+
+    /** 识别期间压在图上的暗幕。 */
+    val scrim = Paint()
 }
 
 /** 一道光在这一帧里不变的部分：图像范围与按缩放反算好的尺寸（图像坐标）。 */
@@ -547,4 +553,39 @@ private fun keepRevealed(
         null, Shader.TileMode.CLAMP,
     )
     canvas.drawRect(-width, -height, width * 2f, height * 2f, paints.keep)
+}
+
+/**
+ * 识别期间压在图上的暗幕，只盖图像范围。识别中是一整块均匀的暗；落码中（[front] 非 null）
+ * 光走过的地方按 ScanEffect.scrim 揭开，光还没到的地方仍然压着。
+ */
+private fun drawScrim(
+    canvas: android.graphics.Canvas,
+    width: Float,
+    height: Float,
+    sinceScanMs: Long,
+    front: Float?,
+    feather: Float,
+    paints: ScanPaints,
+) {
+    val paint = paints.scrim
+    if (front == null) {
+        val alpha = (ScanEffect.scrim(0f, sinceScanMs, null, feather) * 255).roundToInt()
+        if (alpha <= 0) return
+        paint.shader = null
+        paint.color = AndroidColor.argb(alpha, 0, 0, 0)
+    } else {
+        if (front - feather >= height) return   // 整张图都已揭开
+        val top = front - feather
+        paint.color = AndroidColor.BLACK
+        paint.shader = LinearGradient(
+            0f, top, 0f, front,
+            IntArray(KEEP_STOPS + 1) { i ->
+                val y = top + feather * i / KEEP_STOPS
+                AndroidColor.argb((ScanEffect.scrim(y, sinceScanMs, front, feather) * 255).roundToInt(), 0, 0, 0)
+            },
+            null, Shader.TileMode.CLAMP,
+        )
+    }
+    canvas.drawRect(0f, 0f, width, height, paint)
 }

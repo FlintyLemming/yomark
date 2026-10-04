@@ -28,7 +28,7 @@ fun PurposeWatermarkSheet(
         title = { Text("用途水印") },
         text = {
             Column {
-                Text("斜向平铺在整张图上，防止照片被挪作他用。与去水印的付费项无关。")
+                Text("在整张图上铺满一行字，写明这张图的用途，防止被挪用。")
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
@@ -37,7 +37,7 @@ fun PurposeWatermarkSheet(
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(text.ifBlank { null }) }) { Text("应用") } },
+        confirmButton = { TextButton(onClick = { onConfirm(text.ifBlank { null }) }) { Text("确定") } },
         dismissButton = { TextButton(onClick = { onConfirm(null) }) { Text("不加") } },
     )
 }

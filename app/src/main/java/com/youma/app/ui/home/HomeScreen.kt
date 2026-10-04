@@ -83,7 +83,7 @@ fun HomeScreen(
                     }
                 }
                 Text(
-                    "也可以在相册里把图片分享给「有码」，一次分享多张就逐张处理。",
+                    "也可以在相册里分享图片到「有码」，支持多张",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

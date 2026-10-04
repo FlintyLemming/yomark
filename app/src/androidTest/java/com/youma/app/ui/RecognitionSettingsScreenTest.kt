@@ -39,7 +39,7 @@ class RecognitionSettingsScreenTest {
     @Test fun pickingAnAxisEmitsTheNewConfig() {
         var latest: RecognitionConfig? = null
         screen(onChange = { latest = it })
-        compose.onNodeWithText("拉丁").performClick()
+        compose.onNodeWithText("英文").performClick()
         assertThat(latest?.textEngine).isEqualTo(TextEngineOption.LATIN)
     }
 

@@ -24,7 +24,7 @@ class PendingExportDialogTest {
                 onMaskAll = {}, onExportAnyway = {}, onDismiss = {},
             )
         }
-        compose.onNodeWithText("还有 3 处已识别的内容未打码").assertIsDisplayed()
+        compose.onNodeWithText("还有 3 处没打码").assertIsDisplayed()
         compose.onNodeWithText("2 个网址、1 个 IP 地址").assertIsDisplayed()
     }
 

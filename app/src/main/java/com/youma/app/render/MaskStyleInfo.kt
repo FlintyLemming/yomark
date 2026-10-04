@@ -13,11 +13,11 @@ enum class MaskSafety { IRREVERSIBLE, COSMETIC, ANNOTATION_ONLY }
 object MaskStyleInfo {
 
     fun label(style: MaskStyle): String = when (style) {
-        MaskStyle.SOLID -> "实色块"
-        MaskStyle.PIXELATE -> "像素化"
+        MaskStyle.SOLID -> "色块"
+        MaskStyle.PIXELATE -> "马赛克"
         MaskStyle.BLUR -> "模糊"
         MaskStyle.MARKER -> "马克笔"
-        MaskStyle.EMOJI -> "Emoji"
+        MaskStyle.EMOJI -> "表情"
         MaskStyle.ERASE -> "抹除"
     }
 
@@ -36,9 +36,9 @@ object MaskStyleInfo {
 
     /** 逐样式给文案，不按档位共用一句——两种 COSMETIC 的失效方式不一样，说法也该不一样。 */
     fun note(style: MaskStyle): String? = when (style) {
-        MaskStyle.BLUR -> "模糊是外观优先，非安全手段——可能被还原"
-        MaskStyle.PIXELATE -> "像素化是外观优先，非安全手段——已知字体的截图可被逐位还原"
-        MaskStyle.MARKER -> "马克笔仅标记、不遮蔽，底下的内容仍然可见"
+        MaskStyle.BLUR -> "模糊能被还原，不适合遮挡敏感信息"
+        MaskStyle.PIXELATE -> "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
+        MaskStyle.MARKER -> "马克笔只做标记，盖不住下面的内容"
         MaskStyle.SOLID, MaskStyle.EMOJI, MaskStyle.ERASE -> null
     }
 }
