@@ -186,11 +186,4 @@ class EditorViewModelRecognitionTest {
 
         assertThat(ids(vm)).contains("from-${TextEngineOption.LATIN}")
     }
-
-    @Test fun `settings sheet visibility is plain state`() = runTest(dispatcher) {
-        val vm = vm()
-        assertThat(vm.state.value.settingsVisible).isFalse()
-        vm.showSettings(); assertThat(vm.state.value.settingsVisible).isTrue()
-        vm.dismissSettings(); assertThat(vm.state.value.settingsVisible).isFalse()
-    }
 }

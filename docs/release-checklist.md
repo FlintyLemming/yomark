@@ -27,7 +27,7 @@ debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1�
 | 默认打码召回率 | 默认打码类型被 MASKED 覆盖 | ≥ 0.95 | **1.00（合成集）**；真实样本集**未采集** | 同上 |
 | 精确率 | MASKED 区域确实覆盖敏感内容 | ≥ 0.70 | **1.00（合成集）**；真实样本集**未采集** | 同上 |
 | 识别延迟 | 1080×2400，选中到候选出现 | < 800 ms | **143 ms**（断网）／**191 ms**（联网）✅ | `EvaluationTest` 的延迟用例 |
-| 冷启动 | 点图标到 Photo Picker 可交互 | < 1.2 s | 首帧 **392–445 ms**（中位 414）；Picker 成为 topResumedActivity **544–712 ms** ✅ | `am start -W` TotalTime ×5；轮询 `dumpsys activity activities` ×3 |
+| 冷启动 | 点图标到首页可交互 | < 1.2 s | **待重测**：启动器入口已从直接弹 Photo Picker 改为首页（旧流程首帧 392–445 ms，Picker 可交互 544–712 ms） | `am start -W` TotalTime ×5 |
 | 下发体积 | arm64-v8a split | ≤ 25 MB | **17,652,832 B = 16.8 MiB / 17.65 MB** ✅（含中文 OCR 包） | `bundletool get-size total --dimensions=ABI` |
 | 运行期敏感权限 | 除 BILLING 外的 uses-permission 条数 | 0 | **0** ✅（见下方清单） | `assertReleaseNoRuntimePermissions` + 设备侧 `dumpsys package` |
 | 网络请求 | 全流程（不含购买）运行期请求数 | 0 | **0** ✅ | 无 `INTERNET` 权限 + 断网复跑全套 |
@@ -153,7 +153,7 @@ adb logcat -d -s System.out:I | grep YOUMA-EVAL
 
 # 冷启动
 adb shell am force-stop com.youma.app
-adb shell am start -W -n com.youma.app/.ui.EditorActivity | grep TotalTime
+adb shell am start -W -n com.youma.app/.ui.home.HomeActivity | grep TotalTime
 
 # 下发体积
 bundletool build-apks --bundle=app/build/outputs/bundle/release/app-release.aab \

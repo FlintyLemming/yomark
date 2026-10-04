@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
@@ -38,21 +38,22 @@ fun EditorTopBar(
     onRedo: () -> Unit,
     onPurpose: () -> Unit,
     onSettings: () -> Unit,
-    onClose: () -> Unit,
+    onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
     /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        // 向上回到首页，放在 Android 约定的左上角
+        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+        Row(Modifier.weight(1f)) {}
         IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, "撤销") }
         IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, "重做") }
-        Row(Modifier.weight(1f)) {}
         if (onRemoveWatermark != null) {
             IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
         }
         IconButton(onClick = onPurpose) { Icon(Icons.Filled.Layers, "用途水印") }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "识别设置") }
-        IconButton(onClick = onClose) { Icon(Icons.Filled.Close, "关闭") }
     }
 }
 

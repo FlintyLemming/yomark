@@ -116,9 +116,6 @@ class EditorViewModel(
         viewModelScope.launch { settings.setRecognitionConfig(next) }
     }
 
-    fun showSettings() { _state.value = _state.value.copy(settingsVisible = true) }
-    fun dismissSettings() { _state.value = _state.value.copy(settingsVisible = false) }
-
     /**
      * 换方案后的重跑。整次重跑压**一个**快照，用户不满意按一下撤销就回到切换前，
      * 这就是「切着看」这件事成立的全部依据。

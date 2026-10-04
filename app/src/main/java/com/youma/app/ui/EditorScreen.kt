@@ -48,10 +48,14 @@ import com.youma.app.ui.components.EditorTopBar
 import com.youma.app.ui.components.PaywallDialog
 import com.youma.app.ui.components.PendingExportDialog
 import com.youma.app.ui.components.PurposeWatermarkSheet
-import com.youma.app.ui.settings.RecognitionSettingsScreen
 
 @Composable
-fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: () -> Unit) {
+fun EditorScreen(
+    vm: EditorViewModel,
+    onSettings: () -> Unit,
+    onNavigateUp: () -> Unit,
+    onBuyClicked: () -> Unit = {},
+) {
     val state by vm.state.collectAsStateWithLifecycle()
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
@@ -99,19 +103,9 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
         )
     }
 
-    // 设置是整屏页而不是对话框：13 条规则各三个选项，对话框塞不下。
-    if (state.settingsVisible) {
-        RecognitionSettingsScreen(
-            config = state.recognitionConfig,
-            onChange = vm::setRecognitionConfig,
-            onBack = vm::dismissSettings,
-        )
-        return
-    }
-
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        // 边到边（见 EditorActivity）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
+        // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
         // 输入法不算进来：用途水印的输入框在对话框里，编辑器不该跟着键盘挤。
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
     ) { padding ->
@@ -120,10 +114,11 @@ fun EditorScreen(vm: EditorViewModel, onBuyClicked: () -> Unit = {}, onClose: ()
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
                 onPurpose = vm::showPurposeSheet,
-                onSettings = vm::showSettings,
+                // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
+                onSettings = onSettings,
                 // 已购用户不该再看见购买入口
                 onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
-                onClose = onClose,
+                onNavigateUp = onNavigateUp,
             )
             if (state.aiReview == AiReview.RUNNING) {
                 LinearProgressIndicator(Modifier.fillMaxWidth())

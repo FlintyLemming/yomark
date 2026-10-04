@@ -59,9 +59,8 @@ data class EditorUiState(
      */
     val isPro: Boolean = false,
     val paywallVisible: Boolean = false,
-    /** 当前识别方案（2026-09-04 增补设计 §1）。设置页读它画选中态。 */
+    /** 当前识别方案（2026-09-04 增补设计 §1）。 */
     val recognitionConfig: RecognitionConfig = RecognitionConfig(),
-    val settingsVisible: Boolean = false,
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,

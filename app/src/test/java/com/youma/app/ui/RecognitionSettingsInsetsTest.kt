@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -19,6 +20,7 @@ import com.google.common.truth.Truth.assertThat
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.rules.RuleCatalog
 import com.youma.app.ui.settings.RecognitionSettingsScreen
+import com.youma.app.ui.settings.RuleSettingsScreen
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,7 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * 设置页的系统栏避让（真机反馈：标题压在状态栏里，最后一行被手势导航条盖住）。
  *
- * 应用是边到边的，设置页又不在编辑器的 Scaffold 里，让开系统栏全靠它自己。
+ * 应用是边到边的，设置的两页各是一个 Activity，让开系统栏全靠它们自己。
  * Robolectric 不画系统栏也不发 insets，这里像系统那样从窗口发一组下去，再量位置。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -45,10 +47,10 @@ class RecognitionSettingsInsetsTest {
 
     private fun Dp.px() = (value * compose.activity.resources.displayMetrics.density).toInt()
 
-    private fun show(onBack: () -> Unit = {}) {
+    private fun show(screen: @Composable () -> Unit = { RecognitionSettingsScreen(RecognitionConfig(), {}, {}, {}) }) {
         compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
         compose.setContent {
-            MaterialTheme { Surface { RecognitionSettingsScreen(RecognitionConfig(), {}, onBack) } }
+            MaterialTheme { Surface { screen() } }
         }
         compose.runOnUiThread {
             val insets = WindowInsetsCompat.Builder()
@@ -66,8 +68,8 @@ class RecognitionSettingsInsetsTest {
     }
 
     /** 列表可以从导航条底下滚过去，但滚到底时最后一行得整个露在它上面。 */
-    @Test fun `the last row scrolls clear of the navigation bar`() {
-        show()
+    @Test fun `the last rule scrolls clear of the navigation bar`() {
+        show { RuleSettingsScreen(RecognitionConfig(), {}, {}) }
         val last = RuleCatalog.all.last()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey(last.id)
         val row = compose.onNodeWithText(RuleCatalog.label(last)).getUnclippedBoundsInRoot()
@@ -75,11 +77,17 @@ class RecognitionSettingsInsetsTest {
         assertThat(row.bottom).isAtMost(screen.bottom - navigationBar)
     }
 
-    /** 设置页不是单独的 Activity：系统返回要回到编辑器，而不是把编辑器关掉。 */
-    @Test fun `system back goes back to the editor`() {
-        var backs = 0
-        show(onBack = { backs++ })
-        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
-        assertThat(backs).isEqualTo(1)
+    /**
+     * 两页都不拦系统返回：返回交给 Activity 自己 finish。
+     * 有一个常开的回调挂在 dispatcher 上，系统就不放预见式返回的跨 Activity 动画了。
+     */
+    @Test fun `the settings page leaves system back to the activity`() {
+        show()
+        assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
+    }
+
+    @Test fun `the rules page leaves system back to the activity`() {
+        show { RuleSettingsScreen(RecognitionConfig(), {}, {}) }
+        assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
     }
 }
