@@ -2,11 +2,24 @@ package com.youma.app.rules
 
 import com.youma.app.core.model.SensitiveKind
 
-data class RuleMatch(val range: IntRange, val confidence: Float)
+/**
+ * @param outlineOnly 这一处最多只圈出：规则选了「打码」也不自动打码。见 [OutlineOnly]。
+ */
+data class RuleMatch(val range: IntRange, val confidence: Float, val outlineOnly: Boolean = false)
 
 /** 一种认法：只管在一行里找出区间。类型与初始状态由外面的规则决定。 */
 fun interface Finder {
     fun findIn(text: String): List<RuleMatch>
+}
+
+/**
+ * 让一种认法的命中最多只圈出。给同一类型里误报率高出一截的认法用：
+ * 它与其余认法合在一条规则里、共用设置页上的一行，跟着那一行开关；
+ * 那一行选「打码」时，它的命中仍然只圈不打码——与条码宽松档里解不出内容的疑似条码一个道理。
+ */
+class OutlineOnly(private val finder: Finder) : Finder {
+    override fun findIn(text: String): List<RuleMatch> =
+        finder.findIn(text).map { it.copy(outlineOnly = true) }
 }
 
 /**

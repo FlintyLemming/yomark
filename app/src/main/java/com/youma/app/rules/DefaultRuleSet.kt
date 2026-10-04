@@ -5,7 +5,8 @@ import com.youma.app.rules.validator.Checksums
 import com.youma.app.rules.validator.KnownTlds
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。17 条：11 条默认打码、6 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。16 条：11 条默认打码、5 条仅圈出。
+ * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
  * 一直在跟 app 对着干；有校验位兜底的类型误报接近零，自动打码不打扰任何人。
@@ -111,10 +112,16 @@ object DefaultRuleSet {
     )
 
     /**
-     * 姓名 = 字段名后面的值 + 电话前面的名字。
+     * 姓名 = 字段名后面的值 + 电话前面的名字 + 从字面认出的名字。
      *
-     * 后一种是真机漏检补的：菜鸟快递详情页的收件人一行是「沐晨冉 86-186****3392」，
-     * 没有任何字段名。见 NameBeforePhone。
+     * 后两种都是真机漏检补的。电话前面的：菜鸟快递详情页的收件人一行是「沐晨冉 86-186****3392」，
+     * 没有任何字段名，见 NameBeforePhone。从字面认的（HanLP，见 PersonNameRecognizer）补既没有字段名、
+     * 旁边也没有电话的：滴滴出票页的乘车人一行是「沐晨冉 成人」，下面是打了星的身份证号。
+     *
+     * 从字面认的误报率比前两种高一个量级：「申通快递」「瑞幸咖啡」这类拿人名、姓氏起头的商号会被认成人名。
+     * 所以它排在最后，只补前两种够不着的地方，命中只圈不打码（OutlineOnly），按 §6「按误报率划线」。
+     * 它原先单独成一条规则，设置页上另有一行「人名（无字段名）」；两行都是人名，用户分不清关的是哪一个，
+     * 于是并了回来：一行「人名」管三种认法，一起开关。
      */
     private val NAME = CompositeRule(
         id = "name",
@@ -130,21 +137,7 @@ object DefaultRuleSet {
             confidence = 0.8f,
         ),
         NameBeforePhone(PHONE, confidence = 0.7f),
-    )
-
-    /**
-     * 人名，从字面认（HanLP，见 PersonNameRecognizer）：没有字段名、旁边也没有电话的名字。
-     * 真机漏检补的：滴滴出票页的乘车人一行是「沐晨冉 成人」，下面是打了星的身份证号。
-     *
-     * 与上面的 name 分成两条，是因为误报率差一个量级：字段名、电话锚定的几乎不会错，默认打码；
-     * 字面识别会把「申通快递」「瑞幸咖啡」这类拿人名、姓氏起头的商号认成人名，按 §6「按误报率划线」默认仅圈出。
-     * 两条认出同一个名字时，合并按同类型去重，打码的那个留下。
-     */
-    private val NAME_FROM_TEXT = CompositeRule(
-        id = "name-text",
-        kind = SensitiveKind.PERSON_NAME,
-        enabledByDefault = false,
-        PersonNameRecognizer(confidence = 0.6f),
+        OutlineOnly(PersonNameRecognizer(confidence = 0.6f)),
     )
 
     /**
@@ -305,7 +298,7 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, NAME_FROM_TEXT, ADDRESS, PICKUP_CODE,
+        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 }

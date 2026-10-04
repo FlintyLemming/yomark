@@ -33,12 +33,19 @@ object RuleCatalog {
     }
 
     /**
-     * 设置页上这一行的名字。默认就是类型名；同一类型有两条规则时得分得开——
-     * 两行都叫「人名」，用户不知道关的是哪一个。
+     * 设置页上这一行的名字，就是类型名。一种类型只有一条规则（几种认法合成一条，见 CompositeRule），
+     * 设置页上也就只有一行——两行都叫「人名」时，用户不知道关的是哪一个。
      */
-    fun label(rule: Rule): String = LABELS[rule.id] ?: SensitiveKindLabels.display(rule.kind)
+    fun label(rule: Rule): String = SensitiveKindLabels.display(rule.kind)
 
-    private val LABELS = mapOf("name-text" to "人名（无字段名）")
+    /**
+     * 名字下面那行小字：这一行的三态管不到的地方。没有就是 null。
+     *
+     * 人名选「打码」时，从字面猜出的名字仍然只圈出（OutlineOnly）。不写出来，用户会以为打码没生效。
+     */
+    fun note(rule: Rule): String? = NOTES[rule.id]
+
+    private val NOTES = mapOf("name" to "凭字面猜出的只圈不打码")
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =
         if (enabledByDefault == masked) this else StateOverride(this, masked)

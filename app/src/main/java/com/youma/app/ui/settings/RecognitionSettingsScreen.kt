@@ -130,11 +130,16 @@ fun RecognitionSettingsScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    RuleCatalog.label(rule),
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.weight(1f),
-                )
+                Column(Modifier.weight(1f)) {
+                    Text(RuleCatalog.label(rule), style = MaterialTheme.typography.bodyMedium)
+                    RuleCatalog.note(rule)?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 RuleState.entries.forEach { state ->
                     FilterChip(
                         selected = RuleCatalog.stateOf(config, rule.id) == state,

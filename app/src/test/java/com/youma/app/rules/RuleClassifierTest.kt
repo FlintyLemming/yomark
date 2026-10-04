@@ -66,6 +66,19 @@ class RuleClassifierTest {
             .isFalse()
     }
 
+    /** 同一条规则里，OutlineOnly 认出的那一处只圈出；规则本身选的「打码」照样作用于其余认法。 */
+    @Test
+    fun `an outline-only finder stays outlined inside a masked rule`() = runTest {
+        val mixed = CompositeRule(
+            id = "mixed", kind = SensitiveKind.PERSON_NAME, enabledByDefault = true,
+            Finder { t -> listOfNotNull(Regex("""\d{4}""").find(t)?.let { RuleMatch(it.range, 0.8f) }) },
+            OutlineOnly(Finder { t -> listOfNotNull(Regex("""[a-z]{3}""").find(t)?.let { RuleMatch(it.range, 0.6f) }) }),
+        )
+        val out = RuleClassifier(listOf(mixed)).classify(listOf(line("abc 1234")))
+        assertThat(out.map { it.quad.bounds().left to it.enabledByDefault })
+            .containsExactly(60f to true, 0f to false)
+    }
+
     @Test
     fun `select narrows the masked range without changing the match`() = runTest {
         // 匹配 "ab1234"，但只遮后四位

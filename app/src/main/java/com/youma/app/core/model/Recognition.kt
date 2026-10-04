@@ -30,7 +30,8 @@ data class Candidate(
     val confidence: Float,
     /**
      * 进编辑器时的初始状态。true → MASKED，false → OUTLINED。
-     * 由规则表逐条指定（spec §6），不是由 confidence 阈值算出来的。
+     * 由规则表逐条指定（spec §6），不是由 confidence 阈值算出来的；
+     * 同一条规则里误报率高出一截的认法可以把自己的命中压成仅圈出（见 OutlineOnly）。
      */
     val enabledByDefault: Boolean = true,
 )

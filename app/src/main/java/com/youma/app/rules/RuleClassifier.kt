@@ -50,7 +50,8 @@ class RuleClassifier(
                         kind = rule.kind,
                         source = DetectorSource.RULE,
                         confidence = m.confidence,
-                        enabledByDefault = rule.enabledByDefault,
+                        // 规则选了「打码」，OutlineOnly 认出的那几处仍然只圈出
+                        enabledByDefault = rule.enabledByDefault && !m.outlineOnly,
                     )
                 }
             }

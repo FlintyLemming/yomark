@@ -75,23 +75,33 @@ class OutlinedByDefaultRuleTest {
     //   + 标签锚定的 name / address（见 LabeledField）——原先它们标着
     //     「v2 需要 NER，首版不产出」，真机上表现为姓名地址完全漏检
     //   + 菜鸟快递详情页实测漏检补的 pickup（取件码）
-    //   + 滴滴出票页实测漏检补的 name-text（从字面认人名，见 PersonNameRecognizer）
-    @Test fun `the rule set has the eleven spec rules plus the six field-added ones`() {
+    // 滴滴出票页实测漏检补的「从字面认人名」不单独成条，并在 name 里（见 PersonNameRecognizer）
+    @Test fun `the rule set has the eleven spec rules plus the five field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
-            "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey", "name", "name-text", "address",
+            "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey", "name", "address",
             "pickup", "url", "ip", "tracking", "longnum", "datetime",
         )
     }
 
     /**
      * name / address / pickup 加在默认打码一侧：标签锚定的误报率低——「收货地址」四个字后面那一段
-     * 几乎必然是地址，符合 §6「按误报率划线」。name-text 加在仅圈出一侧：从字面认人名会把
-     * 拿人名起头的商号也认进来。
+     * 几乎必然是地址，符合 §6「按误报率划线」。name 里从字面认出的那部分例外，只圈不打码，
+     * 见 PersonNameRecognizerTest。
      */
-    @Test fun `exactly eleven rules are masked by default and six are outlined`() {
+    @Test fun `exactly eleven rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
         assertThat(masked).hasSize(11)
         assertThat(outlined.map { it.id })
-            .containsExactly("name-text", "url", "ip", "tracking", "longnum", "datetime")
+            .containsExactly("url", "ip", "tracking", "longnum", "datetime")
+    }
+
+    /**
+     * 设置页上一条规则一行、行名就是类型名。同一类型出现两条规则，设置页上就有两行同名的开关——
+     * 「人名」与「人名（无字段名）」就是这么让人分不清关的是哪一个的。几种认法要合成一条（CompositeRule）。
+     */
+    @Test fun `every kind has exactly one rule and so one settings row`() {
+        val kinds = DefaultRuleSet.rules.map { it.kind }
+        assertThat(kinds).containsNoDuplicates()
+        assertThat(RuleCatalog.all.map { RuleCatalog.label(it) }).containsNoDuplicates()
     }
 }

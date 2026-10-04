@@ -83,17 +83,30 @@ class PersonNameRecognizerTest {
 
     // ---------- 进规则表的样子 ----------
 
-    private val rule = DefaultRuleSet.rules.first { it.id == "name-text" }
+    /** 不单独成条：并在人名规则里，排在字段名、电话两种锚定之后。 */
+    private val rule = DefaultRuleSet.rules.first { it.id == "name" }
 
-    @Test fun `the rule is a person name rule that only outlines by default`() {
+    /** 规则出厂打码，但只凭字面认出的那一处只圈不打码——商号会被认成人名。 */
+    @Test fun `a name found only from the text is outlined even though the rule masks`() {
         assertThat(rule.kind).isEqualTo(SensitiveKind.PERSON_NAME)
-        assertThat(rule.enabledByDefault).isFalse()
-        assertThat(rule.findIn("沐晨冉 成人").map { it.confidence }).containsExactly(0.6f)
+        assertThat(rule.enabledByDefault).isTrue()
+        val found = rule.findIn("沐晨冉 成人").single()
+        assertThat(found.outlineOnly).isTrue()
+        assertThat(found.confidence).isEqualTo(0.6f)
     }
 
-    /** 设置页上两行都叫「人名」就分不清关的是哪一个。 */
-    @Test fun `the settings row tells the two name rules apart`() {
-        assertThat(RuleCatalog.label(rule)).isEqualTo("人名（无字段名）")
-        assertThat(RuleCatalog.label(DefaultRuleSet.rules.first { it.id == "name" })).isEqualTo("人名")
+    /** 字段名或电话锚定得到的照常打码；字面也认得出它，但锚定的排在前面，只出一个区间。 */
+    @Test fun `an anchored name is reported once and masked`() {
+        listOf("收货人 ： 刘洋 138****6612", "沐晨冉 86-186****3392 号码保护中").forEach { text ->
+            val found = rule.findIn(text).single()
+            assertThat(found.outlineOnly).isFalse()
+        }
+    }
+
+    /** 设置页上只有一行「人名」，名字下面一行小字交代打码管不到的那部分。 */
+    @Test fun `the settings row is one plain name row with a note`() {
+        assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
+        assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
+        assertThat(RuleCatalog.note(rule)).contains("只圈不打码")
     }
 }
