@@ -114,6 +114,7 @@ fun EditorScreen(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
                 onPurpose = vm::showPurposeSheet,
+                purposeOn = state.purposeText != null,
                 // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                 onSettings = onSettings,
                 // 已购用户不该再看见购买入口

@@ -43,6 +43,7 @@ import com.youma.app.core.model.MaskPlan
 import com.youma.app.core.model.MaskState
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.core.model.SensitiveKindLabels
+import com.youma.app.export.PurposeWatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
 import kotlin.math.hypot
@@ -92,6 +93,7 @@ fun ImageCanvas(
         }
     }
     val scanPaints = remember { ScanPaints() }
+    val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
     // 手势循环里必须读这个「永远最新」的引用，否则长按选中后立刻拖手柄，
@@ -263,6 +265,9 @@ fun ImageCanvas(
                 time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime,
                 paints = scanPaints,
             )
+            // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
+            // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
+            state.purposeText?.let { purposeWatermark.draw(canvas, image.width, image.height, it) }
             state.selectedManualId?.let { id ->
                 state.plan.find(id)?.let { item ->
                     canvas.drawPath(item.quad.toPath(), selectionPaint(viewport.scale))

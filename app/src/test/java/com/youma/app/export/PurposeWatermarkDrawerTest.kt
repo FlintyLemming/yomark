@@ -69,6 +69,16 @@ class PurposeWatermarkDrawerTest {
     }
 
     @Test
+    fun `nothing is drawn outside the image bounds`() {
+        // 编辑器预览的画布比图大：图外的留白不该被铺上字
+        val bmp = white()
+        PurposeWatermarkDrawer().draw(Canvas(bmp), 300, 400, "仅供办理签证使用")
+        for (x in 0 until bmp.width step 4) for (y in 0 until bmp.height step 4) {
+            if (x >= 300 || y >= 400) assertThat(bmp.getPixel(x, y)).isEqualTo(Color.WHITE)
+        }
+    }
+
+    @Test
     fun `a tiny image does not crash`() {
         val bmp = white(20, 20)
         PurposeWatermarkDrawer().draw(Canvas(bmp), 20, 20, "仅供办理签证使用")

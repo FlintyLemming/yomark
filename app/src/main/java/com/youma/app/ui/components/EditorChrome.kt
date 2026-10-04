@@ -20,6 +20,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -40,6 +41,8 @@ fun EditorTopBar(
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
+    /** 已设用途水印时按钮着主题色，一眼看出它开着。 */
+    purposeOn: Boolean = false,
     /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
 ) {
@@ -52,7 +55,13 @@ fun EditorTopBar(
         if (onRemoveWatermark != null) {
             IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
         }
-        IconButton(onClick = onPurpose) { Icon(Icons.Filled.Layers, "用途水印") }
+        IconButton(onClick = onPurpose) {
+            Icon(
+                Icons.Filled.Layers,
+                if (purposeOn) "用途水印（已开启）" else "用途水印",
+                tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "识别设置") }
     }
 }

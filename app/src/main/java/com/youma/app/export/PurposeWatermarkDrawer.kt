@@ -32,6 +32,8 @@ class PurposeWatermarkDrawer {
         val stepY = paint.textSize * LINE_RATIO
 
         val save = canvas.save()
+        // 导出位图本身就到边为止；编辑器预览的画布比图大，不裁会铺到图外的留白上
+        canvas.clipRect(0f, 0f, width.toFloat(), height.toFloat())
         canvas.rotate(ANGLE, width / 2f, height / 2f)
         // 旋转后要覆盖原矩形，绘制范围向外扩一个对角线长度
         val diagonal = kotlin.math.hypot(width.toFloat(), height.toFloat())
