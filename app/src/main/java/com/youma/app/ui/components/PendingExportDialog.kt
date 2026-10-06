@@ -31,7 +31,7 @@ import com.youma.app.core.model.SensitiveKindLabels
  * 用户没注意就导出 = 泄露。所以出厂一定会问。
  *
  * 「不再提示」是勾选框，不是第三个按钮：勾上之后点哪个按钮都照常执行，只是以后不再弹。
- * 关掉之后在 识别设置 › 规则 顶上能重新打开，勾上时就把这条路写在下面。
+ * 关掉之后在 设置 › 规则 顶上能重新打开，勾上时就把这条路写在下面。
  *
  * 两个回调的参数都是「勾了不再提示」。
  */
@@ -63,7 +63,7 @@ fun PendingExportDialog(
                 }
                 if (stopReminding) {
                     Text(
-                        "可在 识别设置 › 规则 里重新打开",
+                        "可在 设置 › 规则 里重新打开",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

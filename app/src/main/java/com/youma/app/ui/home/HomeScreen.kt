@@ -31,7 +31,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * 首页：正中一个大按钮选图，右上角是与具体某张图无关的入口（去水印、识别设置）。
+ * 首页：正中一个大按钮选图，右上角是与具体某张图无关的入口（去水印、设置）。
  *
  * 跟某张图有关的（撤销、用途水印……）留在编辑器里；首页不放第二个主操作，
  * 从相册分享进来的图根本不经过这一页。
@@ -54,7 +54,7 @@ fun HomeScreen(
                     if (onRemoveWatermark != null) {
                         IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
                     }
-                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "识别设置") }
+                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
                 },
                 // 边到边（见 enableLightEdgeToEdge）：横屏时左右还要让开挖孔与三键导航
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),

@@ -22,6 +22,7 @@ import com.youma.app.rules.RuleCatalog
 import com.youma.app.ui.canvas.ScanStyle
 import com.youma.app.ui.settings.RecognitionSettingsScreen
 import com.youma.app.ui.settings.RuleSettingsScreen
+import com.youma.app.ui.theme.ThemeColor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,7 +49,7 @@ class RecognitionSettingsInsetsTest {
 
     private fun Dp.px() = (value * compose.activity.resources.displayMetrics.density).toInt()
 
-    private fun show(screen: @Composable () -> Unit = { RecognitionSettingsScreen(RecognitionConfig(), {}, ScanStyle.SWEEP, {}, {}, {}) }) {
+    private fun show(screen: @Composable () -> Unit = { RecognitionSettingsScreen(RecognitionConfig(), {}, ScanStyle.SWEEP, {}, ThemeColor.SYSTEM, {}, {}, {}) }) {
         compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
         compose.setContent {
             MaterialTheme { Surface { screen() } }
@@ -65,7 +66,7 @@ class RecognitionSettingsInsetsTest {
 
     @Test fun `the title bar sits below the status bar`() {
         show()
-        assertThat(compose.onNodeWithText("识别设置").getUnclippedBoundsInRoot().top).isAtLeast(statusBar)
+        assertThat(compose.onNodeWithText("设置").getUnclippedBoundsInRoot().top).isAtLeast(statusBar)
     }
 
     /** 列表可以从导航条底下滚过去，但滚到底时最后一行得整个露在它上面。 */

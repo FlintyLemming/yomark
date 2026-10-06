@@ -1,9 +1,11 @@
 package com.youma.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollToNodeAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -16,6 +18,7 @@ import com.youma.app.rules.RuleCatalog
 import com.youma.app.ui.canvas.ScanStyle
 import com.youma.app.ui.settings.RecognitionSettingsScreen
 import com.youma.app.ui.settings.RuleSettingsScreen
+import com.youma.app.ui.theme.ThemeColor
 import org.junit.Rule
 import org.junit.Test
 
@@ -28,12 +31,15 @@ class RecognitionSettingsScreenTest {
         onChange: (RecognitionConfig) -> Unit = {},
         scanStyle: ScanStyle = ScanStyle.SWEEP,
         onScanStyleChange: (ScanStyle) -> Unit = {},
+        themeColor: ThemeColor = ThemeColor.SYSTEM,
+        onThemeColorChange: (ThemeColor) -> Unit = {},
         onOpenRules: () -> Unit = {},
     ) {
         compose.setContent {
             RecognitionSettingsScreen(
                 config = config, onChange = onChange,
                 scanStyle = scanStyle, onScanStyleChange = onScanStyleChange,
+                themeColor = themeColor, onThemeColorChange = onThemeColorChange,
                 onOpenRules = onOpenRules, onNavigateUp = {},
             )
         }
@@ -66,6 +72,14 @@ class RecognitionSettingsScreenTest {
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("磨砂"))
         compose.onNodeWithText("磨砂").performClick()
         assertThat(latest).isEqualTo(ScanStyle.FROST)
+    }
+
+    @Test fun pickingAThemeColorEmitsIt() {
+        var latest: ThemeColor? = null
+        screen(onThemeColorChange = { latest = it })
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasContentDescription("绿色"))
+        compose.onNodeWithContentDescription("绿色").performClick()
+        assertThat(latest).isEqualTo(ThemeColor.GREEN)
     }
 
     @Test fun rulesLiveOnTheirOwnPage() {
@@ -107,13 +121,17 @@ class RecognitionSettingsScreenTest {
     @Test fun resetClearsEverything() {
         var latest: RecognitionConfig? = null
         var style: ScanStyle? = null
+        var theme: ThemeColor? = null
         screen(
             config = RecognitionConfig(textEngine = TextEngineOption.LATIN), onChange = { latest = it },
             scanStyle = ScanStyle.FROST, onScanStyleChange = { style = it },
+            themeColor = ThemeColor.RED, onThemeColorChange = { theme = it },
         )
         compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("全部恢复默认"))
         compose.onNodeWithText("全部恢复默认").performClick()
         assertThat(latest).isEqualTo(RecognitionConfig())
         assertThat(style).isEqualTo(ScanStyle.SWEEP)
+        // 主题色不是识别设置，恢复默认不碰它
+        assertThat(theme).isNull()
     }
 }

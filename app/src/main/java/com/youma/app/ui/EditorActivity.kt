@@ -8,7 +8,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.createSavedStateHandle
@@ -26,6 +25,7 @@ import com.youma.app.export.WatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.home.HomeActivity
 import com.youma.app.ui.settings.SettingsActivity
+import com.youma.app.ui.theme.YoumaTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -38,6 +38,8 @@ import kotlinx.coroutines.launch
  * 从别的应用分享进来时，向上回到本应用自己的首页，而不是回到别人的应用里。
  */
 class EditorActivity : ComponentActivity() {
+
+    private val settings by lazy { SettingsStore(applicationContext) }
 
     private val vm: EditorViewModel by viewModels {
         val app = applicationContext
@@ -71,7 +73,7 @@ class EditorActivity : ComponentActivity() {
         vm.observePro(billing.isPro)
 
         setContent {
-            MaterialTheme {
+            YoumaTheme(settings) {
                 Surface {
                     EditorScreen(
                         vm = vm,

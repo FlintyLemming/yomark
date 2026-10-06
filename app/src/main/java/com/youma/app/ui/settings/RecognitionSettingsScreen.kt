@@ -35,8 +35,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -48,9 +50,14 @@ import com.youma.app.engine.SemanticOption
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.rules.RuleCatalog
 import com.youma.app.ui.canvas.ScanStyle
+import com.youma.app.ui.components.ColorSwatch
+import com.youma.app.ui.theme.ThemeColor
+import com.youma.app.ui.theme.colorScheme
+import com.youma.app.ui.theme.systemDynamicColorAvailable
 
 /**
- * 识别设置（2026-09-04 增补设计 §5）。一级页放四根轴和识别动效，逐条的规则收进二级页 [RuleSettingsScreen]。
+ * 设置（2026-09-04 增补设计 §5）。一级页放识别的四根轴和识别动效，逐条的规则收进二级页 [RuleSettingsScreen]；
+ * 最底下是与识别无关的主题色。
  *
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
@@ -67,11 +74,13 @@ fun RecognitionSettingsScreen(
     onChange: (RecognitionConfig) -> Unit,
     scanStyle: ScanStyle,
     onScanStyleChange: (ScanStyle) -> Unit,
+    themeColor: ThemeColor,
+    onThemeColorChange: (ThemeColor) -> Unit,
     onOpenRules: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "识别设置", onNavigateUp = onNavigateUp, modifier = modifier) { padding ->
+    SettingsScaffold(title = "设置", onNavigateUp = onNavigateUp, modifier = modifier) { padding ->
         LazyColumn(Modifier.fillMaxSize(), contentPadding = padding) {
             item {
                 AxisSection(
@@ -151,12 +160,17 @@ fun RecognitionSettingsScreen(
             item {
                 ListItem(
                     headlineContent = { Text("全部恢复默认") },
-                    supportingContent = { Text("识别设置和规则全部恢复出厂值") },
+                    supportingContent = { Text("识别设置和规则全部恢复出厂值，不动主题色") },
                     modifier = Modifier.clickable {
                         onChange(RecognitionConfig())
                         onScanStyleChange(ScanStyle.SWEEP)
                     },
                 )
+            }
+
+            item {
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                ThemeColorSection(selected = themeColor, onSelect = onThemeColorChange)
             }
         }
     }
@@ -297,6 +311,59 @@ private fun <T> AxisSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
+}
+
+/**
+ * 主题色：「跟随系统」（莫奈取色）是一个开关式的选项，下面一排是预设色。
+ * 色块画的是选它之后的主色，不是种子色——按钮、选中态最后就是这个颜色。
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ThemeColorSection(selected: ThemeColor, onSelect: (ThemeColor) -> Unit) {
+    val context = LocalContext.current
+    val presets = remember(context) {
+        ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context).primary }
+    }
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text("主题色", style = MaterialTheme.typography.titleMedium)
+        FilterChip(
+            selected = selected == ThemeColor.SYSTEM,
+            onClick = { onSelect(ThemeColor.SYSTEM) },
+            label = { Text(themeColorLabel(ThemeColor.SYSTEM)) },
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        FlowRow(
+            Modifier.fillMaxWidth().padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            presets.forEach { (color, primary) ->
+                ColorSwatch(
+                    color = primary,
+                    name = themeColorLabel(color),
+                    selected = color == selected,
+                    onClick = { onSelect(color) },
+                )
+            }
+        }
+        Text(
+            if (systemDynamicColorAvailable) "跟随系统：随壁纸取色，换壁纸后跟着变。"
+            else "跟随系统需要 Android 12 及以上，本机上是紫色。",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+private fun themeColorLabel(color: ThemeColor) = when (color) {
+    ThemeColor.SYSTEM -> "跟随系统"
+    ThemeColor.PURPLE -> "紫色"
+    ThemeColor.BLUE -> "蓝色"
+    ThemeColor.TEAL -> "青色"
+    ThemeColor.GREEN -> "绿色"
+    ThemeColor.ORANGE -> "橙色"
+    ThemeColor.RED -> "红色"
+    ThemeColor.PINK -> "粉色"
 }
 
 private fun textEngineLabel(option: TextEngineOption) = when (option) {
