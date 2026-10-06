@@ -43,7 +43,7 @@ class HomeScreenTest {
     @Test fun `settings sit in the top bar`() {
         var opened = 0
         show(onSettings = { opened++ })
-        compose.onNodeWithContentDescription("识别设置").performClick()
+        compose.onNodeWithContentDescription("设置").performClick()
         assertThat(opened).isEqualTo(1)
     }
 

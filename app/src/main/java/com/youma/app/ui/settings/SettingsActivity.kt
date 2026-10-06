@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -13,10 +12,11 @@ import androidx.lifecycle.lifecycleScope
 import com.youma.app.data.SettingsStore
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.ui.enableLightEdgeToEdge
+import com.youma.app.ui.theme.YoumaTheme
 import kotlinx.coroutines.launch
 
 /**
- * 识别设置（一级页）。首页和编辑器的右上角都进得来，所以「向上」就是 finish 回到来的那一页，
+ * 设置（一级页）：识别设置与主题色。首页和编辑器的右上角都进得来，所以「向上」就是 finish 回到来的那一页，
  * 不声明固定的 parentActivityName。
  */
 class SettingsActivity : ComponentActivity() {
@@ -27,12 +27,17 @@ class SettingsActivity : ComponentActivity() {
         val store = SettingsStore(applicationContext)
         setRecognitionConfigContent(store) { config, onChange ->
             val scanStyle by store.scanStyle.collectAsStateWithLifecycle(initialValue = null)
-            scanStyle?.let { style ->
+            val themeColor by store.themeColor.collectAsStateWithLifecycle(initialValue = null)
+            val style = scanStyle
+            val color = themeColor
+            if (style != null && color != null) {
                 RecognitionSettingsScreen(
                     config = config,
                     onChange = onChange,
                     scanStyle = style,
                     onScanStyleChange = { next -> lifecycleScope.launch { store.setScanStyle(next) } },
+                    themeColor = color,
+                    onThemeColorChange = { next -> lifecycleScope.launch { store.setThemeColor(next) } },
                     onOpenRules = { startActivity(Intent(this, RuleSettingsActivity::class.java)) },
                     onNavigateUp = ::finish,
                 )
@@ -41,7 +46,7 @@ class SettingsActivity : ComponentActivity() {
     }
 }
 
-/** 识别设置的二级页：导出前提醒与逐条规则。 */
+/** 设置的二级页：导出前提醒与逐条规则。 */
 class RuleSettingsActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,7 +80,7 @@ private fun ComponentActivity.setRecognitionConfigContent(
 ) {
     setContent {
         val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
-        MaterialTheme {
+        YoumaTheme(store) {
             Surface {
                 config?.let { current ->
                     screen(current) { next -> lifecycleScope.launch { store.setRecognitionConfig(next) } }

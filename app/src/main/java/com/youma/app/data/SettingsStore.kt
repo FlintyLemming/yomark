@@ -17,6 +17,7 @@ import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.ui.canvas.ScanStyle
+import com.youma.app.ui.theme.ThemeColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -99,6 +100,16 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_SCAN_STYLE] = style.name }
     }
 
+    /**
+     * 主题色：跟随系统（莫奈取色）或一个预设色（见 ThemeColor）。出厂跟随系统。
+     * 认不出的值退回跟随系统，理由与 lastStyle 一致。
+     */
+    val themeColor: Flow<ThemeColor> = store.data.map { it[KEY_THEME_COLOR].toEnum(ThemeColor.SYSTEM) }
+
+    suspend fun setThemeColor(color: ThemeColor) {
+        store.edit { it[KEY_THEME_COLOR] = color.name }
+    }
+
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -144,6 +155,11 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_SCAN_STYLE] = raw }
     }
 
+    @VisibleForTesting
+    internal suspend fun writeRawThemeColorForTest(raw: String) {
+        store.edit { it[KEY_THEME_COLOR] = raw }
+    }
+
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
@@ -153,6 +169,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
+        val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。

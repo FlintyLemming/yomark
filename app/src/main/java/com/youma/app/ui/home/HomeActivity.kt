@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,6 +22,7 @@ import com.youma.app.ui.components.PaywallDialog
 import com.youma.app.ui.enableLightEdgeToEdge
 import com.youma.app.ui.onboarding.OnboardingScreen
 import com.youma.app.ui.settings.SettingsActivity
+import com.youma.app.ui.theme.YoumaTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -64,7 +64,7 @@ class HomeActivity : ComponentActivity() {
             var paywall by rememberSaveable { mutableStateOf(false) }
             val isPro by billing.isPro.collectAsStateWithLifecycle()
 
-            MaterialTheme {
+            YoumaTheme(settings) {
                 Surface {
                     when {
                         seen == null -> Unit

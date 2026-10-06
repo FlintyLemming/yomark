@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.ui.canvas.ScanStyle
+import com.youma.app.ui.theme.ThemeColor
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -89,5 +90,20 @@ class SettingsStoreTest {
         assertThat(store.pendingExportReminder.first()).isTrue()
         store.setPendingExportReminder(false)
         assertThat(store.pendingExportReminder.first()).isFalse()
+    }
+
+    @Test
+    fun `theme color follows the system by default and remembers the choice`() = runTest {
+        val store = store()
+        assertThat(store.themeColor.first()).isEqualTo(ThemeColor.SYSTEM)
+        store.setThemeColor(ThemeColor.GREEN)
+        assertThat(store.themeColor.first()).isEqualTo(ThemeColor.GREEN)
+    }
+
+    @Test
+    fun `an unknown stored theme color falls back to following the system rather than crashing`() = runTest {
+        val store = store()
+        store.writeRawThemeColorForTest("NOT_A_COLOR")
+        assertThat(store.themeColor.first()).isEqualTo(ThemeColor.SYSTEM)
     }
 }

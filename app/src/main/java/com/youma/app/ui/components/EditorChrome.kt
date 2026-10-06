@@ -62,7 +62,7 @@ fun EditorTopBar(
                 tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
         }
-        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "识别设置") }
+        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
     }
 }
 
