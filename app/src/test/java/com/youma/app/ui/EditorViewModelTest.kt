@@ -29,6 +29,7 @@ import com.youma.app.export.Exporter
 import com.youma.app.export.ImageSink
 import com.youma.app.export.WatermarkDrawer
 import com.youma.app.render.RendererRegistry
+import com.youma.app.ui.canvas.ScanStyle
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -279,6 +280,20 @@ class EditorViewModelTest {
 
         assertThat(vm.state.value.pendingDialogVisible).isFalse()
         assertThat(sink.writes).isEqualTo(1)
+    }
+
+    @Test
+    fun `the canvas follows the scan effect chosen in settings, across image changes`() = runTest(dispatcher) {
+        val vm = vm()
+        advanceUntilIdle()
+        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.SWEEP)
+
+        settings.setScanStyle(ScanStyle.FROST); advanceUntilIdle()
+        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.FROST)
+
+        // 换图会整个重建 EditorUiState，样式不在那里面，不会被换回出厂值
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.FROST)
     }
 
     @Test

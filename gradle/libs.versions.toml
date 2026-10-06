@@ -6,6 +6,7 @@ lifecycle = "2.9.1"
 activityCompose = "1.10.1"
 composeBom = "2025.06.01"
 exifinterface = "1.4.1"
+graphicsShapes = "1.1.0"
 datastore = "1.1.7"
 coroutines = "1.10.2"
 mlkitText = "16.0.1"
@@ -41,6 +42,7 @@ androidx-compose-material-icons = { module = "androidx.compose.material:material
 androidx-compose-ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }
 androidx-compose-ui-test-manifest = { module = "androidx.compose.ui:ui-test-manifest" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "exifinterface" }
+androidx-graphics-shapes = { module = "androidx.graphics:graphics-shapes", version.ref = "graphicsShapes" }
 androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastore" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "coroutines" }

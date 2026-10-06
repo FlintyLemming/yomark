@@ -16,6 +16,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -46,6 +47,8 @@ import com.youma.app.core.model.SensitiveKindLabels
 import com.youma.app.export.PurposeWatermarkDrawer
 import com.youma.app.render.RendererRegistry
 import com.youma.app.ui.EditorUiState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 
@@ -54,6 +57,8 @@ import kotlin.math.roundToInt
  *
  * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
  * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、长按手动框进选中态。
+ *
+ * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  */
 @Composable
 fun ImageCanvas(
@@ -66,24 +71,38 @@ fun ImageCanvas(
     onCommitDrag: () -> Unit,
     onDeleteSelected: () -> Unit,
     modifier: Modifier = Modifier,
+    scanStyle: ScanStyle = ScanStyle.SWEEP,
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
 
-    // 识别中的扫光与结果上屏的落码（见 ScanEffect）。时间轴只在绘制里读，走起来只触发重绘、
-    // 不触发重组；识别中和落码那一遍之外它是 null，一帧都不占。
+    var viewSize by remember { mutableStateOf(0 to 0) }
+    var viewport by remember(image) { mutableStateOf(Viewport(1f, 0f, 0f)) }
+
+    // 识别中的扫光 / 磨砂，与结果上屏的落码 / 散开（见 ScanEffect、FrostEffect）。时间轴只在绘制里读，
+    // 走起来只触发重绘、不触发重组；识别中和收尾那一遍之外它是 null，一帧都不占。
     val scanning = state.analyzing
+    val currentStyle by rememberUpdatedState(scanStyle)
     var scanTime by remember(image) { mutableStateOf<ScanTime?>(null) }
+    // 收尾那一遍按结果到达那一刻的样式与位置走，中途不变
+    var settling by remember(image) { mutableStateOf(ScanStyle.SWEEP) }
+    var revealOrigin by remember(image) { mutableStateOf<PointF?>(null) }
     LaunchedEffect(image, scanning) {
         if (scanning) {
             val start = withFrameMillis { it }
             while (true) withFrameMillis { scanTime = ScanTime(it - start, null) }
         } else {
-            // 没扫过就没有落码这一遍：从重建里恢复的 plan 直接显示，不再演一遍
+            // 没扫过就没有收尾这一遍：从重建里恢复的 plan 直接显示，不再演一遍
             val scanned = scanTime ?: return@LaunchedEffect
-            val settle = ScanEffect.settleMs(scanned.sinceScan)
+            settling = currentStyle
+            // 磨砂从等待图标所在的位置散开，即画布中心；换算成图像坐标，用户此后拖动画面，洞也跟着图走
+            revealOrigin = viewport.screenToImage(PointF(viewSize.first / 2f, viewSize.second / 2f))
+            val settle = when (settling) {
+                ScanStyle.SWEEP -> ScanEffect.settleMs(scanned.sinceScan)
+                ScanStyle.FROST -> FrostEffect.SETTLE_MS
+            }
             val resultAt = withFrameMillis { it }
             while (true) {
                 val since = withFrameMillis { it - resultAt }
@@ -94,6 +113,19 @@ fun ImageCanvas(
         }
     }
     val scanPaints = remember { ScanPaints() }
+
+    // 磨砂要用的模糊图与光点：选的是磨砂、动效又在走（识别中或收尾那一遍）时在后台准备一次（几毫秒）。
+    // 准备好之前的那几帧只压暗，淡入刚开始，看不出差别。识别快到结果先到，也接着准备完，散开那一遍用得上。
+    // 「动效在走」用 derivedStateOf 读：时间轴每帧都在变，直接读会每帧重组一次。
+    var frostLayer by remember(image) { mutableStateOf<FrostLayer?>(null) }
+    val animating by remember(image) { derivedStateOf { scanTime != null } }
+    val wantsFrost = (scanning || animating) && (if (scanning) scanStyle else settling) == ScanStyle.FROST
+    LaunchedEffect(image, wantsFrost, viewSize) {
+        val (w, h) = viewSize
+        if (!wantsFrost || frostLayer != null || w <= 0 || h <= 0) return@LaunchedEffect
+        val fit = Viewport.fit(image.width, image.height, w, h)
+        frostLayer = withContext(Dispatchers.Default) { FrostLayer.prepare(image.bitmap, density.density / fit.scale) }
+    }
     val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
@@ -101,8 +133,6 @@ fun ImageCanvas(
     // 循环里看到的 selectedManualId 还是 null，于是拖出来一个新框而不是改选中框。
     val latest by rememberUpdatedState(state)
 
-    var viewSize by remember { mutableStateOf(0 to 0) }
-    var viewport by remember(image) { mutableStateOf(Viewport(1f, 0f, 0f)) }
     // viewport 是按哪个画布尺寸摆的。用途水印面板顶替底栏、输入法弹起时画布会变矮，
     // 这时要重新摆，否则图的下半截就被挤出画布，调水印时看不到效果。
     var laidOutFor by remember(image) { mutableStateOf(0 to 0) }
@@ -268,13 +298,14 @@ fun ImageCanvas(
             val save = canvas.save()
             canvas.concat(viewport.matrix())
 
-            drawScene(
-                canvas, image, state.plan, registry, viewport.scale, density.density,
-                // 识别中，时间轴的第一帧还没到（或手里还是上一遍落码的帧）也按「识别中」画：
-                // 换方案重跑时旧结果不该闪一下
-                time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime,
-                paints = scanPaints,
-            )
+            // 识别中，时间轴的第一帧还没到（或手里还是上一遍收尾的帧）也按「识别中」画：
+            // 换方案重跑时旧结果不该闪一下
+            val time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime
+            val look = when (if (scanning) scanStyle else settling) {
+                ScanStyle.SWEEP -> ScanLook.Sweep
+                ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
+            }
+            drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look)
             // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
             // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
             state.purposeText?.let {
@@ -312,6 +343,11 @@ fun ImageCanvas(
             draftQuad?.let { canvas.drawPath(it.toPath(), draftPaint(viewport.scale)) }
 
             canvas.restoreToCount(save)
+
+            // 磨砂中间的等待图标跟屏幕走：总在画布中心、大小恒定，不随图缩放平移
+            if (time != null && look is ScanLook.Frost) {
+                drawLoader(canvas, size.width / 2f, size.height / 2f, density.density, time, scanPaints.frost)
+            }
         }
     }
 }
@@ -395,12 +431,13 @@ private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, rect:
 }
 
 /**
- * 图像、遮罩与扫光——画布上除了选中态和草稿框之外的全部内容。拆出来是为了让像素测试
- * 能直接画出动效的任意一帧。
+ * 图像、遮罩与扫描动效——画布上除了选中态、草稿框和磨砂的等待图标之外的全部内容。拆出来是为了
+ * 让像素测试能直接画出动效的任意一帧。
  *
  * 调用前画布已经 concat 了 viewport：这里一律是图像坐标，dp 尺寸按 [scale] 反算。
  *
- * @param time 扫光时间轴上的这一帧（见 ScanEffect）；null 表示静止，照常画全部遮罩
+ * @param time 动效时间轴上的这一帧（见 ScanEffect、FrostEffect）；null 表示静止，照常画全部遮罩
+ * @param look 按哪种样式画这一帧
  */
 internal fun drawScene(
     canvas: android.graphics.Canvas,
@@ -411,6 +448,7 @@ internal fun drawScene(
     density: Float,
     time: ScanTime?,
     paints: ScanPaints,
+    look: ScanLook = ScanLook.Sweep,
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
@@ -428,6 +466,16 @@ internal fun drawScene(
     }
 
     val dp = density / scale
+    if (look is ScanLook.Frost) {
+        val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
+        drawFrostScene(
+            canvas, image.width.toFloat(), image.height.toFloat(), dp, time, look, paints.frost,
+            drawDetected = { drawItems(canvas, detected, plan.style, image, options, registry, scale, labels) },
+            drawManual = { drawItems(canvas, manual, plan.style, image, options, registry, scale, labels) },
+        )
+        return
+    }
+
     val height = image.height.toFloat()
     val trail = ScanEffect.TRAIL_DP * dp
     val lead = ScanEffect.LEAD_DP * dp
@@ -485,8 +533,11 @@ private fun drawItems(
     }
 }
 
-/** 扫光与落码的画笔，跨帧复用。 */
+/** 扫描动效的画笔，跨帧复用。 */
 internal class ScanPaints {
+    /** 磨砂那一套。 */
+    val frost = FrostPaints()
+
     /** 滤色：把光下的字染上颜色；白底滤色之后还是白，看不出来。 */
     val screen = Paint().apply { blendMode = BlendMode.SCREEN }
 

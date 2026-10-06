@@ -30,15 +30,18 @@ import com.youma.app.render.EraseRenderer
 import com.youma.app.ui.batch.BatchItem
 import com.youma.app.ui.batch.BatchSession
 import com.youma.app.ui.canvas.GestureRules
+import com.youma.app.ui.canvas.ScanStyle
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -57,6 +60,13 @@ class EditorViewModel(
 
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
+
+    /**
+     * 识别动效的样式（设置里选的）。只影响画布上的过渡，所以不进 EditorUiState——那里每换一张图就整个重建，
+     * 购买态、水印外观都得一路手动带着；这个直接跟着设置走。设置还没读到时按出厂的扫光算。
+     */
+    val scanStyle: StateFlow<ScanStyle> =
+        settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.SWEEP)
 
     /**
      * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——

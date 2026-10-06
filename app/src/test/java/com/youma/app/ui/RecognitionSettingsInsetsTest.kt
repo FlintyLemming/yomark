@@ -19,6 +19,7 @@ import androidx.core.view.WindowInsetsCompat
 import com.google.common.truth.Truth.assertThat
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.rules.RuleCatalog
+import com.youma.app.ui.canvas.ScanStyle
 import com.youma.app.ui.settings.RecognitionSettingsScreen
 import com.youma.app.ui.settings.RuleSettingsScreen
 import org.junit.Rule
@@ -47,7 +48,7 @@ class RecognitionSettingsInsetsTest {
 
     private fun Dp.px() = (value * compose.activity.resources.displayMetrics.density).toInt()
 
-    private fun show(screen: @Composable () -> Unit = { RecognitionSettingsScreen(RecognitionConfig(), {}, {}, {}) }) {
+    private fun show(screen: @Composable () -> Unit = { RecognitionSettingsScreen(RecognitionConfig(), {}, ScanStyle.SWEEP, {}, {}, {}) }) {
         compose.runOnUiThread { compose.activity.enableEdgeToEdge() }
         compose.setContent {
             MaterialTheme { Surface { screen() } }

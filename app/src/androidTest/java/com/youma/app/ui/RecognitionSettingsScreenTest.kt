@@ -1,15 +1,19 @@
 package com.youma.app.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasScrollToNodeAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
 import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.engine.RuleState
 import com.youma.app.rules.RuleCatalog
+import com.youma.app.ui.canvas.ScanStyle
 import com.youma.app.ui.settings.RecognitionSettingsScreen
 import com.youma.app.ui.settings.RuleSettingsScreen
 import org.junit.Rule
@@ -22,10 +26,16 @@ class RecognitionSettingsScreenTest {
     private fun screen(
         config: RecognitionConfig = RecognitionConfig(),
         onChange: (RecognitionConfig) -> Unit = {},
+        scanStyle: ScanStyle = ScanStyle.SWEEP,
+        onScanStyleChange: (ScanStyle) -> Unit = {},
         onOpenRules: () -> Unit = {},
     ) {
         compose.setContent {
-            RecognitionSettingsScreen(config = config, onChange = onChange, onOpenRules = onOpenRules, onNavigateUp = {})
+            RecognitionSettingsScreen(
+                config = config, onChange = onChange,
+                scanStyle = scanStyle, onScanStyleChange = onScanStyleChange,
+                onOpenRules = onOpenRules, onNavigateUp = {},
+            )
         }
     }
 
@@ -48,6 +58,14 @@ class RecognitionSettingsScreenTest {
         screen(onChange = { latest = it })
         compose.onNodeWithText("宽松").performClick()
         assertThat(latest?.barcode).isEqualTo(BarcodeOption.LOOSE)
+    }
+
+    @Test fun pickingTheFrostedScanEffectEmitsIt() {
+        var latest: ScanStyle? = null
+        screen(onScanStyleChange = { latest = it })
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("磨砂"))
+        compose.onNodeWithText("磨砂").performClick()
+        assertThat(latest).isEqualTo(ScanStyle.FROST)
     }
 
     @Test fun rulesLiveOnTheirOwnPage() {
@@ -88,8 +106,14 @@ class RecognitionSettingsScreenTest {
 
     @Test fun resetClearsEverything() {
         var latest: RecognitionConfig? = null
-        screen(config = RecognitionConfig(textEngine = TextEngineOption.LATIN), onChange = { latest = it })
+        var style: ScanStyle? = null
+        screen(
+            config = RecognitionConfig(textEngine = TextEngineOption.LATIN), onChange = { latest = it },
+            scanStyle = ScanStyle.FROST, onScanStyleChange = { style = it },
+        )
+        compose.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("全部恢复默认"))
         compose.onNodeWithText("全部恢复默认").performClick()
         assertThat(latest).isEqualTo(RecognitionConfig())
+        assertThat(style).isEqualTo(ScanStyle.SWEEP)
     }
 }

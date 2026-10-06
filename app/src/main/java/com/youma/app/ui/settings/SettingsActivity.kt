@@ -24,13 +24,19 @@ class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableLightEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setRecognitionConfigContent(SettingsStore(applicationContext)) { config, onChange ->
-            RecognitionSettingsScreen(
-                config = config,
-                onChange = onChange,
-                onOpenRules = { startActivity(Intent(this, RuleSettingsActivity::class.java)) },
-                onNavigateUp = ::finish,
-            )
+        val store = SettingsStore(applicationContext)
+        setRecognitionConfigContent(store) { config, onChange ->
+            val scanStyle by store.scanStyle.collectAsStateWithLifecycle(initialValue = null)
+            scanStyle?.let { style ->
+                RecognitionSettingsScreen(
+                    config = config,
+                    onChange = onChange,
+                    scanStyle = style,
+                    onScanStyleChange = { next -> lifecycleScope.launch { store.setScanStyle(next) } },
+                    onOpenRules = { startActivity(Intent(this, RuleSettingsActivity::class.java)) },
+                    onNavigateUp = ::finish,
+                )
+            }
         }
     }
 }
