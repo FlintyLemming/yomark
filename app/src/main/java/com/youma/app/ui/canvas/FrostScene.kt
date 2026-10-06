@@ -86,20 +86,18 @@ internal fun drawFrostScene(
 ) {
     val origin = look.origin ?: PointF(width / 2f, height / 2f)
     val feather = FrostEffect.FEATHER_DP * dp
-    val edge = FrostEffect.EDGE_DP * dp
-    val radius = time.sinceResult?.let {
-        FrostEffect.holeRadius(
-            it,
-            start = FrostEffect.HOLE_START_DP * dp,
-            end = FrostEffect.endRadius(origin.x, origin.y, width, height, feather),
-        )
-    }
+    val maxEdge = FrostEffect.EDGE_MAX_DP * dp
+    val start = FrostEffect.HOLE_START_DP * dp
+    val end = FrostEffect.endRadius(origin.x, origin.y, width, height, maxEdge + feather)
+    val since = time.sinceResult
+    val radius = since?.let { FrostEffect.holeRadius(it, start, end) }
+    val edge = since?.let { FrostEffect.edgeWidth(it, start, end, FrostEffect.EDGE_DP * dp, maxEdge) } ?: 0f
 
     // 识别中，识别出的块一律不画：换方案重跑时旧结果先退场。散开时它们画进一个离屏图层，只留洞里那部分
     if (radius != null) {
         val layer = canvas.saveLayer(null, null)
         drawDetected()
-        keepInsideHole(canvas, origin, radius, feather, width, height, paints)
+        keepInsideHole(canvas, origin, radius - edge, feather, width, height, paints)
         canvas.restoreToCount(layer)
     }
 
@@ -197,24 +195,26 @@ private fun punchHole(
 }
 
 /**
- * 识别结果只留洞里的部分：洞的边缘上还没有，往里 [feather] 处盖实（FrostEffect.coverage）。
- * 蒙版比图像大出一圈，探出图像边的标签与描边也一样处理。
+ * 识别结果只留洞里的部分：磨砂完全揭开的那一圈（半径 [cleared]）上还没有，往里 [feather] 处盖实
+ * （FrostEffect.coverage）。蒙版比图像大出一圈，探出图像边的标签与描边也一样处理。
  */
 private fun keepInsideHole(
     canvas: Canvas,
     origin: PointF,
-    radius: Float,
+    cleared: Float,
     feather: Float,
     width: Float,
     height: Float,
     paints: FrostPaints,
 ) {
-    if (radius <= 0f) {
+    if (cleared <= 0f) {
         paints.keep.shader = null
         paints.keep.color = Color.TRANSPARENT
     } else {
-        paints.keep.shader = radialMask(origin, radius, inner = max(0f, radius - feather)) { d ->
-            FrostEffect.coverage(d, radius, feather)
+        // 画笔跨帧复用：上一帧可能把它清成了透明，而着色器的颜色还要再乘上画笔自己的不透明度
+        paints.keep.color = Color.BLACK
+        paints.keep.shader = radialMask(origin, cleared, inner = max(0f, cleared - feather)) { d ->
+            FrostEffect.coverage(d, cleared, 0f, feather)
         }
     }
     canvas.drawRect(-width, -height, width * 2f, height * 2f, paints.keep)

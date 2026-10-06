@@ -70,10 +70,16 @@ class FrostSceneDrawTest {
     /** 结果在识别开始后 3 秒到达，散开过了 [since] 毫秒。 */
     private fun revealing(since: Long) = ScanTime(3_000L + since, since)
 
-    /** 散开过程中，洞的半径第一次超过 [d] 的时刻。 */
-    private fun holeReaching(d: Float): Long {
-        val end = FrostEffect.endRadius(origin.x, origin.y, w.toFloat(), h.toFloat(), FrostEffect.FEATHER_DP)
-        return (0L..FrostEffect.REVEAL_MS).first { FrostEffect.holeRadius(it, FrostEffect.HOLE_START_DP, end) >= d }
+    /** 散开过程中，磨砂完全揭开的那一圈（洞的半径减去边缘）第一次超过 [d] 的时刻。 */
+    private fun clearedReaching(d: Float): Long {
+        val end = FrostEffect.endRadius(
+            origin.x, origin.y, w.toFloat(), h.toFloat(), FrostEffect.EDGE_MAX_DP + FrostEffect.FEATHER_DP,
+        )
+        val start = FrostEffect.HOLE_START_DP
+        return (0L..FrostEffect.REVEAL_MS).first {
+            FrostEffect.holeRadius(it, start, end) -
+                FrostEffect.edgeWidth(it, start, end, FrostEffect.EDGE_DP, FrostEffect.EDGE_MAX_DP) >= d
+        }
     }
 
     /** 一小块区域的平均红色分量：光点只有零星几个像素，取平均不怕撞上。 */
@@ -181,9 +187,9 @@ class FrostSceneDrawTest {
 
     @Test
     fun `the reveal opens from the centre and lays blocks down inside the hole first`() {
-        // 洞已经走过中间那块、渐显区也过去了，还没到角上那块
+        // 磨砂已经揭过中间那块、渐显区也过去了，还没到角上那块
         val d = hypot(center.quad.bounds().right - origin.x, center.quad.bounds().bottom - origin.y)
-        val frame = render(revealing(holeReaching(d + FrostEffect.FEATHER_DP + 1f)))
+        val frame = render(revealing(clearedReaching(d + FrostEffect.FEATHER_DP + 1f)))
         assertThat(frame.at(center)).isEqualTo(MaskOptions.SKY_BLUE)
         // 洞里磨砂已揭开，回到原本的白
         assertThat(frame.getPixel(200, 300)).isEqualTo(Color.WHITE)
@@ -195,11 +201,32 @@ class FrostSceneDrawTest {
     }
 
     @Test
+    fun `blocks still land when the same paints carried over from the first frames of the reveal`() {
+        // 画布上的画笔是跨帧复用的。散开刚开始那几帧，磨砂还没有哪里完全揭开，块一律不画；
+        // 之后的帧里块照样要落下来，不能被前几帧留在画笔上的状态吞掉
+        val source = image()
+        val layer = FrostLayer.prepare(source.bitmap, density / scale)
+        val paints = ScanPaints()
+        fun frame(since: Long): Bitmap {
+            val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+            drawScene(
+                Canvas(out), source, plan, RendererRegistry.default(), scale, density, revealing(since), paints,
+                ScanLook.Frost(layer, origin),
+            )
+            return out
+        }
+        frame(0L)
+        frame(20L)
+        val d = hypot(center.quad.bounds().right - origin.x, center.quad.bounds().bottom - origin.y)
+        assertThat(frame(clearedReaching(d + FrostEffect.FEATHER_DP + 1f)).at(center)).isEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    @Test
     fun `a block the hole has just reached is only partly laid down`() {
         val y = center.quad.bounds().centerY()
         val d = hypot(0f, y - origin.y)
-        // 洞的边缘刚过块的中心半个渐显区
-        val pixel = render(revealing(holeReaching(d + FrostEffect.FEATHER_DP / 2f))).getPixel(200, y.toInt())
+        // 磨砂揭开的那一圈刚过块的中心半个渐显区
+        val pixel = render(revealing(clearedReaching(d + FrostEffect.FEATHER_DP / 2f))).getPixel(200, y.toInt())
         assertThat(pixel).isNotEqualTo(Color.WHITE)
         assertThat(pixel).isNotEqualTo(MaskOptions.SKY_BLUE)
     }

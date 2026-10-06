@@ -18,8 +18,9 @@ import kotlin.math.max
  * - 加一层很淡的天蓝 / 淡紫云，与扫光、打码块同一组颜色，随噪声慢慢起伏；云和光点各占一片。
  *
  * 中间那个边转边变形的等待图标见 [MorphingLoader]。结果到了，图标放大淡出，一个洞从它底下散开：
- * 边缘是柔的，像雾从中间化开，边上一圈光点亮起来；洞里是清晰的原图，打码块在洞的边缘后面由半透明
- * 慢慢盖实——用户先看得见底下原来是什么，再看着它被盖住（与扫光的落码同一个用意）。
+ * 越往外越快，与原生一样冲出屏幕边缘时正快，不在角落里磨蹭；边缘随速度变柔（像运动模糊），走得越快
+ * 越像雾从中间晕开，边上一圈光点亮起来。洞里是清晰的原图，打码块在磨砂完全揭开之后才由半透明慢慢
+ * 盖实——用户先看得见底下原来是什么，再看着它被盖住（与扫光的落码同一个用意）。
  *
  * 与扫光一样只是编辑器里的过渡：不改 plan、不进撤销栈、不进导出。时长、轨迹全在这里，画布只管落笔；
  * 长度一律是图像坐标，由调用方按缩放把 dp 反算好了再传进来。
@@ -32,11 +33,14 @@ internal object FrostEffect {
     /** 等待图标入场的时长。 */
     const val LOADER_IN_MS = 420L
 
-    /** 结果到了，等待图标放大淡出的时长。 */
-    const val BURST_MS = 280L
+    /** 结果到了，等待图标放大淡出的时长。洞在它淡得差不多时从它底下冒出来。 */
+    const val BURST_MS = 240L
 
-    /** 结果到了，洞从中心散开、直到最远的角上也盖实的时长。 */
-    const val REVEAL_MS = 1000L
+    /**
+     * 结果到了，洞从中心散开、直到最远的角上也盖实的时长。手机上约 0.44 秒磨砂就整个揭开了，
+     * 剩下一点时间给最远那几块盖实。原生的圆形揭开在屏幕上看得见的部分也就半秒上下。
+     */
+    const val REVEAL_MS = 500L
 
     /** 结果到达以来，多久之后画面整个回到静止画法。洞的轨迹不随识别时长变，这就是个常数。 */
     const val SETTLE_MS = REVEAL_MS
@@ -79,10 +83,16 @@ internal object FrostEffect {
     /** 洞的起始半径（dp）：比等待图标小，刚开始的那几帧藏在图标底下，看不出是凭空冒出来的。 */
     const val HOLE_START_DP = 12f
 
-    /** 洞的边缘柔化的宽度（dp）。原版是一道硬边，像开了一扇圆窗；柔一些才像雾从中间化开。 */
-    const val EDGE_DP = 20f
+    /**
+     * 洞的边缘柔化的宽度（dp）：跟着洞的速度走，等于边缘在 [MOTION_BLUR_MS] 里走过的距离，
+     * 夹在 [EDGE_DP] 与 [EDGE_MAX_DP] 之间。原版是一道硬边，像开了一扇圆窗；跑快了的硬边每帧跳一大截，
+     * 看着一顿一顿的。按速度柔化，起步时边缘清楚，冲出去时晕开，像运动模糊。
+     */
+    const val EDGE_DP = 16f
+    const val EDGE_MAX_DP = 96f
+    const val MOTION_BLUR_MS = 40f
 
-    /** 打码块从洞的边缘开始显现、到完全盖实，洞要走过的距离（dp）。 */
+    /** 打码块从磨砂完全揭开的地方开始显现、到完全盖实，洞要再走过的距离（dp）。 */
     const val FEATHER_DP = 110f
 
     /** 散开时洞的边缘上那圈光点：宽度（dp，边缘内外各这么宽）与亮度。 */
@@ -103,26 +113,41 @@ internal object FrostEffect {
     fun timeSec(sinceScanMs: Long): Float = (sinceScanMs.coerceAtLeast(0L) + TIME_SEED_MS) / 1000f
 
     /**
-     * 洞此刻的半径：从 [start] 长到 [end]，一半匀速、一半先慢后快再慢——
-     * 刚从图标底下冒出来时不突兀，扫过中段干脆，最后几个角上的块从容地盖实。
+     * 洞此刻的半径：从 [start] 长到 [end]，越来越快——一成匀速、九成二次缓入。
+     * 起步慢，刚好藏在正在散开的图标底下；越往外越快，冲出最远的角时正快。
      */
     fun holeRadius(sinceResultMs: Long, start: Float, end: Float): Float {
-        val p = (sinceResultMs.toFloat() / REVEAL_MS).coerceIn(0f, 1f)
-        return start + (end - start) * (0.4f * p + 0.6f * smooth(p))
+        val p = progress(sinceResultMs)
+        return start + (end - start) * (LINEAR * p + (1f - LINEAR) * p * p)
     }
 
-    /** 洞要长到多大，才能连渐显区一起盖过整张图：圆心到最远那个角的距离，再加上渐显区。 */
-    fun endRadius(originX: Float, originY: Float, width: Float, height: Float, feather: Float): Float {
+    /** 洞的边缘此刻在走多快（每毫秒多少长度，与 [start]、[end] 同一口径）：从一开始就一直在加速。 */
+    fun holeSpeed(sinceResultMs: Long, start: Float, end: Float): Float =
+        (end - start) * (LINEAR + 2f * (1f - LINEAR) * progress(sinceResultMs)) / REVEAL_MS
+
+    /** 洞的边缘此刻有多柔：边缘在 [MOTION_BLUR_MS] 里走过的距离，夹在 [min] 与 [max] 之间。 */
+    fun edgeWidth(sinceResultMs: Long, start: Float, end: Float, min: Float, max: Float): Float =
+        (holeSpeed(sinceResultMs, start, end) * MOTION_BLUR_MS).coerceIn(min, max)
+
+    /**
+     * 洞要长到多大：圆心到最远那个角的距离，再加上 [margin]。散开时传入最柔的边缘加渐显区，
+     * 长到这么大时磨砂一点不剩、最远那块也已盖实。
+     */
+    fun endRadius(originX: Float, originY: Float, width: Float, height: Float, margin: Float): Float {
         val dx = max(originX, width - originX)
         val dy = max(originY, height - originY)
-        return hypot(dx, dy) + feather
+        return hypot(dx, dy) + margin
     }
 
     /** 磨砂在离圆心 [d] 处还剩多少：洞外是 1，洞里是 0，边缘 [edge] 宽的一圈里渐变。 */
     fun frost(d: Float, radius: Float, edge: Float): Float = 1f - smooth((radius - d) / edge)
 
-    /** 识别结果在离圆心 [d] 处显现了多少：洞的边缘上还没有，往里 [feather] 处盖实。 */
-    fun coverage(d: Float, radius: Float, feather: Float): Float = smooth((radius - d) / feather)
+    /**
+     * 识别结果在离圆心 [d] 处显现了多少：磨砂完全揭开的地方（洞的边缘往里 [edge]）才开始显现，
+     * 再往里 [feather] 处盖实。底下原来是什么，总是先清清楚楚地露一下。
+     */
+    fun coverage(d: Float, radius: Float, edge: Float, feather: Float): Float =
+        smooth((radius - edge - d) / feather)
 
     /** 洞边那圈光点在离圆心 [d] 处有多亮：正在边缘上最亮，往里往外 [width] 处落到 0。 */
     fun ring(d: Float, radius: Float, width: Float): Float {
@@ -141,6 +166,11 @@ internal object FrostEffect {
     /** 等待图标的不透明度：入场时淡入，结果到了淡出。 */
     fun loaderAlpha(sinceScanMs: Long, sinceResultMs: Long?): Float =
         smooth(entered(sinceScanMs, sinceResultMs)) * (1f - burst(sinceResultMs))
+
+    /** 洞的半径里匀速那部分的占比，其余是二次缓入。 */
+    private const val LINEAR = 0.1f
+
+    private fun progress(sinceResultMs: Long): Float = (sinceResultMs.toFloat() / REVEAL_MS).coerceIn(0f, 1f)
 
     /** 识别了多久：结果到了就停在那一刻。 */
     private fun scannedFor(sinceScanMs: Long, sinceResultMs: Long?): Long =

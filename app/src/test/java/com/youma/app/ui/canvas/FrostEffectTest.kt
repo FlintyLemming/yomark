@@ -6,17 +6,21 @@ import kotlin.math.hypot
 
 class FrostEffectTest {
 
-    // 图像坐标下的尺寸：一张 1000 × 1600 的图，从正中散开；起始半径 12、边缘 20、渐显区 110
+    // 图像坐标下的尺寸：一张 1000 × 1600 的图，从正中散开；起始半径 12、边缘 16..96、渐显区 110
     private val width = 1000f
     private val height = 1600f
     private val ox = 500f
     private val oy = 800f
     private val start = 12f
-    private val edge = 20f
+    private val minEdge = 16f
+    private val maxEdge = 96f
     private val feather = 110f
-    private val end = FrostEffect.endRadius(ox, oy, width, height, feather)
+    private val end = FrostEffect.endRadius(ox, oy, width, height, maxEdge + feather)
 
     private fun radius(ms: Long) = FrostEffect.holeRadius(ms, start, end)
+    private fun edge(ms: Long) = FrostEffect.edgeWidth(ms, start, end, minEdge, maxEdge)
+    private fun frost(d: Float, ms: Long) = FrostEffect.frost(d, radius(ms), edge(ms))
+    private fun coverage(d: Float, ms: Long) = FrostEffect.coverage(d, radius(ms), edge(ms), feather)
 
     /** 图上若干点离圆心的距离：圆心、中段、四个角里最远的那个。 */
     private val distances = listOf(0f, 200f, 500f, 800f, hypot(500f, 800f))
@@ -61,28 +65,58 @@ class FrostEffectTest {
     }
 
     @Test
-    fun `the hole needs to reach the farthest corner plus the fade-in zone`() {
-        assertThat(end).isWithin(1e-3f).of(hypot(500f, 800f) + feather)
+    fun `the hole needs to reach the farthest corner plus the softest edge and the fade-in zone`() {
+        assertThat(end).isWithin(1e-3f).of(hypot(500f, 800f) + maxEdge + feather)
         // 圆心不在正中时，量的是最远的那个角
         assertThat(FrostEffect.endRadius(100f, 200f, width, height, 0f)).isWithin(1e-3f).of(hypot(900f, 1400f))
         assertThat(FrostEffect.endRadius(950f, 1500f, width, height, 0f)).isWithin(1e-3f).of(hypot(950f, 1500f))
     }
 
     @Test
-    fun `the hole grows from under the loader to past the farthest corner, only outwards`() {
+    fun `the hole grows from under the loader past the farthest corner, faster and faster`() {
         assertThat(radius(0L)).isEqualTo(start)
         assertThat(radius(FrostEffect.REVEAL_MS)).isWithin(1e-3f).of(end)
         assertThat(radius(FrostEffect.REVEAL_MS * 3)).isWithin(1e-3f).of(end)
-        var prev = radius(0L)
+        var prevStep = 0f
         for (ms in 10L..FrostEffect.REVEAL_MS step 10L) {
-            val r = radius(ms)
-            assertThat(r).isGreaterThan(prev)
-            prev = r
+            val step = radius(ms) - radius(ms - 10L)
+            assertThat(step).isGreaterThan(prevStep)
+            prevStep = step
         }
-        // 先慢后快再慢：起步与收尾都比中段慢
-        val mid = radius(FrostEffect.REVEAL_MS / 2 + 50) - radius(FrostEffect.REVEAL_MS / 2 - 50)
-        assertThat(radius(100L) - radius(0L)).isLessThan(mid)
-        assertThat(radius(FrostEffect.REVEAL_MS) - radius(FrostEffect.REVEAL_MS - 100)).isLessThan(mid)
+        // 冲出去时比起步快得多，而且一直在加速，没有收尾时的减速
+        assertThat(FrostEffect.holeSpeed(FrostEffect.REVEAL_MS, start, end))
+            .isGreaterThan(10f * FrostEffect.holeSpeed(0L, start, end))
+    }
+
+    @Test
+    fun `on a phone the frost is gone from every corner in under half a second`() {
+        // 412 × 641 dp 的画布上整图适配，一 dp 一个单位
+        val far = hypot(206f, 320.5f)
+        val e = FrostEffect.endRadius(206f, 320.5f, 412f, 641f, FrostEffect.EDGE_MAX_DP + FrostEffect.FEATHER_DP)
+        val s = FrostEffect.HOLE_START_DP
+        fun cleared(ms: Long) = FrostEffect.holeRadius(ms, s, e) -
+            FrostEffect.edgeWidth(ms, s, e, FrostEffect.EDGE_DP, FrostEffect.EDGE_MAX_DP)
+        val gone = (0L..FrostEffect.REVEAL_MS).first { cleared(it) >= far }
+        assertThat(gone).isAtMost(460L)
+        // 洞在图标还没散完时就冒出来了，不留空档
+        val peek = (0L..FrostEffect.REVEAL_MS).first { FrostEffect.holeRadius(it, s, e) >= MorphingLoader.INDICATOR_DP / 2f }
+        assertThat(peek).isLessThan(FrostEffect.BURST_MS / 2)
+    }
+
+    @Test
+    fun `the edge softens as the hole speeds up, within its bounds`() {
+        assertThat(edge(0L)).isEqualTo(minEdge)
+        var prev = edge(0L)
+        for (ms in 10L..FrostEffect.REVEAL_MS step 10L) {
+            val e = edge(ms)
+            assertThat(e).isAtLeast(prev)
+            assertThat(e).isAtMost(maxEdge)
+            prev = e
+        }
+        // 冲出去时边缘正好是它最后这一段在 MOTION_BLUR_MS 里走过的距离（这张图大，夹到了上限）
+        assertThat(edge(FrostEffect.REVEAL_MS)).isEqualTo(maxEdge)
+        val speed = FrostEffect.holeSpeed(FrostEffect.REVEAL_MS / 2, start, end)
+        assertThat(edge(FrostEffect.REVEAL_MS / 2)).isWithin(1e-3f).of((speed * FrostEffect.MOTION_BLUR_MS).coerceIn(minEdge, maxEdge))
     }
 
     @Test
@@ -95,26 +129,26 @@ class FrostEffectTest {
     @Test
     fun `nothing is revealed away from the centre when results arrive, and everything is by the end`() {
         distances.filter { it >= start }.forEach { d ->
-            assertThat(FrostEffect.coverage(d, radius(0L), feather)).isEqualTo(0f)
-            assertThat(FrostEffect.frost(d, radius(0L), edge)).isEqualTo(1f)
+            assertThat(coverage(d, 0L)).isEqualTo(0f)
+            assertThat(frost(d, 0L)).isEqualTo(1f)
         }
         distances.forEach { d ->
-            assertThat(FrostEffect.coverage(d, radius(FrostEffect.REVEAL_MS), feather)).isEqualTo(1f)
-            assertThat(FrostEffect.frost(d, radius(FrostEffect.REVEAL_MS), edge)).isEqualTo(0f)
+            assertThat(coverage(d, FrostEffect.REVEAL_MS)).isEqualTo(1f)
+            assertThat(frost(d, FrostEffect.REVEAL_MS)).isEqualTo(0f)
         }
     }
 
     @Test
     fun `results appear from the centre outwards and never run backwards`() {
-        val mid = radius(FrostEffect.REVEAL_MS / 2)
-        assertThat(FrostEffect.coverage(0f, mid, feather)).isAtLeast(FrostEffect.coverage(300f, mid, feather))
-        assertThat(FrostEffect.coverage(300f, mid, feather)).isAtLeast(FrostEffect.coverage(800f, mid, feather))
+        val mid = FrostEffect.REVEAL_MS * 3 / 4
+        assertThat(coverage(0f, mid)).isAtLeast(coverage(300f, mid))
+        assertThat(coverage(300f, mid)).isAtLeast(coverage(800f, mid))
         distances.forEach { d ->
             var prevCoverage = 0f
             var prevFrost = 1f
-            for (ms in 0L..FrostEffect.REVEAL_MS step 25L) {
-                val c = FrostEffect.coverage(d, radius(ms), feather)
-                val f = FrostEffect.frost(d, radius(ms), edge)
+            for (ms in 0L..FrostEffect.REVEAL_MS step 5L) {
+                val c = coverage(d, ms)
+                val f = frost(d, ms)
                 assertThat(c).isAtLeast(prevCoverage)
                 assertThat(f).isAtMost(prevFrost)
                 prevCoverage = c
@@ -126,22 +160,24 @@ class FrostEffectTest {
     @Test
     fun `the frost clears exactly inside the hole, with a soft edge`() {
         val r = 400f
-        assertThat(FrostEffect.frost(r - edge - 1f, r, edge)).isEqualTo(0f)
-        assertThat(FrostEffect.frost(r, r, edge)).isEqualTo(1f)
-        assertThat(FrostEffect.frost(r + 100f, r, edge)).isEqualTo(1f)
-        val halfway = FrostEffect.frost(r - edge / 2f, r, edge)
+        val e = 20f
+        assertThat(FrostEffect.frost(r - e - 1f, r, e)).isEqualTo(0f)
+        assertThat(FrostEffect.frost(r, r, e)).isEqualTo(1f)
+        assertThat(FrostEffect.frost(r + 100f, r, e)).isEqualTo(1f)
+        val halfway = FrostEffect.frost(r - e / 2f, r, e)
         assertThat(halfway).isGreaterThan(0f)
         assertThat(halfway).isLessThan(1f)
     }
 
     @Test
     fun `the original shows through before a block is covered`() {
-        // 磨砂刚揭开的地方，识别结果还几乎透明：用户先看见底下原来是什么，再看着它被盖住
-        for (ms in 0L..FrostEffect.REVEAL_MS step 25L) {
-            val r = radius(ms)
-            if (r - edge <= 0f) continue
-            assertThat(FrostEffect.frost(r - edge, r, edge)).isEqualTo(0f)
-            assertThat(FrostEffect.coverage(r - edge, r, feather)).isLessThan(0.1f)
+        // 磨砂刚好完全揭开的那一圈上，识别结果还一点没有：用户先看见底下原来是什么，再看着它被盖住
+        for (ms in 0L..FrostEffect.REVEAL_MS step 10L) {
+            val cleared = radius(ms) - edge(ms)
+            if (cleared <= 0f) continue
+            assertThat(frost(cleared, ms)).isEqualTo(0f)
+            assertThat(coverage(cleared, ms)).isEqualTo(0f)
+            assertThat(coverage(cleared - feather / 2f, ms)).isWithin(1e-4f).of(0.5f)
         }
     }
 
@@ -179,7 +215,7 @@ class FrostEffectTest {
         }
         assertThat(FrostEffect.loaderAlpha(scanAt + FrostEffect.BURST_MS, FrostEffect.BURST_MS)).isEqualTo(0f)
         assertThat(FrostEffect.loaderScale(scanAt + FrostEffect.BURST_MS, FrostEffect.BURST_MS)).isWithin(1e-6f).of(1.5f)
-        // 图标比洞先退场：洞散开的这一遍里，大半时间画面上只有洞
+        // 图标比洞先退场：洞散开的这一遍里，后一半画面上只有洞
         assertThat(FrostEffect.BURST_MS).isLessThan(FrostEffect.REVEAL_MS / 2)
     }
 
