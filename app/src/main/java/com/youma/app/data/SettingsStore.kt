@@ -16,6 +16,7 @@ import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.export.PurposeWatermarkStyle
+import com.youma.app.ui.canvas.ScanStyle
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -86,6 +87,18 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_EXPORT_REMINDER] = on }
     }
 
+    /**
+     * 识别动效：扫光或磨砂（见 ScanStyle）。出厂是扫光。
+     *
+     * 同样不放进 RecognitionConfig：它只是识别时画面上的过渡，放进去的话一换样式编辑器就会重跑识别。
+     * 认不出的值退回扫光，理由与 lastStyle 一致。
+     */
+    val scanStyle: Flow<ScanStyle> = store.data.map { it[KEY_SCAN_STYLE].toEnum(ScanStyle.SWEEP) }
+
+    suspend fun setScanStyle(style: ScanStyle) {
+        store.edit { it[KEY_SCAN_STYLE] = style.name }
+    }
+
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -126,6 +139,11 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_STYLE] = raw }
     }
 
+    @VisibleForTesting
+    internal suspend fun writeRawScanStyleForTest(raw: String) {
+        store.edit { it[KEY_SCAN_STYLE] = raw }
+    }
+
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
@@ -134,6 +152,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
+        val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。

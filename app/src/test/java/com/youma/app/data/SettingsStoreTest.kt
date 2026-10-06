@@ -3,6 +3,7 @@ package com.youma.app.data
 import androidx.test.core.app.ApplicationProvider
 import com.youma.app.core.model.MaskStyle
 import com.youma.app.export.PurposeWatermarkStyle
+import com.youma.app.ui.canvas.ScanStyle
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -65,6 +66,21 @@ class SettingsStoreTest {
         assertThat(store.onboardingSeen.first()).isFalse()
         store.markOnboardingSeen()
         assertThat(store.onboardingSeen.first()).isTrue()
+    }
+
+    @Test
+    fun `scan effect defaults to the sweep and remembers the choice`() = runTest {
+        val store = store()
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
+        store.setScanStyle(ScanStyle.FROST)
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.FROST)
+    }
+
+    @Test
+    fun `an unknown stored scan effect falls back to the sweep rather than crashing`() = runTest {
+        val store = store()
+        store.writeRawScanStyleForTest("NOT_AN_EFFECT")
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
     }
 
     @Test

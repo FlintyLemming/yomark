@@ -61,6 +61,7 @@ fun EditorScreen(
     onRedeem: (String) -> Boolean = { false },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
 
@@ -135,6 +136,7 @@ fun EditorScreen(
                     onResize = vm::previewSelectedQuad,
                     onCommitDrag = vm::commitDrag,
                     onDeleteSelected = vm::deleteSelected,
+                    scanStyle = scanStyle,
                 )
                 AnalyzingPill(
                     visible = state.analyzing && state.image != null,

@@ -153,6 +153,9 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons)
     implementation(libs.androidx.exifinterface)
+    // 磨砂动效中间那个边转边变形的等待图标：Material 3 的 LoadingIndicator 只在 1.5 的 alpha 里，
+    // 这里直接用它底下那套稳定的形状库，照着它的七个形状与节奏自己画
+    implementation(libs.androidx.graphics.shapes)
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mlkit.text.recognition)

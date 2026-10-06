@@ -47,14 +47,16 @@ import com.youma.app.engine.RuleState
 import com.youma.app.engine.SemanticOption
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.rules.RuleCatalog
+import com.youma.app.ui.canvas.ScanStyle
 
 /**
- * 识别设置（2026-09-04 增补设计 §5）。一级页只放四根轴，逐条的规则收进二级页 [RuleSettingsScreen]。
+ * 识别设置（2026-09-04 增补设计 §5）。一级页放四根轴和识别动效，逐条的规则收进二级页 [RuleSettingsScreen]。
  *
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
+ * 最后一项「识别动效」只管识别时画面上的过渡，换它不重跑。
  *
  * 两页各是一个 Activity（[SettingsActivity]、[RuleSettingsActivity]），这里不拦系统返回：
  * 返回由 Activity 自己 finish，预见式返回的跨 Activity 动画才放得出来。
@@ -63,6 +65,8 @@ import com.youma.app.rules.RuleCatalog
 fun RecognitionSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
+    scanStyle: ScanStyle,
+    onScanStyleChange: (ScanStyle) -> Unit,
     onOpenRules: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -116,6 +120,19 @@ fun RecognitionSettingsScreen(
             }
 
             item {
+                AxisSection(
+                    title = "识别动效",
+                    note = "识别时画面上的效果，不影响识别结果。" +
+                        "扫光：一束光自上而下扫过，打码块跟在光后落下。" +
+                        "磨砂：整页模糊、闪着光点，识别完从中心散开。",
+                    options = ScanStyle.entries,
+                    selected = scanStyle,
+                    label = ::scanStyleLabel,
+                    onSelect = onScanStyleChange,
+                )
+            }
+
+            item {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 val changed = config.ruleOverrides.size
                 ListItem(
@@ -135,7 +152,10 @@ fun RecognitionSettingsScreen(
                 ListItem(
                     headlineContent = { Text("全部恢复默认") },
                     supportingContent = { Text("识别设置和规则全部恢复出厂值") },
-                    modifier = Modifier.clickable { onChange(RecognitionConfig()) },
+                    modifier = Modifier.clickable {
+                        onChange(RecognitionConfig())
+                        onScanStyleChange(ScanStyle.SWEEP)
+                    },
                 )
             }
         }
@@ -301,6 +321,11 @@ private fun faceLabel(option: FaceOption) = when (option) {
 private fun semanticLabel(option: SemanticOption) = when (option) {
     SemanticOption.GEMINI_NANO -> "Gemini Nano"
     SemanticOption.OFF -> "关闭"
+}
+
+private fun scanStyleLabel(style: ScanStyle) = when (style) {
+    ScanStyle.SWEEP -> "扫光"
+    ScanStyle.FROST -> "磨砂"
 }
 
 private fun ruleStateLabel(state: RuleState) = when (state) {
