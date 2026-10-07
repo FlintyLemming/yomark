@@ -23,8 +23,7 @@ class RegionMaskItemRulesTest {
     private val face = region("face-0-0", SensitiveKind.FACE, DetectorSource.FACE)
     private val barcode = region("barcode-0", SensitiveKind.BARCODE, DetectorSource.BARCODE)
 
-    private fun planOf(vararg c: Candidate) =
-        MaskPlan(MaskPlanFactory.itemsFrom(c.toList()), MaskStyle.SOLID, MaskOptions())
+    private fun planOf(vararg c: Candidate) = MaskPlan(MaskPlanFactory.itemsFrom(c.toList()))
 
     @Test
     fun `faces and barcodes enter the editor already masked`() {
@@ -37,17 +36,17 @@ class RegionMaskItemRulesTest {
     @Test
     fun `tapping a face toggles between masked and outlined, both ways`() {
         val plan = planOf(face)
-        val once = plan.toggle(face.id)
+        val once = plan.toggle(face.id, MaskLook())
         assertThat(once.find(face.id)!!.state).isEqualTo(MaskState.OUTLINED)
-        assertThat(once.toggle(face.id).find(face.id)!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(once.toggle(face.id, MaskLook()).find(face.id)!!.state).isEqualTo(MaskState.MASKED)
     }
 
     @Test
     fun `tapping a barcode toggles between masked and outlined, both ways`() {
         val plan = planOf(barcode)
-        val once = plan.toggle(barcode.id)
+        val once = plan.toggle(barcode.id, MaskLook())
         assertThat(once.find(barcode.id)!!.state).isEqualTo(MaskState.OUTLINED)
-        assertThat(once.toggle(barcode.id).find(barcode.id)!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(once.toggle(barcode.id, MaskLook()).find(barcode.id)!!.state).isEqualTo(MaskState.MASKED)
     }
 
     @Test
@@ -59,7 +58,7 @@ class RegionMaskItemRulesTest {
 
     @Test
     fun `an outlined face still cannot be deleted and still blocks export`() {
-        val plan = planOf(face).toggle(face.id)
+        val plan = planOf(face).toggle(face.id, MaskLook())
         assertThat(plan.pendingCount).isEqualTo(1)
         assertThat(plan.remove(face.id).items).hasSize(1)
     }

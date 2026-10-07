@@ -7,6 +7,7 @@ import android.net.Uri
 import com.yomark.app.core.image.SourceImageLoader
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
+import com.yomark.app.render.MaskOrder
 import com.yomark.app.render.RendererRegistry
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -62,14 +63,15 @@ class Exporter(
             val factor = 1f / (request.analysisScale * decoded.downsampleFactor)
 
             // 渲染器里的绝对像素常数是原图口径；导出图可能因 32MP 上限降过一次，按它折算。
-            val options = request.plan.options.copy(renderScale = 1f / decoded.downsampleFactor)
+            val renderScale = 1f / decoded.downsampleFactor
 
+            // 每块码按它自己的样式画（spec §7.5 修订），顺序与预览一致（见 MaskOrder）
             val maskedBounds = ArrayList<RectF>()
-            request.plan.items
-                .filter { it.state == MaskState.MASKED }
+            MaskOrder.forDrawing(request.plan.items.filter { it.state == MaskState.MASKED })
                 .forEach { item ->
                     val quad = item.quad.scaled(factor)
-                    registry[request.plan.style].render(canvas, bitmap, quad, options)
+                    val options = item.look.options.copy(renderScale = renderScale)
+                    registry[item.look.style].render(canvas, bitmap, quad, options)
                     maskedBounds += quad.bounds()
                 }
 

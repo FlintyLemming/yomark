@@ -11,7 +11,6 @@ import com.yomark.app.core.model.MaskItem
 import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKind
 import com.yomark.app.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
@@ -39,7 +38,7 @@ class ScanSceneDrawTest {
     private val top = block("top", 100f, DetectorSource.RULE)
     private val manual = block("manual", 450f, DetectorSource.MANUAL)
     private val bottom = block("bottom", 800f, DetectorSource.RULE)
-    private val plan = MaskPlan(listOf(top, manual, bottom), MaskStyle.SOLID, MaskOptions())
+    private val plan = MaskPlan(listOf(top, manual, bottom))
 
     private fun block(id: String, y: Float, source: DetectorSource) = MaskItem(
         id, Quad.fromRect(RectF(10f, y, 110f, y + 30f)),

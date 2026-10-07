@@ -15,7 +15,7 @@ import com.yomark.app.core.image.ImageIntake
 import com.yomark.app.core.image.SourceImageLoader
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
-import com.yomark.app.core.model.MaskOptions
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
 import com.yomark.app.core.model.MaskStyle
@@ -74,9 +74,8 @@ class IrreversibilityTest {
                     rect.right * image.scale, rect.bottom * image.scale,
                 )),
                 SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED,
+                MaskLook(style),
             )),
-            style = style,
-            options = MaskOptions(),
         )
 
         var captured: Bitmap? = null

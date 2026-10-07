@@ -50,6 +50,12 @@ class MaskStyleInfoTest {
         assertThat(MaskStyleInfo.note(MaskStyle.SOLID)).isNull()
     }
 
+    @Test fun `the style bar offers every style once, irreversible ones first`() {
+        assertThat(MaskStyleInfo.ORDER).containsExactlyElementsIn(MaskStyle.entries)
+        assertThat(MaskStyleInfo.ORDER.take(3).map { MaskStyleInfo.safety(it) })
+            .containsExactly(MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE)
+    }
+
     @Test fun `the registry implements every style`() {
         assertThat(RendererRegistry.default().implemented()).containsExactlyElementsIn(MaskStyle.entries)
     }

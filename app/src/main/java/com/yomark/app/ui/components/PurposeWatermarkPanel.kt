@@ -13,7 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -25,9 +24,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.yomark.app.export.PurposeWatermarkStyle
 import kotlin.math.roundToInt
@@ -119,41 +115,6 @@ fun PurposeWatermarkPanel(
     }
 }
 
-@Composable
-private fun LabeledRow(label: String, content: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(LABEL_WIDTH))
-        content()
-    }
-}
-
-@Composable
-private fun SliderRow(
-    label: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    valueText: String,
-    onChange: (Float) -> Unit,
-    steps: Int = 0,
-) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(LABEL_WIDTH))
-        Slider(
-            value = value,
-            onValueChange = onChange,
-            valueRange = range,
-            steps = steps,
-            modifier = Modifier.weight(1f).semantics { contentDescription = label },
-        )
-        Text(
-            valueText,
-            style = MaterialTheme.typography.labelLarge,
-            textAlign = TextAlign.End,
-            modifier = Modifier.width(VALUE_WIDTH),
-        )
-    }
-}
-
 private fun densityText(density: Float) = when {
     density < 0.8f -> "稀疏"
     density <= 1.25f -> "适中"
@@ -161,8 +122,6 @@ private fun densityText(density: Float) = when {
 }
 
 private const val ANGLE_STEP = 15f
-private val LABEL_WIDTH = 72.dp
-private val VALUE_WIDTH = 48.dp
 
 private val COLOR_NAMES = PurposeWatermarkStyle.PALETTE.zip(
     listOf("黑色", "灰色", "白色", "红色", "蓝色", "绿色")

@@ -10,8 +10,11 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
@@ -19,16 +22,24 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Colorize
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +54,9 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yomark.app.core.model.MaskLook
+import com.yomark.app.core.model.MaskState
+import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.render.RendererRegistry
 import com.yomark.app.ui.canvas.ImageCanvas
 import com.yomark.app.ui.canvas.ScanEffect
@@ -51,6 +65,9 @@ import com.yomark.app.ui.components.EditorTopBar
 import com.yomark.app.ui.components.PaywallDialog
 import com.yomark.app.ui.components.PendingExportDialog
 import com.yomark.app.ui.components.PurposeWatermarkPanel
+import com.yomark.app.ui.components.StyleBarActions
+import com.yomark.app.ui.components.StyleBarModel
+import com.yomark.app.ui.components.eraseDegradeNote
 
 @Composable
 fun EditorScreen(
@@ -64,6 +81,7 @@ fun EditorScreen(
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
+    val styleActions = remember(vm) { ViewModelStyleActions(vm) }
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -137,12 +155,22 @@ fun EditorScreen(
                     onDeleteSelected = vm::deleteSelected,
                     scanStyle = scanStyle,
                 )
-                AnalyzingPill(
-                    visible = state.analyzing && state.image != null,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-                )
+                Column(
+                    Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    AnalyzingPill(visible = state.analyzing && state.image != null)
+                    ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
+                }
             }
             val batch = state.batch
+            // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
+            BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)
+            BackHandler(
+                enabled = state.colorPick == null && state.stylePanelOpen && !state.purposeSheetVisible,
+                onBack = vm::dismissStylePanel,
+            )
             if (state.purposeSheetVisible) {
                 // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
                 BackHandler(onBack = vm::dismissPurposeSheet)
@@ -157,9 +185,8 @@ fun EditorScreen(
                     modifier = Modifier.imePadding(),
                 )
             } else EditorBottomBar(
-                style = state.plan.style,
-                degradeNote = state.degradeNote,
-                onStyleChange = vm::setStyle,
+                styleBar = styleBarModel(state),
+                styleActions = styleActions,
                 onExport = {
                     if (batch != null) vm.exportBatch() else vm.requestExport()
                 },
@@ -169,6 +196,64 @@ fun EditorScreen(
                 aiReview = state.aiReview,
                 onAiReview = vm::runAiReview,
             )
+        }
+    }
+}
+
+/**
+ * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、「应用到全部」能改几处、抹除降级了几处。
+ * 降级要逐块采样，只在样式栏停在抹除上时才数。
+ */
+@Composable
+private fun styleBarModel(state: EditorUiState): StyleBarModel {
+    val look = state.barLook
+    val degradeNote = remember(state.image, state.plan, look.style) {
+        if (look.style == MaskStyle.ERASE) eraseDegradeNote(state.image, state.plan) else null
+    }
+    return StyleBarModel(
+        look = look,
+        panelOpen = state.stylePanelOpen,
+        editingSelection = state.selectedItem != null,
+        colorPick = state.colorPick,
+        applicable = state.plan.items.count { it.state == MaskState.MASKED && it.look != look },
+        degradeNote = degradeNote,
+    )
+}
+
+/** 样式栏的动作都交给 ViewModel。 */
+private class ViewModelStyleActions(private val vm: EditorViewModel) : StyleBarActions {
+    override fun onStyleClick(style: MaskStyle) = vm.onStyleChipClick(style)
+    override fun onLookChange(look: MaskLook, inProgress: Boolean) = vm.editLook(look, inProgress)
+    override fun onLookChangeFinished() = vm.finishLookEdit()
+    override fun onReset() = vm.resetLookOptions()
+    override fun onApplyToAll() = vm.applyLookToAll()
+    override fun onCollapse() = vm.dismissStylePanel()
+    override fun onPickColor(target: ColorTarget?) =
+        if (target == null) vm.cancelColorPick() else vm.startColorPick(target)
+}
+
+/**
+ * 吸管在等着取色时浮在画布顶上的提示：点图上哪儿就取哪儿的颜色。右边一个「取消」。
+ * 取的是原图的颜色，不是已经打了码的颜色——想让色块和底色融成一片，要的正是底下的颜色。
+ */
+@Composable
+private fun ColorPickHint(visible: Boolean, onCancel: () -> Unit) {
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            shadowElevation = 3.dp,
+        ) {
+            Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Colorize, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("点一下图片，取那里的颜色", style = MaterialTheme.typography.labelLarge)
+                TextButton(
+                    onClick = onCancel,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.inversePrimary),
+                ) { Text("取消") }
+            }
         }
     }
 }

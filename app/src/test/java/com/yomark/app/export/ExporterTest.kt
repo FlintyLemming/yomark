@@ -10,6 +10,7 @@ import androidx.exifinterface.media.ExifInterface
 import com.yomark.app.core.geometry.Quad
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
@@ -70,7 +71,7 @@ class ExporterTest {
         return f
     }
 
-    private fun planWith(vararg items: MaskItem) = MaskPlan(items.toList(), MaskStyle.SOLID, MaskOptions())
+    private fun planWith(vararg items: MaskItem) = MaskPlan(items.toList())
 
     private fun maskedItem(l: Float, t: Float, r: Float, b: Float, state: MaskState = MaskState.MASKED) =
         MaskItem("i-$l", Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL, state)
@@ -103,6 +104,38 @@ class ExporterTest {
         assertThat(bmp.getPixel(600, 600)).isEqualTo(MaskOptions.SKY_BLUE)
         assertThat(bmp.getPixel(300, 300)).isNotEqualTo(MaskOptions.SKY_BLUE)
         assertThat(bmp.getPixel(900, 900)).isNotEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    @Test
+    fun `each mask is drawn with its own look`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("looks.jpg", 400, 400, png = true)
+        val red = maskedItem(20f, 220f, 120f, 320f).copy(
+            candidateId = "red", look = MaskLook(MaskStyle.SOLID, MaskOptions(solidColor = Color.RED)),
+        )
+        val sky = maskedItem(220f, 220f, 320f, 320f).copy(candidateId = "sky")
+        exporter(sink).export(ExportRequest(src, "image/png", planWith(red, sky), 1f, false))
+        assertThat(sink.bitmap!!.getPixel(70, 270)).isEqualTo(Color.RED)
+        assertThat(sink.bitmap!!.getPixel(270, 270)).isEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    /**
+     * 读像素的样式（抹除）画在直接上色的样式之前，与预览同一个顺序（MaskOrder）：
+     * 抹除的采样环要是先读到隔壁已经画上去的色块，导出就会降级成色块，而预览读的是原图、不降级。
+     */
+    @Test
+    fun `erase next to a solid block samples the original background, as the preview does`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("erase.png", 400, 400, png = true)        // 下半部分是白底
+        // 两块上下紧挨着：抹除的采样环会伸进下面那块色块里
+        val erase = maskedItem(100f, 250f, 300f, 280f).copy(
+            candidateId = "erase", look = MaskLook(MaskStyle.ERASE),
+        )
+        val solid = maskedItem(100f, 282f, 300f, 330f).copy(candidateId = "solid")
+        exporter(sink).export(ExportRequest(src, "image/png", planWith(solid, erase), 1f, false))
+        // 抹除取到的是白底，没有降级成天蓝色块
+        assertThat(sink.bitmap!!.getPixel(200, 265)).isEqualTo(Color.WHITE)
+        assertThat(sink.bitmap!!.getPixel(200, 300)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test

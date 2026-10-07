@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.engine.BarcodeOption
 import com.yomark.app.engine.FaceOption
@@ -29,7 +30,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  *
  * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。
  * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
- * MaskPlan.style 是全局单值，所以样式只需要存一个枚举名。
+ * 编辑器的画笔（下一次打码用的样式）存样式的枚举名加各样式的参数；每块码自己的样式只活在 MaskPlan 里。
  */
 class SettingsStore internal constructor(private val store: DataStore<Preferences>) {
 
@@ -44,6 +45,48 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
     suspend fun setLastStyle(style: MaskStyle) {
         store.edit { it[KEY_STYLE] = style.name }
+    }
+
+    /**
+     * 画笔里各样式的参数：色块颜色、马赛克粗细、模糊强度、马克笔颜色与浓淡、表情与它的底色和排法。
+     * 与 lastStyle 一样是编辑器里记住的偏好，不是设置页上的项，「恢复默认设置」不动它。
+     *
+     * 读回来一律 normalized()：手改过的或以后改了范围的旧值收回范围内，色块不会变成半透明的，
+     * 马克笔也不会变成不透明的。
+     */
+    val maskOptions: Flow<MaskOptions> = store.data.map { prefs ->
+        val fallback = MaskOptions()
+        MaskOptions(
+            solidColor = prefs[KEY_SOLID_COLOR] ?: fallback.solidColor,
+            pixelBlockDivisor = prefs[KEY_PIXEL_DIVISOR] ?: fallback.pixelBlockDivisor,
+            blurRadiusRatio = prefs[KEY_BLUR_RATIO] ?: fallback.blurRadiusRatio,
+            markerColor = prefs[KEY_MARKER_COLOR] ?: fallback.markerColor,
+            emoji = prefs[KEY_EMOJI] ?: fallback.emoji,
+            emojiBackground = prefs[KEY_EMOJI_BACKGROUND] ?: fallback.emojiBackground,
+            emojiTiled = prefs[KEY_EMOJI_TILED] ?: fallback.emojiTiled,
+        ).normalized()
+    }
+
+    suspend fun setMaskOptions(options: MaskOptions) {
+        val o = options.normalized()
+        store.edit {
+            it[KEY_SOLID_COLOR] = o.solidColor
+            it[KEY_PIXEL_DIVISOR] = o.pixelBlockDivisor
+            it[KEY_BLUR_RATIO] = o.blurRadiusRatio
+            it[KEY_MARKER_COLOR] = o.markerColor
+            it[KEY_EMOJI] = o.emoji
+            it[KEY_EMOJI_BACKGROUND] = o.emojiBackground
+            it[KEY_EMOJI_TILED] = o.emojiTiled
+        }
+    }
+
+    @VisibleForTesting
+    internal suspend fun writeRawMaskOptionsForTest(markerColor: Int, pixelDivisor: Int, solidColor: Int) {
+        store.edit {
+            it[KEY_MARKER_COLOR] = markerColor
+            it[KEY_PIXEL_DIVISOR] = pixelDivisor
+            it[KEY_SOLID_COLOR] = solidColor
+        }
     }
 
     val onboardingSeen: Flow<Boolean> = store.data.map { it[KEY_ONBOARDING] ?: false }
@@ -206,6 +249,13 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
+        val KEY_SOLID_COLOR = intPreferencesKey("mask_solid_color")
+        val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor")
+        val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio")
+        val KEY_MARKER_COLOR = intPreferencesKey("mask_marker_color")
+        val KEY_EMOJI = stringPreferencesKey("mask_emoji")
+        val KEY_EMOJI_BACKGROUND = intPreferencesKey("mask_emoji_background")
+        val KEY_EMOJI_TILED = booleanPreferencesKey("mask_emoji_tiled")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
         val KEY_PURPOSE_COLOR = intPreferencesKey("purpose_watermark_color")
         val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")

@@ -33,8 +33,8 @@ import kotlinx.coroutines.launch
  * 编辑器：从首页选图进来（intent.data），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
  *
  * 返回就是 finish：回到首页，或回到分享它的那个应用。系统返回不拦（不常驻 BackHandler），
- * 预见式返回的跨 Activity 动画才放得出来。唯一的例外是用途水印面板开着的时候：
- * 那时的 BackHandler 只随面板存在，返回先收面板。左上角的向上按钮按 Android 的导航约定走：
+ * 预见式返回的跨 Activity 动画才放得出来。例外是用途水印面板、样式面板开着，或吸管正等着取色的时候：
+ * 那时的 BackHandler 只随它们存在，返回先收起它们。左上角的向上按钮按 Android 的导航约定走：
  * 从别的应用分享进来时，向上回到本应用自己的首页，而不是回到别人的应用里。
  */
 class EditorActivity : ComponentActivity() {

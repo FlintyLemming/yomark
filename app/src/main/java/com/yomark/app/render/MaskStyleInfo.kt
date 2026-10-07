@@ -12,6 +12,12 @@ enum class MaskSafety { IRREVERSIBLE, COSMETIC, ANNOTATION_ONLY }
 
 object MaskStyleInfo {
 
+    /** 样式栏上的顺序：不可还原的三种排前面，外观优先的与只做标记的排后面（与 README 的样式表一致）。 */
+    val ORDER: List<MaskStyle> = listOf(
+        MaskStyle.SOLID, MaskStyle.EMOJI, MaskStyle.ERASE,
+        MaskStyle.PIXELATE, MaskStyle.BLUR, MaskStyle.MARKER,
+    )
+
     fun label(style: MaskStyle): String = when (style) {
         MaskStyle.SOLID -> "色块"
         MaskStyle.PIXELATE -> "马赛克"

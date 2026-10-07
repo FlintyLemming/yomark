@@ -127,7 +127,11 @@ class ReadmeScreenshots {
     @Test fun styles() {
         val vm = openSample()
         MaskStyle.entries.filter { it != MaskStyle.SOLID }.forEach { style ->
-            compose.runOnUiThread { vm.setStyle(style) }
+            // 样式只管之后的打码，对照图要整张图都换成这种：换了再「应用到全部」
+            compose.runOnUiThread {
+                vm.setStyle(style)
+                vm.applyLookToAll()
+            }
             settle()
             shoot("editor-${style.name.lowercase()}")
         }

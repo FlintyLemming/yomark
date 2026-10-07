@@ -18,7 +18,6 @@ import com.yomark.app.core.model.MaskItem
 import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKind
 import com.yomark.app.export.ExportOutcome
 import com.yomark.app.export.ExportRequest
@@ -71,8 +70,6 @@ class EndToEndManualRedactionTest {
                     SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
                 )
             ),
-            style = MaskStyle.SOLID,
-            options = MaskOptions(),
         )
 
         // 4. 导出

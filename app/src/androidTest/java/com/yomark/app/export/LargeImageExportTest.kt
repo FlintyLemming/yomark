@@ -12,10 +12,8 @@ import com.yomark.app.core.geometry.Quad
 import com.yomark.app.core.image.SourceImageLoader
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
-import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKind
 import com.yomark.app.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
@@ -77,8 +75,6 @@ class LargeImageExportTest {
                     SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
                 )
             ),
-            style = MaskStyle.SOLID,
-            options = MaskOptions(),
         )
 
         val outcome = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink)

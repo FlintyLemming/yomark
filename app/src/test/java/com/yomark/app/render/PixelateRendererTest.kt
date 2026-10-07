@@ -95,6 +95,26 @@ class PixelateRendererTest {
         renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(-50f, -50f, 60f, 60f)), MaskOptions())
     }
 
+    /**
+     * 往粗调时下限跟着抬：截图上的文字行短边多半不到 96px，出厂时起作用的一直是 12px 下限，
+     * 只放大比例的话，面板上的「颗粒」在文字上拖不出任何变化。
+     */
+    @Test
+    fun `a coarser setting raises the floor too, so text lines get bigger blocks`() {
+        val line = Quad.fromRect(RectF(0f, 0f, 400f, 40f))
+        assertThat(renderer.blockSizeFor(line, divisor = 8)).isWithin(0.1f).of(12f)
+        assertThat(renderer.blockSizeFor(line, divisor = 4)).isWithin(0.1f).of(24f)
+        assertThat(renderer.blockSizeFor(line, divisor = 3)).isWithin(0.1f).of(32f)
+        assertThat(renderer.willFallBack(line, divisor = 3)).isFalse()
+    }
+
+    @Test
+    fun `the factory setting keeps the original 12px floor`() {
+        val q = Quad.fromRect(RectF(0f, 0f, 200f, 40f))
+        assertThat(renderer.blockSizeFor(q, divisor = MaskOptions.FINEST_PIXEL_DIVISOR))
+            .isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
+    }
+
     @Test
     fun `a larger divisor makes smaller blocks but never below the floor`() {
         val q = Quad.fromRect(RectF(0f, 0f, 400f, 400f))

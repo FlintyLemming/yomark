@@ -56,12 +56,11 @@ import com.yomark.app.core.geometry.Quad
 import com.yomark.app.core.image.SourceImage
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
-import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKindLabels
 import com.yomark.app.export.PurposeWatermarkDrawer
+import com.yomark.app.render.MaskOrder
 import com.yomark.app.render.RendererRegistry
 import com.yomark.app.ui.EditorUiState
 import kotlinx.coroutines.Dispatchers
@@ -559,16 +558,12 @@ internal fun drawScene(
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
-    // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
-    // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
-    val options = plan.options.copy(renderScale = image.scale)
-
-    // 面积大的先画，小的盖在上面 —— 与 GestureRules.hitTest 的「取最小」互为对应
-    val sorted = plan.items.sortedByDescending { it.quad.area() }
+    // 读像素的样式先画、直接上色的后画，同一组里大的先画、小的盖在上面——与导出同一个顺序（见 MaskOrder）
+    val sorted = MaskOrder.forDrawing(plan.items)
     // 标签按整张 plan 一起摆：识别中/落码时打码块分两批画，标签之间也得互相避让
     val labels = layoutKindLabels(sorted, image, scale)
     if (time == null) {
-        drawItems(canvas, sorted, plan.style, image, options, registry, scale, labels)
+        drawItems(canvas, sorted, image, registry, scale, labels)
         return
     }
 
@@ -577,8 +572,8 @@ internal fun drawScene(
         val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
         drawFrostScene(
             canvas, image.width.toFloat(), image.height.toFloat(), dp, time, look, paints.frost,
-            drawDetected = { drawItems(canvas, detected, plan.style, image, options, registry, scale, labels) },
-            drawManual = { drawItems(canvas, manual, plan.style, image, options, registry, scale, labels) },
+            drawDetected = { drawItems(canvas, detected, image, registry, scale, labels) },
+            drawManual = { drawItems(canvas, manual, image, registry, scale, labels) },
         )
         return
     }
@@ -599,7 +594,7 @@ internal fun drawScene(
     // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
     if (front != null) {
         val layer = canvas.saveLayer(null, null)
-        drawItems(canvas, detected, plan.style, image, options, registry, scale, labels)
+        drawItems(canvas, detected, image, registry, scale, labels)
         keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
         canvas.restoreToCount(layer)
         drawLight(canvas, light, front, strength = 1f, paints)
@@ -613,22 +608,26 @@ internal fun drawScene(
         )
     }
     // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
-    drawItems(canvas, manual, plan.style, image, options, registry, scale, labels)
+    drawItems(canvas, manual, image, registry, scale, labels)
 }
 
-/** 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。 */
+/**
+ * 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。
+ * 每块码按它自己的样式画；[items] 已经按 MaskOrder 排好了。
+ */
 private fun drawItems(
     canvas: android.graphics.Canvas,
     items: List<MaskItem>,
-    style: MaskStyle,
     image: SourceImage,
-    options: MaskOptions,
     registry: RendererRegistry,
     scale: Float,
     labels: Map<String, RectF>,
 ) {
     items.filter { it.state == MaskState.MASKED }.forEach {
-        registry[style].render(canvas, image.bitmap, it.quad, options)
+        // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
+        // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
+        val options = it.look.options.copy(renderScale = image.scale)
+        registry[it.look.style].render(canvas, image.bitmap, it.quad, options)
     }
     items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
         canvas.drawPath(item.quad.toPath(), outlinePaint(scale))

@@ -5,6 +5,7 @@ import android.net.Uri
 import com.yomark.app.core.geometry.Quad
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
@@ -28,8 +29,6 @@ class BatchSessionTest {
             MaskItem("p$it", Quad.fromRect(RectF(0f, 0f, 10f, 10f)),
                 SensitiveKind.URL, DetectorSource.RULE, MaskState.OUTLINED)
         },
-        style = MaskStyle.SOLID,
-        options = MaskOptions(),
     )
 
     @Test fun `total is the number of items`() {
@@ -73,6 +72,13 @@ class BatchSessionTest {
 
     @Test fun `maskAllEverywhere clears pending on every stored plan`() {
         val s = session(2).withPlan(planWithPending(2)).advance().withPlan(planWithPending(3))
-        assertThat(s.maskAllEverywhere().totalPending).isEqualTo(0)
+        assertThat(s.maskAllEverywhere(MaskLook()).totalPending).isEqualTo(0)
+    }
+
+    @Test fun `maskAllEverywhere masks with the given look on every image`() {
+        val look = MaskLook(MaskStyle.EMOJI, MaskOptions(emoji = "🐱"))
+        val s = session(2).withPlan(planWithPending(1)).advance().withPlan(planWithPending(2))
+        val looks = s.maskAllEverywhere(look).items.flatMap { it.plan!!.items }.map { it.look }
+        assertThat(looks).containsExactly(look, look, look)
     }
 }
