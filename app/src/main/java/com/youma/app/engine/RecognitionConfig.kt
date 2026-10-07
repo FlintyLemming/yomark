@@ -7,16 +7,19 @@ package com.youma.app.engine
 enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
 
 /**
- * 条码策略。
+ * 条码的识别模式。认出来之后打码、仅圈出还是干脆不认，由 [RecognitionConfig.barcodeState] 管。
  *
  * LOOSE 连解不出内容的疑似条码也报（`enableAllPotentialBarcodes`），倾斜的收款码不会被
  * 静默丢掉（STRICT 在自造 36 张评测图里丢 6 张）。代价是布料印花、格纹这类有规律纹理
  * 会被判成疑似条码。彩色照片在像素上就筛掉了（`TwoInks`：不是两种墨色印出来的），剩下的只圈不打码。
+ *
+ * 声明顺序就是设置页上的排列顺序，出厂项排第一；持久化存的是名字，调换顺序不影响老安装。
+ * 原先还有一个 OFF，2026-10-07 起「关」挪到了 barcodeState，老安装存着的 OFF 由 SettingsStore 迁过去。
  */
-/** 声明顺序就是设置页上的排列顺序，出厂项排第一；持久化存的是名字，调换顺序不影响老安装。 */
-enum class BarcodeOption { STRICT, LOOSE, OFF }
+enum class BarcodeOption { STRICT, LOOSE }
 
-enum class FaceOption { FAST, ACCURATE, OFF }
+/** 人脸的识别模式。打不打码、关不关由 [RecognitionConfig.faceState] 管；OFF 的迁移同 [BarcodeOption]。 */
+enum class FaceOption { FAST, ACCURATE }
 
 /**
  * 语义判定（设置页上叫「AI 复查」）：让端侧大模型把整页文字再看一遍（spec §14 的 Gemini Nano 接口位）。
@@ -26,7 +29,10 @@ enum class FaceOption { FAST, ACCURATE, OFF }
  */
 enum class SemanticOption { GEMINI_NANO, OFF }
 
-/** 一条规则的三态。OFF 的规则根本不进引擎，另两态决定候选的初始 MaskState。 */
+/**
+ * 一条规则的三态。OFF 的规则根本不进引擎，另两态决定候选的初始 MaskState。
+ * 人脸、条码用的也是这三态（[RecognitionConfig.faceState]、[RecognitionConfig.barcodeState]）。
+ */
 enum class RuleState { OFF, OUTLINED, MASKED }
 
 /**
@@ -43,7 +49,14 @@ data class RecognitionConfig(
     val textEngine: TextEngineOption = TextEngineOption.PADDLE,
     /** 出厂是 STRICT（2026-10-04 起）：不误圈花纹，代价是歪斜、模糊的码可能漏掉。 */
     val barcode: BarcodeOption = BarcodeOption.STRICT,
+    /**
+     * 认出来的条码怎么处理，和文字规则同样的三态。OFF 时条码检测根本不跑。
+     * MASKED 只管解得出内容的那些：解不出的疑似条码（LOOSE 才有）无论如何只圈出。
+     */
+    val barcodeState: RuleState = RuleState.MASKED,
     val face: FaceOption = FaceOption.FAST,
+    /** 认出来的人脸怎么处理。OFF 时人脸检测根本不跑。 */
+    val faceState: RuleState = RuleState.MASKED,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
      * **只存与出厂默认不同的项。** 存全表的话，出厂默认改了之后老安装会读到

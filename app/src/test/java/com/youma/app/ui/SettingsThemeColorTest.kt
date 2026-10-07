@@ -12,16 +12,15 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
-import com.youma.app.engine.RecognitionConfig
 import com.youma.app.ui.canvas.ScanStyle
-import com.youma.app.ui.settings.RecognitionSettingsScreen
+import com.youma.app.ui.settings.AppearanceSettingsScreen
 import com.youma.app.ui.theme.ThemeColor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** 设置页最底下的主题色：跟随系统是一个选项，后面是预设色块。 */
+/** 设置「外观」页的主题色：跟随系统是一个单选项，下面是预设色块。 */
 @RunWith(RobolectricTestRunner::class)
 class SettingsThemeColorTest {
 
@@ -31,11 +30,10 @@ class SettingsThemeColorTest {
         compose.setContent {
             MaterialTheme {
                 Surface {
-                    RecognitionSettingsScreen(
-                        config = RecognitionConfig(), onChange = {},
-                        scanStyle = ScanStyle.SWEEP, onScanStyleChange = {},
+                    AppearanceSettingsScreen(
                         themeColor = themeColor, onThemeColorChange = onThemeColorChange,
-                        onOpenRules = {}, onNavigateUp = {},
+                        scanStyle = ScanStyle.SWEEP, onScanStyleChange = {},
+                        onNavigateUp = {},
                     )
                 }
             }

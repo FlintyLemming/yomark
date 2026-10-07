@@ -14,6 +14,7 @@ import com.youma.app.core.model.MaskStyle
 import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.FaceOption
 import com.youma.app.engine.RecognitionConfig
+import com.youma.app.engine.RuleState
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.export.PurposeWatermarkStyle
 import com.youma.app.ui.canvas.ScanStyle
@@ -115,13 +116,23 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     /**
      * 逐项容错：认不出的枚举名只让**该项**退回出厂默认，不牵连其余项，
      * 也绝不在启动路径上抛。理由与 lastStyle 一致。
+     *
+     * 人脸、条码的「关」原先是识别模式里的一个选项（存在 KEY_FACE / KEY_BARCODE 里的 OFF），
+     * 现在挪到了各自的处理方式。老安装里存着 OFF、还没有处理方式这一项的，读成「关」，
+     * 识别模式退回出厂值——不迁的话，关掉过人脸的用户升级后会突然又被打码。
      */
     val recognitionConfig: Flow<RecognitionConfig> = store.data.map { prefs ->
         val fallback = RecognitionConfig()
         RecognitionConfig(
             textEngine = prefs[KEY_TEXT_ENGINE].toEnum(fallback.textEngine),
             barcode = prefs[KEY_BARCODE].toEnum(fallback.barcode),
+            barcodeState = prefs[KEY_BARCODE_STATE].toEnum(
+                if (prefs[KEY_BARCODE] == LEGACY_OFF) RuleState.OFF else fallback.barcodeState,
+            ),
             face = prefs[KEY_FACE].toEnum(fallback.face),
+            faceState = prefs[KEY_FACE_STATE].toEnum(
+                if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
+            ),
             semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
@@ -131,9 +142,31 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit {
             it[KEY_TEXT_ENGINE] = config.textEngine.name
             it[KEY_BARCODE] = config.barcode.name
+            it[KEY_BARCODE_STATE] = config.barcodeState.name
             it[KEY_FACE] = config.face.name
+            it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_SEMANTIC] = config.semantic.name
             it[KEY_RULES] = config.encodeOverrides()
+        }
+    }
+
+    /**
+     * 设置一级页的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出前提醒回到出厂值。
+     * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动。
+     *
+     * 做法是删掉这些键，而不是写一份当下的出厂值：读的时候缺省就是出厂值，和新装一样，
+     * 出厂值以后再改也不会被这一下冻住（与 RecognitionConfig.ruleOverrides 只存差异同一条理由）。
+     */
+    suspend fun resetSettings() {
+        store.edit {
+            it.remove(KEY_TEXT_ENGINE)
+            it.remove(KEY_BARCODE)
+            it.remove(KEY_BARCODE_STATE)
+            it.remove(KEY_FACE)
+            it.remove(KEY_FACE_STATE)
+            it.remove(KEY_SEMANTIC)
+            it.remove(KEY_RULES)
+            it.remove(KEY_EXPORT_REMINDER)
         }
     }
 
@@ -143,6 +176,17 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     @VisibleForTesting
     internal suspend fun writeRawTextEngineForTest(raw: String) {
         store.edit { it[KEY_TEXT_ENGINE] = raw }
+    }
+
+    /** 模拟升级前的老安装：只有识别模式这一项，处理方式还没存过。 */
+    @VisibleForTesting
+    internal suspend fun writeLegacyDetectorModesForTest(face: String?, barcode: String?) {
+        store.edit {
+            if (face != null) it[KEY_FACE] = face
+            if (barcode != null) it[KEY_BARCODE] = barcode
+            it.remove(KEY_FACE_STATE)
+            it.remove(KEY_BARCODE_STATE)
+        }
     }
 
     @VisibleForTesting
@@ -178,8 +222,13 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_TEXT_ENGINE = stringPreferencesKey("recognition_text_engine_v2")
         /** v2：出厂条码从 LOOSE 改成 STRICT，换键的理由同 KEY_TEXT_ENGINE。 */
         val KEY_BARCODE = stringPreferencesKey("recognition_barcode_v2")
+        val KEY_BARCODE_STATE = stringPreferencesKey("recognition_barcode_state")
         val KEY_FACE = stringPreferencesKey("recognition_face")
+        val KEY_FACE_STATE = stringPreferencesKey("recognition_face_state")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
+
+        /** 人脸、条码的识别模式里原先那个「关」。只在读老安装时认它，见 recognitionConfig。 */
+        const val LEGACY_OFF = "OFF"
     }
 }

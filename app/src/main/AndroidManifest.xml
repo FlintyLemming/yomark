@@ -71,8 +71,9 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />
 
+        <!-- 设置的六个二级页共用一个 Activity，打开哪一页由 intent 里的参数决定 -->
         <activity
-            android:name=".ui.settings.RuleSettingsActivity"
+            android:name=".ui.settings.SettingsPageActivity"
             android:exported="false"
             android:parentActivityName=".ui.settings.SettingsActivity" />
     </application>

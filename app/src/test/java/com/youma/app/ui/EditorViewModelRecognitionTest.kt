@@ -18,10 +18,10 @@ import com.youma.app.core.model.SensitiveKind
 import com.youma.app.core.model.TextLine
 import com.youma.app.data.SettingsStore
 import com.youma.app.data.isolatedSettingsStore
-import com.youma.app.engine.BarcodeOption
 import com.youma.app.engine.CandidateMerger
 import com.youma.app.engine.RecognitionConfig
 import com.youma.app.engine.RedactionEngine
+import com.youma.app.engine.RuleState
 import com.youma.app.engine.SensitivityClassifier
 import com.youma.app.engine.TextEngineOption
 import com.youma.app.engine.TextRecognizer
@@ -152,10 +152,10 @@ class EditorViewModelRecognitionTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         assertThat(vm.state.value.canUndo).isFalse()
 
-        vm.setRecognitionConfig(RecognitionConfig(barcode = BarcodeOption.OFF)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(barcodeState = RuleState.OFF)); advanceUntilIdle()
 
         assertThat(vm.state.value.canUndo).isTrue()
-        assertThat(vm.state.value.recognitionConfig.barcode).isEqualTo(BarcodeOption.OFF)
+        assertThat(vm.state.value.recognitionConfig.barcodeState).isEqualTo(RuleState.OFF)
     }
 
     @Test fun `writing the same config again does not re-run`() = runTest(dispatcher) {
