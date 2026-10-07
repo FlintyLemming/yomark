@@ -15,9 +15,11 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.yomark.app.billing.BillingRepository
+import com.yomark.app.billing.Edition
 import com.yomark.app.billing.PurchaseStore
 import com.yomark.app.data.SettingsStore
 import com.yomark.app.ui.EditorActivity
+import com.yomark.app.ui.components.FreeEditionDialog
 import com.yomark.app.ui.components.PaywallDialog
 import com.yomark.app.ui.enableLightEdgeToEdge
 import com.yomark.app.ui.onboarding.OnboardingScreen
@@ -76,11 +78,13 @@ class HomeActivity : ComponentActivity() {
                         else -> HomeScreen(
                             onPickImage = ::pickImage,
                             onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
-                            // 已购用户不该再看见购买入口
-                            onRemoveWatermark = if (isPro) null else ({ paywall = true }),
+                            // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
+                            onRemoveWatermark = if (isPro && !Edition.isFree) null else ({ paywall = true }),
                         )
                     }
-                    if (paywall) {
+                    if (paywall && Edition.isFree) {
+                        FreeEditionDialog(onDismiss = { paywall = false })
+                    } else if (paywall) {
                         PaywallDialog(
                             onBuy = {
                                 paywall = false

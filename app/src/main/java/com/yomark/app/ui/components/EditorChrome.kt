@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import com.yomark.app.billing.Edition
 import com.yomark.app.ui.AiReview
 
 @Composable
@@ -43,7 +44,7 @@ fun EditorTopBar(
     modifier: Modifier = Modifier,
     /** 已设用途水印时按钮着主题色，一眼看出它开着。 */
     purposeOn: Boolean = false,
-    /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
+    /** 去水印的购买入口（开源版是免费版说明与打赏）。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -53,7 +54,7 @@ fun EditorTopBar(
         IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, "撤销") }
         IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, "重做") }
         if (onRemoveWatermark != null) {
-            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
+            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, if (Edition.isFree) "全功能免费版" else "去除水印") }
         }
         IconButton(onClick = onPurpose) {
             Icon(

@@ -66,14 +66,15 @@
 
 - 导出在原图分辨率上重新绘制、重新编码。EXIF 里的位置、机型、拍摄时间一律不保留。
 - 用途水印的颜色、角度、透明度和密度都可以调，带实时预览。
-- 免费版导出的图片右下角有一个「有码 Yomark」小水印，会自动避开打码区域。一次性买断或输入兑换码可以去掉。这是唯一的付费项，其他功能不受限制。
+- 开源版全功能免费，导出的图片不带品牌水印。首页和编辑器右上角的按钮仍在，点开会说明这一点，并提供打赏入口：点「打赏」会用系统浏览器打开 <https://pay.mitsea.com>，应用自己不发任何网络请求。
+- 以后上架 Play 商店的版本会恢复内购：免费导出时右下角带一个「有码 Yomark」小水印（自动避开打码区域），一次性买断或输入兑换码可以去掉。那也是唯一的付费项，其他功能不受限制。
 
 ## 隐私与权限
 
 - 不申请任何运行期权限。选图通过系统的 Photo Picker 完成，应用只能拿到你选中的那几张图，读不到相册里的其他图片。
 - 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。
 - 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
-    - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。
+    - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。开源版不连 Play Billing，留给以后上架的版本。
     - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 复查」绑定系统的 AICore，模型在本机运行。
     - `com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
 
@@ -110,7 +111,7 @@ app/src/main/java/com/yomark/app/
   render/    六种样式的渲染器，预览和导出共用
   export/    原图重绘、品牌水印、用途水印、写入相册
   ui/        首页、编辑器、设置（Jetpack Compose）
-  billing/   去水印的一次性购买与兑换码
+  billing/   发行版本开关（开源版免费）、去水印的一次性购买与兑换码
 docs/        设计文档、模型调研、上架验收记录
 tools/       模型评测、测试语料和主题配色表的生成脚本
 ```

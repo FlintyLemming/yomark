@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
@@ -40,14 +41,18 @@ class BillingRepository(
     context: Context,
     private val store: PurchaseStore,
     private val scope: CoroutineScope,
+    /** 开源版（[Edition.isFree]）：恒为已购，不连 Play。 */
+    private val freeEdition: Boolean = Edition.isFree,
 ) {
 
     /** Play 购买态。查询结果可以把它改回 false（退款/撤单）。 */
     private val _purchased = MutableStateFlow(false)
     /** 兑换码解锁态。只会变 true，Play 查询碰不到它。 */
     private val _redeemed = MutableStateFlow(false)
-    val isPro: StateFlow<Boolean> = combine(_purchased, _redeemed) { purchased, redeemed -> purchased || redeemed }
-        .stateIn(scope, SharingStarted.Eagerly, false)
+    val isPro: StateFlow<Boolean> =
+        if (freeEdition) MutableStateFlow(true).asStateFlow()
+        else combine(_purchased, _redeemed) { purchased, redeemed -> purchased || redeemed }
+            .stateIn(scope, SharingStarted.Eagerly, false)
 
     private val listener = PurchasesUpdatedListener { result, purchases ->
         if (result.responseCode == BillingClient.BillingResponseCode.OK && purchases != null) {
@@ -64,6 +69,8 @@ class BillingRepository(
 
     /** 启动时调用：先用缓存点亮 UI，再尝试联网校验。 */
     fun start() {
+        // 开源版没有东西可买，也就不去碰 Play 服务
+        if (freeEdition) return
         scope.launch {
             _purchased.value = store.isPro.first()
             if (store.isRedeemed.first()) _redeemed.value = true
