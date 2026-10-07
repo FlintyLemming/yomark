@@ -16,6 +16,12 @@ class RecognitionConfigTest {
         assertThat(RecognitionConfig().face).isEqualTo(FaceOption.FAST)
     }
 
+    /** 人脸、条码出厂都打码：设置里加了处理方式这一项，出厂行为不能跟着变。 */
+    @Test fun `factory default masks faces and barcodes`() {
+        assertThat(RecognitionConfig().faceState).isEqualTo(RuleState.MASKED)
+        assertThat(RecognitionConfig().barcodeState).isEqualTo(RuleState.MASKED)
+    }
+
     @Test fun `factory default overrides nothing`() {
         assertThat(RecognitionConfig().ruleOverrides).isEmpty()
     }
@@ -91,7 +97,7 @@ class RecognitionConfigTest {
         val cfg = RecognitionConfig(
             textEngine = TextEngineOption.CHINESE,
             barcode = BarcodeOption.STRICT,
-            face = FaceOption.OFF,
+            faceState = RuleState.OFF,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )
         assertThat(RecognitionConfig.parseOverrides(cfg.encodeOverrides())).isEqualTo(cfg.ruleOverrides)

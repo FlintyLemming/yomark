@@ -31,6 +31,16 @@ class BarcodeCandidateTest {
         assertThat(BarcodeCandidates.from(0, quad, decodable = false).enabledByDefault).isFalse()
     }
 
+    /** 设置里条码设成「仅圈出」：解得出内容的也只圈出。 */
+    @Test fun `decodable barcode is only outlined when barcodes are set to outline`() {
+        assertThat(BarcodeCandidates.from(0, quad, decodable = true, masked = false).enabledByDefault).isFalse()
+    }
+
+    /** 反过来不成立：设成「打码」也不会把解不出内容的疑似条码打上码。 */
+    @Test fun `undecodable barcode stays outlined even when barcodes are set to mask`() {
+        assertThat(BarcodeCandidates.from(0, quad, decodable = false, masked = true).enabledByDefault).isFalse()
+    }
+
     @Test fun `undecodable barcode carries lower confidence`() {
         val sure = BarcodeCandidates.from(0, quad, decodable = true)
         val maybe = BarcodeCandidates.from(1, quad, decodable = false)

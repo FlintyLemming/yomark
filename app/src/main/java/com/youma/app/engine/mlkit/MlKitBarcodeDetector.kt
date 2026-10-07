@@ -29,14 +29,15 @@ object BarcodeCandidates {
      *   格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的。
      *   彩色照片在进这里之前已经被 [TwoInks] 筛掉；剩下的仍然报出来（漏检是事故），
      *   但只圈不打码，交给导出拦截兜底。
+     * @param masked 设置里条码的处理方式是「打码」。设成「仅圈出」时解得出的也只圈出。
      */
-    fun from(index: Int, quad: Quad, decodable: Boolean) = Candidate(
+    fun from(index: Int, quad: Quad, decodable: Boolean, masked: Boolean = true) = Candidate(
         id = "barcode-$index",
         quad = quad,
         kind = SensitiveKind.BARCODE,
         source = DetectorSource.BARCODE,
         confidence = if (decodable) CONFIDENCE_DECODED else CONFIDENCE_POTENTIAL,
-        enabledByDefault = decodable,
+        enabledByDefault = decodable && masked,
     )
 
     private const val CONFIDENCE_DECODED = 0.98f
@@ -53,6 +54,8 @@ object BarcodeCandidates {
  */
 class MlKitBarcodeDetector(
     private val strategy: BarcodeOption = BarcodeOption.LOOSE,
+    /** 解得出内容的条码一进编辑器就打码（true），还是只圈出（false）。 */
+    private val masked: Boolean = true,
 ) : RegionDetector {
 
     override val id = "mlkit-barcode-${strategy.name.lowercase()}"
@@ -109,7 +112,7 @@ class MlKitBarcodeDetector(
                 if (!decodable && !runCatching { TwoInks.looksPrinted(image.bitmap, quad) }.getOrDefault(true)) {
                     return@mapIndexedNotNull null
                 }
-                BarcodeCandidates.from(i, quad, decodable)
+                BarcodeCandidates.from(i, quad, decodable, masked)
             }
         }
     }

@@ -22,8 +22,12 @@ import com.youma.app.rules.RuleClassifier
 fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig()) = RedactionEngine(
     recognizer = textRecognizerFor(context, config.textEngine),
     regionDetectors = buildList {
-        if (config.face != FaceOption.OFF) add(MlKitFaceDetector(config.face))
-        if (config.barcode != BarcodeOption.OFF) add(MlKitBarcodeDetector(config.barcode))
+        if (config.faceState != RuleState.OFF) {
+            add(MlKitFaceDetector(config.face, masked = config.faceState == RuleState.MASKED))
+        }
+        if (config.barcodeState != RuleState.OFF) {
+            add(MlKitBarcodeDetector(config.barcode, masked = config.barcodeState == RuleState.MASKED))
+        }
     },
     classifiers = listOf(RuleClassifier(RuleCatalog.rulesFor(config))),
     refiners = when (config.semantic) {
