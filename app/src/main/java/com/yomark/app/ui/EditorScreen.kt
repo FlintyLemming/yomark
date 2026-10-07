@@ -54,6 +54,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yomark.app.billing.Edition
 import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskState
 import com.yomark.app.core.model.MaskStyle
@@ -62,6 +63,7 @@ import com.yomark.app.ui.canvas.ImageCanvas
 import com.yomark.app.ui.canvas.ScanEffect
 import com.yomark.app.ui.components.EditorBottomBar
 import com.yomark.app.ui.components.EditorTopBar
+import com.yomark.app.ui.components.FreeEditionDialog
 import com.yomark.app.ui.components.PaywallDialog
 import com.yomark.app.ui.components.PendingExportDialog
 import com.yomark.app.ui.components.PurposeWatermarkPanel
@@ -114,7 +116,9 @@ fun EditorScreen(
         )
     }
 
-    if (state.paywallVisible) {
+    if (state.paywallVisible && Edition.isFree) {
+        FreeEditionDialog(onDismiss = vm::dismissPaywall)
+    } else if (state.paywallVisible) {
         PaywallDialog(
             onBuy = onBuyClicked,
             onRedeem = { code -> onRedeem(code).also { if (it) vm.dismissPaywall() } },
@@ -137,8 +141,8 @@ fun EditorScreen(
                 purposeOn = state.purposeText != null,
                 // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                 onSettings = onSettings,
-                // 已购用户不该再看见购买入口
-                onRemoveWatermark = if (state.isPro) null else vm::showPaywall,
+                // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
+                onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
             )
             // 底栏的按钮已经写着「复查中…」，这里只给一条进度，不再重复说一遍

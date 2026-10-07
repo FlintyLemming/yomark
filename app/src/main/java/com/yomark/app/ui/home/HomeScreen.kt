@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.yomark.app.billing.Edition
 
 /**
  * 首页：正中一个大按钮选图，右上角是与具体某张图无关的入口（去水印、设置）。
@@ -42,7 +43,7 @@ fun HomeScreen(
     onPickImage: () -> Unit,
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 去水印的购买入口。已购用户传 null，按钮就不出现。 */
+    /** 去水印的购买入口（开源版是免费版说明与打赏）。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
 ) {
     Scaffold(
@@ -52,7 +53,7 @@ fun HomeScreen(
                 title = { Text("有码") },
                 actions = {
                     if (onRemoveWatermark != null) {
-                        IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, "去除水印") }
+                        IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, if (Edition.isFree) "全功能免费版" else "去除水印") }
                     }
                     IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
                 },

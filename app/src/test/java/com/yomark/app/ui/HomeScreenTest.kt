@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import com.google.common.truth.Truth.assertThat
+import com.yomark.app.billing.Edition
 import com.yomark.app.ui.home.HomeScreen
 import org.junit.Rule
 import org.junit.Test
@@ -50,6 +51,15 @@ class HomeScreenTest {
     @Test fun `the remove-watermark entry is gone once bought`() {
         show(onRemoveWatermark = null)
         compose.onNodeWithContentDescription("去除水印").assertDoesNotExist()
+        compose.onNodeWithContentDescription("全功能免费版").assertDoesNotExist()
+    }
+
+    /** 开源版也留着这个按钮，只是它说的是免费版与打赏，不再是「去除水印」。 */
+    @Test fun `the entry names the edition it opens`() {
+        var opened = 0
+        show(onRemoveWatermark = { opened++ })
+        compose.onNodeWithContentDescription(if (Edition.isFree) "全功能免费版" else "去除水印").performClick()
+        assertThat(opened).isEqualTo(1)
     }
 
     /** 首页是任务的根：返回由系统处理（回桌面），预见式返回才有回桌面的动画。 */

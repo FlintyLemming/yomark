@@ -65,6 +65,9 @@ android {
         versionCode = 9
         versionName = "0.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
+        // 以后上架 Play 的构建改成 false，就回到一次性买断去水印。
+        buildConfigField("boolean", "FREE_EDITION", "true")
     }
 
     // 固定签名：CI 从 Secrets 解出 keystore 并通过环境变量传进来。
@@ -96,7 +99,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
     kotlin { jvmToolchain(21) }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 
     testOptions {
         unitTests {
