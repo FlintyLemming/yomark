@@ -58,8 +58,8 @@ app/src/androidTest/assets/samples/
 
 ```bash
 ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.youma.app.eval.EvaluationTest
-adb logcat -d -s System.out:I | grep YOUMA-EVAL
+  -Pandroid.testInstrumentationRunnerArguments.class=com.yomark.app.eval.EvaluationTest
+adb logcat -d -s System.out:I | grep YOMARK-EVAL
 ```
 
 样本目录为空时 `real_sample_set_meets_the_m2_exit_criteria_when_present` 会打印提示并跳过，不会失败。

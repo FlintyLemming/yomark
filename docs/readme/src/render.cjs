@@ -4,7 +4,7 @@
 //   node docs/readme/src/render.cjs hero       → docs/readme/hero.png（只用样图的内容排版，不依赖截图）
 //   node docs/readme/src/render.cjs styles     → docs/readme/styles.png
 //
-// styles 需要先用 app/src/test/java/com/youma/app/readme/ReadmeScreenshots.kt 把截图拍到 docs/readme/shots/。
+// styles 需要先用 app/src/test/java/com/yomark/app/readme/ReadmeScreenshots.kt 把截图拍到 docs/readme/shots/。
 // 需要 Playwright（npm i -g playwright）和能访问 Google Fonts 的网络。
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');

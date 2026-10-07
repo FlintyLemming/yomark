@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/FlintyLemming/youma/releases"><img src="https://img.shields.io/github/v/release/FlintyLemming/youma?label=Release&color=101014" alt="Release"></a>
-  <a href="https://github.com/FlintyLemming/youma/actions/workflows/android-apk.yml"><img src="https://github.com/FlintyLemming/youma/actions/workflows/android-apk.yml/badge.svg" alt="Android APK"></a>
+  <a href="https://github.com/FlintyLemming/yomark/releases"><img src="https://img.shields.io/github/v/release/FlintyLemming/yomark?label=Release&color=101014" alt="Release"></a>
+  <a href="https://github.com/FlintyLemming/yomark/actions/workflows/android-apk.yml"><img src="https://github.com/FlintyLemming/yomark/actions/workflows/android-apk.yml/badge.svg" alt="Android APK"></a>
   <img src="https://img.shields.io/badge/Android-10%2B-3ddc84?logo=android&logoColor=white" alt="Android 10+">
 </p>
 
@@ -63,7 +63,7 @@
 
 - 导出在原图分辨率上重新绘制、重新编码。EXIF 里的位置、机型、拍摄时间一律不保留。
 - 用途水印的颜色、角度、透明度和密度都可以调，带实时预览。
-- 免费版导出的图片右下角有一个「有码 Youma」小水印，会自动避开打码区域。一次性买断或输入兑换码可以去掉。这是唯一的付费项，其他功能不受限制。
+- 免费版导出的图片右下角有一个「有码 Yomark」小水印，会自动避开打码区域。一次性买断或输入兑换码可以去掉。这是唯一的付费项，其他功能不受限制。
 
 ## 隐私与权限
 
@@ -72,7 +72,7 @@
 - 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
     - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。
     - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 复查」绑定系统的 AICore，模型在本机运行。
-    - `com.youma.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
+    - `com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
 
 ## 实现
 
@@ -83,7 +83,7 @@
 
 ## 下载
 
-在 [Releases](https://github.com/FlintyLemming/youma/releases) 下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。安装包是 debug 构建、固定签名，可以直接覆盖升级（v0.3.3 之前的版本签名不固定，需要先卸载）。
+在 [Releases](https://github.com/FlintyLemming/yomark/releases) 下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。安装包是 debug 构建、固定签名，可以直接覆盖升级。v0.5.0 起包名改为 `com.yomark.app`，不会覆盖 v0.4.0 及更早的版本，装好后把旧版卸载即可。
 
 每次推送后，GitHub Actions 也会打一份 APK，可以在对应运行的 Artifacts 里下载。推送 `v*` 标签，或者在 Actions 页面手动触发并填写版本号，单元测试通过后会自动发布 Release，说明取自 `docs/release-notes/<版本号>.md`。
 
@@ -100,7 +100,7 @@
 ## 项目结构
 
 ```
-app/src/main/java/com/youma/app/
+app/src/main/java/com/yomark/app/
   core/      几何、图片读取、打码方案（MaskPlan）的数据模型
   engine/    OCR、人脸、条码的封装，候选去重合并
   rules/     敏感信息规则与校验位
@@ -112,7 +112,7 @@ docs/        设计文档、模型调研、上架验收记录
 tools/       模型评测、测试语料和主题配色表的生成脚本
 ```
 
-设计上的取舍见[总体方案](docs/superpowers/specs/2026-09-02-youma-android-design.md)，各项指标的实测数值见[上架验收记录](docs/release-checklist.md)。
+设计上的取舍见[总体方案](docs/superpowers/specs/2026-09-02-yomark-android-design.md)，各项指标的实测数值见[上架验收记录](docs/release-checklist.md)。
 
 ---
 
