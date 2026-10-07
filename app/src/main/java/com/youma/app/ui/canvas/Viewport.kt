@@ -2,6 +2,7 @@ package com.youma.app.ui.canvas
 
 import android.graphics.Matrix
 import android.graphics.PointF
+import android.graphics.RectF
 import kotlin.math.abs
 import kotlin.math.min
 
@@ -13,6 +14,11 @@ import kotlin.math.min
 data class Viewport(val scale: Float, val offsetX: Float, val offsetY: Float) {
 
     fun imageToScreen(p: PointF) = PointF(p.x * scale + offsetX, p.y * scale + offsetY)
+
+    fun imageToScreen(r: RectF) = RectF(
+        r.left * scale + offsetX, r.top * scale + offsetY,
+        r.right * scale + offsetX, r.bottom * scale + offsetY,
+    )
 
     fun screenToImage(p: PointF) = PointF((p.x - offsetX) / scale, (p.y - offsetY) / scale)
 

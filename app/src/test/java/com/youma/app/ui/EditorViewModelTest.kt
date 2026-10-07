@@ -133,13 +133,49 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `tapping a mask toggles it to outlined`() = runTest(dispatcher) {
+    fun `a freshly drawn box is selected so its handles show right away`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+
+        val item = vm.state.value.plan.items.single()
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+
+        vm.previewSelectedQuad(Quad.fromRect(RectF(10f, 10f, 150f, 120f)))
+        vm.commitDrag()
+        assertThat(vm.state.value.plan.items.single().quad.bounds()).isEqualTo(RectF(10f, 10f, 150f, 120f))
+    }
+
+    private fun rule(id: String, l: Float, t: Float, r: Float, b: Float) =
+        manual(id, l, t, r, b).copy(source = DetectorSource.RULE, kind = SensitiveKind.URL)
+
+    @Test
+    fun `tapping a detected mask toggles it to outlined`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f)))
         vm.onTap(PointF(50f, 50f))
 
         assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.OUTLINED)
+    }
+
+    @Test
+    fun `tapping a manual box selects it again instead of toggling it`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+        vm.onTap(PointF(300f, 300f))
+        assertThat(vm.state.value.selectedManualId).isNull()
+
+        vm.onTap(PointF(50f, 50f))
+        val item = vm.state.value.plan.items.single()
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+        assertThat(item.state).isEqualTo(MaskState.MASKED)
+
+        // 选中时再点一下，还是选中、还是打码
+        vm.onTap(PointF(50f, 50f))
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.MASKED)
     }
 
     @Test
@@ -147,11 +183,23 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
-        vm.onLongPress(PointF(50f, 50f))
         assertThat(vm.state.value.selectedManualId).isNotNull()
 
         vm.onTap(PointF(300f, 300f))
         assertThat(vm.state.value.selectedManualId).isNull()
+    }
+
+    @Test
+    fun `tapping a detected box toggles it and clears the selection`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+        assertThat(vm.state.value.selectedManualId).isNotNull()
+
+        vm.onTap(PointF(250f, 250f))
+        assertThat(vm.state.value.selectedManualId).isNull()
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
     }
 
     @Test
@@ -175,15 +223,15 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
-        vm.onLongPress(PointF(50f, 50f))
+        vm.onTap(PointF(300f, 300f))
+        vm.onTap(PointF(50f, 50f))
         vm.deleteSelected()
         assertThat(vm.state.value.plan.items).isEmpty()
 
-        // 塞进一个规则候选，长按选中后删不掉
-        vm.replacePlanForTest(vm.state.value.plan.add(
-            manual("rule", 10f, 10f, 90f, 90f).copy(source = DetectorSource.RULE, kind = SensitiveKind.URL)
-        ))
-        vm.onLongPress(PointF(50f, 50f))
+        // 塞进一个规则候选：点它进不了选中态，删除也就删不掉它
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f)))
+        vm.onTap(PointF(50f, 50f))
+        assertThat(vm.state.value.selectedManualId).isNull()
         vm.deleteSelected()
         assertThat(vm.state.value.plan.items).hasSize(1)
     }

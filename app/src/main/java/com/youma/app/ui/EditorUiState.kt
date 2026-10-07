@@ -44,7 +44,7 @@ data class EditorUiState(
     /** 端侧大模型的第二遍。只在用户点了之后跑，结果追加进 plan，只圈出。 */
     val aiReview: AiReview = AiReview.HIDDEN,
     val exporting: Boolean = false,
-    /** 长按手动框进入的选中态：出现四角手柄与删除按钮。 */
+    /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
     val pendingDialogVisible: Boolean = false,
     /** 当前样式在这张图上会降级时的说明。抹除遇到复杂背景时非空。 */

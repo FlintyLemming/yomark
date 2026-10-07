@@ -10,10 +10,25 @@ import android.graphics.PointF
 import android.graphics.PorterDuff
 import android.graphics.RectF
 import android.graphics.Shader
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -29,9 +44,11 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
@@ -56,7 +73,7 @@ import kotlin.math.roundToInt
  * 画布：图像 + 遮罩 + 叠层 + 手势。
  *
  * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
- * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、长按手动框进选中态。
+ * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  */
@@ -65,7 +82,6 @@ fun ImageCanvas(
     state: EditorUiState,
     registry: RendererRegistry,
     onTap: (PointF) -> Unit,
-    onLongPress: (PointF) -> Unit,
     onManualBox: (Quad) -> Unit,
     onResize: (Quad) -> Unit,
     onCommitDrag: () -> Unit,
@@ -129,7 +145,7 @@ fun ImageCanvas(
     val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
-    // 手势循环里必须读这个「永远最新」的引用，否则长按选中后立刻拖手柄，
+    // 手势循环里必须读这个「永远最新」的引用，否则点选手动框后立刻拖手柄，
     // 循环里看到的 selectedManualId 还是 null，于是拖出来一个新框而不是改选中框。
     val latest by rememberUpdatedState(state)
 
@@ -137,132 +153,133 @@ fun ImageCanvas(
     // 这时要重新摆，否则图的下半截就被挤出画布，调水印时看不到效果。
     var laidOutFor by remember(image) { mutableStateOf(0 to 0) }
     var draftQuad by remember { mutableStateOf<Quad?>(null) }
+    // 正在拖选中框的手柄或框体。拖的时候收起工具条，免得它跟着框一路晃
+    var editingSelection by remember(image) { mutableStateOf(false) }
+    // 草稿框每一帧都在变；工具条只关心「是不是正在画」，不跟着每帧重组
+    val drafting by remember { derivedStateOf { draftQuad != null } }
     // 双击自己数时间戳，不叠第二层 detectTapGestures：
     // 两层 pointerInput 里第二层根本收不到本层已在处理的手势（实机验证过），
     // 而把单击延后 300ms 去等第二击又会让「点遮罩」明显发滞。
     var lastTapAt by remember { mutableLongStateOf(0L) }
     var lastTapAtScreen by remember { mutableStateOf(PointF(0f, 0f)) }
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .clipToBounds()          // 放大后图像会溢出画布区，压到顶栏上
-            .pointerInput(image) {
-                awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
+    // 选中框、草稿框与手柄用主题色，与应用其余部分一致
+    val colorScheme = MaterialTheme.colorScheme
+    val selectionColors = remember(colorScheme.primary, colorScheme.surface) {
+        SelectionColors(colorScheme.primary.toArgb(), colorScheme.surface.toArgb())
+    }
 
-                    // 选中态优先：删除按钮 > 手柄 > 框体，都不中才轮到画框/点击
-                    val selected = latest.selectedManualId?.let { latest.plan.find(it) }
-                    val handleSize = HANDLE_DP_PX / viewport.scale
-                    val downImage = viewport.screenToImage(PointF(down.position.x, down.position.y))
-                    var grabbedHandle: HandleCorner? = null
-                    var grabbingBody = false
-                    if (selected != null) {
-                        if (SelectionHandles.deleteButtonRect(selected.quad, handleSize * 1.4f)
-                                .contains(downImage.x, downImage.y)
-                        ) {
-                            onDeleteSelected()
-                            return@awaitEachGesture
-                        }
-                        grabbedHandle = SelectionHandles.hitHandle(selected.quad, downImage, handleSize)
-                        grabbingBody = grabbedHandle == null && selected.quad.contains(downImage)
-                    }
+    Box(modifier.fillMaxSize().clipToBounds()) {     // 放大后图像会溢出画布区，压到顶栏上
+        Canvas(
+            modifier = Modifier
+                .matchParentSize()
+                .pointerInput(image) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
 
-                    val start = down.position
-                    var last = down.position
-                    var totalDx: Float
-                    var totalDy: Float
-                    var pointerCount = 1
-                    var mode = Mode.UNDECIDED
-                    val downTime = System.currentTimeMillis()
-
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Main)
-                        val pressed = event.changes.filter { it.pressed }
-                        pointerCount = maxOf(pointerCount, pressed.size)
-
-                        if (pressed.size >= 2) {
-                            // 两指：导航。已经开始画的草稿作废——用户改主意了。
-                            mode = Mode.NAVIGATE
-                            draftQuad = null
-                            val a = pressed[0]; val b = pressed[1]
-                            val prevCentroid = Offset(
-                                (a.previousPosition.x + b.previousPosition.x) / 2f,
-                                (a.previousPosition.y + b.previousPosition.y) / 2f,
-                            )
-                            val centroid = Offset(
-                                (a.position.x + b.position.x) / 2f,
-                                (a.position.y + b.position.y) / 2f,
-                            )
-                            val prevSpan = (a.previousPosition - b.previousPosition).getDistance()
-                            val span = (a.position - b.position).getDistance()
-                            val zoom = if (prevSpan > 1f) span / prevSpan else 1f
-                            val fit = Viewport.fit(image.width, image.height, viewSize.first, viewSize.second)
-                            viewport = viewport
-                                .zoomAround(PointF(centroid.x, centroid.y), zoom)
-                                .pan(centroid.x - prevCentroid.x, centroid.y - prevCentroid.y)
-                                .clamped(image.width, image.height, viewSize.first, viewSize.second, fit.scale)
-                            event.changes.forEach { it.consume() }
-                        } else if (pressed.size == 1) {
-                            val c = pressed.first()
-                            totalDx = c.position.x - start.x
-                            totalDy = c.position.y - start.y
-                            if (mode == Mode.UNDECIDED && GestureRules.isDrag(totalDx, totalDy, touchSlopPx)) {
-                                mode = Mode.DRAW
+                        // 选中态优先：手柄 > 框体，都不中才轮到画框 / 点击。
+                        // 删除在框上方的工具条里，那是叠在画布上的另一个控件，按它的手势到不了这里
+                        val selected = latest.selectedManualId?.let { latest.plan.find(it) }
+                        val downImage = viewport.screenToImage(PointF(down.position.x, down.position.y))
+                        var grabbedHandle: HandleCorner? = null
+                        var grabOffset = PointF(0f, 0f)
+                        var grabbingBody = false
+                        if (selected != null) {
+                            val hitSize = HANDLE_HIT_DP * density.density / viewport.scale
+                            grabbedHandle = SelectionHandles.hitHandle(selected.quad, downImage, hitSize)
+                            grabbingBody = grabbedHandle == null && selected.quad.contains(downImage)
+                            // 按下的地方离角有多远：拖起来角跟着手指平移，不会一动就跳到手指底下
+                            grabbedHandle?.let {
+                                val corner = SelectionHandles.cornerPoint(selected.quad, it)
+                                grabOffset = PointF(corner.x - downImage.x, corner.y - downImage.y)
                             }
-                            if (grabbedHandle != null && selected != null) {
-                                val to = viewport.screenToImage(PointF(c.position.x, c.position.y))
-                                onResize(
-                                    SelectionHandles.resize(
-                                        latest.plan.find(selected.candidateId)?.quad ?: selected.quad,
-                                        grabbedHandle, to, minBoxPx / viewport.scale,
-                                    )
+                        }
+
+                        val start = down.position
+                        var last = down.position
+                        var pointerCount = 1
+                        var mode = Mode.UNDECIDED
+                        val downTime = System.currentTimeMillis()
+
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val pressed = event.changes.filter { it.pressed }
+                            pointerCount = maxOf(pointerCount, pressed.size)
+
+                            if (pressed.size >= 2) {
+                                // 两指：导航。已经开始画的草稿作废——用户改主意了。
+                                // 此后这一手势剩下的单指部分不再改框，也不画框
+                                mode = Mode.NAVIGATE
+                                draftQuad = null
+                                val a = pressed[0]; val b = pressed[1]
+                                val prevCentroid = Offset(
+                                    (a.previousPosition.x + b.previousPosition.x) / 2f,
+                                    (a.previousPosition.y + b.previousPosition.y) / 2f,
                                 )
-                                if (c.positionChanged()) c.consume()
-                            } else if (grabbingBody && selected != null) {
-                                val prev = viewport.screenToImage(PointF(c.previousPosition.x, c.previousPosition.y))
-                                val now = viewport.screenToImage(PointF(c.position.x, c.position.y))
-                                onResize(
-                                    SelectionHandles.move(
-                                        latest.plan.find(selected.candidateId)?.quad ?: selected.quad,
-                                        now.x - prev.x, now.y - prev.y,
-                                    )
+                                val centroid = Offset(
+                                    (a.position.x + b.position.x) / 2f,
+                                    (a.position.y + b.position.y) / 2f,
                                 )
-                                if (c.positionChanged()) c.consume()
-                            } else if (mode == Mode.DRAW) {
-                                draftQuad = GestureRules.quadFromDrag(
-                                    viewport.screenToImage(PointF(start.x, start.y)),
-                                    viewport.screenToImage(PointF(c.position.x, c.position.y)),
-                                )
-                                if (c.positionChanged()) c.consume()
+                                val prevSpan = (a.previousPosition - b.previousPosition).getDistance()
+                                val span = (a.position - b.position).getDistance()
+                                val zoom = if (prevSpan > 1f) span / prevSpan else 1f
+                                val fit = Viewport.fit(image.width, image.height, viewSize.first, viewSize.second)
+                                viewport = viewport
+                                    .zoomAround(PointF(centroid.x, centroid.y), zoom)
+                                    .pan(centroid.x - prevCentroid.x, centroid.y - prevCentroid.y)
+                                    .clamped(image.width, image.height, viewSize.first, viewSize.second, fit.scale)
+                                event.changes.forEach { it.consume() }
+                            } else if (pressed.size == 1) {
+                                val c = pressed.first()
+                                if (mode == Mode.UNDECIDED &&
+                                    GestureRules.isDrag(c.position.x - start.x, c.position.y - start.y, touchSlopPx)
+                                ) {
+                                    mode = Mode.DRAG
+                                }
+                                // 过了 touch slop 才动手，没动的话这一下是点击。
+                                // 改框一律按起手那一刻的框加手指的总位移算：框紧跟手指，不丢 slop 那一段
+                                if (mode == Mode.DRAG) {
+                                    val now = viewport.screenToImage(PointF(c.position.x, c.position.y))
+                                    val handle = grabbedHandle
+                                    if (selected != null && handle != null) {
+                                        editingSelection = true
+                                        val to = PointF(now.x + grabOffset.x, now.y + grabOffset.y)
+                                        onResize(SelectionHandles.resize(selected.quad, handle, to, minBoxPx / viewport.scale))
+                                    } else if (selected != null && grabbingBody) {
+                                        editingSelection = true
+                                        onResize(SelectionHandles.move(selected.quad, now.x - downImage.x, now.y - downImage.y))
+                                    } else {
+                                        draftQuad = GestureRules.quadFromDrag(
+                                            viewport.screenToImage(PointF(start.x, start.y)), now,
+                                        )
+                                    }
+                                    if (c.positionChanged()) c.consume()
+                                }
+                                last = c.position
                             }
-                            last = c.position
+
+                            if (event.changes.all { !it.pressed }) break
                         }
 
-                        if (event.changes.all { !it.pressed }) break
-                    }
+                        editingSelection = false
+                        // 整段拖动只压一个快照。没真拖起来的话 ViewModel 那边什么也没记，这一下什么都不做
+                        if (grabbedHandle != null || grabbingBody) onCommitDrag()
 
-                    if (grabbedHandle != null || grabbingBody) {
-                        onCommitDrag()               // 整段拖动只压一个快照
-                        return@awaitEachGesture
-                    }
-
-                    val duration = System.currentTimeMillis() - downTime
-                    when {
-                        mode == Mode.DRAW -> {
-                            val q = draftQuad
-                            draftQuad = null
-                            val minInImage = minBoxPx / viewport.scale
-                            if (q != null && GestureRules.acceptsBox(q, minInImage)) onManualBox(q)
-                        }
-                        mode == Mode.UNDECIDED && pointerCount == 1 -> {
-                            val p = viewport.screenToImage(PointF(last.x, last.y))
-                            if (duration >= LONG_PRESS_MS) {
-                                onLongPress(p)
-                                lastTapAt = 0L
-                            } else {
+                        val duration = System.currentTimeMillis() - downTime
+                        when {
+                            mode == Mode.DRAG && grabbedHandle == null && !grabbingBody -> {
+                                val q = draftQuad
+                                draftQuad = null
+                                val minInImage = minBoxPx / viewport.scale
+                                if (q != null && GestureRules.acceptsBox(q, minInImage)) onManualBox(q)
+                            }
+                            // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了
+                            mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null -> {
+                                val p = viewport.screenToImage(PointF(last.x, last.y))
                                 val now = System.currentTimeMillis()
-                                val isSecond = now - lastTapAt <= DOUBLE_TAP_MS &&
+                                // 按得久的一下也是点击（Android 上没有长按动作的控件都这样），只是不拿来凑双击
+                                val quick = duration < LONG_PRESS_MS
+                                val isSecond = quick && now - lastTapAt <= DOUBLE_TAP_MS &&
                                     hypot(last.x - lastTapAtScreen.x, last.y - lastTapAtScreen.y) <= touchSlopPx * 2f
                                 if (isSecond) {
                                     // 第二击只做缩放，不再切换遮罩状态——第一击已经切过一次了
@@ -273,91 +290,139 @@ fun ImageCanvas(
                                     lastTapAt = 0L
                                 } else {
                                     onTap(p)
-                                    lastTapAt = now
+                                    lastTapAt = if (quick) now else 0L
                                     lastTapAtScreen = PointF(last.x, last.y)
                                 }
                             }
                         }
                     }
                 }
+        ) {
+            viewSize = size.width.toInt() to size.height.toInt()
+            if (viewSize != laidOutFor) {
+                val (w, h) = viewSize
+                val fit = Viewport.fit(image.width, image.height, w, h)
+                val (oldW, oldH) = laidOutFor
+                // 原本就是整图适配（或第一次摆）就按新尺寸重新适配；用户放大过的保留缩放，只收回边界
+                val wasFit = oldW == 0 || viewport == Viewport.fit(image.width, image.height, oldW, oldH)
+                viewport = if (wasFit) fit else viewport.clamped(image.width, image.height, w, h, fit.scale)
+                laidOutFor = viewSize
             }
-    ) {
-        viewSize = size.width.toInt() to size.height.toInt()
-        if (viewSize != laidOutFor) {
-            val (w, h) = viewSize
-            val fit = Viewport.fit(image.width, image.height, w, h)
-            val (oldW, oldH) = laidOutFor
-            // 原本就是整图适配（或第一次摆）就按新尺寸重新适配；用户放大过的保留缩放，只收回边界
-            val wasFit = oldW == 0 || viewport == Viewport.fit(image.width, image.height, oldW, oldH)
-            viewport = if (wasFit) fit else viewport.clamped(image.width, image.height, w, h, fit.scale)
-            laidOutFor = viewSize
-        }
 
-        drawIntoCanvas { compose ->
-            val canvas = compose.nativeCanvas
-            val save = canvas.save()
-            canvas.concat(viewport.matrix())
+            drawIntoCanvas { compose ->
+                val canvas = compose.nativeCanvas
+                val save = canvas.save()
+                canvas.concat(viewport.matrix())
 
-            // 识别中，时间轴的第一帧还没到（或手里还是上一遍收尾的帧）也按「识别中」画：
-            // 换方案重跑时旧结果不该闪一下
-            val time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime
-            val look = when (if (scanning) scanStyle else settling) {
-                ScanStyle.SWEEP -> ScanLook.Sweep
-                ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
-            }
-            drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look)
-            // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
-            // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
-            state.purposeText?.let {
-                purposeWatermark.draw(canvas, image.width, image.height, it, state.purposeStyle)
-            }
-            state.selectedManualId?.let { id ->
-                state.plan.find(id)?.let { item ->
-                    canvas.drawPath(item.quad.toPath(), selectionPaint(viewport.scale))
-                    val size = HANDLE_DP_PX / viewport.scale
-                    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.FILL; color = AndroidColor.WHITE
-                    }
-                    val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE; color = AndroidColor.BLACK
-                        strokeWidth = 2f / viewport.scale
-                    }
-                    SelectionHandles.handleRects(item.quad, size).values.forEach { r ->
-                        canvas.drawRect(r, fill)
-                        canvas.drawRect(r, edge)
-                    }
-                    // 删除按钮：白底红叉
-                    val del = SelectionHandles.deleteButtonRect(item.quad, size * 1.4f)
-                    canvas.drawOval(del, fill)
-                    canvas.drawOval(del, edge)
-                    val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        style = Paint.Style.STROKE
-                        color = AndroidColor.rgb(0xD3, 0x2F, 0x2F)
-                        strokeWidth = 3f / viewport.scale
-                    }
-                    val pad = del.width() * 0.28f
-                    canvas.drawLine(del.left + pad, del.top + pad, del.right - pad, del.bottom - pad, cross)
-                    canvas.drawLine(del.right - pad, del.top + pad, del.left + pad, del.bottom - pad, cross)
+                // 识别中，时间轴的第一帧还没到（或手里还是上一遍收尾的帧）也按「识别中」画：
+                // 换方案重跑时旧结果不该闪一下
+                val time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime
+                val look = when (if (scanning) scanStyle else settling) {
+                    ScanStyle.SWEEP -> ScanLook.Sweep
+                    ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
+                }
+                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look)
+                // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
+                // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
+                state.purposeText?.let {
+                    purposeWatermark.draw(canvas, image.width, image.height, it, state.purposeStyle)
+                }
+                val dp = density.density / viewport.scale
+                state.selectedManualId?.let { id ->
+                    state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp) }
+                }
+                draftQuad?.let { drawDraft(canvas, it, selectionColors, dp) }
+
+                canvas.restoreToCount(save)
+
+                // 磨砂中间的等待图标跟屏幕走：总在画布中心、大小恒定，不随图缩放平移
+                if (time != null && look is ScanLook.Frost) {
+                    drawLoader(canvas, size.width / 2f, size.height / 2f, density.density, time, scanPaints.frost)
                 }
             }
-            draftQuad?.let { canvas.drawPath(it.toPath(), draftPaint(viewport.scale)) }
+        }
 
-            canvas.restoreToCount(save)
-
-            // 磨砂中间的等待图标跟屏幕走：总在画布中心、大小恒定，不随图缩放平移
-            if (time != null && look is ScanLook.Frost) {
-                drawLoader(canvas, size.width / 2f, size.height / 2f, density.density, time, scanPaints.frost)
-            }
+        // 选中框上方的「删除」。淡出的那一下（删掉了、开始拖了）框可能已经不在 plan 里，按它最后的位置摆
+        val selectedQuad = state.selectedManualId?.let { state.plan.find(it) }?.quad
+        val lastSelectedQuad = remember { QuadHolder() }
+        if (selectedQuad != null) lastSelectedQuad.quad = selectedQuad
+        AnimatedVisibility(
+            visible = selectedQuad != null && !editingSelection && !drafting,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.matchParentSize(),
+        ) {
+            SelectionToolbar(
+                quad = selectedQuad ?: lastSelectedQuad.quad,
+                viewport = { viewport },
+                onDelete = onDeleteSelected,
+            )
         }
     }
 }
 
-private enum class Mode { UNDECIDED, DRAW, NAVIGATE }
+/**
+ * 选中手动框时浮在框上方的工具条。与应用里其余的按钮一样是 Material 组件——主题色、字体、
+ * 按下时的水波纹都一致，不在画布上自己画。只有「删除」一个操作：移动、调大小直接在框上拖。
+ *
+ * 这一层铺满画布，但只有工具条本身接触摸；别处的手势照常落到底下的画布上。
+ */
+@Composable
+private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: () -> Unit) {
+    Layout(
+        content = {
+            // 与 Material 的菜单、文字选择工具条同一种容器：surfaceContainer 底色加一层浅投影
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 3.dp) {
+                TextButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("删除")
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val bar = measurables.single().measure(constraints.copy(minWidth = 0, minHeight = 0))
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            // viewport 在摆放这一步才读：缩放、平移时工具条只重新摆，不重组
+            val box = quad?.let { viewport().imageToScreen(it.bounds()) } ?: return@layout
+            SelectionHandles.toolbarPosition(
+                box, bar.width, bar.height, constraints.maxWidth, constraints.maxHeight,
+                gap = TOOLBAR_GAP_DP.dp.toPx(), margin = TOOLBAR_MARGIN_DP.dp.toPx(),
+            )?.let { bar.place(it.x, it.y) }
+        }
+    }
+}
+
+/** 记住最后一个选中框的位置，供工具条淡出时用。普通字段，改它不触发重组。 */
+private class QuadHolder { var quad: Quad? = null }
+
+private enum class Mode { UNDECIDED, DRAG, NAVIGATE }
 private const val LONG_PRESS_MS = 450L
 private const val DOUBLE_TAP_MS = 300L
 
-/** 手柄边长（图像坐标下按缩放反算，视觉上恒定）。 */
-private const val HANDLE_DP_PX = 22f
+/** 手柄直径（dp），含外面那一圈。画的时候按缩放反算到图像坐标，视觉大小恒定。 */
+private const val HANDLE_DP = 16f
+
+/** 手柄外圈的宽度（dp）。 */
+private const val HANDLE_RING_DP = 2.5f
+
+/** 手柄的命中边长（dp）。SelectionHandles.hitHandle 还会再放宽 1.5 倍，约 48dp，与触控目标的推荐尺寸一致。 */
+private const val HANDLE_HIT_DP = 32f
+
+/** 选中框、草稿框的线宽（dp）。 */
+private const val SELECTION_LINE_DP = 2f
+
+/** 线两侧垫的浅色细边各多宽（dp）。 */
+private const val HALO_DP = 1f
+
+/** 工具条与框之间的距离（dp），让开角上的手柄。 */
+private const val TOOLBAR_GAP_DP = 12f
+
+/** 工具条离画布边缘至少多远（dp）。 */
+private const val TOOLBAR_MARGIN_DP = 8f
+
+/** 草稿框内那层主题色的不透明度，约 12%，与 Material 的状态层一个量级。 */
+private const val DRAFT_FILL_ALPHA = 0x1F
 
 /** 2dp 虚线框（琥珀色）—— 圈出未打码的外观（spec §7.2）。线宽按缩放反算，保持视觉恒定。 */
 private fun outlinePaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -367,17 +432,59 @@ private fun outlinePaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     pathEffect = DashPathEffect(floatArrayOf(12f / scale, 8f / scale), 0f)
 }
 
-private fun selectionPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+/** 选中框、草稿框与手柄的颜色，取自主题（见 YoumaTheme）。 */
+private class SelectionColors(val primary: Int, val surface: Int)
+
+/**
+ * 线底下垫的那道浅色细边（surface 色）。主题色的线落在白底截图上很清楚，落在深色或同色的图上就看不清了，
+ * 垫一道浅色的边哪里都看得见。[dp] 是 1dp 在图像坐标下的长度。
+ */
+private fun haloPaint(colors: SelectionColors, dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
-    color = AndroidColor.WHITE
-    strokeWidth = 3f / scale
+    color = colors.surface
+    strokeWidth = (SELECTION_LINE_DP + HALO_DP * 2f) * dp
 }
 
-private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+private fun linePaint(colors: SelectionColors, dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
-    color = AndroidColor.argb(200, 255, 255, 255)
-    strokeWidth = 3f / scale
-    pathEffect = DashPathEffect(floatArrayOf(10f / scale, 6f / scale), 0f)
+    color = colors.primary
+    strokeWidth = SELECTION_LINE_DP * dp
+}
+
+/** 选中框：主题色实线，四角是可以拖的手柄。 */
+private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
+    val path = quad.toPath()
+    canvas.drawPath(path, haloPaint(colors, dp))
+    canvas.drawPath(path, linePaint(colors, dp))
+    // 手柄：主题色圆点套一圈浅色，再带一点投影——Material 滑块上那个拖动点的样子
+    val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = colors.surface
+        setShadowLayer(2f * dp, 0f, 1f * dp, AndroidColor.argb(0x4D, 0, 0, 0))
+    }
+    val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = colors.primary
+    }
+    HandleCorner.entries.forEach { corner ->
+        val p = SelectionHandles.cornerPoint(quad, corner)
+        canvas.drawCircle(p.x, p.y, HANDLE_DP / 2f * dp, ring)
+        canvas.drawCircle(p.x, p.y, (HANDLE_DP / 2f - HANDLE_RING_DP) * dp, dot)
+    }
+}
+
+/** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
+private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
+    val path = quad.toPath()
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = (colors.primary and 0x00FFFFFF) or (DRAFT_FILL_ALPHA shl 24)
+    }
+    canvas.drawPath(path, fill)
+    canvas.drawPath(path, haloPaint(colors, dp))
+    canvas.drawPath(path, linePaint(colors, dp).apply {
+        pathEffect = DashPathEffect(floatArrayOf(8f * dp, 5f * dp), 0f)
+    })
 }
 
 /** 类型小标签的文字：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */

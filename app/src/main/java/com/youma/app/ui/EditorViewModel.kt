@@ -421,14 +421,20 @@ class EditorViewModel(
 
     // ---------- 编辑 ----------
 
+    /**
+     * 点一下：识别出的候选在 MASKED ⇄ OUTLINED 之间切换；手动框不切换，而是选中它，调出手柄与删除。
+     * 手动框是用户自己画的，画它就是要打码，不想要就删掉——点它要是把码去掉了，
+     * 「点一下再调一调」就成了「点一下码没了」。
+     */
     fun onTap(imagePoint: PointF) {
-        val plan = _state.value.plan
-        val hit = GestureRules.hitTest(plan.items, imagePoint)
-        if (hit == null) {
-            uiState = _state.value.copy(selectedManualId = null)
+        val hit = GestureRules.hitTest(_state.value.plan.items, imagePoint)
+        if (hit?.source == DetectorSource.MANUAL) {
+            uiState = _state.value.copy(selectedManualId = hit.candidateId)
             return
         }
-        mutate { it.toggle(hit.candidateId) }
+        // 点空白、点候选都算点了别处：选中态收起
+        if (hit != null) mutate { it.toggle(hit.candidateId) }
+        uiState = _state.value.copy(selectedManualId = null)
     }
 
     fun onManualBox(quadInImageSpace: Quad) {
@@ -440,11 +446,8 @@ class EditorViewModel(
             state = MaskState.MASKED,          // 落笔即打码
         )
         mutate { it.add(item) }
-    }
-
-    fun onLongPress(imagePoint: PointF) {
-        val hit = GestureRules.hitTest(_state.value.plan.items, imagePoint)
-        uiState = _state.value.copy(selectedManualId = hit?.candidateId)
+        // 画完直接进选中态：手柄就在手边，不用再点一下才能调大小
+        uiState = _state.value.copy(selectedManualId = item.candidateId)
     }
 
     fun clearSelection() {
