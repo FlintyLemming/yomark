@@ -83,7 +83,7 @@
 
 ## 下载
 
-在 [Releases](https://github.com/FlintyLemming/yomark/releases) 下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。安装包是 debug 构建、固定签名，可以直接覆盖升级。v0.5.0 起包名改为 `com.yomark.app`，不会覆盖 v0.4.0 及更早的版本，装好后把旧版卸载即可。
+在 [Releases](https://github.com/FlintyLemming/yomark/releases) 下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。安装包是 debug 构建、固定签名，可以直接覆盖升级。
 
 每次推送后，GitHub Actions 也会打一份 APK，可以在对应运行的 Artifacts 里下载。推送 `v*` 标签，或者在 Actions 页面手动触发并填写版本号，单元测试通过后会自动发布 Release，说明取自 `docs/release-notes/<版本号>.md`。
 
