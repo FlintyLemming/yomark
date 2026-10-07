@@ -96,7 +96,7 @@ HanLP（portable 1.8.4，Apache-2.0，jar 8 MB，纯 Java，能在 Android 上�
    可以在真机上试试给 Prompt API 加一张截图（`ImagePart`）会不会更好；
 3. **可选：HanLP 人名识别**，做成识别设置里的实验开关，结果只圈不打码，专门补聊天句子里的人名。先在真机上量内存和首次加载时间。
    **已实施**：并在人名规则 `name` 里，从字面认出的只圈不打码（起初单独成规则 `name-text`，2026-10-04 并回「人名」一行），
-   见 `docs/superpowers/specs/2026-10-03-youma-name-from-text-design.md`；
+   见 `docs/superpowers/specs/2026-10-03-yomark-name-from-text-design.md`；
 4. **条码默认改严格档**：解不出内容就不报。没有随包模型，就没法让模型复核疑似条码；宽松档留作选项；
 5. **规则管不到的部分**，即没有 Nano 的设备上、自由行文里没带称呼的人名，留给导出前的检查和手动框。
    这是全设备方案的边界，界面上要说清楚，不能假装都认出来了。
@@ -255,7 +255,7 @@ python3 make_samples.py                     # 合成页 + 真值 + 条码探针�
 LLAMA_SERVER=/path/to/llama-server python3 run_eval.py qwen35-2b  # 文字、看图、条码题
 LLAMA_SERVER=/path/to/llama-server python3 run_hybrid.py qwen35-2b  # 文字·全送、图 + 文字
 python3 score_eval.py qwen35-2b
-../../gradlew -p ocr-dump -q run -Pmain=com.youma.app.RuleProtoKt --args="../out/ocr ../out/rule-proto.json"
+../../gradlew -p ocr-dump -q run -Pmain=com.yomark.app.RuleProtoKt --args="../out/ocr ../out/rule-proto.json"
 python3 score_rules.py out/rule-proto.json   # 出厂规则、规则 + 补强、HanLP
 ```
 

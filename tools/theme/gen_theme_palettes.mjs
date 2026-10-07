@@ -5,7 +5,7 @@
 // 而不是莫奈默认的 TonalSpot 那样褪成砖红、和橙色分不太开。
 //
 //   cd tools/theme && npm install
-//   node gen_theme_palettes.mjs > ../../app/src/main/java/com/youma/app/ui/theme/ThemePalettes.kt
+//   node gen_theme_palettes.mjs > ../../app/src/main/java/com/yomark/app/ui/theme/ThemePalettes.kt
 //
 // 改种子色或增删预设后重跑一遍，并同步 ThemeColor 枚举。
 import {
@@ -40,7 +40,7 @@ const ROLES = [
 const hex = (argb) => '0x' + (argb >>> 0).toString(16).toUpperCase().padStart(8, '0');
 
 const out = [];
-out.push('package com.youma.app.ui.theme');
+out.push('package com.yomark.app.ui.theme');
 out.push('');
 out.push('import androidx.compose.material3.ColorScheme');
 out.push('import androidx.compose.material3.lightColorScheme');

@@ -1,5 +1,5 @@
 {
-  "name": "youma-theme-palettes",
+  "name": "yomark-theme-palettes",
   "private": true,
   "type": "module",
   "description": "生成 app 里预设主题色的浅色配色表（ThemePalettes.kt）",

@@ -4,7 +4,7 @@
       写在主题里是为了冷启动的启动窗口那一下也对——父主题的状态栏是深灰底配白色图标，
       Android 15 起底色被系统换成透明，白色图标就落在浅色窗口背景上了。
     -->
-    <style name="Theme.Youma" parent="android:Theme.Material.Light.NoActionBar">
+    <style name="Theme.Yomark" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">true</item>

@@ -1,8 +1,8 @@
-package com.youma.app
+package com.yomark.app
 
 import com.hankcs.hanlp.HanLP
-import com.youma.app.rules.DefaultRuleSet
-import com.youma.app.rules.LabeledField
+import com.yomark.app.rules.DefaultRuleSet
+import com.yomark.app.rules.LabeledField
 import java.io.File
 import java.util.Locale
 
@@ -10,7 +10,7 @@ import java.util.Locale
  * 规则补强的原型（只在评测台里，不进 app）：在出厂规则之外再加五种认法，外加 HanLP 的人名识别，
  * 对每页 OCR 行跑一遍，按来源分组写出命中原文，供 Python 打分。
  *
- * 用法：gradle run -Pmain=com.youma.app.RuleProtoKt --args="<ocr目录> <输出.json>"
+ * 用法：gradle run -Pmain=com.yomark.app.RuleProtoKt --args="<ocr目录> <输出.json>"
  */
 
 private class Line(val text: String, val conf: Float, val l: Float, val t: Float, val r: Float, val b: Float) {

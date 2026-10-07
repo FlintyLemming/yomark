@@ -25,13 +25,13 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" tools:node="remove" />
 
     <application
-        android:name=".YoumaApplication"
+        android:name=".YomarkApplication"
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:largeHeap="true"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Youma"
+        android:theme="@style/Theme.Yomark"
         android:enableOnBackInvokedCallback="true">
         <!--
           enableOnBackInvokedCallback：预见式返回。Android 16 起 targetSdk 36 默认就开，

@@ -1,7 +1,7 @@
-package com.youma.app
+package com.yomark.app
 
-import com.youma.app.engine.genai.SemanticPrompt
-import com.youma.app.engine.ppocr.PpOcrEngine
+import com.yomark.app.engine.genai.SemanticPrompt
+import com.yomark.app.engine.ppocr.PpOcrEngine
 import java.io.File
 import javax.imageio.ImageIO
 

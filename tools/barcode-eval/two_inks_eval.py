@@ -9,7 +9,7 @@
 另一边是照片：scikit-image 自带的彩色样图（CC0 / 公有领域）里随机取的窗口，
 以及 --photos 指定目录里的图（整张缩到 200 像素宽当一个框，模拟截图里的缩略图）。
 
-判定逐行对应 app/src/main/java/com/youma/app/engine/mlkit/TwoInks.kt：像素中心落在四边形里、
+判定逐行对应 app/src/main/java/com/yomark/app/engine/mlkit/TwoInks.kt：像素中心落在四边形里、
 又不在中心 logo 区里才算，整数亮度、256 档 Otsu、两类逐通道中位色连线、离线距离与占比、η 后路。
 阈值改了两边一起改。
 

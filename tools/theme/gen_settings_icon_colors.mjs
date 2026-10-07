@@ -8,7 +8,7 @@
 // 绿和青能到 40 以上，不压的话这两个会亮得扎眼。图标保留种子色的彩度。
 //
 //   cd tools/theme && npm install
-//   node gen_settings_icon_colors.mjs > ../../app/src/main/java/com/youma/app/ui/settings/SettingsIconColors.kt
+//   node gen_settings_icon_colors.mjs > ../../app/src/main/java/com/yomark/app/ui/settings/SettingsIconColors.kt
 //
 // 增删颜色后重跑一遍。
 import { Hct, TonalPalette } from '@material/material-color-utilities';
@@ -32,7 +32,7 @@ const hex = (argb) => '0x' + (argb >>> 0).toString(16).toUpperCase().padStart(8,
 const seedHex = (argb) => '#' + (argb & 0xffffff).toString(16).toUpperCase().padStart(6, '0');
 
 const out = [];
-out.push('package com.youma.app.ui.settings');
+out.push('package com.yomark.app.ui.settings');
 out.push('');
 out.push('import androidx.compose.ui.graphics.Color');
 out.push('');
