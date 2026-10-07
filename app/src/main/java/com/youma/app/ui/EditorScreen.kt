@@ -131,7 +131,6 @@ fun EditorScreen(
                     state = state,
                     registry = registry,
                     onTap = vm::onTap,
-                    onLongPress = vm::onLongPress,
                     onManualBox = vm::onManualBox,
                     onResize = vm::previewSelectedQuad,
                     onCommitDrag = vm::commitDrag,

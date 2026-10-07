@@ -1,32 +1,40 @@
 package com.youma.app.ui.canvas
 
+import android.graphics.Point
 import android.graphics.PointF
 import android.graphics.RectF
 import com.youma.app.core.geometry.Quad
 import kotlin.math.hypot
+import kotlin.math.roundToInt
 
 enum class HandleCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT }
 
 /**
- * 手动框的选中态（spec §7.3）：四角手柄 + 删除按钮，拖框体移动、拖手柄调整大小。
+ * 手动框的选中态（spec §7.3）：四角手柄 + 框上方的「删除」工具条，拖框体移动、拖手柄调整大小。
  *
- * 只对 kind == MANUAL 的框出现。规则命中的候选进不了选中态——
+ * 只对手动框出现。规则命中的候选进不了选中态——
  * 它们不可删也不可改，能做的只有 MASKED ⇄ OUTLINED 切换（spec §4.2 的不对称规则）。
  *
  * 手动框一律是轴对齐的（GestureRules.quadFromDrag 保证），所以这里用 bounds 运算是安全的。
  */
 object SelectionHandles {
 
-    fun handleRects(quad: Quad, sizePx: Float): Map<HandleCorner, RectF> {
+    fun cornerPoint(quad: Quad, corner: HandleCorner): PointF {
         val b = quad.bounds()
+        return when (corner) {
+            HandleCorner.TOP_LEFT -> PointF(b.left, b.top)
+            HandleCorner.TOP_RIGHT -> PointF(b.right, b.top)
+            HandleCorner.BOTTOM_RIGHT -> PointF(b.right, b.bottom)
+            HandleCorner.BOTTOM_LEFT -> PointF(b.left, b.bottom)
+        }
+    }
+
+    fun handleRects(quad: Quad, sizePx: Float): Map<HandleCorner, RectF> {
         val h = sizePx / 2f
-        fun at(x: Float, y: Float) = RectF(x - h, y - h, x + h, y + h)
-        return mapOf(
-            HandleCorner.TOP_LEFT to at(b.left, b.top),
-            HandleCorner.TOP_RIGHT to at(b.right, b.top),
-            HandleCorner.BOTTOM_RIGHT to at(b.right, b.bottom),
-            HandleCorner.BOTTOM_LEFT to at(b.left, b.bottom),
-        )
+        return HandleCorner.entries.associateWith { corner ->
+            val p = cornerPoint(quad, corner)
+            RectF(p.x - h, p.y - h, p.x + h, p.y + h)
+        }
     }
 
     /**
@@ -39,12 +47,31 @@ object SelectionHandles {
             .minByOrNull { hypot(it.value.centerX() - point.x, it.value.centerY() - point.y) }
             ?.key
 
-    fun deleteButtonRect(quad: Quad, sizePx: Float): RectF {
-        val b = quad.bounds()
-        val h = sizePx / 2f
-        val cx = b.right
-        val cy = b.top - sizePx * 1.2f
-        return RectF(cx - h, cy - h, cx + h, cy + h)
+    /**
+     * 工具条左上角摆在哪（屏幕像素）。[box] 是选中框在屏幕上的范围，[areaW]×[areaH] 是画布。
+     *
+     * 优先放在框上方、与框水平居中；上方放不下就放到框下方，再放不下（框几乎占满画布）就贴着画布顶边。
+     * 水平方向不出画布。框整个被拖出了视野时返回 null：工具条不该孤零零地贴在画布边上。
+     */
+    fun toolbarPosition(
+        box: RectF,
+        barW: Int,
+        barH: Int,
+        areaW: Int,
+        areaH: Int,
+        gap: Float,
+        margin: Float,
+    ): Point? {
+        if (box.right < 0f || box.left > areaW || box.bottom < 0f || box.top > areaH) return null
+        val above = box.top - gap - barH
+        val below = box.bottom + gap
+        val y = when {
+            above >= margin -> above
+            below + barH <= areaH - margin -> below
+            else -> margin
+        }
+        val x = (box.centerX() - barW / 2f).coerceAtMost(areaW - margin - barW).coerceAtLeast(margin)
+        return Point(x.roundToInt(), y.roundToInt())
     }
 
     fun move(quad: Quad, dx: Float, dy: Float): Quad {

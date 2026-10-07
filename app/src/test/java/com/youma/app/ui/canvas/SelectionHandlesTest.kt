@@ -46,11 +46,39 @@ class SelectionHandlesTest {
         assertThat(SelectionHandles.hitHandle(box, PointF(200f, 150f), 20f)).isNull()
     }
 
+    // 工具条 100×40，画布 1000×800，与框隔 10、离画布边至少 8
+    private fun toolbar(l: Float, t: Float, r: Float, b: Float) =
+        SelectionHandles.toolbarPosition(RectF(l, t, r, b), 100, 40, 1000, 800, gap = 10f, margin = 8f)
+
     @Test
-    fun `the delete button sits above the top-right corner`() {
-        val r = SelectionHandles.deleteButtonRect(box, sizePx = 20f)
-        assertThat(r.centerY()).isLessThan(100f)
-        assertThat(r.centerX()).isGreaterThan(280f)
+    fun `the toolbar sits above the box, centred on it`() {
+        val p = toolbar(300f, 300f, 500f, 400f)!!
+        assertThat(p.x).isEqualTo(350)          // 框中心 400 - 工具条半宽 50
+        assertThat(p.y).isEqualTo(250)          // 框顶 300 - 间距 10 - 工具条高 40
+    }
+
+    @Test
+    fun `with no room above, the toolbar goes below the box`() {
+        val p = toolbar(300f, 20f, 500f, 400f)!!
+        assertThat(p.y).isEqualTo(410)
+    }
+
+    @Test
+    fun `when the box fills the canvas, the toolbar hugs the top edge`() {
+        val p = toolbar(-50f, 10f, 1050f, 790f)!!
+        assertThat(p.y).isEqualTo(8)
+    }
+
+    @Test
+    fun `the toolbar never leaves the canvas sideways`() {
+        assertThat(toolbar(-80f, 300f, 20f, 400f)!!.x).isEqualTo(8)
+        assertThat(toolbar(980f, 300f, 1100f, 400f)!!.x).isEqualTo(1000 - 8 - 100)
+    }
+
+    @Test
+    fun `no toolbar for a box panned out of view`() {
+        assertThat(toolbar(1100f, 300f, 1200f, 400f)).isNull()
+        assertThat(toolbar(300f, -200f, 500f, -10f)).isNull()
     }
 
     @Test
