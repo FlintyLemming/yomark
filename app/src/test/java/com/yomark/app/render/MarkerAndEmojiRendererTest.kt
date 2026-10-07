@@ -79,6 +79,41 @@ class MarkerAndEmojiRendererTest {
         assertThat(bmp.getPixel(10, 10)).isEqualTo(Color.WHITE)
     }
 
+    @Test fun `emoji paints the chosen background, always opaque`() {
+        val bmp = white()
+        EmojiRenderer().render(
+            Canvas(bmp), bmp, Quad.fromRect(RectF(40f, 40f, 160f, 160f)),
+            MaskOptions(emojiBackground = 0x00FF0000),            // 透明度不认：底色是盖住内容的那一层
+        )
+        assertThat(bmp.getPixel(45, 45)).isEqualTo(Color.RED)
+    }
+
+    /** 长条形的框上，单个表情只在正中；排满时两头也有。 */
+    @Test fun `tiled emoji fills the long edge instead of one glyph in the middle`() {
+        fun inkNearLeftEnd(tiled: Boolean): Boolean {
+            val bmp = white(240)
+            val opts = MaskOptions(emojiBackground = Color.WHITE, emojiTiled = tiled)
+            EmojiRenderer().render(Canvas(bmp), bmp, Quad.fromRect(RectF(10f, 100f, 230f, 140f)), opts)
+            for (x in 12..50 step 2) for (y in 102..138 step 2) {
+                if (bmp.getPixel(x, y) != Color.WHITE) return true
+            }
+            return false
+        }
+        assertThat(inkNearLeftEnd(tiled = false)).isFalse()
+        assertThat(inkNearLeftEnd(tiled = true)).isTrue()
+    }
+
+    @Test fun `marker draws with the chosen opacity`() {
+        fun redAt(alpha: Float): Int {
+            val bmp = white()
+            val color = MaskOptions.withAlpha(Color.BLUE, alpha)
+            MarkerRenderer().render(Canvas(bmp), bmp, Quad.fromRect(RectF(40f, 40f, 160f, 160f)), MaskOptions(markerColor = color))
+            return Color.red(bmp.getPixel(100, 100))
+        }
+        // 蓝色越浓，白底上剩下的红越少
+        assertThat(redAt(0.7f)).isLessThan(redAt(0.2f))
+    }
+
     @Test fun `a tiny region does not crash either renderer`() {
         val bmp = white()
         val tiny = Quad.fromRect(RectF(0f, 0f, 2f, 2f))

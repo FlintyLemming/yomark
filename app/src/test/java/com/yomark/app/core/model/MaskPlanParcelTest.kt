@@ -31,12 +31,12 @@ class MaskPlanParcelTest {
     private fun plan() = MaskPlan(
         items = listOf(
             MaskItem("rule-card-0-0-0", Quad.fromRect(RectF(1f, 2f, 3f, 4f)),
-                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED),
+                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED,
+                MaskLook(MaskStyle.PIXELATE, MaskOptions(solidColor = 0x11223344, pixelBlockDivisor = 6))),
             MaskItem("manual-abc", Quad.fromRect(RectF(5f, 6f, 7f, 8f)),
-                SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.OUTLINED),
+                SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.OUTLINED,
+                MaskLook(MaskStyle.EMOJI, MaskOptions(emoji = "🙈", emojiBackground = 0xFFFFE082.toInt(), emojiTiled = true))),
         ),
-        style = MaskStyle.PIXELATE,
-        options = MaskOptions(solidColor = 0x11223344, pixelBlockDivisor = 6, emoji = "🙈"),
     )
 
     @Test
@@ -62,10 +62,13 @@ class MaskPlanParcelTest {
     }
 
     @Test
-    fun `style and options survive`() {
+    fun `each item keeps its own style and options`() {
         val restored = roundTrip(plan())
-        assertThat(restored.style).isEqualTo(MaskStyle.PIXELATE)
-        assertThat(restored.options.pixelBlockDivisor).isEqualTo(6)
-        assertThat(restored.options.emoji).isEqualTo("🙈")
+        val (card, manual) = restored.items
+        assertThat(card.look.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(card.look.options.pixelBlockDivisor).isEqualTo(6)
+        assertThat(manual.look.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(manual.look.options.emoji).isEqualTo("🙈")
+        assertThat(manual.look.options.emojiTiled).isTrue()
     }
 }

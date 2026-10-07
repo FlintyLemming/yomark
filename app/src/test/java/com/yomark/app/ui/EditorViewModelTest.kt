@@ -13,6 +13,7 @@ import com.yomark.app.core.geometry.Quad
 import com.yomark.app.core.image.ImageIntake
 import com.yomark.app.core.model.DetectorSource
 import com.yomark.app.core.model.MaskItem
+import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskState
 import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKind
@@ -236,15 +237,217 @@ class EditorViewModelTest {
         assertThat(vm.state.value.plan.items).hasSize(1)
     }
 
+    // ---------- 样式：每块码有自己的样式，样式栏是画笔（spec §7.5 修订） ----------
+
+    private fun box(l: Float, t: Float, r: Float, b: Float) = Quad.fromRect(RectF(l, t, r, b))
+
+    private fun EditorViewModel.looks() = state.value.plan.items.map { it.look.style }
+
     @Test
-    fun `changing style is undoable and global`() = runTest(dispatcher) {
+    fun `a new style applies to the next mask, not to the ones already made`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+        vm.onManualBox(box(10f, 10f, 90f, 90f))
+        vm.clearSelection()
+
         vm.setStyle(MaskStyle.PIXELATE)
-        assertThat(vm.state.value.plan.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID)          // 已经打好的不跟着变
+
+        vm.onManualBox(box(120f, 120f, 200f, 200f))
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.PIXELATE).inOrder()
+    }
+
+    @Test
+    fun `tapping an outlined candidate masks it with the current style`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED)))
+        vm.setStyle(MaskStyle.EMOJI)
+
+        vm.onTap(PointF(50f, 50f))
+        val item = vm.state.value.plan.items.single()
+        assertThat(item.state).isEqualTo(MaskState.MASKED)
+        assertThat(item.look.style).isEqualTo(MaskStyle.EMOJI)
+    }
+
+    @Test
+    fun `changing the style with nothing selected is not an undo step`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.BLUR)
+        assertThat(vm.state.value.canUndo).isFalse()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.BLUR)
+    }
+
+    /** 刚画完的框就是选中的：画完接着调颜色，改的就是它，之后再画的也是这个颜色。 */
+    @Test
+    fun `panel edits change the selected box and the boxes drawn after it`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(box(10f, 10f, 90f, 90f))
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.RED)))
+
+        assertThat(vm.state.value.plan.items.single().look.options.solidColor).isEqualTo(Color.RED)
+        vm.clearSelection()
+        vm.onManualBox(box(120f, 120f, 200f, 200f))
+        assertThat(vm.state.value.plan.items.map { it.look.options.solidColor })
+            .containsExactly(Color.RED, Color.RED)
+
+        // 撤销只撤 plan，画笔不回退
+        vm.undo(); vm.undo()
+        assertThat(vm.state.value.plan.items.single().look.options.solidColor).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(vm.state.value.brush.options.solidColor).isEqualTo(Color.RED)
+    }
+
+    @Test
+    fun `selecting a box shows its look without changing the brush`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(box(10f, 10f, 90f, 90f))
+        vm.clearSelection()
+        vm.setStyle(MaskStyle.EMOJI)
+
+        vm.onTap(PointF(50f, 50f))                                         // 点选那个色块
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.SOLID)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+
+        vm.onTap(PointF(300f, 300f))                                       // 点空白，样式栏回到画笔
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.EMOJI)
+    }
+
+    @Test
+    fun `a slider drag on the selected box is a single undo step`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.BLUR)
+        vm.onManualBox(box(10f, 10f, 90f, 90f))
+        val start = vm.state.value.barLook
+
+        listOf(0.12f, 0.18f, 0.24f, 0.3f).forEach {
+            vm.editLook(start.copy(options = start.options.copy(blurRadiusRatio = it)), inProgress = true)
+        }
+        vm.finishLookEdit()
+        assertThat(vm.state.value.plan.items.single().look.options.blurRadiusRatio).isEqualTo(0.3f)
+
         vm.undo()
-        assertThat(vm.state.value.plan.style).isEqualTo(MaskStyle.SOLID)
+        assertThat(vm.state.value.plan.items.single().look).isEqualTo(start)
+        vm.undo()
+        assertThat(vm.state.value.plan.items).isEmpty()
+    }
+
+    @Test
+    fun `apply to all restyles every masked item in one step and leaves outlined ones`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(
+            vm.state.value.plan
+                .add(rule("a", 10f, 10f, 90f, 90f))
+                .add(rule("b", 120f, 10f, 200f, 90f).copy(state = MaskState.OUTLINED))
+                .add(manual("m", 10f, 120f, 90f, 200f))
+        )
+        vm.setStyle(MaskStyle.MARKER)
+        vm.applyLookToAll()
+
+        val looks = vm.state.value.plan.items.associate { it.candidateId to it.look.style }
+        assertThat(looks).containsExactly("a", MaskStyle.MARKER, "b", MaskStyle.SOLID, "m", MaskStyle.MARKER)
+        vm.undo()
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.SOLID, MaskStyle.SOLID)
+    }
+
+    @Test
+    fun `reset puts back only the current style's params`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.BLACK, emoji = "🐱")))
+        vm.resetLookOptions()
+        assertThat(vm.state.value.brush.options.solidColor).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(vm.state.value.brush.options.emoji).isEqualTo("🐱")
+    }
+
+    @Test
+    fun `tapping a style opens its panel and tapping it again closes it`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onStyleChipClick(MaskStyle.EMOJI)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+
+        vm.onStyleChipClick(MaskStyle.EMOJI)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        vm.onStyleChipClick(MaskStyle.EMOJI)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        vm.dismissStylePanel()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+    }
+
+    @Test
+    fun `the brush is remembered across image changes and sessions`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri("brush-1.jpg")); advanceUntilIdle()
+        vm.setStyle(MaskStyle.EMOJI)
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(emoji = "🐱", emojiTiled = true)))
+        advanceUntilIdle()                                                 // 落盘有去抖
+
+        vm.onImageChosen(sampleUri("brush-2.jpg")); advanceUntilIdle()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(vm.state.value.brush.options.emoji).isEqualTo("🐱")
+
+        val next = EditorViewModel(
+            intake = ImageIntake(context),
+            exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
+            engineProvider = { emptyEngine() },
+            settings = settings,
+            savedState = SavedStateHandle(),
+            ioDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+        assertThat(next.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(next.state.value.brush.options.emojiTiled).isTrue()
+    }
+
+    private fun twoToneUri(name: String): Uri {
+        val f = File(context.cacheDir, name)
+        val bmp = Bitmap.createBitmap(400, 400, Bitmap.Config.ARGB_8888)
+        Canvas(bmp).apply {
+            drawColor(Color.WHITE)
+            drawRect(200f, 0f, 400f, 400f, android.graphics.Paint().apply { color = Color.rgb(0x20, 0x60, 0xA0) })
+        }
+        f.outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bmp.recycle()
+        return f.toUri()
+    }
+
+    @Test
+    fun `the eyedropper takes the color under the tap and toggles nothing`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(twoToneUri("eyedropper.png")); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 250f, 250f, 350f, 350f)))
+        vm.startColorPick(ColorTarget.SOLID)
+
+        vm.onTap(PointF(-20f, 100f))                                       // 点在图外：接着等
+        assertThat(vm.state.value.colorPick).isEqualTo(ColorTarget.SOLID)
+
+        vm.onTap(PointF(300f, 300f))                                       // 点在一块码上：只取色，不切换
+        assertThat(vm.state.value.colorPick).isNull()
+        assertThat(vm.state.value.brush.options.solidColor).isEqualTo(Color.rgb(0x20, 0x60, 0xA0))
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.canUndo).isFalse()
+    }
+
+    @Test
+    fun `the eyedropper keeps the marker's opacity`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(twoToneUri("eyedropper-marker.png")); advanceUntilIdle()
+        vm.setStyle(MaskStyle.MARKER)
+        val before = vm.state.value.brush.options.markerAlpha
+        vm.startColorPick(ColorTarget.MARKER)
+        vm.onTap(PointF(300f, 100f))
+        val after = vm.state.value.brush.options
+        assertThat(after.markerColor and 0xFFFFFF).isEqualTo(0x2060A0)
+        assertThat(after.markerAlpha).isWithin(0.01f).of(before)
     }
 
     @Test

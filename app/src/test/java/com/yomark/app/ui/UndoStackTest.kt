@@ -1,8 +1,14 @@
 package com.yomark.app.ui
 
-import com.yomark.app.core.model.MaskOptions
+import android.graphics.RectF
+import com.yomark.app.core.geometry.Quad
+import com.yomark.app.core.model.DetectorSource
+import com.yomark.app.core.model.MaskItem
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskPlan
+import com.yomark.app.core.model.MaskState
 import com.yomark.app.core.model.MaskStyle
+import com.yomark.app.core.model.SensitiveKind
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,7 +17,15 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class UndoStackTest {
 
-    private fun planOf(style: MaskStyle) = MaskPlan(emptyList(), style, MaskOptions())
+    /** 一块用 [style] 打的码：不同样式的 plan 彼此不相等，正好拿来区分快照。 */
+    private fun planOf(style: MaskStyle) = MaskPlan(
+        listOf(
+            MaskItem(
+                "m", Quad.fromRect(RectF(0f, 0f, 10f, 10f)), SensitiveKind.MANUAL,
+                DetectorSource.MANUAL, MaskState.MASKED, MaskLook(style),
+            )
+        )
+    )
 
     @Test
     fun `fresh stack can neither undo nor redo`() {

@@ -1,6 +1,7 @@
 package com.yomark.app.ui.batch
 
 import android.net.Uri
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskPlan
 import java.io.File
 
@@ -42,6 +43,7 @@ data class BatchSession(val items: List<BatchItem>, val index: Int) {
 
     fun advance(): BatchSession = if (isLast) this else copy(index = index + 1)
 
-    fun maskAllEverywhere(): BatchSession =
-        copy(items = items.map { it.copy(plan = it.plan?.maskAll()) })
+    /** 拦截对话框的「全部打码」：每一张的圈出项都用 [look]（编辑器当下的画笔）打上码。 */
+    fun maskAllEverywhere(look: MaskLook): BatchSession =
+        copy(items = items.map { it.copy(plan = it.plan?.maskAll(look)) })
 }

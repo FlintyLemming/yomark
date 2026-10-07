@@ -1,6 +1,7 @@
 package com.yomark.app.data
 
 import androidx.test.core.app.ApplicationProvider
+import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.export.PurposeWatermarkStyle
 import com.yomark.app.ui.canvas.ScanStyle
@@ -36,6 +37,48 @@ class SettingsStoreTest {
         val store = store()
         store.writeRawStyleForTest("NOT_A_STYLE")
         assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.SOLID)
+    }
+
+    @Test
+    fun `mask options default to the factory look`() = runTest {
+        assertThat(store().maskOptions.first()).isEqualTo(MaskOptions())
+    }
+
+    @Test
+    fun `mask options survive a write and read`() = runTest {
+        val store = store()
+        val tuned = MaskOptions(
+            solidColor = 0xFF000000.toInt(),
+            pixelBlockDivisor = 4,
+            blurRadiusRatio = 0.2f,
+            markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f),
+            emoji = "🐱",
+            emojiBackground = 0xFFFFE082.toInt(),
+            emojiTiled = true,
+        )
+        store.setMaskOptions(tuned)
+        assertThat(store.maskOptions.first()).isEqualTo(tuned)
+    }
+
+    /** 手改过的、以后改了范围的旧值读回来收进范围：色块不会半透明，马克笔不会不透明，马赛克不比出厂细。 */
+    @Test
+    fun `out of range stored mask options are pulled back into range`() = runTest {
+        val store = store()
+        store.writeRawMaskOptionsForTest(markerColor = 0xFFFFEB3B.toInt(), pixelDivisor = 64, solidColor = 0x10000000)
+        val read = store.maskOptions.first()
+        assertThat(read.markerAlpha).isWithin(0.01f).of(MaskOptions.MARKER_ALPHA_RANGE.endInclusive)
+        assertThat(read.pixelBlockDivisor).isEqualTo(MaskOptions.FINEST_PIXEL_DIVISOR)
+        assertThat(read.solidColor).isEqualTo(0xFF000000.toInt())
+    }
+
+    @Test
+    fun `resetting settings leaves the editor's brush alone`() = runTest {
+        val store = store()
+        store.setLastStyle(MaskStyle.EMOJI)
+        store.setMaskOptions(MaskOptions(emoji = "🐱"))
+        store.resetSettings()
+        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.EMOJI)
+        assertThat(store.maskOptions.first().emoji).isEqualTo("🐱")
     }
 
     @Test

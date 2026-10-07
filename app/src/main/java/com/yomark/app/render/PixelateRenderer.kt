@@ -21,9 +21,20 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
 
     override val style = MaskStyle.PIXELATE
 
-    /** @param renderScale 见 [MaskOptions.renderScale]：12px 下限是原图口径，按它折算到当前坐标系。 */
-    fun blockSizeFor(quad: Quad, divisor: Int, renderScale: Float = 1f): Float =
-        max(quad.shortEdge() / max(1, divisor), MIN_BLOCK_PX * renderScale)
+    /**
+     * 块边长 = max(区域短边 / divisor, 下限)。出厂的 divisor = 8 时下限就是 12px。
+     *
+     * 往粗调（divisor 变小）时下限按同样的比例抬高：截图上一条文字行的短边多半不到 96px，
+     * 那里起作用的一直是下限，只放大比例的话，面板上的滑条在文字上拖不出任何变化。
+     * divisor 比 8 大时下限不再降——12px 是安全底线，不跟着变细。
+     *
+     * @param renderScale 见 [MaskOptions.renderScale]：下限是原图口径，按它折算到当前坐标系。
+     */
+    fun blockSizeFor(quad: Quad, divisor: Int, renderScale: Float = 1f): Float {
+        val d = max(1, divisor)
+        val coarsen = max(1f, MaskOptions.FINEST_PIXEL_DIVISOR.toFloat() / d)
+        return max(quad.shortEdge() / d, MIN_BLOCK_PX * renderScale * coarsen)
+    }
 
     fun willFallBack(quad: Quad, divisor: Int, renderScale: Float = 1f): Boolean =
         blockSizeFor(quad, divisor, renderScale) >= quad.shortEdge()

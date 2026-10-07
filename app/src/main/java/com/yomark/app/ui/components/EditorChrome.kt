@@ -27,8 +27,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.ui.AiReview
 
 @Composable
@@ -68,9 +68,8 @@ fun EditorTopBar(
 
 @Composable
 fun EditorBottomBar(
-    style: MaskStyle,
-    degradeNote: String?,
-    onStyleChange: (MaskStyle) -> Unit,
+    styleBar: StyleBarModel,
+    styleActions: StyleBarActions,
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
@@ -81,9 +80,11 @@ fun EditorBottomBar(
     aiReview: AiReview = AiReview.HIDDEN,
     onAiReview: () -> Unit = {},
 ) {
+    // 横屏的手机上屏幕矮，样式面板开着时再留一行导出按钮，画布就只剩一条缝了：先让给画布，收起面板就回来
+    val short = LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_DP
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        StyleBar(style = style, onChange = onStyleChange, degradeNote = degradeNote)
-        Row(
+        StyleBar(model = styleBar, actions = styleActions)
+        if (!(short && styleBar.panelOpen)) Row(
             Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -101,6 +102,9 @@ fun EditorBottomBar(
         }
     }
 }
+
+/** 比这矮的屏幕（横屏的手机）上，样式面板开着时收起导出那一行。 */
+private const val SHORT_SCREEN_DP = 480
 
 /**
  * 「AI 复查」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持、设置里关了时整个不出现。

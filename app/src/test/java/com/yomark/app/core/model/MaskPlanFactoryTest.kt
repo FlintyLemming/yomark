@@ -42,6 +42,13 @@ class MaskPlanFactoryTest {
     }
 
     @Test
+    fun `every item carries the look it was given`() {
+        val look = MaskLook(MaskStyle.BLUR, MaskOptions(blurRadiusRatio = 0.2f))
+        val items = MaskPlanFactory.itemsFrom(listOf(candidate("1", true), candidate("2", false)), look)
+        assertThat(items.map { it.look }).containsExactly(look, look)
+    }
+
+    @Test
     fun `empty candidates yield an empty item list`() {
         assertThat(MaskPlanFactory.itemsFrom(emptyList())).isEmpty()
     }

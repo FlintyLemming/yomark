@@ -14,7 +14,6 @@ import com.yomark.app.core.model.MaskItem
 import com.yomark.app.core.model.MaskOptions
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.core.model.MaskState
-import com.yomark.app.core.model.MaskStyle
 import com.yomark.app.core.model.SensitiveKind
 import com.yomark.app.render.RendererRegistry
 import org.junit.Test
@@ -41,7 +40,7 @@ class FrostSceneDrawTest {
     private val center = block("center", 150f, 330f, 250f, 370f, DetectorSource.RULE)
     private val corner = block("corner", 300f, 640f, 390f, 690f, DetectorSource.RULE)
     private val manual = block("manual", 20f, 20f, 120f, 60f, DetectorSource.MANUAL)
-    private val plan = MaskPlan(listOf(center, corner, manual), MaskStyle.SOLID, MaskOptions())
+    private val plan = MaskPlan(listOf(center, corner, manual))
 
     private fun block(id: String, l: Float, t: Float, r: Float, b: Float, source: DetectorSource) = MaskItem(
         id, Quad.fromRect(RectF(l, t, r, b)),

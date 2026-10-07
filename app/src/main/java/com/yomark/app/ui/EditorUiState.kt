@@ -2,6 +2,8 @@ package com.yomark.app.ui
 
 import android.net.Uri
 import com.yomark.app.core.image.SourceImage
+import com.yomark.app.core.model.MaskItem
+import com.yomark.app.core.model.MaskLook
 import com.yomark.app.core.model.MaskPlan
 import com.yomark.app.engine.RecognitionConfig
 import com.yomark.app.export.PurposeWatermarkStyle
@@ -46,9 +48,16 @@ data class EditorUiState(
     val exporting: Boolean = false,
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
+    /**
+     * 画笔：下一次打码用的样式和参数（spec §7.5 修订）。新画的框、点了打码的虚线框、识别出来直接打码的都用它，
+     * 已经打好的码不跟着变。偏好项，记在 SettingsStore 里，也活过每一次 EditorUiState 重建。
+     */
+    val brush: MaskLook = MaskLook(),
+    /** 样式栏下面的调节面板开着。点样式栏上的一项就弹出来，再点一下当前那项收起。 */
+    val stylePanelOpen: Boolean = false,
+    /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
+    val colorPick: ColorTarget? = null,
     val pendingDialogVisible: Boolean = false,
-    /** 当前样式在这张图上会降级时的说明。抹除遇到复杂背景时非空。 */
-    val degradeNote: String? = null,
     /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
     val purposeText: String? = null,
     /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
@@ -68,4 +77,14 @@ data class EditorUiState(
     val canUndo: Boolean = false,
     val canRedo: Boolean = false,
     val message: EditorMessage? = null,
-)
+) {
+    /** 选中的手动框；没有选中、或选中的框已经不在了（被撤销掉了）时为 null。 */
+    val selectedItem: MaskItem? get() = selectedManualId?.let { plan.find(it) }
+
+    /**
+     * 样式栏上显示、面板里调的那一份：选中了手动框时是那个框的样子，否则是画笔。
+     * 在面板上改，选中的框跟着变，画笔也换成改后的样子（见 EditorViewModel.editLook）；
+     * 只是选中、什么也没改，画笔不动——取消选中后样式栏回到画笔。
+     */
+    val barLook: MaskLook get() = selectedItem?.look ?: brush
+}
