@@ -3,6 +3,7 @@ package com.youma.app.ui.canvas
 import android.graphics.PointF
 import android.graphics.RectF
 import com.youma.app.core.geometry.Quad
+import kotlin.math.hypot
 
 enum class HandleCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT }
 
@@ -28,10 +29,14 @@ object SelectionHandles {
         )
     }
 
-    /** 命中判定放宽到手柄的 1.5 倍，手指比图标粗。 */
+    /**
+     * 命中判定放宽到手柄的 1.5 倍，手指比图标粗。
+     * 小框上几个角的命中区会叠在一起，取离手指最近的那个角，免得总是抓到左上角。
+     */
     fun hitHandle(quad: Quad, point: PointF, sizePx: Float): HandleCorner? =
         handleRects(quad, sizePx * 1.5f).entries
-            .firstOrNull { it.value.contains(point.x, point.y) }
+            .filter { it.value.contains(point.x, point.y) }
+            .minByOrNull { hypot(it.value.centerX() - point.x, it.value.centerY() - point.y) }
             ?.key
 
     fun deleteButtonRect(quad: Quad, sizePx: Float): RectF {

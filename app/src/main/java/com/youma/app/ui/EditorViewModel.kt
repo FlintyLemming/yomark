@@ -440,6 +440,8 @@ class EditorViewModel(
             state = MaskState.MASKED,          // 落笔即打码
         )
         mutate { it.add(item) }
+        // 画完直接进选中态：手柄就在手边，不用再长按一次才能调大小
+        uiState = _state.value.copy(selectedManualId = item.candidateId)
     }
 
     fun onLongPress(imagePoint: PointF) {

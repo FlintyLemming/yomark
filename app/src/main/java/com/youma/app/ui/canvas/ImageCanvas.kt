@@ -153,18 +153,21 @@ fun ImageCanvas(
 
                     // 选中态优先：删除按钮 > 手柄 > 框体，都不中才轮到画框/点击
                     val selected = latest.selectedManualId?.let { latest.plan.find(it) }
-                    val handleSize = HANDLE_DP_PX / viewport.scale
+                    val dpInImage = density.density / viewport.scale
+                    val handleHit = HANDLE_HIT_DP * dpInImage
                     val downImage = viewport.screenToImage(PointF(down.position.x, down.position.y))
                     var grabbedHandle: HandleCorner? = null
                     var grabbingBody = false
                     if (selected != null) {
-                        if (SelectionHandles.deleteButtonRect(selected.quad, handleSize * 1.4f)
+                        // 删除按钮的命中区比画出来的圆大一圈，与手柄一样照顾手指
+                        if (SelectionHandles.deleteButtonRect(selected.quad, DELETE_DP * dpInImage)
+                                .let { RectF(it).apply { inset(-it.width() * 0.3f, -it.height() * 0.3f) } }
                                 .contains(downImage.x, downImage.y)
                         ) {
                             onDeleteSelected()
                             return@awaitEachGesture
                         }
-                        grabbedHandle = SelectionHandles.hitHandle(selected.quad, downImage, handleSize)
+                        grabbedHandle = SelectionHandles.hitHandle(selected.quad, downImage, handleHit)
                         grabbingBody = grabbedHandle == null && selected.quad.contains(downImage)
                     }
 
@@ -210,7 +213,9 @@ fun ImageCanvas(
                             if (mode == Mode.UNDECIDED && GestureRules.isDrag(totalDx, totalDy, touchSlopPx)) {
                                 mode = Mode.DRAW
                             }
-                            if (grabbedHandle != null && selected != null) {
+                            if (mode == Mode.NAVIGATE) {
+                                // 两指导航过一次，这一手势剩下的单指部分不再改框，也不画框
+                            } else if (grabbedHandle != null && selected != null) {
                                 val to = viewport.screenToImage(PointF(c.position.x, c.position.y))
                                 onResize(
                                     SelectionHandles.resize(
@@ -219,17 +224,13 @@ fun ImageCanvas(
                                     )
                                 )
                                 if (c.positionChanged()) c.consume()
-                            } else if (grabbingBody && selected != null) {
-                                val prev = viewport.screenToImage(PointF(c.previousPosition.x, c.previousPosition.y))
+                            } else if (grabbingBody && selected != null && mode == Mode.DRAW) {
+                                // 过了 touch slop 才算拖框体：没动的话这一下是点击，照常切换打码 / 圈出。
+                                // 位移按起手那一刻的框加总位移算，框紧跟手指，不丢 slop 那一段。
                                 val now = viewport.screenToImage(PointF(c.position.x, c.position.y))
-                                onResize(
-                                    SelectionHandles.move(
-                                        latest.plan.find(selected.candidateId)?.quad ?: selected.quad,
-                                        now.x - prev.x, now.y - prev.y,
-                                    )
-                                )
+                                onResize(SelectionHandles.move(selected.quad, now.x - downImage.x, now.y - downImage.y))
                                 if (c.positionChanged()) c.consume()
-                            } else if (mode == Mode.DRAW) {
+                            } else if (mode == Mode.DRAW && !grabbingBody) {
                                 draftQuad = GestureRules.quadFromDrag(
                                     viewport.screenToImage(PointF(start.x, start.y)),
                                     viewport.screenToImage(PointF(c.position.x, c.position.y)),
@@ -242,7 +243,7 @@ fun ImageCanvas(
                         if (event.changes.all { !it.pressed }) break
                     }
 
-                    if (grabbedHandle != null || grabbingBody) {
+                    if (grabbedHandle != null || (grabbingBody && mode != Mode.UNDECIDED)) {
                         onCommitDrag()               // 整段拖动只压一个快照
                         return@awaitEachGesture
                     }
@@ -313,34 +314,46 @@ fun ImageCanvas(
             }
             state.selectedManualId?.let { id ->
                 state.plan.find(id)?.let { item ->
-                    canvas.drawPath(item.quad.toPath(), selectionPaint(viewport.scale))
-                    val size = HANDLE_DP_PX / viewport.scale
+                    val dp = density.density / viewport.scale
+                    val path = item.quad.toPath()
+                    canvas.drawPath(path, underlayPaint(dp))
+                    canvas.drawPath(path, selectionPaint(dp))
                     val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         style = Paint.Style.FILL; color = AndroidColor.WHITE
                     }
                     val edge = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         style = Paint.Style.STROKE; color = AndroidColor.BLACK
-                        strokeWidth = 2f / viewport.scale
+                        strokeWidth = 1.5f * dp
                     }
-                    SelectionHandles.handleRects(item.quad, size).values.forEach { r ->
-                        canvas.drawRect(r, fill)
-                        canvas.drawRect(r, edge)
+                    // 手柄画成圆点：Material 里通行的「可拖动的角」的样子，比小方块好认
+                    SelectionHandles.handleRects(item.quad, HANDLE_DP * dp).values.forEach { r ->
+                        canvas.drawOval(r, fill)
+                        canvas.drawOval(r, edge)
                     }
                     // 删除按钮：白底红叉
-                    val del = SelectionHandles.deleteButtonRect(item.quad, size * 1.4f)
+                    val del = SelectionHandles.deleteButtonRect(item.quad, DELETE_DP * dp)
                     canvas.drawOval(del, fill)
                     canvas.drawOval(del, edge)
                     val cross = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         style = Paint.Style.STROKE
                         color = AndroidColor.rgb(0xD3, 0x2F, 0x2F)
-                        strokeWidth = 3f / viewport.scale
+                        strokeWidth = 2f * dp
+                        strokeCap = Paint.Cap.ROUND
                     }
                     val pad = del.width() * 0.28f
                     canvas.drawLine(del.left + pad, del.top + pad, del.right - pad, del.bottom - pad, cross)
                     canvas.drawLine(del.right - pad, del.top + pad, del.left + pad, del.bottom - pad, cross)
                 }
             }
-            draftQuad?.let { canvas.drawPath(it.toPath(), draftPaint(viewport.scale)) }
+            draftQuad?.let {
+                // 草稿框：先铺一层淡淡的暗色，再画深色实线打底、白色虚线压在上面。
+                // 只有白色虚线的话，落在白底截图上几乎看不见
+                val dp = density.density / viewport.scale
+                val path = it.toPath()
+                canvas.drawPath(path, draftFillPaint)
+                canvas.drawPath(path, underlayPaint(dp))
+                canvas.drawPath(path, draftPaint(dp))
+            }
 
             canvas.restoreToCount(save)
 
@@ -356,8 +369,14 @@ private enum class Mode { UNDECIDED, DRAW, NAVIGATE }
 private const val LONG_PRESS_MS = 450L
 private const val DOUBLE_TAP_MS = 300L
 
-/** 手柄边长（图像坐标下按缩放反算，视觉上恒定）。 */
-private const val HANDLE_DP_PX = 22f
+/** 手柄直径（dp）。画的时候按缩放反算到图像坐标，视觉大小恒定。 */
+private const val HANDLE_DP = 14f
+
+/** 手柄的命中边长（dp）。SelectionHandles.hitHandle 还会再放宽 1.5 倍，约 48dp，与触控目标的推荐尺寸一致。 */
+private const val HANDLE_HIT_DP = 32f
+
+/** 删除按钮直径（dp）。 */
+private const val DELETE_DP = 24f
 
 /** 2dp 虚线框（琥珀色）—— 圈出未打码的外观（spec §7.2）。线宽按缩放反算，保持视觉恒定。 */
 private fun outlinePaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -367,17 +386,33 @@ private fun outlinePaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     pathEffect = DashPathEffect(floatArrayOf(12f / scale, 8f / scale), 0f)
 }
 
-private fun selectionPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+/**
+ * 选中框、草稿框底下那一道深色实线：白线落在白底上看不见，深色线落在深底上看不见，
+ * 两道叠在一起什么底色上都看得清。[dp] 是 1dp 在图像坐标下的长度。
+ */
+private fun underlayPaint(dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
-    color = AndroidColor.WHITE
-    strokeWidth = 3f / scale
+    color = AndroidColor.argb(170, 0, 0, 0)
+    strokeWidth = 3.5f * dp
 }
 
-private fun draftPaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+private fun selectionPaint(dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
-    color = AndroidColor.argb(200, 255, 255, 255)
-    strokeWidth = 3f / scale
-    pathEffect = DashPathEffect(floatArrayOf(10f / scale, 6f / scale), 0f)
+    color = AndroidColor.WHITE
+    strokeWidth = 2f * dp
+}
+
+private fun draftPaint(dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    style = Paint.Style.STROKE
+    color = AndroidColor.WHITE
+    strokeWidth = 2f * dp
+    pathEffect = DashPathEffect(floatArrayOf(8f * dp, 5f * dp), 0f)
+}
+
+/** 草稿框内的淡暗色，拖的时候一眼看出圈住了哪一块。 */
+private val draftFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+    style = Paint.Style.FILL
+    color = AndroidColor.argb(48, 0, 0, 0)
 }
 
 /** 类型小标签的文字：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */

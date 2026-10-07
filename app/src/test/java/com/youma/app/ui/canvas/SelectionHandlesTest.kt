@@ -35,6 +35,13 @@ class SelectionHandlesTest {
     }
 
     @Test
+    fun `on a small box with overlapping hit areas, hitHandle picks the nearest corner`() {
+        val small = Quad.fromRect(RectF(100f, 100f, 120f, 120f))
+        assertThat(SelectionHandles.hitHandle(small, PointF(118f, 119f), 40f)).isEqualTo(HandleCorner.BOTTOM_RIGHT)
+        assertThat(SelectionHandles.hitHandle(small, PointF(119f, 101f), 40f)).isEqualTo(HandleCorner.TOP_RIGHT)
+    }
+
+    @Test
     fun `hitHandle returns null in the middle of the box`() {
         assertThat(SelectionHandles.hitHandle(box, PointF(200f, 150f), 20f)).isNull()
     }

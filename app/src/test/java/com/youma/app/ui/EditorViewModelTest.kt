@@ -133,6 +133,20 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `a freshly drawn box is selected so its handles show right away`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+
+        val item = vm.state.value.plan.items.single()
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+
+        vm.previewSelectedQuad(Quad.fromRect(RectF(10f, 10f, 150f, 120f)))
+        vm.commitDrag()
+        assertThat(vm.state.value.plan.items.single().quad.bounds()).isEqualTo(RectF(10f, 10f, 150f, 120f))
+    }
+
+    @Test
     fun `tapping a mask toggles it to outlined`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
