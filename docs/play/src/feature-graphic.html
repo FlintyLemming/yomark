@@ -1,0 +1,111 @@
+<!doctype html>
+<!-- Play 置顶大图，1024×500。node docs/play/src/render.cjs feature-graphic 渲染成 docs/play/feature-graphic.png
+     照 Play 的要求：底色不用白、黑、深灰（会和商店页面融在一起），用打码块的天蓝；要紧的东西放在中间，
+     四边留出会被裁掉的余量；不重复画应用图标，也不写「免费」「最好」之类的字。
+     右边的卡片是 README 头图里那张样图（order-page.html）的内容：一道光自上而下扫过，光走过的地方落了码，
+     与编辑器里识别完的样子一致——色块 #87CEEB，虚线框和类型标签 #FFB300，光是天蓝到淡紫。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Inter:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101014;
+    --text: #1f2329;
+    --mute: #8a8f99;
+    --sky: #87ceeb;
+    --amber: #ffb300;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1024px; height: 500px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(520px 360px at 12% 8%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 70%),
+      radial-gradient(480px 420px at 78% 92%, rgba(165, 180, 252, 0.45), rgba(165, 180, 252, 0) 70%),
+      linear-gradient(135deg, #a8ddf4 0%, #7cc6ec 48%, #5aaee3 100%);
+  }
+
+  /* ---------- 左：一句话 ---------- */
+  .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 430px; display: flex; flex-direction: column; justify-content: center; }
+  .eyebrow { font-family: 'Inter', 'Noto Sans SC', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 4px; color: rgba(16, 16, 20, 0.62); }
+  h1 { margin-top: 16px; font-size: 46px; font-weight: 900; line-height: 1.32; letter-spacing: 1px; }
+  .pills { display: flex; gap: 10px; margin-top: 30px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 18px; font-weight: 500; color: var(--text);
+    box-shadow: 0 2px 8px rgba(16, 60, 110, 0.12);
+  }
+  .pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+
+  /* ---------- 右：识别中的那一下 ---------- */
+  .card {
+    position: absolute; left: 536px; top: 50px; width: 420px; height: 400px; overflow: hidden;
+    background: #fff; border-radius: 26px;
+    padding: 26px 28px 0;
+    box-shadow: 0 6px 16px rgba(16, 60, 110, 0.14), 0 30px 60px rgba(16, 60, 110, 0.22);
+    font-size: 19px; color: var(--text);
+  }
+  .state { display: flex; align-items: baseline; gap: 16px; padding-bottom: 14px; }
+  .state b { color: #ff6a00; font-size: 26px; font-weight: 700; }
+  .state span { color: #ff6a00; font-size: 18px; }
+  .row { display: flex; align-items: center; gap: 14px; height: 56px; border-top: 1px solid #f0f1f3; }
+  .k { color: var(--mute); font-size: 16px; width: 66px; flex: none; }
+  .v { letter-spacing: 0.3px; white-space: nowrap; }
+  .v.big { font-size: 24px; font-weight: 500; letter-spacing: 1px; }
+
+  .mask { color: transparent; background: var(--sky); box-shadow: 0 0 0 3px var(--sky); }
+  .outline { position: relative; outline: 2px dashed var(--amber); outline-offset: 3px; }
+  .outline::before {
+    content: attr(data-label);
+    position: absolute; left: -5px; top: -21px;
+    padding: 1px 5px; background: var(--amber); color: #000;
+    font-size: 11px; font-weight: 500; line-height: 13px; letter-spacing: 0.5px; white-space: nowrap;
+  }
+
+  /* 光正走到的那一块码：从半透明慢慢盖实，底下的字还看得见一点 */
+  .mask.half { background: rgba(135, 206, 235, 0.55); box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.55); color: rgba(31, 35, 41, 0.35); }
+
+  /* 光还没走到的地方压一层暗幕，光走过的地方揭开，和编辑器里识别时一样 */
+  .scrim {
+    position: absolute; left: 0; right: 0; top: 312px; bottom: 0;
+    background: linear-gradient(180deg, rgba(16, 16, 20, 0) 0, rgba(16, 16, 20, 0.5) 46px, rgba(16, 16, 20, 0.5) 100%);
+  }
+  /* 光：中心往上拖一条长尾、往下只有一小段前沿，颜色天蓝到长春花蓝到淡紫（ScanEffect.HUES） */
+  .light {
+    position: absolute; left: 0; right: 0; top: 236px; height: 136px; pointer-events: none;
+    background: linear-gradient(90deg, #87ceeb, #a5b4fc 55%, #c4b5fd);
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.7) 76%, #000 82%, rgba(0,0,0,0) 100%);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.7) 76%, #000 82%, rgba(0,0,0,0) 100%);
+    opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="eyebrow">有码 · YOMARK</div>
+    <h1>截图里的敏感信息，<br>发出去之前先遮住。</h1>
+    <div class="pills">
+      <span class="pill">本机识别</span>
+      <span class="pill">不联网</span>
+      <span class="pill">零权限</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span></div>
+    <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
+    <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span></div>
+    <div class="row"><span class="k">联系邮箱</span><span class="v mask half">wangxm@example.com</span></div>
+    <div class="row"><span class="k">订单编号</span><span class="v">20260929123045188392</span></div>
+    <div class="scrim"></div>
+    <div class="light"></div>
+  </div>
+</body>
+</html>

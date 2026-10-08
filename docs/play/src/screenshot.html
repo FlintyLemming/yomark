@@ -1,0 +1,64 @@
+<!doctype html>
+<!-- Play 手机截图的排版，1080×1920（9:16）。render.cjs 打开这一页，再把 screenshots.json 里的一项交给 show()。
+     上面一行标题、一行副标题，合起来不到整张图的五分之一（Play 要求说明文字不超过 20%）；
+     下面是 PlayScreenshots 在 Robolectric 上拍的编辑器截图，是应用的真实渲染结果。不套手机外框：Play 不建议画设备。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101014;
+    --sub: #4b5563;
+    --sky: #87ceeb;
+    /* 截图原尺寸 1236×2580（412×860 dp，3 倍） */
+    --shot-w: 1236;
+    --shot-h: 2580;
+    --top: 292px;
+    --bottom: 64px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: 'Noto Sans SC', sans-serif;
+    background:
+      radial-gradient(760px 900px at 50% 64%, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0) 70%),
+      linear-gradient(180deg, #e6f4fc 0%, #d2eaf8 100%);
+  }
+  .cap { position: absolute; left: 60px; right: 60px; top: 84px; text-align: center; }
+  h1 { font-size: 64px; font-weight: 900; line-height: 1.3; letter-spacing: 2px; color: var(--ink); white-space: nowrap; }
+  /* 关键词底下一道天蓝，像在字上打了一半的码 */
+  .hl { background: linear-gradient(180deg, transparent 58%, var(--sky) 58%, var(--sky) 92%, transparent 92%); padding: 0 4px; }
+  p { margin-top: 18px; font-size: 34px; font-weight: 500; line-height: 1.4; letter-spacing: 1px; color: var(--sub); white-space: nowrap; }
+
+  .screen {
+    position: absolute; left: 50%; top: var(--top);
+    height: calc(1920px - var(--top) - var(--bottom));
+    aspect-ratio: var(--shot-w) / var(--shot-h);
+    transform: translateX(-50%);
+    border-radius: 44px; overflow: hidden; background: #fff;
+    box-shadow: 0 0 0 1px rgba(16, 16, 20, 0.06), 0 6px 16px rgba(16, 60, 110, 0.10), 0 34px 70px rgba(16, 60, 110, 0.20);
+  }
+  .screen img { display: block; width: 100%; height: 100%; }
+</style>
+</head>
+<body>
+  <div class="cap"><h1 id="title"></h1><p id="subtitle"></p></div>
+  <div class="screen"><img id="shot" alt=""></div>
+  <script>
+    // 标题里用 {} 括起来的是要加底色的关键词
+    function show(shot) {
+      const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+      document.getElementById('title').innerHTML = esc(shot.title).replace(/\{(.+?)\}/g, '<span class="hl">$1</span>');
+      document.getElementById('subtitle').textContent = shot.subtitle;
+      const img = document.getElementById('shot');
+      return new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = () => reject(new Error('截图没加载出来：' + shot.shot));
+        img.src = '../shots/' + shot.shot + '.png';
+      });
+    }
+  </script>
+</body>
+</html>
