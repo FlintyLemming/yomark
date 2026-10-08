@@ -60,8 +60,9 @@ jobs:
       - name: Build release bundle and APKs
         run: |
           echo "FREE_EDITION=$FREE_EDITION"
-          ./gradlew --no-daemon -Pyomark.freeEdition="$FREE_EDITION" \
-            :app:bundleRelease :app:assembleRelease :app:assertReleaseNoRuntimePermissions
+          # 分两次跑：打 AAB 时 ABI 拆包会被关掉（见 build.gradle.kts 的 splits），APK 要单独打
+          ./gradlew --no-daemon -Pyomark.freeEdition="$FREE_EDITION" :app:bundleRelease :app:assertReleaseNoRuntimePermissions
+          ./gradlew --no-daemon -Pyomark.freeEdition="$FREE_EDITION" :app:assembleRelease
 
       - uses: actions/upload-artifact@v4
         with:
