@@ -11,6 +11,8 @@ import androidx.compose.runtime.Composable
  *
  * 措辞要说清楚「付费买的纯粹是外观」——免费版一项隐私能力都不缺。
  * 这是避免商店评论区出现「保护隐私还要收费」的唯一办法。
+ *
+ * 点「购买」后对话框自己关掉：购买在 Play 的界面里进行，买完回来不该还停在这个框上。
  */
 @Composable
 fun PaywallDialog(onBuy: () -> Unit, onDismiss: () -> Unit) {
@@ -23,7 +25,12 @@ fun PaywallDialog(onBuy: () -> Unit, onDismiss: () -> Unit) {
                 Text("付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。")
             }
         },
-        confirmButton = { TextButton(onClick = onBuy) { Text("购买") } },
+        confirmButton = {
+            TextButton(onClick = {
+                onBuy()
+                onDismiss()
+            }) { Text("购买") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
     )
 }

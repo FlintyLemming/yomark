@@ -22,15 +22,25 @@ class PaywallDialogTest {
     }
 
     @Test
-    fun the_buy_and_dismiss_buttons_fire_their_callbacks() {
+    fun buying_starts_the_purchase_and_closes_the_dialog() {
         var bought = false
         var dismissed = false
         compose.setContent { PaywallDialog(onBuy = { bought = true }, onDismiss = { dismissed = true }) }
 
         compose.onNodeWithText("购买").performClick()
         assertThat(bought).isTrue()
+        // 编辑器里曾经漏了关框：买完从 Play 回来，购买框还开着
+        assertThat(dismissed).isTrue()
+    }
+
+    @Test
+    fun cancel_just_closes() {
+        var bought = false
+        var dismissed = false
+        compose.setContent { PaywallDialog(onBuy = { bought = true }, onDismiss = { dismissed = true }) }
 
         compose.onNodeWithText("取消").performClick()
         assertThat(dismissed).isTrue()
+        assertThat(bought).isFalse()
     }
 }
