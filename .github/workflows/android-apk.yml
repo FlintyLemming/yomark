@@ -1,11 +1,16 @@
 name: Android APK
 
-# 每次推送都打一份可直接安装的 debug APK；也可以在 Actions 页手动触发。
+# 每次推送都打一份可直接安装的 debug APK；也可以在 Actions 页手动触发。只改落地页（site/）的推送不打。
 # 发版：推 v* 标签，或在 Actions 页手动触发并填 release_tag。两种方式都会在单元测试通过后
 # 发一个 GitHub Release，附上这次打出的 APK；手动触发时标签由 Release 在当前提交上创建。
-# 说明取自 docs/release-notes/<标签>.md，没有这个文件就让 GitHub 自动生成。
+# 说明取自 docs/release-notes/<标签>.md，没有这个文件就让 GitHub 自动生成。发完版顺带重新部署落地页（pages.yml）。
 on:
   push:
+    # 路径过滤对推标签不生效，发版不受影响
+    paths-ignore:
+      - 'site/**'
+      - 'tools/site/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -24,6 +29,7 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: write   # 发 Release 用
+      actions: write    # 发版后触发落地页重新部署
     env:
       # keystore 文件路径由下面的 Decode 步骤写进 SIGNING_KEYSTORE_FILE
       SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
@@ -87,6 +93,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release_tag || github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           # 临时签名的包装不上已有版本，不能拿去发版
           if [ -z "${SIGNING_KEYSTORE_FILE:-}" ]; then
@@ -100,3 +107,7 @@ jobs:
           notes="docs/release-notes/$TAG.md"
           if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
           gh release create "$TAG" dist/*.apk --title "$TAG" --target "$GITHUB_SHA" "$@"
+          # 落地页的下载按钮指向最新 Release 的 APK，让它重新部署一次。
+          # 用 GITHUB_TOKEN 建的 Release 不会触发别的工作流，只能这样点名；没触发成也不影响这次发版
+          gh workflow run pages.yml --ref "$DEFAULT_BRANCH" \
+            || echo "::warning::没能触发落地页重新部署，可以在 Actions 页手动运行 Pages"
