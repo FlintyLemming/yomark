@@ -30,15 +30,7 @@ class PurchaseStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_PRO] = value }
     }
 
-    /** 兑换码解锁。与 [isPro] 分开存：Play 查询结果只覆盖购买缓存，不会把兑换来的权益撤掉。 */
-    val isRedeemed: Flow<Boolean> = store.data.map { it[KEY_REDEEMED] ?: false }
-
-    suspend fun setRedeemed() {
-        store.edit { it[KEY_REDEEMED] = true }
-    }
-
     private companion object {
         val KEY_PRO = booleanPreferencesKey("pro")
-        val KEY_REDEEMED = booleanPreferencesKey("redeemed")
     }
 }

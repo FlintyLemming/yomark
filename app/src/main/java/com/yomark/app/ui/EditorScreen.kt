@@ -77,7 +77,6 @@ fun EditorScreen(
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     onBuyClicked: () -> Unit = {},
-    onRedeem: (String) -> Boolean = { false },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -119,11 +118,7 @@ fun EditorScreen(
     if (state.paywallVisible && Edition.isFree) {
         FreeEditionDialog(onDismiss = vm::dismissPaywall)
     } else if (state.paywallVisible) {
-        PaywallDialog(
-            onBuy = onBuyClicked,
-            onRedeem = { code -> onRedeem(code).also { if (it) vm.dismissPaywall() } },
-            onDismiss = vm::dismissPaywall,
-        )
+        PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
     }
 
     Scaffold(

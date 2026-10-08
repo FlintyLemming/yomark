@@ -90,7 +90,6 @@ class HomeActivity : ComponentActivity() {
                                 paywall = false
                                 lifecycleScope.launch { billing.launchPurchase(this@HomeActivity) }
                             },
-                            onRedeem = { code -> billing.redeem(code).also { if (it) paywall = false } },
                             onDismiss = { paywall = false },
                         )
                     }
