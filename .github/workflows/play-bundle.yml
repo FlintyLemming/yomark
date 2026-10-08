@@ -1,6 +1,8 @@
 name: Play Bundle
 
 # 打一份上传 Google Play 用的 release AAB（R8 混淆裁剪、固定签名）。
+# 默认打内购版：导出带水印、一次性买断去水印，没有打赏入口。免费版的打赏会把人引到
+# Play 结算以外的付款页，Play 的付款政策不允许，所以免费版只发 GitHub Releases。
 # 在 Actions 页手动触发；改动本文件的推送也会自动跑一遍，验证它本身没写坏。
 # 产物：
 # - yomark-play-aab：上传到 Play 管理中心的 .aab
@@ -10,9 +12,9 @@ on:
   workflow_dispatch:
     inputs:
       free_edition:
-        description: '全功能免费版（关掉就是导出带水印、一次性买断去水印的内购版）'
+        description: '全功能免费版（带打赏入口，不能传 Play；不勾就是内购版）'
         type: boolean
-        default: true
+        default: false
   push:
     branches: ['**']
     paths: ['.github/workflows/play-bundle.yml']
@@ -29,8 +31,8 @@ jobs:
       SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
       SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
       SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-      # 手动触发时取勾选值，其他触发方式没有 inputs，按免费版打
-      FREE_EDITION: ${{ github.event_name != 'workflow_dispatch' || inputs.free_edition }}
+      # 手动触发时取勾选值，其他触发方式没有 inputs，按内购版打
+      FREE_EDITION: ${{ github.event_name == 'workflow_dispatch' && inputs.free_edition }}
     steps:
       - uses: actions/checkout@v4
 

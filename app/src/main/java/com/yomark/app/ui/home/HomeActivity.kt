@@ -86,11 +86,7 @@ class HomeActivity : ComponentActivity() {
                         FreeEditionDialog(onDismiss = { paywall = false })
                     } else if (paywall) {
                         PaywallDialog(
-                            onBuy = {
-                                paywall = false
-                                lifecycleScope.launch { billing.launchPurchase(this@HomeActivity) }
-                            },
-                            onRedeem = { code -> billing.redeem(code).also { if (it) paywall = false } },
+                            onBuy = { lifecycleScope.launch { billing.launchPurchase(this@HomeActivity) } },
                             onDismiss = { paywall = false },
                         )
                     }
