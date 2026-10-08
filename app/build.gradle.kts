@@ -62,12 +62,13 @@ android {
         applicationId = "com.yomark.app"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 10
+        versionCode = 11
         versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
-        // 以后上架 Play 的构建改成 false，就回到一次性买断去水印。
-        buildConfigField("boolean", "FREE_EDITION", "true")
+        // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
+        val freeEdition = providers.gradleProperty("yomark.freeEdition").orNull?.toBooleanStrict() ?: true
+        buildConfigField("boolean", "FREE_EDITION", "$freeEdition")
     }
 
     // 固定签名：CI 从 Secrets 解出 keystore 并通过环境变量传进来。
@@ -112,9 +113,11 @@ android {
 
     // 直接装的 APK 也按 ABI 拆：ONNX Runtime 的 .so 每个 ABI 二三十 MB，四个塞进一个包就是三百多 MB。
     // 真机装 arm64-v8a 那个，模拟器装 x86_64 那个。
+    // 打 AAB 时关掉：开着资源裁剪时 AGP 不允许 bundle 与拆 APK 同时出现（issuetracker 402800800），
+    // AAB 的 ABI 拆分由下面的 bundle {} 交给 Play 做。
     splits {
         abi {
-            isEnable = true
+            isEnable = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) }
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
             isUniversalApk = false
