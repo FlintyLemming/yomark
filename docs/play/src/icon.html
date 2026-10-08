@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- Play 商店图标，512×512。node docs/play/src/render.cjs icon 渲染成 docs/play/icon.png
+     Play 要的是启动器图标的高清版：满版方形、不加圆角和阴影（圆角由 Play 统一裁），
+     所以照 res/drawable/ic_launcher_foreground.xml 换算：自适应图标 108 dp 的画布只露出中间 72 dp，
+     48×24 dp 的白条在可见区域里占 2/3 宽、1/3 高，底色同 ic_launcher_background。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 512px; height: 512px; overflow: hidden; background: #101014; }
+  .bar {
+    position: absolute;
+    left: calc(512px * 12 / 72); top: calc(512px * 24 / 72);
+    width: calc(512px * 48 / 72); height: calc(512px * 24 / 72);
+    background: #fff;
+  }
+</style>
+</head>
+<body><div class="bar"></div></body>
+</html>

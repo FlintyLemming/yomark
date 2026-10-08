@@ -114,7 +114,7 @@ app/src/main/java/com/yomark/app/
   export/    原图重绘、品牌水印、用途水印、写入相册
   ui/        首页、编辑器、设置（Jetpack Compose）
   billing/   发行版本开关（开源版免费）、去水印的一次性购买
-docs/        设计文档、模型调研、上架验收记录
+docs/        设计文档、模型调研、上架验收记录、Play 商品详情的文字与图片（docs/play/）
 tools/       模型评测、测试语料、主题配色表和落地页小图的生成脚本
 site/        落地页和隐私权政策页，纯静态，由 .github/workflows/pages.yml 部署到 GitHub Pages
 ```
