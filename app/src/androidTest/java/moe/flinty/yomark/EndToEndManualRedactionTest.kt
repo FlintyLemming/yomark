@@ -1,0 +1,106 @@
+package moe.flinty.yomark
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
+import androidx.core.net.toUri
+import androidx.exifinterface.media.ExifInterface
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.test.platform.app.InstrumentationRegistry
+import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.image.ImageIntake
+import moe.flinty.yomark.core.image.SourceImageLoader
+import moe.flinty.yomark.core.model.DetectorSource
+import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.core.model.MaskOptions
+import moe.flinty.yomark.core.model.MaskPlan
+import moe.flinty.yomark.core.model.MaskState
+import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.export.ExportOutcome
+import moe.flinty.yomark.export.ExportRequest
+import moe.flinty.yomark.export.Exporter
+import moe.flinty.yomark.export.MediaStoreSink
+import moe.flinty.yomark.export.WatermarkDrawer
+import moe.flinty.yomark.render.RendererRegistry
+import com.google.common.collect.Range
+import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.test.runTest
+import org.junit.Test
+import org.junit.runner.RunWith
+import java.io.File
+
+@RunWith(AndroidJUnit4::class)
+class EndToEndManualRedactionTest {
+
+    private val context = InstrumentationRegistry.getInstrumentation().targetContext
+
+    @Test
+    fun manual_redaction_round_trip_hides_the_secret_and_strips_metadata() = runTest {
+        // 1. 造一张「有秘密」的源图：白底 + 一块红色秘密区
+        val src = File(context.cacheDir, "e2e-src.jpg")
+        val w = 1600; val h = 1200
+        Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).let { bmp ->
+            Canvas(bmp).apply {
+                drawColor(Color.WHITE)
+                drawRect(RectF(400f, 400f, 800f, 600f), Paint().apply { color = Color.RED })
+            }
+            src.outputStream().use { bmp.compress(Bitmap.CompressFormat.JPEG, 100, it) }
+            bmp.recycle()
+        }
+        ExifInterface(src.absolutePath).apply {
+            setLatLong(37.4220, -122.0841)
+            setAttribute(ExifInterface.TAG_MODEL, "Secret-Device")
+            saveAttributes()
+        }
+
+        // 2. 走真实入口：私有副本 → 分析用解码
+        val intake = ImageIntake(context)
+        val taken = intake.copyToPrivate(src.toUri())
+        val image = SourceImageLoader.loadForAnalysis(taken.file, taken.mimeType)
+
+        // 3. 在分析坐标系里把秘密区框住
+        val f = image.scale
+        val plan = MaskPlan(
+            items = listOf(
+                MaskItem(
+                    "e2e", Quad.fromRect(RectF(400f * f, 400f * f, 800f * f, 600f * f)),
+                    SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
+                )
+            ),
+        )
+
+        // 4. 导出
+        val exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), MediaStoreSink(context))
+        val outcome = exporter.export(
+            ExportRequest(taken.file, taken.mimeType, plan, image.scale, applyWatermark = true)
+        )
+        assertThat(outcome).isInstanceOf(ExportOutcome.Success::class.java)
+        val uri = (outcome as ExportOutcome.Success).uri
+
+        // 5. 读回来校验
+        context.contentResolver.openInputStream(uri)!!.use { input ->
+            val out = BitmapFactory.decodeStream(input)!!
+            assertThat(out.width).isEqualTo(w)            // 原图分辨率，不是分析分辨率
+            assertThat(out.height).isEqualTo(h)
+            // 秘密被天蓝色块遮住。JPEG 往返会让颜色偏一两个单位，逐通道留余量比对
+            val masked = out.getPixel(600, 500)
+            val sky = MaskOptions.SKY_BLUE
+            assertThat(Color.red(masked)).isIn(Range.closed(Color.red(sky) - 12, Color.red(sky) + 12))
+            assertThat(Color.green(masked)).isIn(Range.closed(Color.green(sky) - 12, Color.green(sky) + 12))
+            assertThat(Color.blue(masked)).isIn(Range.closed(Color.blue(sky) - 12, Color.blue(sky) + 12))
+            assertThat(Color.red(out.getPixel(100, 100))).isGreaterThan(200)  // 其余不变
+            out.recycle()
+        }
+        context.contentResolver.openInputStream(uri)!!.use { input ->
+            val exif = ExifInterface(input)
+            assertThat(exif.latLong).isNull()
+            assertThat(exif.getAttribute(ExifInterface.TAG_MODEL)).isNull()
+        }
+
+        context.contentResolver.delete(uri, null, null)
+        intake.clear()
+    }
+}

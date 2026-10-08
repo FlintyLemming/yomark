@@ -71,14 +71,14 @@
 
 ## 隐私与权限
 
-完整的[隐私权政策](https://flintylemming.github.io/yomark/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置」里打开。
+完整的[隐私权政策](https://yomark.flinty.moe/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置」里打开。
 
 - 不申请任何运行期权限。选图通过系统的 Photo Picker 完成，应用只能拿到你选中的那几张图，读不到相册里的其他图片。
 - 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。
 - 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
     - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。开源版不连 Play Billing，留给以后上架的版本。
     - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 复查」绑定系统的 AICore，模型在本机运行。
-    - `com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
+    - `moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
 
 ## 实现
 
@@ -106,7 +106,7 @@
 ## 项目结构
 
 ```
-app/src/main/java/com/yomark/app/
+app/src/main/java/moe/flinty/yomark/
   core/      几何、图片读取、打码方案（MaskPlan）的数据模型
   engine/    OCR、人脸、条码的封装，候选去重合并
   rules/     敏感信息规则与校验位

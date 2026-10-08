@@ -1,7 +1,7 @@
 name: Pages
 
 # 把 site/ 部署成 GitHub Pages 上的落地页，隐私权政策在 site/privacy/（应用设置页里链接的就是它）。
-# 第一次用之前，在仓库 Settings → Pages 里把 Source 设成「GitHub Actions」。
+# 第一次用之前，在仓库 Settings → Pages 里把 Source 设成「GitHub Actions」，Custom domain 填 yomark.flinty.moe。
 # main 上 site/ 或头图有改动时部署；Android APK 工作流发完 Release 会手动触发这里一次；也可以在 Actions 页手动触发。
 # 部署时往页面里补两样东西：
 #   - og.png：分享卡片的图，复制自 docs/readme/hero.png
@@ -45,8 +45,8 @@ jobs:
         run: |
           cp -r site _site
           cp docs/readme/hero.png _site/og.png
-          # 分享卡片和 canonical 要绝对地址，页面里写的是默认的 github.io 地址；配了自定义域名就换成实际地址
-          find _site -name '*.html' -exec sed -i "s#https://flintylemming.github.io/yomark/#${BASE_URL%/}/#g" {} +
+          # 分享卡片和 canonical 要绝对地址，页面里写的是自定义域名；Pages 实际地址不同（比如 fork 的 github.io）就换成实际地址
+          find _site -name '*.html' -exec sed -i "s#https://yomark.flinty.moe/#${BASE_URL%/}/#g" {} +
           if gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '{
               tag: .tag_name,
               published: .published_at,

@@ -54,10 +54,10 @@ debug 变体（体积与权限两项用 release bundle）。JDK 21，AGP 8.11.1�
 
 ```
 com.android.vending.BILLING
-com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
+moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 ```
 
-两条都不是运行期权限。设备侧 `dumpsys package com.yomark.app` 复核：
+两条都不是运行期权限。设备侧 `dumpsys package moe.flinty.yomark` 复核：
 `requested permissions` 就这两条，两条 `install permissions` 均 `granted=true`，
 **`runtime permissions` 一节为空**。
 
@@ -148,12 +148,12 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
 
 # 评测指标
 adb logcat -c && ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.package=com.yomark.app.eval
+  -Pandroid.testInstrumentationRunnerArguments.package=moe.flinty.yomark.eval
 adb logcat -d -s System.out:I | grep YOMARK-EVAL
 
 # 冷启动
-adb shell am force-stop com.yomark.app
-adb shell am start -W -n com.yomark.app/.ui.home.HomeActivity | grep TotalTime
+adb shell am force-stop moe.flinty.yomark
+adb shell am start -W -n moe.flinty.yomark/.ui.home.HomeActivity | grep TotalTime
 
 # 下发体积
 bundletool build-apks --bundle=app/build/outputs/bundle/release/app-release.aab \

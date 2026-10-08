@@ -58,7 +58,7 @@ app/src/androidTest/assets/samples/
 
 ```bash
 ./gradlew :app:connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=com.yomark.app.eval.EvaluationTest
+  -Pandroid.testInstrumentationRunnerArguments.class=moe.flinty.yomark.eval.EvaluationTest
 adb logcat -d -s System.out:I | grep YOMARK-EVAL
 ```
 

@@ -1,7 +1,7 @@
-package com.yomark.app
+package moe.flinty.yomark
 
-import com.yomark.app.engine.genai.SemanticPrompt
-import com.yomark.app.engine.ppocr.PpOcrEngine
+import moe.flinty.yomark.engine.genai.SemanticPrompt
+import moe.flinty.yomark.engine.ppocr.PpOcrEngine
 import java.io.File
 import javax.imageio.ImageIO
 

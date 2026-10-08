@@ -255,7 +255,7 @@ python3 make_samples.py                     # 合成页 + 真值 + 条码探针�
 LLAMA_SERVER=/path/to/llama-server python3 run_eval.py qwen35-2b  # 文字、看图、条码题
 LLAMA_SERVER=/path/to/llama-server python3 run_hybrid.py qwen35-2b  # 文字·全送、图 + 文字
 python3 score_eval.py qwen35-2b
-../../gradlew -p ocr-dump -q run -Pmain=com.yomark.app.RuleProtoKt --args="../out/ocr ../out/rule-proto.json"
+../../gradlew -p ocr-dump -q run -Pmain=moe.flinty.yomark.RuleProtoKt --args="../out/ocr ../out/rule-proto.json"
 python3 score_rules.py out/rule-proto.json   # 出厂规则、规则 + 补强、HanLP
 ```
 

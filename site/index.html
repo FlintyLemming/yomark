@@ -13,14 +13,14 @@
   <meta name="color-scheme" content="only light">
   <meta name="theme-color" content="#f5f7fa">
   <!-- 下面几个绝对地址部署时会换成 Pages 的实际地址（见 pages.yml） -->
-  <link rel="canonical" href="https://flintylemming.github.io/yomark/">
+  <link rel="canonical" href="https://yomark.flinty.moe/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="有码 Yomark">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:title" content="有码：截图里的敏感信息，发出去之前先遮住">
   <meta property="og:description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。本机识别，应用没有联网权限。">
-  <meta property="og:url" content="https://flintylemming.github.io/yomark/">
-  <meta property="og:image" content="https://flintylemming.github.io/yomark/og.png">
+  <meta property="og:url" content="https://yomark.flinty.moe/">
+  <meta property="og:image" content="https://yomark.flinty.moe/og.png">
   <meta property="og:image:width" content="2560">
   <meta property="og:image:height" content="1280">
   <meta name="twitter:card" content="summary_large_image">
@@ -278,7 +278,7 @@
             <ul>
               <li><code>com.android.vending.BILLING</code><span>Play 内购，留给以后上架的版本。购买在 Play 商店的进程里进行，开源版不连 Play Billing。</span></li>
               <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code><span>「AI 复查」绑定系统的 AICore，模型在本机运行。</span></li>
-              <li><code>com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code><span>androidx 自动生成的 signature 级权限，其他应用无法获取。</span></li>
+              <li><code>moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code><span>androidx 自动生成的 signature 级权限，其他应用无法获取。</span></li>
               <li class="removed"><code>android.permission.INTERNET</code><span>构建时移除</span></li>
               <li class="removed"><code>android.permission.ACCESS_NETWORK_STATE</code><span>构建时移除</span></li>
             </ul>
