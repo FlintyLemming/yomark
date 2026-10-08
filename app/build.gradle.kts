@@ -40,7 +40,7 @@ abstract class AssertPermissionsTask : DefaultTask() {
          * - com.google.android.apps.aicore.service.BIND_SERVICE\uff1aML Kit GenAI\uff08Gemini Nano\uff09\u5408\u5e76\u8fdb\u6765\u3002
          *   \u53ea\u7528\u4e8e\u7ed1\u5b9a\u7cfb\u7edf\u7684 AICore \u670d\u52a1\u3001\u7531\u5b83\u5728\u672c\u673a\u8dd1\u6a21\u578b\uff1b
          *   \u4e0d\u5f39\u6388\u6743\u6846\u3001\u4e0d\u89e6\u53ca\u4efb\u4f55\u7528\u6237\u6570\u636e\u3001\u672c\u5e94\u7528\u4e5f\u4e0d\u56e0\u6b64\u8054\u7f51\u3002
-         * - com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION\uff1aandroidx.core \u5408\u5e76\u8fdb\u6765\u3002
+         * - moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION\uff1aandroidx.core \u5408\u5e76\u8fdb\u6765\u3002
          *   \u5b83\u662f\u672c\u5e94\u7528\u7ed9\u81ea\u5df1\u5b9a\u4e49\u7684 protectionLevel="signature" \u6743\u9650\uff0c
          *   \u7528\u4e8e ContextCompat.registerReceiver \u6ce8\u518c\u975e\u5bfc\u51fa\u5e7f\u64ad\u63a5\u6536\u5668\u3002
          *   \u5b83\u4e0d\u662f\u8fd0\u884c\u671f\u6743\u9650\uff1a\u4e0d\u5f39\u6388\u6743\u6846\u3001\u4e0d\u89e6\u53ca\u4efb\u4f55\u7528\u6237\u6570\u636e\uff0c
@@ -49,21 +49,21 @@ abstract class AssertPermissionsTask : DefaultTask() {
         val ALLOWED = setOf(
             "com.android.vending.BILLING",
             "com.google.android.apps.aicore.service.BIND_SERVICE",
-            "com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+            "moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
         )
     }
 }
 
 android {
-    namespace = "com.yomark.app"
+    namespace = "moe.flinty.yomark"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.yomark.app"
+        applicationId = "moe.flinty.yomark"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.6.1"
+        versionCode = 13
+        versionName = "0.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
         // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。

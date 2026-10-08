@@ -11,18 +11,18 @@ sourceSets {
             srcDir("../../../app/src/main/java")
             include(
                 "OcrDump.kt", "RuleProto.kt",
-                "com/yomark/app/engine/ppocr/CtcDecoder.kt", "com/yomark/app/engine/ppocr/DbPostProcess.kt",
-                "com/yomark/app/engine/ppocr/OcrTypes.kt", "com/yomark/app/engine/ppocr/PpOcrEngine.kt",
-                "com/yomark/app/engine/ppocr/WordGaps.kt",
-                "com/yomark/app/engine/genai/SemanticPrompt.kt",
-                "com/yomark/app/core/model/Sensitivity.kt",
+                "moe/flinty/yomark/engine/ppocr/CtcDecoder.kt", "moe/flinty/yomark/engine/ppocr/DbPostProcess.kt",
+                "moe/flinty/yomark/engine/ppocr/OcrTypes.kt", "moe/flinty/yomark/engine/ppocr/PpOcrEngine.kt",
+                "moe/flinty/yomark/engine/ppocr/WordGaps.kt",
+                "moe/flinty/yomark/engine/genai/SemanticPrompt.kt",
+                "moe/flinty/yomark/core/model/Sensitivity.kt",
                 // 规则原型要对照出厂规则表
-                "com/yomark/app/rules/Rule.kt", "com/yomark/app/rules/DefaultRuleSet.kt",
-                "com/yomark/app/rules/PhoneRule.kt", "com/yomark/app/rules/NameBeforePhone.kt",
-                "com/yomark/app/rules/LabeledField.kt", "com/yomark/app/rules/HanView.kt",
-                "com/yomark/app/rules/PersonNameRecognizer.kt",
-                "com/yomark/app/rules/AddressShape.kt", "com/yomark/app/rules/DateTimeRule.kt",
-                "com/yomark/app/rules/validator/Checksums.kt", "com/yomark/app/rules/validator/KnownTlds.kt",
+                "moe/flinty/yomark/rules/Rule.kt", "moe/flinty/yomark/rules/DefaultRuleSet.kt",
+                "moe/flinty/yomark/rules/PhoneRule.kt", "moe/flinty/yomark/rules/NameBeforePhone.kt",
+                "moe/flinty/yomark/rules/LabeledField.kt", "moe/flinty/yomark/rules/HanView.kt",
+                "moe/flinty/yomark/rules/PersonNameRecognizer.kt",
+                "moe/flinty/yomark/rules/AddressShape.kt", "moe/flinty/yomark/rules/DateTimeRule.kt",
+                "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )
         }
     }
@@ -32,5 +32,5 @@ dependencies {
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.52")
     implementation("com.hankcs:hanlp:portable-1.8.4")   // 只有规则原型里的人名识别对照用
 }
-application { mainClass.set(providers.gradleProperty("main").orElse("com.yomark.app.OcrDumpKt")) }
+application { mainClass.set(providers.gradleProperty("main").orElse("moe.flinty.yomark.OcrDumpKt")) }
 tasks.named<JavaExec>("run") { workingDir = projectDir }

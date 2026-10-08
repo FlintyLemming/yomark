@@ -28,7 +28,7 @@
   const marks = Array.from(demo.querySelectorAll('.m'));
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
-  // 节奏和光的形状照编辑器里的扫光（app/src/main/java/com/yomark/app/ui/canvas/ScanEffect.kt），
+  // 节奏和光的形状照编辑器里的扫光（app/src/main/java/moe/flinty/yomark/ui/canvas/ScanEffect.kt），
   // 识别那一趟比应用里短一点，网页上没人等得了两秒。
   const PASS_MS = 1700; // 识别中，光从顶扫到底一趟
   const REVEAL_MS = 1400; // 落码那一遍

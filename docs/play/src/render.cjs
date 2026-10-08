@@ -6,7 +6,7 @@
 //   node docs/play/src/render.cjs screenshots      → docs/play/screenshots/*.png（1080×1920，配文见 screenshots.json）
 //   node docs/play/src/render.cjs all              → 后三项
 //
-// screenshots 需要先用 app/src/test/java/com/yomark/app/store/PlayScreenshots.kt 把编辑器截图拍到 docs/play/shots/。
+// screenshots 需要先用 app/src/test/java/moe/flinty/yomark/store/PlayScreenshots.kt 把编辑器截图拍到 docs/play/shots/。
 // 渲染完再跑 python3 docs/play/src/finalize.py：去掉 Play 不收的 alpha 通道，并核对尺寸与体积。
 // 需要 Playwright（npm i -g playwright，运行时带上 NODE_PATH="$(npm root -g)"）和能访问 Google Fonts 的网络。
 const fs = require('node:fs');
