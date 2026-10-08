@@ -1,0 +1,433 @@
+<!doctype html>
+<!--
+  有码的落地页。纯静态：没有构建步骤，不加载任何第三方资源，直接用浏览器打开这个文件就能预览。
+  部署见 .github/workflows/pages.yml：部署时会补上 og.png（复制自 docs/readme/hero.png）和 release.json（最新版本的 APK 地址）。
+  演示和样式图里的人名、地址、号码都是编的，与 docs/readme/src/order-page.html 的样图一致。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>有码 Yomark：截图自动打码，本机识别、不联网</title>
+  <meta name="description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。识别、编辑、导出都在手机上完成，应用没有联网权限。开源，全功能免费。">
+  <meta name="color-scheme" content="only light">
+  <meta name="theme-color" content="#f5f7fa">
+  <!-- 下面几个绝对地址部署时会换成 Pages 的实际地址（见 pages.yml） -->
+  <link rel="canonical" href="https://flintylemming.github.io/yomark/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="有码 Yomark">
+  <meta property="og:locale" content="zh_CN">
+  <meta property="og:title" content="有码：截图里的敏感信息，发出去之前先遮住">
+  <meta property="og:description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。本机识别，应用没有联网权限。">
+  <meta property="og:url" content="https://flintylemming.github.io/yomark/">
+  <meta property="og:image" content="https://flintylemming.github.io/yomark/og.png">
+  <meta property="og:image:width" content="2560">
+  <meta property="og:image:height" content="1280">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+  <script src="main.js" defer></script>
+</head>
+<body>
+  <a class="skip" href="#main">跳到正文</a>
+
+  <svg class="sprite" aria-hidden="true">
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11"/><path d="M7.5 10.5 12 15l4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+    <symbol id="i-github" viewBox="0 0 16 16"><path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="17" height="15" rx="3"/><circle cx="9" cy="10" r="1.75"/><path d="m20.5 15.5-4.3-4.3a1.5 1.5 0 0 0-2.1 0L6 19.3"/></symbol>
+    <symbol id="i-scan" viewBox="0 0 24 24"><path d="M4 8.5V7a3 3 0 0 1 3-3h1.5M15.5 4H17a3 3 0 0 1 3 3v1.5M20 15.5V17a3 3 0 0 1-3 3h-1.5M8.5 20H7a3 3 0 0 1-3-3v-1.5"/><path d="M7.5 12h9"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M5 13.5V17a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3.5"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"/><path d="M12 9v6M9 12h6"/></symbol>
+    <symbol id="i-stack" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></symbol>
+    <symbol id="i-remind" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-9l-4 3.2V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/><path d="M12 8.5v3.5M12 14.5v.01"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M10.5 3.5c.5 3.8 2.2 5.5 6 6-3.8.5-5.5 2.2-6 6-.5-3.8-2.2-5.5-6-6 3.8-.5 5.5-2.2 6-6z"/><path d="M18 14.5c.25 1.7 1 2.45 2.5 2.7-1.5.25-2.25 1-2.5 2.7-.25-1.7-1-2.45-2.5-2.7 1.5-.25 2.25-1 2.5-2.7z"/></symbol>
+    <symbol id="i-type" viewBox="0 0 24 24"><path d="M5.5 7.5v-2h13v2"/><path d="M12 5.5v13"/><path d="M9.5 18.5h5"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.7-.8 1.7-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6h1.8a4.4 4.4 0 0 0 4.4-4.4C20.5 6.7 16.7 3.5 12 3.5z"/><circle cx="7.7" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.6" r="1.1"/><circle cx="15" cy="7.9" r="1.1"/></symbol>
+    <symbol id="i-wifi-off" viewBox="0 0 24 24"><path d="M12 19h.01"/><path d="M8.8 15.6a4.6 4.6 0 0 1 6.4 0"/><path d="M5.5 12.3a9.3 9.3 0 0 1 4-2.2M18.5 12.3a9.3 9.3 0 0 0-2.2-1.6"/><path d="M2.5 8.9A14 14 0 0 1 6.6 6.4M21.5 8.9A14 14 0 0 0 11 5"/><path d="m4 4 16 16"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 19 6.3v5.4c0 4.2-2.9 7.6-7 8.8-4.1-1.2-7-4.6-7-8.8V6.3z"/><path d="m8.8 12 2.2 2.2 4.2-4.3"/></symbol>
+    <symbol id="i-pin-off" viewBox="0 0 24 24"><path d="M12 20.5s-6.5-5.4-6.5-10.5a6.5 6.5 0 0 1 13 0c0 5.1-6.5 10.5-6.5 10.5z"/><circle cx="12" cy="10" r="2.2"/><path d="m4 4 16 16"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7.5-4.4-7.5-9.9A4.4 4.4 0 0 1 12 6.9a4.4 4.4 0 0 1 7.5 2.7c0 5.5-7.5 9.9-7.5 9.9z"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M10.3 4.6 3.4 16.6a2 2 0 0 0 1.7 3h13.8a2 2 0 0 0 1.7-3L13.7 4.6a2 2 0 0 0-3.4 0z"/><path d="M12 9.5v3.8M12 16.3v.01"/></symbol>
+    <symbol id="i-replay" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3L4.5 9"/><path d="M4.5 4.5V9H9"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  </svg>
+
+  <header class="nav">
+    <div class="wrap nav-in">
+      <a class="brand" href="#top" aria-label="有码 Yomark，回到顶部">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand-cn">有码</span>
+        <span class="brand-en">Yomark</span>
+      </a>
+      <nav class="nav-links" aria-label="页面导航">
+        <a href="#how">怎么用</a>
+        <a href="#scope">识别范围</a>
+        <a href="#styles">打码样式</a>
+        <a href="#privacy">隐私</a>
+        <a href="#faq">问答</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="icon-btn" href="https://github.com/FlintyLemming/yomark" aria-label="GitHub 上的源代码">
+          <svg class="i i-solid" aria-hidden="true"><use href="#i-github"/></svg>
+        </a>
+        <a class="btn btn-ink btn-sm" href="https://github.com/FlintyLemming/yomark/releases/latest" data-apk>下载</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero" id="top">
+      <div class="wrap hero-in">
+        <div class="hero-copy">
+          <ul class="pills">
+            <li>本机识别</li>
+            <li>不联网</li>
+            <li>零权限</li>
+          </ul>
+          <h1>截图里的敏感信息，<br>发出去之前<span class="hl">先遮住</span>。</h1>
+          <p class="lead">自动找出截图里的手机号、地址、人名、取件码、人脸和二维码，直接打上码。识别、编辑、导出全在手机上完成，应用没有联网权限。</p>
+          <div class="cta">
+            <a class="btn btn-ink btn-lg" href="https://github.com/FlintyLemming/yomark/releases/latest" data-apk>
+              <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>下载 APK
+            </a>
+            <a class="btn btn-ghost btn-lg" href="https://github.com/FlintyLemming/yomark">
+              <svg class="i i-solid" aria-hidden="true"><use href="#i-github"/></svg>查看源代码
+            </a>
+          </div>
+          <p class="meta"><span data-release></span>Android 10 及以上 · 开源免费</p>
+        </div>
+
+        <!-- 首屏演示：照编辑器里的样子，先扫一遍光，再把码落下来。点标记在打码和圈出之间切换。
+             没有 JS 时停在识别后的样子。 -->
+        <figure class="demo" data-demo>
+          <div class="demo-stage">
+            <span class="demo-chip" data-chip>识别后</span>
+            <div class="shot" data-shot>
+              <div class="shot-status" aria-hidden="true"><span>16:08</span><span class="bat"></span></div>
+              <div class="shot-bar" aria-hidden="true"><span class="back"></span>包裹详情</div>
+              <div class="shot-body">
+                <div class="o-card">
+                  <div class="o-state"><b>待取件</b><button class="m" type="button" data-kind="日期时间" data-state="outlined">09-29 12:30</button></div>
+                  <div class="o-code"><span class="k">取件码</span><button class="m m-big" type="button" data-kind="取件码" data-state="masked">3-2-1234</button><span class="o-btn" aria-hidden="true">复制</span></div>
+                </div>
+                <div class="o-card">
+                  <div class="o-row"><span class="k">顺达快递</span><button class="m" type="button" data-kind="快递单号" data-state="outlined">773512046683217</button><span class="o-btn" aria-hidden="true">复制</span></div>
+                  <div class="o-row"><span class="k">送至</span><button class="m" type="button" data-kind="地址" data-state="masked">长江路88号阳光新村5幢302室</button></div>
+                  <div class="o-row"><span class="k">收件人</span><button class="m" type="button" data-kind="人名" data-state="masked">王小明</button><button class="m" type="button" data-kind="电话" data-state="masked">86-139****5678</button><span class="o-tag">号码保护中</span></div>
+                </div>
+                <div class="o-card">
+                  <div class="o-shop">青柠生活旗舰店</div>
+                  <div class="o-item"><span class="thumb" aria-hidden="true"></span><span class="o-name">挂耳咖啡 · 中度烘焙<small>20 袋装 ×1</small></span><span class="o-price">¥59.9</span></div>
+                  <div class="o-row"><span class="k">订单编号</span><button class="m" type="button" data-kind="长数字串" data-state="outlined">2026092912304518839201746355</button></div>
+                  <div class="o-row"><span class="k">联系邮箱</span><button class="m" type="button" data-kind="邮箱" data-state="masked">wangxm@example.com</button></div>
+                </div>
+              </div>
+              <div class="scrim" aria-hidden="true"></div>
+              <div class="beam" aria-hidden="true"></div>
+            </div>
+          </div>
+          <figcaption class="demo-foot">
+            <span class="legend"><i class="sw sw-mask" aria-hidden="true"></i><b data-count="masked">5</b> 处已打码</span>
+            <span class="legend"><i class="sw sw-outline" aria-hidden="true"></i><b data-count="outlined">3</b> 处等你确认</span>
+            <button class="replay" type="button" data-replay hidden>
+              <svg class="i" aria-hidden="true"><use href="#i-replay"/></svg>重新识别
+            </button>
+            <span class="demo-hint">点一下标记，在打码和圈出之间切换。</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="sec" id="how" aria-labelledby="how-title">
+      <div class="wrap">
+        <header class="sec-head">
+          <p class="eyebrow">怎么用</p>
+          <h2 id="how-title">选图，看一眼，导出。</h2>
+        </header>
+        <ol class="steps">
+          <li class="step">
+            <div class="step-top"><span class="step-n">01</span><svg class="i" aria-hidden="true"><use href="#i-image"/></svg></div>
+            <h3>选图</h3>
+            <p>在首页选一张图，或者在相册里把图分享给「有码」。一次分享多张也行，逐张处理后一起导出。</p>
+          </li>
+          <li class="step">
+            <div class="step-top"><span class="step-n">02</span><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg></div>
+            <h3>看一眼</h3>
+            <p>一两秒就识别完。<span class="key key-mask">天蓝色块</span>是已经打码的，<span class="key key-outline">琥珀色虚线框</span>是拿不准、等你确认的，点一下就能切换。漏掉的地方，用一根手指拖出一个框补上。</p>
+          </li>
+          <li class="step">
+            <div class="step-top"><span class="step-n">03</span><svg class="i" aria-hidden="true"><use href="#i-export"/></svg></div>
+            <h3>导出</h3>
+            <p>按原图分辨率重新绘制，EXIF 一律不保留。还有圈出但没打码的内容，导出前会先提醒你。</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="sec" id="scope" aria-labelledby="scope-title">
+      <div class="wrap">
+        <header class="sec-head">
+          <p class="eyebrow">识别范围</p>
+          <h2 id="scope-title">该遮的，先替你找出来。</h2>
+          <p class="lead">文字由随包分发的 PP-OCRv5 识别，人脸和条码由 ML Kit 的离线模型识别。哪些算敏感信息交给规则判断，不交给模型：正则加校验位，每一条命中都说得出原因。</p>
+        </header>
+        <div class="scope">
+          <div class="scope-card">
+            <h3><span class="sw sw-mask" aria-hidden="true"></span>默认直接打码</h3>
+            <ul class="chips chips-mask">
+              <li>电话</li><li>邮箱</li><li>人名</li><li>地址</li><li>取件码</li>
+              <li>银行卡号</li><li>IBAN</li><li>护照号</li><li>社保号</li>
+              <li>密钥（API key）</li><li>MAC 地址</li>
+              <li>人脸</li><li>能解码的二维码、条形码</li>
+            </ul>
+          </div>
+          <div class="scope-card">
+            <h3><span class="sw sw-outline" aria-hidden="true"></span>默认只圈出，等你确认</h3>
+            <ul class="chips chips-outline">
+              <li>快递单号</li><li>订单号、交易号等长数字串</li><li>日期时间</li>
+              <li>网址</li><li>IP 地址</li><li>无法解码的疑似条码</li>
+            </ul>
+            <p class="scope-note">疑似条码只在条码识别设为「宽松」时圈出。</p>
+          </div>
+        </div>
+        <p class="sec-note">每一类都可以在设置里改成「打码」「仅圈出」或「关闭」：文字按类型逐条设，人脸和条码各一项。</p>
+      </div>
+    </section>
+
+    <section class="sec" id="styles" aria-labelledby="styles-title">
+      <div class="wrap">
+        <header class="sec-head">
+          <p class="eyebrow">打码样式</p>
+          <h2 id="styles-title">六种样式，每一块码各用各的。</h2>
+          <p class="lead">预览和导出用同一套渲染器，导出的就是你看到的。下面六张图裁自应用在样图上的真实渲染。</p>
+        </header>
+        <!-- 小图由 tools/site/crop_style_tiles.py 从 docs/readme/styles.png 裁出 -->
+        <ul class="tiles">
+          <li class="tile">
+            <div class="tile-head"><h3>色块</h3><span class="badge badge-safe">不可还原</span></div>
+            <img src="img/style-solid.webp" width="1089" height="235" loading="lazy" decoding="async" alt="色块样式：地址、人名和电话被不透明的天蓝色块盖住">
+            <p>默认样式。颜色可以选预设、自定义，也能用吸管从图上取。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>表情</h3><span class="badge badge-safe">不可还原</span></div>
+            <img src="img/style-emoji.webp" width="1089" height="235" loading="lazy" decoding="async" alt="表情样式：深色底块上放着笑脸表情">
+            <p>20 个表情，底色可调，放一个或者排满一行。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>抹除</h3><span class="badge badge-safe">不可还原</span></div>
+            <img src="img/style-erase.webp" width="1089" height="236" loading="lazy" decoding="async" alt="抹除样式：文字所在的区域被周围的白色填平，看不出原来有字">
+            <p>用周围的颜色把区域填平。背景太复杂时改用色块。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>马赛克</h3><span class="badge badge-warn">可能被还原</span></div>
+            <img src="img/style-pixelate.webp" width="1089" height="235" loading="lazy" decoding="async" alt="马赛克样式：文字被像素化成色块">
+            <p>颗粒粗细可调，只能比默认更粗。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>模糊</h3><span class="badge badge-warn">可能被还原</span></div>
+            <img src="img/style-blur.webp" width="1089" height="235" loading="lazy" decoding="async" alt="模糊样式：文字被高斯模糊，仍能看出大致轮廓">
+            <p>高斯模糊，强度只能比默认更强。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>马克笔</h3><span class="badge badge-warn">不遮盖内容</span></div>
+            <img src="img/style-marker.webp" width="1089" height="236" loading="lazy" decoding="async" alt="马克笔样式：文字上盖着半透明的黄色高亮，内容仍然清楚可读">
+            <p>半透明高亮，只做标记。颜色可调，浓淡最高 70%。</p>
+          </li>
+        </ul>
+        <aside class="callout">
+          <svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>
+          <div>
+            <h3>马赛克和模糊不等于安全</h3>
+            <p>截图的字体固定、背景干净，马赛克可以被逐字还原。需要真正隐藏信息时，请用色块、表情或抹除；选了后三种时，应用里也会提示。<a href="https://github.com/FlintyLemming/yomark/blob/main/docs/release-checklist.md">看实测记录</a></p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="sec sec-dark" id="privacy" aria-labelledby="privacy-title">
+      <div class="wrap">
+        <header class="sec-head">
+          <p class="eyebrow">隐私</p>
+          <h2 id="privacy-title">没有联网权限。</h2>
+          <p class="lead">不是承诺「不上传」，而是在系统层面就不给这个进程开网络。识别、编辑、导出全在手机上完成，开着飞行模式也照常工作。</p>
+        </header>
+        <div class="privacy">
+          <ul class="facts">
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-wifi-off"/></svg>
+              <div><h3>摘掉联网权限</h3><p>ML Kit 的依赖会把 <code>INTERNET</code> 和 <code>ACCESS_NETWORK_STATE</code> 带进 manifest，构建时把这两条移除。没有这条权限，进程就拿不到网络。</p></div>
+            </li>
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>
+              <div><h3>不申请运行期权限</h3><p>选图走系统的 Photo Picker，应用只拿得到你选中的那几张，读不到相册里的其他图片。</p></div>
+            </li>
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-shield"/></svg>
+              <div><h3>构建时把关</h3><p>构建任务会检查合并后的 manifest。除了清单里三条不涉及数据访问的声明，多出任何一条权限，构建直接失败。</p></div>
+            </li>
+            <li>
+              <svg class="i" aria-hidden="true"><use href="#i-pin-off"/></svg>
+              <div><h3>干净导出</h3><p>在原图分辨率上重新绘制、重新编码，EXIF 里的位置、机型、拍摄时间一律不保留。</p></div>
+            </li>
+          </ul>
+          <div class="manifest">
+            <p class="manifest-title">合并后 manifest 里的全部权限</p>
+            <ul>
+              <li><code>com.android.vending.BILLING</code><span>Play 内购，留给以后上架的版本。购买在 Play 商店的进程里进行，开源版不连 Play Billing。</span></li>
+              <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code><span>「AI 复查」绑定系统的 AICore，模型在本机运行。</span></li>
+              <li><code>com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code><span>androidx 自动生成的 signature 级权限，其他应用无法获取。</span></li>
+              <li class="removed"><code>android.permission.INTERNET</code><span>构建时移除</span></li>
+              <li class="removed"><code>android.permission.ACCESS_NETWORK_STATE</code><span>构建时移除</span></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="more" aria-labelledby="more-title">
+      <div class="wrap">
+        <header class="sec-head">
+          <p class="eyebrow">更多功能</p>
+          <h2 id="more-title">补漏、批量、水印，都在手机上做完。</h2>
+        </header>
+        <ul class="features">
+          <li class="feature">
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-box"/></svg></span>
+            <h3>手动补框</h3>
+            <p>单指拖出一个框补上漏掉的地方，拖四个角调大小，双指缩放和平移。</p>
+          </li>
+          <li class="feature">
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-stack"/></svg></span>
+            <h3>批量处理</h3>
+            <p>在相册里一次分享多张图，逐张处理后一起导出。</p>
+          </li>
+          <li class="feature">
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-remind"/></svg></span>
+            <h3>导出前提醒</h3>
+            <p>还有圈出但没打码的内容，导出前先列出来，让你再确认一次。不需要的话可以在设置里关掉。</p>
+          </li>
+          <li class="feature feature-wm">
+            <svg class="wm-bg" aria-hidden="true">
+              <defs>
+                <pattern id="wm" width="168" height="54" patternUnits="userSpaceOnUse" patternTransform="rotate(-22)">
+                  <text x="0" y="22">仅供办理签证使用</text>
+                  <text x="84" y="49">仅供办理签证使用</text>
+                </pattern>
+              </defs>
+              <rect width="100%" height="100%" fill="url(#wm)"/>
+            </svg>
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-type"/></svg></span>
+            <h3>用途水印</h3>
+            <p>在整张图上平铺一行字，例如「仅供办理签证使用」，被挪作他用时一眼就能认出来。颜色、角度、透明度和密度都能调。</p>
+          </li>
+          <li class="feature">
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-sparkle"/></svg></span>
+            <h3>AI 复查</h3>
+            <p>在支持 AICore 的机型上，让本机的 Gemini Nano 把整页文字再读一遍。新发现的内容只圈出，不会自动打码。</p>
+          </li>
+          <li class="feature">
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-palette"/></svg></span>
+            <h3>跟随壁纸取色</h3>
+            <p>主题色默认跟随系统壁纸（Android 12 及以上），也可以换成紫、蓝、青、绿、橙、红、粉中的一种。</p>
+            <ul class="swatches" aria-hidden="true">
+              <li style="--c:#6750a4"></li><li style="--c:#1a73e8"></li><li style="--c:#00897b"></li><li style="--c:#43a047"></li><li style="--c:#f57c00"></li><li style="--c:#e53935"></li><li style="--c:#d81b60"></li>
+            </ul>
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="sec" id="oss" aria-labelledby="oss-title">
+      <div class="wrap">
+        <div class="oss">
+          <div class="oss-copy">
+            <p class="eyebrow">开源</p>
+            <h2 id="oss-title">开源，全功能免费。</h2>
+            <p>导出的图片不带水印，所有功能直接用。源代码、设计文档、模型评测和上架验收记录都在 GitHub 上。</p>
+            <p>如果有码帮到了你，欢迎打赏支持后续开发。应用里的打赏入口交给系统浏览器打开，应用本身仍然不联网。</p>
+            <div class="cta">
+              <a class="btn btn-ink" href="https://pay.mitsea.com"><svg class="i" aria-hidden="true"><use href="#i-heart"/></svg>打赏支持</a>
+              <a class="btn btn-ghost" href="https://github.com/FlintyLemming/yomark"><svg class="i i-solid" aria-hidden="true"><use href="#i-github"/></svg>GitHub 仓库</a>
+            </div>
+          </div>
+          <a class="repo" href="https://github.com/FlintyLemming/yomark" aria-label="打开 GitHub 上的 FlintyLemming/yomark 仓库">
+            <span class="repo-name"><svg class="i i-solid" aria-hidden="true"><use href="#i-github"/></svg>FlintyLemming / <b>yomark</b></span>
+            <span class="repo-tree" aria-hidden="true">
+              <span><code>app/</code>Kotlin、Jetpack Compose</span>
+              <span><code>docs/</code>设计文档、模型调研、上架验收记录</span>
+              <span><code>tools/</code>模型评测、测试语料</span>
+              <span><code>site/</code>就是这个页面</span>
+            </span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" id="faq" aria-labelledby="faq-title">
+      <div class="wrap wrap-narrow">
+        <header class="sec-head">
+          <p class="eyebrow">问答</p>
+          <h2 id="faq-title">常见问题</h2>
+        </header>
+        <div class="faq">
+          <details>
+            <summary>该下载哪个安装包？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>手机装 arm64-v8a 版，页面上的「下载 APK」就是它。x86_64 版是给电脑上的安卓模拟器用的。所有版本都在 <a href="https://github.com/FlintyLemming/yomark/releases">GitHub Releases</a>。</p>
+          </details>
+          <details>
+            <summary>安装包为什么这么大？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>文字识别、人脸和条码的模型，连同运行模型的 ONNX Runtime，都打包在安装包里。装好就能离线使用，之后不需要再下载任何东西。</p>
+          </details>
+          <details>
+            <summary>怎么安装和升级？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>用手机浏览器下载后点开安装。第一次从浏览器或文件管理器装应用时，系统会让你允许这个来源。安装包用的是固定签名，出了新版本下载后直接安装，就会覆盖旧版本。</p>
+          </details>
+          <details>
+            <summary>支持哪些手机？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>Android 10 及以上。从 Android 10 开始，应用读写自己创建的图片不需要存储权限，这是零权限的前提。目前只有安卓版。</p>
+          </details>
+          <details>
+            <summary>图片会被上传吗？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>不会。应用没有联网权限，图片只在手机上处理，导出的图片存进相册。</p>
+          </details>
+          <details>
+            <summary>以后会收费吗？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+            <p>开源版全功能免费，导出不带水印。以后上架 Play 商店的版本会恢复内购：免费导出时右下角带一个小水印，一次性买断可以去掉。那也是唯一的付费项，其他功能不受限制。</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+    <section class="final" aria-labelledby="final-title">
+      <div class="wrap final-in">
+        <span class="mark mark-lg" aria-hidden="true"></span>
+        <h2 id="final-title">下次发截图之前，<br>先过一遍有码。</h2>
+        <a class="btn btn-ink btn-lg" href="https://github.com/FlintyLemming/yomark/releases/latest" data-apk>
+          <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>下载 APK
+        </a>
+        <p class="meta"><span data-release></span>Android 10 及以上 · 开源免费</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <div class="wrap foot-in">
+      <a class="brand" href="#top" aria-label="有码 Yomark，回到顶部">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand-cn">有码</span>
+        <span class="brand-en">Yomark</span>
+      </a>
+      <nav class="foot-links" aria-label="相关链接">
+        <a href="https://github.com/FlintyLemming/yomark">GitHub</a>
+        <a href="https://github.com/FlintyLemming/yomark/releases">版本记录</a>
+        <a href="https://github.com/FlintyLemming/yomark/blob/main/docs/superpowers/specs/2026-09-02-yomark-android-design.md">设计文档</a>
+        <a href="https://pay.mitsea.com">打赏</a>
+      </nav>
+      <p class="fine">页面里的人名、地址、号码都是虚构的。</p>
+    </div>
+  </footer>
+</body>
+</html>

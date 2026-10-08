@@ -113,7 +113,8 @@ app/src/main/java/com/yomark/app/
   ui/        首页、编辑器、设置（Jetpack Compose）
   billing/   发行版本开关（开源版免费）、去水印的一次性购买与兑换码
 docs/        设计文档、模型调研、上架验收记录
-tools/       模型评测、测试语料和主题配色表的生成脚本
+tools/       模型评测、测试语料、主题配色表和落地页小图的生成脚本
+site/        落地页，纯静态，由 .github/workflows/pages.yml 部署到 GitHub Pages
 ```
 
 设计上的取舍见[总体方案](docs/superpowers/specs/2026-09-02-yomark-android-design.md)，各项指标的实测数值见[上架验收记录](docs/release-checklist.md)。
