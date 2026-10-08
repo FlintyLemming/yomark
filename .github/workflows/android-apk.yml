@@ -1,16 +1,9 @@
 name: Android APK
 
-# 每次推送都打一份可直接安装的 debug APK；也可以在 Actions 页手动触发。只改落地页（site/）的推送不打。
-# 发版：推 v* 标签，或在 Actions 页手动触发并填 release_tag。两种方式都会在单元测试通过后
-# 发一个 GitHub Release，附上这次打出的 APK；手动触发时标签由 Release 在当前提交上创建。
+# 只在 Actions 页手动触发：打一份可直接安装的 debug APK。
+# 发版：手动触发时填 release_tag，单元测试通过后发一个 GitHub Release，附上这次打出的 APK，标签由 Release 在当前提交上创建。
 # 说明取自 docs/release-notes/<标签>.md，没有这个文件就让 GitHub 自动生成。发完版顺带重新部署落地页（pages.yml）。
 on:
-  push:
-    # 路径过滤对推标签不生效，发版不受影响
-    paths-ignore:
-      - 'site/**'
-      - 'tools/site/**'
-      - '.github/workflows/pages.yml'
   workflow_dispatch:
     inputs:
       release_tag:
@@ -19,9 +12,9 @@ on:
         default: ''
 
 concurrency:
-  # 带上触发方式：手动发版不该被同分支随后的一次推送取消
-  group: apk-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  # 都是手动点的，后一次排队等前一次，不取消，免得把正在发的版打断
+  group: apk-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -89,10 +82,10 @@ jobs:
 
       # 放在单元测试之后：测试不过不发版
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        if: inputs.release_tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.release_tag || github.ref_name }}
+          TAG: ${{ inputs.release_tag }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           # 临时签名的包装不上已有版本，不能拿去发版
