@@ -26,7 +26,7 @@ import com.yomark.app.engine.SemanticOption
 import com.yomark.app.rules.RuleCatalog
 
 /**
- * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 docs/privacy/index.html，由 GitHub Pages 发布。
+ * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
  * 交给系统浏览器打开，应用本身仍然没有网络权限。
  */
 const val PRIVACY_POLICY_URL = "https://flintylemming.github.io/yomark/privacy/"

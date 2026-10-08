@@ -1293,6 +1293,32 @@ img {
   color: var(--sky);
 }
 
+.policy-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 36px;
+  color: #fff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.policy-link .i {
+  width: 18px;
+  height: 18px;
+  color: var(--sky);
+  transition: transform 0.15s;
+}
+
+.policy-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.policy-link:hover .i {
+  transform: translateX(3px);
+}
+
 /* ---------- 更多功能 ---------- */
 
 .features {

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>有码 Yomark 隐私权政策</title>
 <meta name="description" content="有码（Yomark）Android 应用的隐私权政策：应用不收集、不上传、不分享任何用户数据。">
+<!-- 应用的设置页和 Play 商品详情都链接到这个地址（SettingsScreen.kt 的 PRIVACY_POLICY_URL），别改路径 -->
+<link rel="canonical" href="https://flintylemming.github.io/yomark/privacy/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
 <style>
   :root {
     --bg: #ffffff;
@@ -30,6 +34,13 @@
     font: 16px/1.75 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
   }
   main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  /* 顶上的品牌标同落地页（site/style.css 的 .mark）：前景色方块上一条底色横杠，深色模式下自动反过来 */
+  .top { max-width: 720px; margin: 0 auto; padding: 20px 16px 0; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; }
+  .mark { position: relative; flex: none; width: 28px; height: 28px; border-radius: 25%; background: var(--fg); }
+  .mark::after { content: ""; position: absolute; left: 28%; right: 28%; top: 39%; bottom: 39%; border-radius: 2px; background: var(--bg); }
+  .brand-cn { font-size: 19px; font-weight: 900; letter-spacing: 0.08em; line-height: 1; }
+  .brand-en { font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); line-height: 1; }
   h1 { font-size: 1.75rem; line-height: 1.3; margin: 0 0 4px; }
   h2 { font-size: 1.2rem; margin: 2.2em 0 0.4em; }
   p, li { overflow-wrap: anywhere; }
@@ -42,6 +53,13 @@
 </style>
 </head>
 <body>
+<header class="top">
+  <a class="brand" href="../" aria-label="有码 Yomark 首页">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="brand-cn">有码</span>
+    <span class="brand-en">Yomark</span>
+  </a>
+</header>
 <main>
 
 <h1>有码 Yomark 隐私权政策</h1>
