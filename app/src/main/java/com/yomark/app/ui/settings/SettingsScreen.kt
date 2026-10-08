@@ -5,6 +5,7 @@ import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.TextFields
@@ -18,10 +19,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import com.yomark.app.engine.RecognitionConfig
 import com.yomark.app.engine.RuleState
 import com.yomark.app.engine.SemanticOption
 import com.yomark.app.rules.RuleCatalog
+
+/**
+ * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
+ * 交给系统浏览器打开，应用本身仍然没有网络权限。
+ */
+const val PRIVACY_POLICY_URL = "https://flintylemming.github.io/yomark/privacy/"
 
 /** 设置的二级页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。 */
 enum class SettingsPage { TEXT_RULES, FACE, BARCODE, TEXT_RECOGNITION, EXPORT, APPEARANCE }
@@ -33,7 +41,9 @@ enum class SettingsPage { TEXT_RULES, FACE, BARCODE, TEXT_RECOGNITION, EXPORT, A
  * 直接铺在一级页上，规则却收在二级页里，层级对不齐；现在一律收进二级页，一级页每一项下面写着它眼下的状态。
  *
  * 前三项是「识别到了怎么办」：文字、人脸、条码，各自都能设成打码、仅圈出或关闭；
- * 后三项是怎么识别、导出和外观。最后一项恢复默认，点了先问一句。
+ * 后三项是怎么识别、导出和外观。再往下是隐私权政策，最后一项恢复默认，点了先问一句。
+ *
+ * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  */
 @Composable
 fun SettingsScreen(
@@ -43,6 +53,7 @@ fun SettingsScreen(
     onReset: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
+    openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
 ) {
     var confirmReset by rememberSaveable { mutableStateOf(false) }
 
@@ -98,6 +109,19 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Palette,
                     iconColors = SettingsIconColors.pink,
                     onClick = { onOpen(SettingsPage.APPEARANCE) },
+                )
+            }
+        }
+
+        item {
+            GroupSpacer()
+            SettingsGroup {
+                NavigationRow(
+                    title = "隐私权政策",
+                    summary = PRIVACY_POLICY_URL.removePrefix("https://"),
+                    icon = Icons.Outlined.Policy,
+                    iconColors = SettingsIconColors.gray,
+                    onClick = { runCatching { openUrl(PRIVACY_POLICY_URL) } },
                 )
             }
         }

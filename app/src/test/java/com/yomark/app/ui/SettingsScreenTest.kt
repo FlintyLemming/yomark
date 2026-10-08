@@ -27,6 +27,7 @@ import com.yomark.app.ui.settings.AppearanceSettingsScreen
 import com.yomark.app.ui.settings.BarcodeSettingsScreen
 import com.yomark.app.ui.settings.ExportSettingsScreen
 import com.yomark.app.ui.settings.FaceSettingsScreen
+import com.yomark.app.ui.settings.PRIVACY_POLICY_URL
 import com.yomark.app.ui.settings.SettingsPage
 import com.yomark.app.ui.settings.SettingsScreen
 import com.yomark.app.ui.settings.TextRecognitionSettingsScreen
@@ -57,15 +58,32 @@ class SettingsScreenTest {
         exportReminder: Boolean = true,
         onOpen: (SettingsPage) -> Unit = {},
         onReset: () -> Unit = {},
-    ) = show { SettingsScreen(config, exportReminder, onOpen, onReset, onNavigateUp = {}) }
+        openUrl: (String) -> Unit = {},
+    ) = show { SettingsScreen(config, exportReminder, onOpen, onReset, onNavigateUp = {}, openUrl = openUrl) }
 
     // ---------- 一级页 ----------
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "文字识别", "导出", "外观", "恢复默认设置").forEach {
+        listOf("文字", "人脸", "条码", "文字识别", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
+    }
+
+    /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里。 */
+    @Test fun privacyPolicyOpensInTheBrowser() {
+        var opened: String? = null
+        home(openUrl = { opened = it })
+        compose.onNodeWithText("flintylemming.github.io/yomark/privacy/").assertIsDisplayed()
+        compose.onNodeWithText("隐私权政策").performClick()
+        assertThat(opened).isEqualTo(PRIVACY_POLICY_URL)
+    }
+
+    /** 没有浏览器能接也不能闪退。 */
+    @Test fun privacyPolicySurvivesHavingNoBrowser() {
+        home(openUrl = { throw IllegalStateException("no browser") })
+        compose.onNodeWithText("隐私权政策").performClick()
+        compose.onNodeWithText("隐私权政策").assertIsDisplayed()
     }
 
     /** 一级页不直接摆选项：原先铺在这里的识别模式、引擎都收进了二级页。 */

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>有码 Yomark 隐私权政策</title>
+<meta name="description" content="有码（Yomark）Android 应用的隐私权政策：应用不收集、不上传、不分享任何用户数据。">
+<!-- 应用的设置页和 Play 商品详情都链接到这个地址（SettingsScreen.kt 的 PRIVACY_POLICY_URL），别改路径 -->
+<link rel="canonical" href="https://flintylemming.github.io/yomark/privacy/">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1b1b1f;
+    --muted: #5d5e66;
+    --rule: #e2e2e9;
+    --accent: #004493;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121316;
+      --fg: #e3e2e6;
+      --muted: #a9aab3;
+      --rule: #2f3036;
+      --accent: #adc6ff;
+    }
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 16px/1.75 system-ui, -apple-system, "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif;
+  }
+  main { max-width: 720px; margin: 0 auto; padding: 32px 16px 64px; }
+  /* 顶上的品牌标同落地页（site/style.css 的 .mark）：前景色方块上一条底色横杠，深色模式下自动反过来 */
+  .top { max-width: 720px; margin: 0 auto; padding: 20px 16px 0; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); text-decoration: none; }
+  .mark { position: relative; flex: none; width: 28px; height: 28px; border-radius: 25%; background: var(--fg); }
+  .mark::after { content: ""; position: absolute; left: 28%; right: 28%; top: 39%; bottom: 39%; border-radius: 2px; background: var(--bg); }
+  .brand-cn { font-size: 19px; font-weight: 900; letter-spacing: 0.08em; line-height: 1; }
+  .brand-en { font-size: 12px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); line-height: 1; }
+  h1 { font-size: 1.75rem; line-height: 1.3; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 2.2em 0 0.4em; }
+  p, li { overflow-wrap: anywhere; }
+  ul { padding-left: 1.3em; }
+  a { color: var(--accent); }
+  .meta { color: var(--muted); margin: 0 0 1.5em; }
+  .lang { margin: 0 0 2em; }
+  hr { border: 0; border-top: 1px solid var(--rule); margin: 4em 0 2em; }
+  code { font-size: 0.92em; }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="../" aria-label="有码 Yomark 首页">
+    <span class="mark" aria-hidden="true"></span>
+    <span class="brand-cn">有码</span>
+    <span class="brand-en">Yomark</span>
+  </a>
+</header>
+<main>
+
+<h1>有码 Yomark 隐私权政策</h1>
+<p class="meta">生效日期：2026 年 10 月 8 日</p>
+<p class="lang"><a href="#en">English version below</a></p>
+
+<p>本政策适用于 Android 应用「有码」（英文名 Yomark，包名 <code>com.yomark.app</code>，以下简称「本应用」），说明本应用如何处理你的数据。</p>
+
+<p><strong>一句话概括：本应用不收集、不上传、不分享任何个人数据或设备数据。</strong>图片的识别、编辑和导出全部在你的手机上完成，开发者无法看到你处理的任何内容。</p>
+
+<h2>1. 本应用不收集的数据</h2>
+<p>本应用没有账号系统，没有服务器，不包含广告、统计分析或崩溃上报 SDK。我们不收集以下任何信息：</p>
+<ul>
+  <li>你选择或分享给本应用的图片，以及从中识别出的文字、人脸、二维码等内容；</li>
+  <li>姓名、电话、邮箱、地址等个人信息；</li>
+  <li>设备标识符、广告 ID、位置信息；</li>
+  <li>使用记录、操作日志或崩溃日志。</li>
+</ul>
+
+<h2>2. 网络访问</h2>
+<p>本应用在系统层面不具备网络权限（<code>INTERNET</code> 权限在构建时被移除），因此无法自行连接互联网。本应用使用的 Google ML Kit 离线组件中带有向 Google 回传使用统计的代码，但由于没有网络权限，这些代码无法发送任何数据。</p>
+<p>以下情况会由其他应用代为联网，均需你主动操作：</p>
+<ul>
+  <li><strong>应用内购买</strong>：购买「去除水印」时，支付流程在 Google Play 商店应用中完成（见第 5 节）；</li>
+  <li><strong>打开网页</strong>：点击本政策或打赏等链接时，会交给你手机上的浏览器打开，之后的访问适用该网站自己的政策。</li>
+</ul>
+
+<h2>3. 图片如何处理</h2>
+<ul>
+  <li><strong>读取</strong>：通过系统照片选择器或「分享」选择图片，本应用只能读到你选中的那几张图，无法访问相册里的其他内容。</li>
+  <li><strong>识别</strong>：文字识别（PP-OCR、Google ML Kit）、人脸和条码识别（Google ML Kit）都使用随应用安装的离线模型，在本机运行。「AI 复查」功能使用手机系统自带的 Gemini Nano（通过 Android AICore），同样在本机运行，本应用不会把图片或文字发送到任何服务器。</li>
+  <li><strong>临时副本</strong>：编辑期间，图片会复制一份到本应用的私有缓存目录，其他应用无法访问，也不会离开你的手机。打开下一张图片时，上一次的副本会被删除；清除本应用的缓存或卸载本应用也会将其删除。</li>
+  <li><strong>导出</strong>：导出的图片保存在手机相册的「Pictures/Yomark」文件夹中，按原图重新绘制，不保留位置、机型、拍摄时间等 EXIF 信息。</li>
+</ul>
+
+<h2>4. 保存在本机的数据</h2>
+<p>本应用只在手机上保存以下内容，均不包含图片或识别结果：</p>
+<ul>
+  <li>你的设置，例如各类信息的处理方式、打码样式、主题色、用途水印的外观；</li>
+  <li>是否已解锁「去除水印」。</li>
+</ul>
+<p>这些数据不会被上传，也不参与系统云备份。卸载本应用后会被系统一并删除；你也可以在系统设置中清除本应用的数据。</p>
+
+<h2>5. 应用内购买</h2>
+<p>在 Google Play 发布的版本提供一项一次性购买：去除导出图片上的品牌水印。购买由 Google Play 处理，你的付款信息只提供给 Google，开发者无法获得。本应用只会从 Google Play 得知你是否已购买该商品，用于决定是否显示水印。Google 如何处理相关数据，请参阅 <a href="https://policies.google.com/privacy">Google 隐私权政策</a>。</p>
+
+<h2>6. 权限</h2>
+<p>本应用不申请任何需要你授权的运行时权限（相机、存储、位置、通讯录等）。安装包中仅包含以下不涉及读取个人数据的声明：</p>
+<ul>
+  <li><code>com.android.vending.BILLING</code>：用于 Google Play 应用内购买；</li>
+  <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code>：用于调用系统的本机 AI 服务（AI 复查）；</li>
+  <li><code>com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code>：Android 组件库自动生成的内部权限，其他应用无法获取。</li>
+</ul>
+
+<h2>7. 数据分享</h2>
+<p>由于本应用不收集任何数据，我们不会向任何第三方（包括广告商、数据分析服务或其他公司）出售、分享或转让你的数据。</p>
+
+<h2>8. 儿童隐私</h2>
+<p>本应用不以儿童为目标受众，也不会收集任何人的个人信息，包括儿童。</p>
+
+<h2>9. 开源</h2>
+<p>本应用的源代码公开在 <a href="https://github.com/FlintyLemming/yomark">GitHub</a>，你可以自行查看上述说明是否属实。</p>
+
+<h2>10. 政策变更</h2>
+<p>如本政策有更新，我们会在此页面发布新版本并修改顶部的生效日期。</p>
+
+<h2>11. 联系我们</h2>
+<p>如对本政策有任何疑问，请在 <a href="https://github.com/FlintyLemming/yomark/issues">GitHub Issues</a> 中提出。</p>
+
+<hr>
+
+<h1 id="en">Yomark Privacy Policy</h1>
+<p class="meta">Effective date: October 8, 2026</p>
+
+<p>This policy applies to the Android app Yomark (有码, package name <code>com.yomark.app</code>, "the app") and explains how the app handles your data.</p>
+
+<p><strong>In short: the app does not collect, upload or share any personal or device data.</strong> Recognition, editing and export all happen on your phone. The developer cannot see anything you process.</p>
+
+<h2>1. Data we do not collect</h2>
+<p>The app has no accounts, no servers, and no advertising, analytics or crash-reporting SDKs. We do not collect:</p>
+<ul>
+  <li>images you pick or share to the app, or the text, faces, QR codes and other content recognized in them;</li>
+  <li>personal information such as names, phone numbers, email addresses or addresses;</li>
+  <li>device identifiers, advertising IDs or location;</li>
+  <li>usage history, activity logs or crash logs.</li>
+</ul>
+
+<h2>2. Network access</h2>
+<p>The app has no network permission at the system level (the <code>INTERNET</code> permission is removed at build time), so it cannot connect to the internet by itself. The offline Google ML Kit components bundled in the app contain code that reports usage statistics to Google, but without network permission that code cannot send anything.</p>
+<p>Other apps go online on the app's behalf only when you act:</p>
+<ul>
+  <li><strong>In-app purchase</strong>: buying "Remove watermark" is handled inside the Google Play Store app (see section 5);</li>
+  <li><strong>Opening web pages</strong>: links such as this policy are opened in your browser, and that website's own policy applies from then on.</li>
+</ul>
+
+<h2>3. How images are handled</h2>
+<ul>
+  <li><strong>Access</strong>: images are chosen through the system photo picker or the Share menu. The app can only read the images you select and cannot access the rest of your photo library.</li>
+  <li><strong>Recognition</strong>: text recognition (PP-OCR, Google ML Kit) and face and barcode detection (Google ML Kit) use offline models shipped with the app and run on your device. The "AI review" feature uses the Gemini Nano model built into your phone's system (via Android AICore), also on-device. The app never sends images or text to any server.</li>
+  <li><strong>Temporary copies</strong>: while you edit, a copy of the image is kept in the app's private cache, which other apps cannot access, and it never leaves your phone. The previous copy is deleted when you open the next image, and clearing the app's cache or uninstalling the app also removes it.</li>
+  <li><strong>Export</strong>: exported images are saved to the "Pictures/Yomark" folder on your phone. They are redrawn from scratch and carry no EXIF data such as location, device model or capture time.</li>
+</ul>
+
+<h2>4. Data stored on your device</h2>
+<p>The app stores only the following on your phone, none of which includes images or recognition results:</p>
+<ul>
+  <li>your settings, such as how each type of information is handled, mask styles, theme color and purpose-watermark appearance;</li>
+  <li>whether "Remove watermark" has been unlocked.</li>
+</ul>
+<p>This data is never uploaded and is excluded from system cloud backup. It is deleted when you uninstall the app, and you can clear it at any time from the system settings.</p>
+
+<h2>5. In-app purchase</h2>
+<p>The version distributed on Google Play offers a single one-time purchase that removes the brand watermark from exported images. Purchases are processed by Google Play. Your payment information is provided only to Google, and the developer never receives it. The app only learns from Google Play whether you own this item, to decide whether to show the watermark. See the <a href="https://policies.google.com/privacy">Google Privacy Policy</a> for how Google handles this data.</p>
+
+<h2>6. Permissions</h2>
+<p>The app requests no runtime permissions (camera, storage, location, contacts and so on). The package contains only these declarations, none of which reads personal data:</p>
+<ul>
+  <li><code>com.android.vending.BILLING</code>: Google Play in-app purchases;</li>
+  <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code>: the system's on-device AI service (AI review);</li>
+  <li><code>com.yomark.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code>: an internal permission generated by AndroidX that other apps cannot obtain.</li>
+</ul>
+
+<h2>7. Data sharing</h2>
+<p>Because the app collects no data, we do not sell, share or transfer your data to any third party, including advertisers, analytics providers or other companies.</p>
+
+<h2>8. Children's privacy</h2>
+<p>The app is not directed at children and collects no personal information from anyone, including children.</p>
+
+<h2>9. Open source</h2>
+<p>The app's source code is public on <a href="https://github.com/FlintyLemming/yomark">GitHub</a>, so you can verify the statements above yourself.</p>
+
+<h2>10. Changes to this policy</h2>
+<p>If this policy changes, we will publish the new version on this page and update the effective date at the top.</p>
+
+<h2>11. Contact</h2>
+<p>If you have any questions about this policy, please open an issue on <a href="https://github.com/FlintyLemming/yomark/issues">GitHub Issues</a>.</p>
+
+</main>
+</body>
+</html>

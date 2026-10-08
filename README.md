@@ -71,6 +71,8 @@
 
 ## 隐私与权限
 
+完整的[隐私权政策](https://flintylemming.github.io/yomark/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置」里打开。
+
 - 不申请任何运行期权限。选图通过系统的 Photo Picker 完成，应用只能拿到你选中的那几张图，读不到相册里的其他图片。
 - 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。
 - 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
@@ -113,7 +115,8 @@ app/src/main/java/com/yomark/app/
   ui/        首页、编辑器、设置（Jetpack Compose）
   billing/   发行版本开关（开源版免费）、去水印的一次性购买与兑换码
 docs/        设计文档、模型调研、上架验收记录
-tools/       模型评测、测试语料和主题配色表的生成脚本
+tools/       模型评测、测试语料、主题配色表和落地页小图的生成脚本
+site/        落地页和隐私权政策页，纯静态，由 .github/workflows/pages.yml 部署到 GitHub Pages
 ```
 
 设计上的取舍见[总体方案](docs/superpowers/specs/2026-09-02-yomark-android-design.md)，各项指标的实测数值见[上架验收记录](docs/release-checklist.md)。
