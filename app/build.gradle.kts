@@ -66,8 +66,9 @@ android {
         versionName = "0.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
-        // 以后上架 Play 的构建改成 false，就回到一次性买断去水印。
-        buildConfigField("boolean", "FREE_EDITION", "true")
+        // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
+        val freeEdition = providers.gradleProperty("yomark.freeEdition").orNull?.toBooleanStrict() ?: true
+        buildConfigField("boolean", "FREE_EDITION", "$freeEdition")
     }
 
     // 固定签名：CI 从 Secrets 解出 keystore 并通过环境变量传进来。
