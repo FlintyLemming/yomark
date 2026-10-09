@@ -19,7 +19,7 @@ fun interface Finder {
  *
  * 一行文字看不出旁证在哪，所以由 RuleClassifier 看整页再定：同一行或上下相邻一行有锚点
  * （见 DefaultRuleSet.nameAnchors）的，照这一行的设置打码或圈出；附近没有的，出厂丢掉，
- * 设置里打开「没有旁证的人名也圈出」才只圈不打码。
+ * 设置 › 文字 › 人名里打开「没有旁证的也圈出」才只圈不打码。
  */
 class NeedsAnchor(private val finder: Finder) : Finder {
     override fun findIn(text: String): List<RuleMatch> =

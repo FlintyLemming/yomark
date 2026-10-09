@@ -6,7 +6,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
-import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -31,8 +30,9 @@ import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
 import moe.flinty.yomark.ui.settings.SettingsPage
 import moe.flinty.yomark.ui.settings.SettingsScreen
-import moe.flinty.yomark.ui.settings.TextRecognitionSettingsScreen
-import moe.flinty.yomark.ui.settings.TextRulesScreen
+import moe.flinty.yomark.ui.settings.TextEngineSettingsScreen
+import moe.flinty.yomark.ui.settings.TextRuleSettingsScreen
+import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import moe.flinty.yomark.ui.theme.ThemeColor
 import org.junit.Rule
 import org.junit.Test
@@ -66,9 +66,15 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "文字识别", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
+        listOf("文字", "人脸", "条码", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
+    }
+
+    /** 「文字识别」并进了「文字」：认字和认出来怎么处理不再分在两处。 */
+    @Test fun textRecognitionIsNoLongerATopicOfItsOwn() {
+        home()
+        compose.onNode(hasText("文字识别")).assertDoesNotExist()
     }
 
     /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里。 */
@@ -108,11 +114,10 @@ class SettingsScreenTest {
         )
         compose.onNodeWithText("仅圈出 · 精确识别").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("PP-OCR · AI 复查关闭").assertIsDisplayed()
         compose.onNodeWithText("导出前提醒已关闭").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED }
         val outlined = RuleCatalog.all.size - masked - 1
-        compose.onNodeWithText("打码 $masked 类 · 圈出 $outlined 类 · 关闭 1 类").assertIsDisplayed()
+        compose.onNodeWithText("打码 $masked 类 · 圈出 $outlined 类 · 关闭 1 类 · PP-OCR").assertIsDisplayed()
     }
 
     @Test fun tappingATopicOpensItsPage() {
@@ -121,7 +126,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("人脸").performClick()
         compose.onNodeWithText("文字").performClick()
         compose.onNodeWithText("外观").performClick()
-        assertThat(opened).containsExactly(SettingsPage.FACE, SettingsPage.TEXT_RULES, SettingsPage.APPEARANCE).inOrder()
+        assertThat(opened).containsExactly(SettingsPage.FACE, SettingsPage.TEXT, SettingsPage.APPEARANCE).inOrder()
     }
 
     /** 恢复默认在一级页上就是普通的一行，误点一下不能就把设置全清了。 */
@@ -192,59 +197,136 @@ class SettingsScreenTest {
         assertThat(latest?.barcode).isEqualTo(BarcodeOption.LOOSE)
     }
 
-    // ---------- 文字识别 ----------
+    // ---------- 文字 ----------
+
+    private fun textPage(
+        config: RecognitionConfig = RecognitionConfig(),
+        onChange: (RecognitionConfig) -> Unit = {},
+        onOpenEngine: () -> Unit = {},
+        onOpenRule: (String) -> Unit = {},
+    ) = show { TextSettingsScreen(config, onChange, onOpenEngine, onOpenRule, onNavigateUp = {}) }
+
+    /** 认字的两项在上面，下面是各类；每类一行，小字是它眼下怎么处理。 */
+    @Test fun theTextPageReadsTextAndListsEveryKind() {
+        textPage()
+        compose.onNodeWithText("识别引擎").assertIsDisplayed()
+        compose.onNodeWithText("AI 复查").assertIsDisplayed()
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
+        compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
+        compose.onNode(hasTestTag("rule-url") and hasText("仅圈出")).assertExists()
+    }
+
+    /** 设置页上常见的几类打头，规则表里的每一类都在、只出现一次。 */
+    @Test fun theKindsAreListedCommonFirst() {
+        assertThat(RuleCatalog.inSettingsOrder).containsExactlyElementsIn(RuleCatalog.all)
+        assertThat(RuleCatalog.inSettingsOrder.take(4).map { it.id })
+            .containsExactly("name", "phone", "address", "pickup").inOrder()
+    }
+
+    /** 人名那一行把没有旁证的那些怎么办也写出来：不写的话，聊天里的人名不圈了，用户只看得到「打码」。 */
+    @Test fun theNameRowSaysWhatHappensWithoutEvidence() {
+        textPage()
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("name")
+        compose.onNode(hasTestTag("rule-name") and hasText("打码 · 没有旁证的不圈")).assertExists()
+    }
+
+    @Test fun tappingTheEngineOpensItsPage() {
+        var opened = false
+        textPage(onOpenEngine = { opened = true })
+        compose.onNodeWithText("识别引擎").performClick()
+        assertThat(opened).isTrue()
+    }
+
+    @Test fun tappingAKindOpensItsPage() {
+        var opened: String? = null
+        textPage(onOpenRule = { opened = it })
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
+        compose.onNodeWithTag("rule-url").performClick()
+        assertThat(opened).isEqualTo("url")
+    }
+
+    @Test fun theAiReviewSwitchTurnsItOff() {
+        var latest: RecognitionConfig? = null
+        textPage(onChange = { latest = it })
+        compose.onNodeWithText("AI 复查").performClick()
+        assertThat(latest?.semantic).isEqualTo(SemanticOption.OFF)
+    }
+
+    /** 恢复默认管这一页和它下面的各页：引擎、AI 复查、各类、人名的开关。人脸、条码不动。 */
+    @Test fun resettingTheTextPageKeepsFacesAndBarcodes() {
+        var latest: RecognitionConfig? = null
+        val config = RecognitionConfig(
+            textEngine = TextEngineOption.LATIN,
+            semantic = SemanticOption.OFF,
+            faceState = RuleState.OUTLINED,
+            barcodeState = RuleState.OFF,
+            outlineUnanchoredNames = true,
+        ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
+        textPage(config, onChange = { latest = it })
+        compose.onNodeWithText("恢复默认").performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OUTLINED, barcodeState = RuleState.OFF))
+    }
+
+    @Test fun resetIsDisabledWhenTheTextPageIsAtFactory() {
+        textPage(RecognitionConfig(faceState = RuleState.OFF))
+        compose.onNodeWithText("恢复默认").assertIsNotEnabled()
+    }
 
     @Test fun pickingAnEngineEmitsIt() {
         var latest: RecognitionConfig? = null
-        show { TextRecognitionSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
+        show { TextEngineSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
         compose.onNodeWithText("PP-OCR").assertIsSelected()
         compose.onNodeWithText("ML Kit 英文").performClick()
         assertThat(latest?.textEngine).isEqualTo(TextEngineOption.LATIN)
     }
 
-    @Test fun theAiReviewSwitchTurnsItOff() {
-        var latest: RecognitionConfig? = null
-        show { TextRecognitionSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("使用 AI 复查").performClick()
-        assertThat(latest?.semantic).isEqualTo(SemanticOption.OFF)
+    // ---------- 文字里的一类 ----------
+
+    private fun rulePage(id: String, config: RecognitionConfig = RecognitionConfig(), onChange: (RecognitionConfig) -> Unit = {}) =
+        show { TextRuleSettingsScreen(id, config, onChange, onNavigateUp = {}) }
+
+    /** 和人脸、条码同一个样子：识别到时怎么办，下面写着怎么认的。 */
+    @Test fun aKindPageShowsHandlingAndHowItIsFound() {
+        rulePage("url")
+        compose.onNodeWithText("识别到网址时").assertIsDisplayed()
+        compose.onNodeWithText("仅圈出").assertIsSelected()
+        compose.onNodeWithText(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" })).assertIsDisplayed()
     }
 
-    // ---------- 文字（规则） ----------
-
-    @Test fun aRuleSelectorEmitsTheNewState() {
+    @Test fun pickingAHandlingOnAKindPageEmitsIt() {
         var latest: RecognitionConfig? = null
-        show { TextRulesScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
-        compose.onNode(hasText("打码") and hasAnyAncestor(hasTestTag("rule-url"))).performClick()
+        rulePage("url", onChange = { latest = it })
+        compose.onNodeWithText("打码").performClick()
         assertThat(latest?.ruleOverrides).containsExactly("url", RuleState.MASKED)
+    }
+
+    /** 改回出厂值不留覆盖。 */
+    @Test fun pickingTheFactoryHandlingClearsTheOverride() {
+        var latest: RecognitionConfig? = null
+        val config = RecognitionConfig().withRule("url", RuleState.OFF, RuleCatalog.factoryState("url"))
+        rulePage("url", config, onChange = { latest = it })
+        compose.onNodeWithText("仅圈出").performClick()
+        assertThat(latest?.ruleOverrides).isEmpty()
+    }
+
+    /** 没有旁证的人名那个开关只在人名的页上。 */
+    @Test fun onlyTheNamePageHasTheEvidenceSwitch() {
+        rulePage("phone")
+        compose.onNodeWithTag("unanchored-names").assertDoesNotExist()
     }
 
     @Test fun theUnanchoredNamesSwitchTurnsItOn() {
         var latest: RecognitionConfig? = null
-        show { TextRulesScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("unanchored-names")
-        compose.onNodeWithText("没有旁证的人名也圈出").performClick()
+        rulePage("name", onChange = { latest = it })
+        compose.onNodeWithText("没有旁证的也圈出").performClick()
         assertThat(latest?.outlineUnanchoredNames).isTrue()
     }
 
-    /** 人名一行选了「关」，这个开关管不到任何东西，灰掉。 */
+    /** 人名选了「关闭」，这个开关管不到任何东西，灰掉。 */
     @Test fun theUnanchoredNamesSwitchIsDisabledWhileNamesAreOff() {
-        val config = RecognitionConfig().withRule("name", RuleState.OFF, RuleCatalog.factoryState("name"))
-        show { TextRulesScreen(config, onChange = {}, onNavigateUp = {}) }
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("unanchored-names")
+        rulePage("name", RecognitionConfig().withRule("name", RuleState.OFF, RuleCatalog.factoryState("name")))
         compose.onNodeWithTag("unanchored-names").assertIsNotEnabled()
-    }
-
-    @Test fun resettingRulesKeepsTheAxes() {
-        var latest: RecognitionConfig? = null
-        val config = RecognitionConfig(
-            textEngine = TextEngineOption.LATIN,
-            faceState = RuleState.OUTLINED,
-            outlineUnanchoredNames = true,
-        ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
-        show { TextRulesScreen(config, onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("恢复默认").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(textEngine = TextEngineOption.LATIN, faceState = RuleState.OUTLINED))
     }
 
     // ---------- 导出、外观 ----------

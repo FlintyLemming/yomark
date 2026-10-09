@@ -1,7 +1,6 @@
 package moe.flinty.yomark.ui.settings
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Palette
@@ -22,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
-import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.rules.RuleCatalog
 
 /**
@@ -31,8 +29,11 @@ import moe.flinty.yomark.rules.RuleCatalog
  */
 const val PRIVACY_POLICY_URL = "https://yomark.flinty.moe/privacy/"
 
-/** 设置的二级页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。 */
-enum class SettingsPage { TEXT_RULES, FACE, BARCODE, TEXT_RECOGNITION, EXPORT, APPEARANCE }
+/**
+ * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
+ * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
+ */
+enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, EXPORT, APPEARANCE }
 
 /**
  * 设置的一级页（2026-10-07 起，见 docs/superpowers/specs/2026-10-07-yomark-settings-pages-design.md）。
@@ -40,8 +41,9 @@ enum class SettingsPage { TEXT_RULES, FACE, BARCODE, TEXT_RECOGNITION, EXPORT, A
  * 只是一张目录：每一项点进去是一页，一级页上不直接摆选项。原先文字识别、条码、人脸这几根轴的选项
  * 直接铺在一级页上，规则却收在二级页里，层级对不齐；现在一律收进二级页，一级页每一项下面写着它眼下的状态。
  *
- * 前三项是「识别到了怎么办」：文字、人脸、条码，各自都能设成打码、仅圈出或关闭；
- * 后三项是怎么识别、导出和外观。再往下是隐私权政策，最后一项恢复默认，点了先问一句。
+ * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
+ * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是导出和外观，与识别无关。
+ * 再往下是隐私权政策，最后一项恢复默认，点了先问一句。
  *
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  */
@@ -63,10 +65,10 @@ fun SettingsScreen(
             SettingsGroup {
                 NavigationRow(
                     title = "文字",
-                    summary = textRulesSummary(config),
+                    summary = textSummary(config),
                     icon = Icons.Outlined.TextFields,
                     iconColors = SettingsIconColors.blue,
-                    onClick = { onOpen(SettingsPage.TEXT_RULES) },
+                    onClick = { onOpen(SettingsPage.TEXT) },
                 )
                 NavigationRow(
                     title = "人脸",
@@ -88,14 +90,6 @@ fun SettingsScreen(
         item {
             GroupSpacer()
             SettingsGroup {
-                NavigationRow(
-                    title = "文字识别",
-                    summary = textEngineLabel(config.textEngine) + " · AI 复查" +
-                        if (config.semantic == SemanticOption.OFF) "关闭" else "开启",
-                    icon = Icons.Outlined.DocumentScanner,
-                    iconColors = SettingsIconColors.purple,
-                    onClick = { onOpen(SettingsPage.TEXT_RECOGNITION) },
-                )
                 NavigationRow(
                     title = "导出",
                     summary = if (exportReminder) "导出前提醒已开启" else "导出前提醒已关闭",
@@ -145,7 +139,7 @@ fun SettingsScreen(
             onDismissRequest = { confirmReset = false },
             icon = { Icon(Icons.Outlined.SettingsBackupRestore, contentDescription = null) },
             title = { Text("恢复默认设置？") },
-            text = { Text("文字、人脸、条码、文字识别和导出的设置都会恢复出厂值。主题色和识别动效不变。") },
+            text = { Text("文字、人脸、条码和导出的设置都会恢复出厂值。主题色和识别动效不变。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
@@ -157,12 +151,14 @@ fun SettingsScreen(
     }
 }
 
-/** 「打码 11 类 · 圈出 5 类」，有关掉的再加一段「关闭 1 类」。 */
-internal fun textRulesSummary(config: RecognitionConfig): String {
+/** 「打码 11 类 · 圈出 5 类 · PP-OCR」：有关掉的再加一段「关闭 1 类」，最后是识别引擎。 */
+internal fun textSummary(config: RecognitionConfig): String {
     val counts = RuleCatalog.all.groupingBy { RuleCatalog.stateOf(config, it.id) }.eachCount()
-    return listOf(RuleState.MASKED to "打码", RuleState.OUTLINED to "圈出", RuleState.OFF to "关闭")
-        .mapNotNull { (state, label) -> counts[state]?.let { "$label $it 类" } }
-        .joinToString(" · ")
+    return (
+        listOf(RuleState.MASKED to "打码", RuleState.OUTLINED to "圈出", RuleState.OFF to "关闭")
+            .mapNotNull { (state, label) -> counts[state]?.let { "$label $it 类" } } +
+            textEngineLabel(config.textEngine)
+        ).joinToString(" · ")
 }
 
 /** 人脸、条码那一行：「打码 · 快速」；关掉了就只写「关闭」，模式无所谓了。 */

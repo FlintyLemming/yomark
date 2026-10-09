@@ -107,7 +107,7 @@ class RuleClassifierTest {
         assertThat(guesses(line("abc xyz"))).isEmpty()
     }
 
-    /** 设置里打开「没有旁证的人名也圈出」：留下来，但只圈不打码。 */
+    /** 设置 › 文字 › 人名里打开「没有旁证的也圈出」：留下来，但只圈不打码。 */
     @Test
     fun `an unanchored guess is outlined when the setting keeps it`() = runTest {
         val out = guesses(line("abc"), keepUnanchored = true)

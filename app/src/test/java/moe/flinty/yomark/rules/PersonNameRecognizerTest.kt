@@ -142,10 +142,10 @@ class PersonNameRecognizerTest {
         }
     }
 
-    /** 设置页上只有一行「人名」，名字下面一行小字交代字面猜的那部分要旁证。 */
-    @Test fun `the settings row is one plain name row with a note`() {
+    /** 设置页上只有一行「人名」，它的页上交代字面猜的那部分要旁证。 */
+    @Test fun `the settings row is one plain name row that explains the evidence`() {
         assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
         assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
-        assertThat(RuleCatalog.note(rule)).contains("旁边有电话、证件号或地址才认")
+        assertThat(RuleCatalog.description(rule)).contains("旁边得有电话、证件号、地址")
     }
 }

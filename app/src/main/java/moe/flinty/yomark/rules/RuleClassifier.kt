@@ -22,7 +22,7 @@ class RuleClassifier(
     private val rules: List<Rule>,
     /**
      * 附近没有旁证的猜测怎么办：false 丢掉（出厂），true 只圈不打码。
-     * 设置页「文字」里「没有旁证的人名也圈出」那个开关。
+     * 设置 › 文字 › 人名的页上「没有旁证的也圈出」那个开关。
      */
     private val keepUnanchored: Boolean = false,
     /** 什么算旁证。见 DefaultRuleSet.nameAnchors。 */

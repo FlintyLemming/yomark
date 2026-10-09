@@ -37,7 +37,7 @@ import moe.flinty.yomark.rules.RuleClassifier
 import moe.flinty.yomark.ui.EditorScreen
 import moe.flinty.yomark.ui.EditorUiState
 import moe.flinty.yomark.ui.EditorViewModel
-import moe.flinty.yomark.ui.settings.TextRulesScreen
+import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import moe.flinty.yomark.ui.theme.ThemeColor
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.CompletableDeferred
@@ -290,13 +290,13 @@ class PlayScreenshots {
     }
 
     /**
-     * 设置 › 文字：每一类都能设成打码、仅圈出或关闭。出厂配置，列表滚到中段，
-     * 默认打码的几类（护照、密钥、人名……）和默认只圈出的几类（网址、IP、快递单号……）同在一屏。
+     * 设置 › 文字：每一类一行，小字是它眼下怎么处理，点进去能改成打码、仅圈出或关闭。出厂配置，
+     * 列表滚到各类开头，默认打码的几类（人名、电话、地址……）和默认只圈出的几类（快递单号、日期时间、网址……）同在一屏。
      */
     @Test fun rules() {
-        show { TextRulesScreen(config = RecognitionConfig(), onChange = {}, onNavigateUp = {}) }
+        show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenEngine = {}, onOpenRule = {}, onNavigateUp = {}) }
         compose.waitForIdle()
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("passport")
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("name")
         compose.waitForIdle()
         shoot("rules")
     }
