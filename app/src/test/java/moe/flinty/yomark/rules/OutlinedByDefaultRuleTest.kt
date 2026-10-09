@@ -85,8 +85,8 @@ class OutlinedByDefaultRuleTest {
 
     /**
      * name / address / pickup 加在默认打码一侧：标签锚定的误报率低——「收货地址」四个字后面那一段
-     * 几乎必然是地址，符合 §6「按误报率划线」。name 里从字面认出的那部分例外，只圈不打码，
-     * 见 PersonNameRecognizerTest。
+     * 几乎必然是地址，符合 §6「按误报率划线」。name 里从字面认出的那部分例外，要旁证才算，
+     * 见 PersonNameRecognizerTest、NameAnchorPageTest。
      */
     @Test fun `exactly eleven rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }

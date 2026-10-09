@@ -62,6 +62,13 @@ object Checksums {
         return true
     }
 
+    // ---------- 中国居民身份证：GB 11643 的 ISO 7064 MOD 11-2 校验码 ----------
+    fun chineseIdValid(raw: String): Boolean {
+        if (raw.length != 18 || !raw.take(17).all { it.isDigit() }) return false
+        val sum = (0 until 17).sumOf { (raw[it] - '0') * ID_WEIGHTS[it] }
+        return "10X98765432"[sum % 11] == raw[17].uppercaseChar()
+    }
+
     // ---------- 护照 MRZ（TD3，两行各 44 字符） ----------
     fun mrzTd3Line1(line: String): Boolean =
         line.length == 44 && MRZ_L1.matches(line)
@@ -128,6 +135,7 @@ object Checksums {
         return seps.length == 5 && seps.toSet().size == 1
     }
 
+    private val ID_WEIGHTS = intArrayOf(7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2)
     private val SSN_SHAPE = Regex("""^(\d{3})-(\d{2})-(\d{4})$""")
     private val MRZ_L1 = Regex("""^P[A-Z<][A-Z<]{3}[A-Z<]{39}$""")
 

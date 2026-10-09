@@ -3,9 +3,10 @@ package moe.flinty.yomark.rules
 import moe.flinty.yomark.core.model.SensitiveKind
 
 /**
- * @param outlineOnly 这一处最多只圈出：规则选了「打码」也不自动打码。见 [OutlineOnly]。
+ * @param needsAnchor 这一处只是猜测：要页面上附近有电话、证件号、地址或「收货人」这类字段才算数。
+ *   见 [NeedsAnchor]。
  */
-data class RuleMatch(val range: IntRange, val confidence: Float, val outlineOnly: Boolean = false)
+data class RuleMatch(val range: IntRange, val confidence: Float, val needsAnchor: Boolean = false)
 
 /** 一种认法：只管在一行里找出区间。类型与初始状态由外面的规则决定。 */
 fun interface Finder {
@@ -13,13 +14,16 @@ fun interface Finder {
 }
 
 /**
- * 让一种认法的命中最多只圈出。给同一类型里误报率高出一截的认法用：
- * 它与其余认法合在一条规则里、共用设置页上的一行，跟着那一行开关；
- * 那一行选「打码」时，它的命中仍然只圈不打码——与条码宽松档里解不出内容的疑似条码一个道理。
+ * 让一种认法的命中只算猜测，要靠页面上的旁证坐实。给同一类型里误报率高出一截的认法用：
+ * 它与其余认法合在一条规则里、共用设置页上的一行，跟着那一行开关。
+ *
+ * 一行文字看不出旁证在哪，所以由 RuleClassifier 看整页再定：同一行或上下相邻一行有锚点
+ * （见 DefaultRuleSet.nameAnchors）的，照这一行的设置打码或圈出；附近没有的，出厂丢掉，
+ * 设置里打开「没有旁证的人名也圈出」才只圈不打码。
  */
-class OutlineOnly(private val finder: Finder) : Finder {
+class NeedsAnchor(private val finder: Finder) : Finder {
     override fun findIn(text: String): List<RuleMatch> =
-        finder.findIn(text).map { it.copy(outlineOnly = true) }
+        finder.findIn(text).map { it.copy(needsAnchor = true) }
 }
 
 /**

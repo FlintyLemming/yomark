@@ -41,11 +41,12 @@ object RuleCatalog {
     /**
      * 名字下面那行小字：这一行的三态管不到的地方。没有就是 null。
      *
-     * 人名选「打码」时，从字面猜出的名字仍然只圈出（OutlineOnly）。不写出来，用户会以为打码没生效。
+     * 人名：没有「姓名」这类字段名、按字面推断的名字只算猜测，旁边得有电话、证件号、地址才认（NeedsAnchor）。
+     * 不写出来，用户会以为聊天里的人名漏了是坏了。
      */
     fun note(rule: Rule): String? = NOTES[rule.id]
 
-    private val NOTES = mapOf("name" to "没有「姓名」等标签、按字面推断的人名只圈出，不打码")
+    private val NOTES = mapOf("name" to "没有「姓名」等字段名时，旁边有电话、证件号或地址才认")
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =
         if (enabledByDefault == masked) this else StateOverride(this, masked)

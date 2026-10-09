@@ -354,14 +354,22 @@ internal fun SwitchRow(
     modifier: Modifier = Modifier,
     summary: String? = null,
     icon: ImageVector? = null,
+    enabled: Boolean = true,
 ) {
     SettingsRow(
         title = title,
         summary = summary,
         modifier = modifier,
-        interaction = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        enabled = enabled,
+        interaction = Modifier.toggleable(
+            value = checked,
+            enabled = enabled,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        ),
         leading = icon?.let { { RowIcon(it) } },
         trailing = {
+            // 滑块按「可用」画，灰掉交给整行的透明度，理由同 RadioRow 的圆点
             Switch(
                 checked = checked,
                 onCheckedChange = null,

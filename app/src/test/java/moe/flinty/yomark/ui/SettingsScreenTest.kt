@@ -11,6 +11,7 @@ import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
@@ -218,10 +219,29 @@ class SettingsScreenTest {
         assertThat(latest?.ruleOverrides).containsExactly("url", RuleState.MASKED)
     }
 
+    @Test fun theUnanchoredNamesSwitchTurnsItOn() {
+        var latest: RecognitionConfig? = null
+        show { TextRulesScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("unanchored-names")
+        compose.onNodeWithText("没有旁证的人名也圈出").performClick()
+        assertThat(latest?.outlineUnanchoredNames).isTrue()
+    }
+
+    /** 人名一行选了「关」，这个开关管不到任何东西，灰掉。 */
+    @Test fun theUnanchoredNamesSwitchIsDisabledWhileNamesAreOff() {
+        val config = RecognitionConfig().withRule("name", RuleState.OFF, RuleCatalog.factoryState("name"))
+        show { TextRulesScreen(config, onChange = {}, onNavigateUp = {}) }
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("unanchored-names")
+        compose.onNodeWithTag("unanchored-names").assertIsNotEnabled()
+    }
+
     @Test fun resettingRulesKeepsTheAxes() {
         var latest: RecognitionConfig? = null
-        val config = RecognitionConfig(textEngine = TextEngineOption.LATIN, faceState = RuleState.OUTLINED)
-            .withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
+        val config = RecognitionConfig(
+            textEngine = TextEngineOption.LATIN,
+            faceState = RuleState.OUTLINED,
+            outlineUnanchoredNames = true,
+        ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
         show { TextRulesScreen(config, onChange = { latest = it }, onNavigateUp = {}) }
         compose.onNodeWithText("恢复默认").performClick()
         assertThat(latest).isEqualTo(RecognitionConfig(textEngine = TextEngineOption.LATIN, faceState = RuleState.OUTLINED))

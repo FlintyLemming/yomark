@@ -111,6 +111,13 @@ object DefaultRuleSet {
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
+    /** 人名字段名。姓名规则拿它锚定取值，从字面猜出的名字也拿它当旁证（见 nameAnchors）。 */
+    private val NAME_LABELS = listOf(
+        "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
+        "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
+        "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
+    )
+
     /**
      * 姓名 = 字段名后面的值 + 电话前面的名字 + 从字面认出的名字。
      *
@@ -118,8 +125,10 @@ object DefaultRuleSet {
      * 没有任何字段名，见 NameBeforePhone。从字面认的（HanLP，见 PersonNameRecognizer）补既没有字段名、
      * 旁边也没有电话的：滴滴出票页的乘车人一行是「沐晨冉 成人」，下面是打了星的身份证号。
      *
-     * 从字面认的误报率比前两种高一个量级：「申通快递」「瑞幸咖啡」这类拿人名、姓氏起头的商号会被认成人名。
-     * 所以它排在最后，只补前两种够不着的地方，命中只圈不打码（OutlineOnly），按 §6「按误报率划线」。
+     * 从字面认的误报率比前两种高一个量级：药名、品牌名、规格词都会被认成人名（真机上一整页商品规格被圈满）。
+     * 所以它排在最后，只补前两种够不着的地方，而且只算猜测（NeedsAnchor）：同一行或上下相邻一行有
+     * 电话、证件号、地址、「乘车人」这类字段的才算数，照这一行的设置打码；附近什么都没有的，出厂丢掉，
+     * 设置里打开「没有旁证的人名也圈出」才只圈不打码。
      * 它原先单独成一条规则，设置页上另有一行「人名（无字段名）」；两行都是人名，用户分不清关的是哪一个，
      * 于是并了回来：一行「人名」管三种认法，一起开关。
      */
@@ -127,17 +136,9 @@ object DefaultRuleSet {
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
-        LabeledField(
-            labels = listOf(
-                "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
-                "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
-                "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
-            ),
-            value = NAME_VALUE,
-            confidence = 0.8f,
-        ),
+        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
-        OutlineOnly(PersonNameRecognizer(confidence = 0.6f)),
+        NeedsAnchor(PersonNameRecognizer(confidence = 0.6f)),
     )
 
     /**
@@ -301,4 +302,46 @@ object DefaultRuleSet {
         CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
+
+    // ---------- 人名的旁证 ----------
+
+    /** 18 位身份证号，查校验码。 */
+    private val ID_NUMBER = Regex("""(?<![0-9A-Za-z])\d{17}[\dXx](?![0-9A-Za-z])""")
+
+    /**
+     * 打了星的号码：证件号「3201**********1234」、卡号「6222****1234」、手机号「138****6612」。
+     * 打星本身就说明 app 认为这是某个人的号码。
+     */
+    private val MASKED_NUMBER = Regex("""(?<![\d*＊])\d{2,6}\s?[*＊•●]{3,}\s?\d{2,4}[\dXx]?(?![\d*＊])""")
+
+    /**
+     * 说明「这里是一个人」的字段名：姓名规则的字段名，加上出行、住宿、就诊、保险、转账页上的。
+     * 后面这些不拿来锚定取值——「乘客 1 位」「抄送 3 人」后面跟的不是名字——只当旁证。
+     * 票种也算：滴滴出票页那一行就是「沐晨冉 成人」。
+     */
+    private val PERSON_FIELD = run {
+        val fields = NAME_LABELS + listOf(
+            "乘车人", "乘客", "旅客", "乘机人", "出行人", "入住人", "住客", "预订人", "订票人", "购票人",
+            "就诊人", "患者", "投保人", "被保险人", "受益人", "审批人", "经办人", "抄送", "对方账户", "收款方",
+        )
+        Regex(
+            "(?<![\\u4e00-\\u9fa5A-Za-z])(?:" +
+                fields.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) } + ")" +
+                "|(?<![\\u4e00-\\u9fa5])(?:成人|儿童|学生|婴儿)票?(?![\\u4e00-\\u9fa5])"
+        )
+    }
+
+    /**
+     * 从字面猜出的人名要有旁证（见 NeedsAnchor、RuleClassifier）：电话、邮箱、地址、证件号、
+     * 打了星的号码、说明「这里是一个人」的字段名。
+     *
+     * 与姓名规则拿电话找锚同一个道理：电话、地址规则被用户关掉时照样算旁证——关的是「遮」，不是「认」。
+     */
+    val nameAnchors: Finder = Finder { text ->
+        val view = HanView.of(text)
+        val numbers = ID_NUMBER.findAll(text).filter { Checksums.chineseIdValid(it.value) } + MASKED_NUMBER.findAll(text)
+        listOf(PHONE, EMAIL, ADDRESS).flatMap { it.findIn(text) } +
+            numbers.map { RuleMatch(it.range, 1f) } +
+            PERSON_FIELD.findAll(view.text).map { RuleMatch(view.toSource(it.range), 1f) }
+    }
 }

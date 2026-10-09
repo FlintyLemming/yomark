@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.QrCode2
@@ -63,7 +64,8 @@ import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
  */
 
 /**
- * 文字：每一类文字三态，关 / 圈出 / 打码。右上角的「恢复默认」只管这一页的规则。
+ * 文字：每一类文字三态，关 / 圈出 / 打码。下面另有一个人名的开关：没有旁证的人名要不要也圈出。
+ * 右上角的「恢复默认」只管这一页：规则和那个开关。
  */
 @Composable
 fun TextRulesScreen(
@@ -77,9 +79,18 @@ fun TextRulesScreen(
         onNavigateUp = onNavigateUp,
         modifier = modifier,
         actions = {
+            val factory = RecognitionConfig()
             TextButton(
-                onClick = { onChange(config.copy(ruleOverrides = emptyMap())) },
-                enabled = config.ruleOverrides.isNotEmpty(),
+                onClick = {
+                    onChange(
+                        config.copy(
+                            ruleOverrides = emptyMap(),
+                            outlineUnanchoredNames = factory.outlineUnanchoredNames,
+                        )
+                    )
+                },
+                enabled = config.ruleOverrides.isNotEmpty() ||
+                    config.outlineUnanchoredNames != factory.outlineUnanchoredNames,
             ) { Text("恢复默认") }
         },
     ) {
@@ -111,6 +122,21 @@ fun TextRulesScreen(
                 },
             )
             if (i < rules.lastIndex) RowGapSpacer()
+        }
+        item(key = "unanchored-names") {
+            SectionHeader("人名")
+            SettingsGroup {
+                SwitchRow(
+                    title = "没有旁证的人名也圈出",
+                    summary = "旁边没有电话、证件号、地址或「收货人」这类字段、只凭字面猜出的人名也圈出，不打码。" +
+                        "会多圈到药名、品牌名",
+                    icon = Icons.Outlined.PersonSearch,
+                    checked = config.outlineUnanchoredNames,
+                    enabled = RuleCatalog.stateOf(config, "name") != RuleState.OFF,
+                    onCheckedChange = { onChange(config.copy(outlineUnanchoredNames = it)) },
+                    modifier = Modifier.testTag("unanchored-names"),
+                )
+            }
         }
     }
 }

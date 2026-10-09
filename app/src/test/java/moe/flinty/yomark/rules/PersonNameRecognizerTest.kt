@@ -72,6 +72,45 @@ class PersonNameRecognizerTest {
         ).forEach { assertThat(names(it)).isEmpty() }
     }
 
+    /**
+     * 真机反馈：淘宝商品规格页上一整页都被圈成了人名。HanLP 把药名「福来恩」「海乐妙」、规格「成猫」「单月」
+     * 都认成人名，还把「8周以上」里的「周」当成姓、连上「以上」。它们紧贴着数量、规格词、名词，名字不会这样。
+     */
+    @Test fun `a product spec page yields no names`() {
+        listOf(
+            "【8周以上猫通用】福来恩3支", "【8周以上猫通用】福来恩1支", "【幼猫单月装】福来恩1支+海乐妙1粒",
+            "【成猫单月装】福来恩1支+海乐妙1粒", "【幼猫季度装】福来恩3支+海乐妙3粒", "【成猫季度装】福来恩3支+海乐妙3粒",
+            "【幼猫半年装】福来恩6支+海乐妙6粒", "【成猫半年装】福来恩6支+海乐妙6粒", "成猫单月套",
+            "福来恩滴剂+海乐妙驱虫一粒", "平台加补后¥64.3 | 优惠前¥120", "（限购3件）有货", "颜色分类：成猫单月装",
+            "规格：单月装 季度装 半年装", "适用体重：成猫2-8kg",
+        ).forEach { assertThat(names(it)).isEmpty() }
+    }
+
+    /** 品牌名里被切出来的一截：左右紧贴着名词。 */
+    @Test fun `brand names glued to the product are not names`() {
+        listOf(
+            "冠能猫粮 室内成猫 7kg", "伟嘉成猫猫粮海洋鱼味 3.6kg", "兰蔻小黑瓶精华肌底液 50ml", "珀莱雅双抗精华 2.0",
+            "百雀羚水能量焕颜霜", "良品铺子猪肉脯 200g", "卫龙大面筋 106g*5袋", "金龙鱼大米", "舒肤佳香皂",
+            "潘婷护发素", "曼秀雷敦唇膏", "本周热卖", "北京西站", "希尔顿欢朋", "连花清瘟胶囊", "江中健胃消食片",
+        ).forEach { assertThat(names(it)).isEmpty() }
+    }
+
+    /** 名要像名：猫几乎不作名用，「古茗」的茗也是。 */
+    @Test fun `a given name that is never used as one is rejected`() {
+        assertThat(names("古茗")).isEmpty()
+        assertThat(names("诺和锐")).isEmpty()
+    }
+
+    /** 名字后面紧贴称呼、自己的东西，前面紧贴身份，都还是名字。 */
+    @Test fun `names next to titles roles and their own things`() {
+        assertThat(names("张三老师好")).containsExactly("张三")
+        assertThat(names("李娜电话多少")).containsExactly("李娜")
+        assertThat(names("沐晨冉成人")).containsExactly("沐晨冉")
+        assertThat(names("司机李建国正在赶来")).containsExactly("李建国")
+        assertThat(names("群主王建国")).containsExactly("王建国")
+        assertThat(names("您的快件已由李师傅揽收")).containsExactly("李师傅")
+    }
+
     @Test fun `a single character is never a name on its own`() {
         assertThat(names("冉")).isEmpty()
     }
@@ -86,27 +125,27 @@ class PersonNameRecognizerTest {
     /** 不单独成条：并在人名规则里，排在字段名、电话两种锚定之后。 */
     private val rule = DefaultRuleSet.rules.first { it.id == "name" }
 
-    /** 规则出厂打码，但只凭字面认出的那一处只圈不打码——商号会被认成人名。 */
-    @Test fun `a name found only from the text is outlined even though the rule masks`() {
+    /** 只凭字面认出的只是猜测：附近有没有旁证，RuleClassifier 看整页再定（见 NameAnchorPageTest）。 */
+    @Test fun `a name found only from the text is a guess that needs an anchor`() {
         assertThat(rule.kind).isEqualTo(SensitiveKind.PERSON_NAME)
         assertThat(rule.enabledByDefault).isTrue()
         val found = rule.findIn("沐晨冉 成人").single()
-        assertThat(found.outlineOnly).isTrue()
+        assertThat(found.needsAnchor).isTrue()
         assertThat(found.confidence).isEqualTo(0.6f)
     }
 
-    /** 字段名或电话锚定得到的照常打码；字面也认得出它，但锚定的排在前面，只出一个区间。 */
-    @Test fun `an anchored name is reported once and masked`() {
+    /** 字段名或电话锚定得到的不用旁证；字面也认得出它，但锚定的排在前面，只出一个区间。 */
+    @Test fun `an anchored name is reported once and needs nothing more`() {
         listOf("收货人 ： 刘洋 138****6612", "沐晨冉 86-186****3392 号码保护中").forEach { text ->
             val found = rule.findIn(text).single()
-            assertThat(found.outlineOnly).isFalse()
+            assertThat(found.needsAnchor).isFalse()
         }
     }
 
-    /** 设置页上只有一行「人名」，名字下面一行小字交代打码管不到的那部分。 */
+    /** 设置页上只有一行「人名」，名字下面一行小字交代字面猜的那部分要旁证。 */
     @Test fun `the settings row is one plain name row with a note`() {
         assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
         assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
-        assertThat(RuleCatalog.note(rule)).contains("只圈出，不打码")
+        assertThat(RuleCatalog.note(rule)).contains("旁边有电话、证件号或地址才认")
     }
 }

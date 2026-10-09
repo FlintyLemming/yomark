@@ -1,6 +1,8 @@
 package moe.flinty.yomark.rules
 
 import com.hankcs.hanlp.HanLP
+import com.hankcs.hanlp.corpus.tag.NR
+import com.hankcs.hanlp.dictionary.nr.PersonDictionary
 import com.hankcs.hanlp.seg.Segment
 import com.hankcs.hanlp.seg.common.Term
 
@@ -11,15 +13,26 @@ import com.hankcs.hanlp.seg.common.Term
  * LabeledField 和 NameBeforePhone 都接不住，只有按需跑的 AI 复查（Gemini Nano）圈了出来——
  * 而 Nano 只在少数旗舰上有。HanLP 是纯 Java 的词典与统计模型，jar 8 MB，一行零点几毫秒，所有设备都能跑。
  *
- * 在 HanLP 的结果上做三件事：
+ * HanLP 的角色标注不看上下文，凡是「姓氏用字 + 一两个字」都可能认成人名。真机反馈：淘宝商品规格页上
+ * 「福来恩」「海乐妙」（药名）、「成猫」「单月」、「8周以上」里的「周以上」全被圈成人名。
+ * 「福来恩」按 HanLP 自己的统计比「沐晨冉」还像人名（福、沐作姓都只有二十来次），单看字面分不开，
+ * 只能看它周围。所以在 HanLP 的结果上做这几件事：
  * - **拼回被切开的名字**：相邻的人名词首尾相接就并成一个，「沐晨」+「冉」→「沐晨冉」；
- * - **单个的姓往后补**：只认出一个姓（「< 陈晓峰」里的「陈」、「赵师傅」里的「赵」）时，
- *   后面紧跟着一两个汉字的词就连上，凑成两到三个字。复姓同理，凑到四个字为止；
+ * - **单个的姓往后补**：只认出一个姓（「< 陈晓峰」里的「陈」、「赵师傅」里的「赵」）时，后面紧跟着的
+ *   一两个字像名（HanLP 人名词典里常作名用）或是称呼，才连上。「周」+「以上」不连；
+ * - **看左右邻居**：人名紧挨着的是标点、空格、动词、介词（「转告周振宇」「黄磊拍了拍你」「来自赵磊的转账」）。
+ *   左边紧贴名词、形容词、数量词（「好丽友派」「8周」），右边紧贴名词、数量、规格词
+ *   （「福来恩3支」「冠能猫粮」「单月装」）的，是商品名、品牌名里被切出来的一截，作废。
+ *   称呼、票种、自己的东西例外：「张三老师」「沐晨冉成人」「李娜电话多少」；
+ * - **名要像名**：单名的那个字在人名词典里几乎不作名用的（「成猫」的猫），作废；
+ *   四个字的只认复姓开头的（「欧阳娜娜」），「成猫」+「单月」拼出来的「成猫单月」不要；
  * - **挡商号和地名**：以人名命名、以姓开头的店名品牌（「申通快递」「瑞幸咖啡」「张亮麻辣烫」「高德地图」）
- *   会被认成人名，名字后面紧跟着行业词的整个作废；姓开头的路名（「祁门路」）也会被认成人名，
- *   以门牌用字结尾的整个作废。另有几个实测撞上的词直接排除。
+ *   名字后面紧跟着行业词的整个作废；姓开头的路名（「祁门路」）以门牌用字结尾的整个作废。另有几个实测撞上的词直接排除。
  *
  * 只要中文人名（nr），音译名（nrf）和日本人名（nrj）不要：「优衣库」就是被当成音译名认出来的。
+ *
+ * 这里只管一行之内；认出来的仍然只是猜测。附近有没有电话、证件号、地址、「收货人」这类字段，
+ * 由 RuleClassifier 看整页再定（见 [NeedsAnchor]）。
  *
  * 跑在 HanView 上：逐字切分的「沐 晨 冉」先拼回「沐晨冉」再交给分词。
  */
@@ -40,20 +53,21 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
                 end += terms[j].word.length
                 j++
             }
-            // 只认出了姓：后面紧跟的一两个汉字的词连上
+            // 只认出了姓：后面紧跟的一两个字像名、或者是称呼，才连上
             if (j < terms.size && isBareSurname(t.substring(start, end))) {
                 val next = terms[j]
                 val cap = if (end - start == 1) MAX_SINGLE_SURNAME_NAME else MAX_NAME
                 if (next.offset == end && next.word.length <= 2 && next.word.all { it.isHan() } &&
-                    end - start + next.word.length <= cap
+                    end - start + next.word.length <= cap &&
+                    (next.word in TITLES || looksLikeGivenName(next.word))
                 ) {
                     end += next.word.length
                     j++
                 }
             }
             val name = t.substring(start, end)
-            if (name.length in MIN_NAME..MAX_NAME && name !in NOT_NAMES && name.last() !in PLACE_ENDINGS &&
-                !followedByBusiness(t, end)
+            if (looksLikeName(name) && !followedByBusiness(t, end) &&
+                fitsLeft(t, terms.getOrNull(i - 1), start) && fitsRight(t, terms.getOrNull(j), end)
             ) {
                 out += RuleMatch(view.toSource(start until end), confidence)
             }
@@ -69,6 +83,69 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
 
     private fun isBareSurname(s: String) = s.length == 1 || s in COMPOUND_SURNAMES
 
+    /** 长度、排除词、地名用字，以及姓后面那一两个字像不像名。带称呼的（「赵师傅」「王女士」）不看名。 */
+    private fun looksLikeName(name: String): Boolean {
+        if (name.length !in MIN_NAME..MAX_NAME || name in NOT_NAMES || name.last() in PLACE_ENDINGS) return false
+        if (!name.all { it.isHan() }) return false
+        val surname = if (name.take(2) in COMPOUND_SURNAMES) 2 else 1
+        if (name.length == MAX_NAME && surname == 1) return false
+        if (TITLES.any { name.endsWith(it) }) return true
+        return looksLikeGivenName(name.substring(surname))
+    }
+
+    /**
+     * 按 HanLP 人名词典里的角色频次：单名看这个字作单名（E）的次数，双名看首字作名首（C）、
+     * 末字作名末（D）的次数，或者整个词本身就常作双名（Z，「晓峰」）。门槛很低，只挡几乎不作名用的字——
+     * 「月」作单名 30 次、「三」22 次、「嵩」41 次，都得放过；「猫」4 次、「茗」5 次，挡掉。
+     */
+    private fun looksLikeGivenName(given: String): Boolean = when (given.length) {
+        1 -> roleFrequency(given, NR.E) >= MIN_ROLE_FREQUENCY
+        2 -> roleFrequency(given, NR.Z) > 0 ||
+            (roleFrequency(given.substring(0, 1), NR.C) >= MIN_ROLE_FREQUENCY &&
+                roleFrequency(given.substring(1), NR.D) >= MIN_ROLE_FREQUENCY)
+        else -> false
+    }
+
+    private fun roleFrequency(word: String, role: NR): Int =
+        PersonDictionary.dictionary.get(word)?.getFrequency(role) ?: 0
+
+    /** 左边紧贴着的词。中间隔着空格、标点的不算紧贴。 */
+    private fun fitsLeft(t: String, prev: Term?, start: Int): Boolean {
+        if (start == 0) return true
+        val c = t[start - 1]
+        if (c.isAsciiLetterOrDigit()) return false                    // 「8周以上」
+        if (!c.isHan() || prev == null || prev.offset + prev.word.length != start) return true
+        if (LEFT_ROLES.any { prev.word.endsWith(it) }) return true    // 「司机李建国」「群主王建国」
+        return !prev.isNounLike() && prev.natureInitial() !in "amqbr"
+    }
+
+    /** 右边紧贴着的词。 */
+    private fun fitsRight(t: String, next: Term?, end: Int): Boolean {
+        if (end == t.length) return true
+        val c = t[end]
+        if (c.isDigit()) {
+            // 紧跟一个数再跟一个量词或单位：「福来恩3支」「卫龙106g」
+            var k = end
+            while (k < t.length && (t[k].isDigit() || t[k] == '.')) k++
+            return k == t.length || !t[k].isLetter()
+        }
+        if (!c.isHan() || next == null || next.offset != end) return true
+        if (c in SPEC_SUFFIXES) return false                          // 「单月装」「季度装」
+        if (RIGHT_WORDS.any { next.word.startsWith(it) }) return true // 「张三老师」「李娜电话多少」
+        return !next.isNounLike() && next.natureInitial() !in "amqb"
+    }
+
+    /** 名词一类（含专名、机构名、地名、音译名），以及名动词「驱虫」「快递」、名形词。人名本身已在前面并掉了。 */
+    private fun Term.isNounLike(): Boolean {
+        val n = nature.toString()
+        return (n.startsWith("n") && n != "nr" && n != "nx") || n == "vn" || n == "an"
+    }
+
+    /** 词性的大类：a 形容词、m 数词、q 量词、b 区别词、r 代词…… */
+    private fun Term.natureInitial(): Char = nature.toString().firstOrNull() ?: ' '
+
+    private fun Char.isAsciiLetterOrDigit() = this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9'
+
     private fun followedByBusiness(t: String, end: Int): Boolean {
         val rest = t.substring(end).trimStart()
         return BUSINESS_SUFFIXES.any { rest.startsWith(it) }
@@ -78,11 +155,37 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
         private const val MIN_NAME = 2
         private const val MAX_NAME = 4
         private const val MAX_SINGLE_SURNAME_NAME = 3
+        private const val MIN_ROLE_FREQUENCY = 10
 
         private val COMPOUND_SURNAMES = setOf(
             "欧阳", "司马", "上官", "诸葛", "东方", "皇甫", "司徒", "夏侯", "慕容", "令狐", "公孙", "长孙",
             "宇文", "尉迟", "独孤", "南宫", "西门", "端木", "轩辕", "呼延", "百里", "亓官", "澹台", "万俟",
         )
+
+        /** 跟在姓后面的称呼：「赵师傅」「王女士」。 */
+        private val TITLES = setOf(
+            "师傅", "女士", "先生", "小姐", "老师", "同学", "经理", "总监", "主任", "医生", "大夫", "护士",
+            "律师", "教授", "博士", "阿姨", "叔叔", "伯伯", "大爷", "大妈", "老板", "同志",
+        )
+
+        /**
+         * 名字后面紧贴着也不奇怪的词：称呼、亲属、票种、这个人自己的东西，
+         * 以及 HanLP 迷你词典标成名词的几个动词（「李师傅揽收」）。
+         */
+        private val RIGHT_WORDS = TITLES + listOf(
+            "学长", "学姐", "老婆", "老公", "妈妈", "爸爸", "父亲", "母亲", "儿子", "女儿", "家",
+            "成人", "儿童", "学生", "婴儿", "本人", "电话", "手机", "微信", "邮箱", "账号", "号码", "身份证",
+            "揽收", "签收", "代收", "派送", "派件",
+        )
+
+        /** 紧贴在名字前面也不奇怪的身份名词：「司机李建国」「群主王建国」。 */
+        private val LEFT_ROLES = listOf(
+            "司机", "骑手", "快递员", "派送员", "配送员", "群主", "管理员", "老师", "同学", "医生", "护士",
+            "客服", "店主", "房东", "经理", "主管", "师傅",
+        )
+
+        /** 紧跟在名字后面就说明这是规格：「单月装」「季度装」「经典款」。 */
+        private const val SPEC_SUFFIXES = "装套款版型色码味"
 
         /** 紧跟在后面就说明前面是商号：快递公司、餐饮、出行、地图、零售。 */
         private val BUSINESS_SUFFIXES = listOf(

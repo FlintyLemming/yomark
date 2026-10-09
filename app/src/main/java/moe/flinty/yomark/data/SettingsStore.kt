@@ -177,6 +177,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
             semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
+            outlineUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.outlineUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
     }
@@ -189,6 +190,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
             it[KEY_FACE] = config.face.name
             it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_SEMANTIC] = config.semantic.name
+            it[KEY_UNANCHORED_NAMES] = config.outlineUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
         }
     }
@@ -208,6 +210,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
             it.remove(KEY_FACE)
             it.remove(KEY_FACE_STATE)
             it.remove(KEY_SEMANTIC)
+            it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_EXPORT_REMINDER)
         }
@@ -277,6 +280,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_FACE_STATE = stringPreferencesKey("recognition_face_state")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
+        val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
 
         /** 人脸、条码的识别模式里原先那个「关」。只在读老安装时认它，见 recognitionConfig。 */
         const val LEGACY_OFF = "OFF"
