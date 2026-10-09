@@ -73,7 +73,17 @@ class RuleClassifierTest {
         id = "guess", kind = SensitiveKind.PERSON_NAME, enabledByDefault = true,
         NeedsAnchor(Finder { t -> Regex("""[a-z]{3}""").findAll(t).map { RuleMatch(it.range, 0.6f) }.toList() }),
     )
-    private val digitAnchors = Finder { t -> Regex("""\d{4}""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }
+    private val digitAnchors = listOf(
+        NameAnchor("数字", NameAnchor.Reach.NEARBY, Finder { t -> Regex("""\d{4}""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
+    )
+
+    /** 紧挨着才算的旁证：XYZ（大写，猜测是小写，不会互相认错）。 */
+    private val attachedAnchors = listOf(
+        NameAnchor("称呼", NameAnchor.Reach.ATTACHED, Finder { t -> Regex("""XYZ""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
+    )
+
+    private suspend fun attached(vararg lines: TextLine) =
+        RuleClassifier(listOf(guess), anchors = attachedAnchors).classify(lines.toList())
 
     private suspend fun guesses(vararg lines: TextLine, keepUnanchored: Boolean = false) =
         RuleClassifier(listOf(guess), keepUnanchored = keepUnanchored, anchors = digitAnchors).classify(lines.toList())
@@ -117,7 +127,7 @@ class RuleClassifierTest {
     /** 猜测落在旁证里面：旁证撑不住它自己里面的那一截。 */
     @Test
     fun `an anchor does not vouch for a guess inside it`() = runTest {
-        val overlapping = Finder { t -> listOf(RuleMatch(t.indices, 1f)) }
+        val overlapping = listOf(NameAnchor("整行", NameAnchor.Reach.NEARBY, Finder { t -> listOf(RuleMatch(t.indices, 1f)) }))
         val out = RuleClassifier(listOf(guess), anchors = overlapping).classify(listOf(line("abc")))
         assertThat(out).isEmpty()
     }
@@ -136,8 +146,35 @@ class RuleClassifierTest {
     /** 别的规则不要旁证：附近什么都没有也照出。 */
     @Test
     fun `matches that need no anchor are never dropped`() = runTest {
-        val out = RuleClassifier(listOf(digits), anchors = Finder { emptyList() }).classify(listOf(line("code 1234")))
+        val out = RuleClassifier(listOf(digits), anchors = emptyList()).classify(listOf(line("code 1234")))
         assertThat(out.single().enabledByDefault).isTrue()
+    }
+
+    // ---------- 紧挨着才算的旁证（称呼） ----------
+
+    /** 紧跟在后面，或者中间只隔着空格：「王小明先生」「王小明 先生」。 */
+    @Test
+    fun `an attached anchor right after the guess vouches for it`() = runTest {
+        assertThat(attached(line("abcXYZ")).single().enabledByDefault).isTrue()
+        assertThat(attached(line("abc XYZ")).single().enabledByDefault).isTrue()
+    }
+
+    /** 落在猜测里头：「王女士」整个是一个猜测。 */
+    @Test
+    fun `an attached anchor inside the guess vouches for it`() = runTest {
+        val inside = CompositeRule(
+            id = "guess", kind = SensitiveKind.PERSON_NAME, enabledByDefault = true,
+            NeedsAnchor(Finder { t -> Regex("""[a-z]XYZ""").findAll(t).map { RuleMatch(it.range, 0.6f) }.toList() }),
+        )
+        val out = RuleClassifier(listOf(inside), anchors = attachedAnchors).classify(listOf(line("aXYZ")))
+        assertThat(out.single().enabledByDefault).isTrue()
+    }
+
+    /** 隔着别的字、在下一行：都不算。上一行写着「先生您好」，说明不了这一行的名字是谁。 */
+    @Test
+    fun `an attached anchor that does not touch the guess does not count`() = runTest {
+        assertThat(attached(line("abc 1 XYZ"))).isEmpty()
+        assertThat(attached(line("abc"), line("XYZ", top = 30f))).isEmpty()
     }
 
     @Test

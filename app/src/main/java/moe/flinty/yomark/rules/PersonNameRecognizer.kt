@@ -2,6 +2,7 @@ package moe.flinty.yomark.rules
 
 import com.hankcs.hanlp.HanLP
 import com.hankcs.hanlp.corpus.tag.NR
+import com.hankcs.hanlp.dictionary.CoreDictionary
 import com.hankcs.hanlp.dictionary.nr.PersonDictionary
 import com.hankcs.hanlp.seg.Segment
 import com.hankcs.hanlp.seg.common.Term
@@ -20,6 +21,9 @@ import com.hankcs.hanlp.seg.common.Term
  * - **拼回被切开的名字**：相邻的人名词首尾相接就并成一个，「沐晨」+「冉」→「沐晨冉」；
  * - **单个的姓往后补**：只认出一个姓（「< 陈晓峰」里的「陈」、「赵师傅」里的「赵」）时，后面紧跟着的
  *   一两个字像名（HanLP 人名词典里常作名用）或是称呼，才连上。「周」+「以上」不连；
+ * - **姓 + 称呼补认**：HanLP 常常不把它们标成人名——「张先生」「刘老师」整个成了专名（nz），
+ *   「张」「老师」被拆开、「张」还被标成量词。姓是常见的姓、后面紧跟称呼的，照样当人名。
+ *   「常见」按人名词典：作姓的次数够多，还要多过作上下文的次数，「向老师请教」里的「向」是介词；
  * - **看左右邻居**：人名紧挨着的是标点、空格、动词、介词（「转告周振宇」「黄磊拍了拍你」「来自赵磊的转账」）。
  *   左边紧贴名词、形容词、数量词（「好丽友派」「8周」），右边紧贴名词、数量、规格词
  *   （「福来恩3支」「冠能猫粮」「单月装」）的，是商品名、品牌名里被切出来的一截，作废。
@@ -36,7 +40,17 @@ import com.hankcs.hanlp.seg.common.Term
  *
  * 跑在 HanView 上：逐字切分的「沐 晨 冉」先拼回「沐晨冉」再交给分词。
  */
-class PersonNameRecognizer(private val confidence: Float) : Finder {
+class PersonNameRecognizer(
+    private val confidence: Float,
+    /**
+     * 跟在名字后面的称呼（DefaultRuleSet.PERSON_TITLES）。拿它补全「赵」+「师傅」、补认 HanLP 漏标的「张先生」，
+     * 也放过紧贴在名字后面的它（「张三老师」）。同一张表也是人名的旁证，见 DefaultRuleSet.nameAnchors。
+     */
+    private val titles: List<String>,
+) : Finder {
+
+    /** 名字后面紧贴着也不奇怪的词：称呼，加上 [RIGHT_WORDS]。 */
+    private val rightWords = titles + RIGHT_WORDS
 
     override fun findIn(text: String): List<RuleMatch> {
         val view = HanView.of(text)
@@ -45,35 +59,75 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
         val out = ArrayList<RuleMatch>()
         var i = 0
         while (i < terms.size) {
-            if (!terms[i].isChineseName()) { i++; continue }
             val start = terms[i].offset
-            var end = start + terms[i].word.length
-            var j = i + 1
-            while (j < terms.size && terms[j].isChineseName() && terms[j].offset == end) {
-                end += terms[j].word.length
-                j++
-            }
-            // 只认出了姓：后面紧跟的一两个字像名、或者是称呼，才连上
-            if (j < terms.size && isBareSurname(t.substring(start, end))) {
-                val next = terms[j]
-                val cap = if (end - start == 1) MAX_SINGLE_SURNAME_NAME else MAX_NAME
-                if (next.offset == end && next.word.length <= 2 && next.word.all { it.isHan() } &&
-                    end - start + next.word.length <= cap &&
-                    (next.word in TITLES || looksLikeGivenName(next.word))
-                ) {
-                    end += next.word.length
-                    j++
-                }
-            }
+            // 名字之后的那个词的下标
+            val j = if (terms[i].isChineseName()) nameEnd(t, terms, i) else titledSurnameEnd(terms, i)
+            if (j < 0) { i++; continue }
+            val end = terms[j - 1].offset + terms[j - 1].word.length
             val name = t.substring(start, end)
-            if (looksLikeName(name) && !followedByBusiness(t, end) &&
-                fitsLeft(t, terms.getOrNull(i - 1), start) && fitsRight(t, terms.getOrNull(j), end)
+            val titled = titles.any { name.endsWith(it) }
+            if (looksLikeName(name, titled) && !followedByBusiness(t, end) &&
+                fitsLeft(t, terms.getOrNull(i - 1), start) && fitsRight(t, terms.getOrNull(j), end, titled)
             ) {
                 out += RuleMatch(view.toSource(start until end), confidence)
             }
             i = j
         }
         return out
+    }
+
+    /** 从人名词 [i] 起：并上首尾相接的人名词；只认出了姓的，后面紧跟的一两个字像名、或者是称呼，才连上。 */
+    private fun nameEnd(t: String, terms: List<Term>, i: Int): Int {
+        val start = terms[i].offset
+        var end = start + terms[i].word.length
+        var j = i + 1
+        while (j < terms.size && terms[j].isChineseName() && terms[j].offset == end) {
+            end += terms[j].word.length
+            j++
+        }
+        if (j < terms.size && isBareSurname(t.substring(start, end))) {
+            val next = terms[j]
+            val cap = if (end - start == 1) MAX_SINGLE_SURNAME_NAME else MAX_NAME
+            if (next.offset == end && next.word.length <= 2 && next.word.all { it.isHan() } &&
+                end - start + next.word.length <= cap &&
+                (next.word in titles || looksLikeGivenName(next.word))
+            ) {
+                j++
+            }
+        }
+        return j
+    }
+
+    /**
+     * HanLP 没标成人名的姓 + 称呼：「张先生」整个成了专名，或者「张」「老师」被拆成两个词。
+     * 是的话返回名字之后那个词的下标，不是返回 -1。
+     *
+     * 整个成词的，核心词典里收了的不算：那是品牌、常用词（「康师傅」）。「张先生」「刘老师」只在
+     * 自定义词典里，是语料里常见的称呼，不是一个词。
+     */
+    private fun titledSurnameEnd(terms: List<Term>, i: Int): Int {
+        val word = terms[i].word
+        val title = titles.firstOrNull { word.length > it.length && word.endsWith(it) }
+        if (title != null) {
+            val isName = isCommonSurname(word.dropLast(title.length)) && CoreDictionary.get(word) == null
+            return if (isName) i + 1 else -1
+        }
+        val next = terms.getOrNull(i + 1) ?: return -1
+        val adjacent = next.offset == terms[i].offset + word.length
+        return if (adjacent && next.word in titles && isCommonSurname(word)) i + 2 else -1
+    }
+
+    /**
+     * 常见的姓：人名词典里作姓够 [MIN_SURNAME_FREQUENCY] 次，而且多过它作人名上下文的次数。
+     * 「班」作姓 34 次，「班主任」不是人；「向」作姓 309 次、作上下文一千五百多次，「向老师请教」里它是介词。
+     */
+    private fun isCommonSurname(s: String): Boolean {
+        if (s in COMPOUND_SURNAMES) return true
+        if (s.length != 1) return false
+        val item = PersonDictionary.dictionary.get(s) ?: return false
+        val asSurname = item.getFrequency(NR.B)
+        val asContext = item.getFrequency(NR.K) + item.getFrequency(NR.L) + item.getFrequency(NR.M)
+        return asSurname >= MIN_SURNAME_FREQUENCY && asSurname >= asContext
     }
 
     private fun Term.isChineseName(): Boolean {
@@ -84,13 +138,12 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
     private fun isBareSurname(s: String) = s.length == 1 || s in COMPOUND_SURNAMES
 
     /** 长度、排除词、地名用字，以及姓后面那一两个字像不像名。带称呼的（「赵师傅」「王女士」）不看名。 */
-    private fun looksLikeName(name: String): Boolean {
+    private fun looksLikeName(name: String, titled: Boolean): Boolean {
         if (name.length !in MIN_NAME..MAX_NAME || name in NOT_NAMES || name.last() in PLACE_ENDINGS) return false
         if (!name.all { it.isHan() }) return false
         val surname = if (name.take(2) in COMPOUND_SURNAMES) 2 else 1
         if (name.length == MAX_NAME && surname == 1) return false
-        if (TITLES.any { name.endsWith(it) }) return true
-        return looksLikeGivenName(name.substring(surname))
+        return titled || looksLikeGivenName(name.substring(surname))
     }
 
     /**
@@ -119,8 +172,8 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
         return !prev.isNounLike() && prev.natureInitial() !in "amqbr"
     }
 
-    /** 右边紧贴着的词。 */
-    private fun fitsRight(t: String, next: Term?, end: Int): Boolean {
+    /** 右边紧贴着的词。[titled]：名字以称呼结尾。 */
+    private fun fitsRight(t: String, next: Term?, end: Int, titled: Boolean): Boolean {
         if (end == t.length) return true
         val c = t[end]
         if (c.isDigit()) {
@@ -131,7 +184,9 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
         }
         if (!c.isHan() || next == null || next.offset != end) return true
         if (c in SPEC_SUFFIXES) return false                          // 「单月装」「季度装」
-        if (RIGHT_WORDS.any { next.word.startsWith(it) }) return true // 「张三老师」「李娜电话多少」
+        if (rightWords.any { next.word.startsWith(it) }) return true  // 「张三老师」「李娜电话多少」
+        // 称呼后面紧跟形容词是客套：「张老师好」。名词、数量、区别词照样不行：「李先生牛肉面」「康师傅红烧」
+        if (titled) return !next.isNounLike() && next.natureInitial() !in "mqb"
         return !next.isNounLike() && next.natureInitial() !in "amqb"
     }
 
@@ -146,9 +201,10 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
 
     private fun Char.isAsciiLetterOrDigit() = this in 'a'..'z' || this in 'A'..'Z' || this in '0'..'9'
 
+    /** 后面紧跟着行业词（「张亮麻辣烫」），或者分店的括号（「李先生（望京店）」）：这是店。 */
     private fun followedByBusiness(t: String, end: Int): Boolean {
         val rest = t.substring(end).trimStart()
-        return BUSINESS_SUFFIXES.any { rest.startsWith(it) }
+        return BUSINESS_SUFFIXES.any { rest.startsWith(it) } || BRANCH.containsMatchIn(rest)
     }
 
     companion object {
@@ -156,23 +212,18 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
         private const val MAX_NAME = 4
         private const val MAX_SINGLE_SURNAME_NAME = 3
         private const val MIN_ROLE_FREQUENCY = 10
+        private const val MIN_SURNAME_FREQUENCY = 100
 
         private val COMPOUND_SURNAMES = setOf(
             "欧阳", "司马", "上官", "诸葛", "东方", "皇甫", "司徒", "夏侯", "慕容", "令狐", "公孙", "长孙",
             "宇文", "尉迟", "独孤", "南宫", "西门", "端木", "轩辕", "呼延", "百里", "亓官", "澹台", "万俟",
         )
 
-        /** 跟在姓后面的称呼：「赵师傅」「王女士」。 */
-        private val TITLES = setOf(
-            "师傅", "女士", "先生", "小姐", "老师", "同学", "经理", "总监", "主任", "医生", "大夫", "护士",
-            "律师", "教授", "博士", "阿姨", "叔叔", "伯伯", "大爷", "大妈", "老板", "同志",
-        )
-
         /**
-         * 名字后面紧贴着也不奇怪的词：称呼、亲属、票种、这个人自己的东西，
+         * 名字后面紧贴着也不奇怪的词（称呼之外）：亲属、票种、这个人自己的东西，
          * 以及 HanLP 迷你词典标成名词的几个动词（「李师傅揽收」）。
          */
-        private val RIGHT_WORDS = TITLES + listOf(
+        private val RIGHT_WORDS = listOf(
             "学长", "学姐", "老婆", "老公", "妈妈", "爸爸", "父亲", "母亲", "儿子", "女儿", "家",
             "成人", "儿童", "学生", "婴儿", "本人", "电话", "手机", "微信", "邮箱", "账号", "号码", "身份证",
             "揽收", "签收", "代收", "派送", "派件",
@@ -195,6 +246,9 @@ class PersonNameRecognizer(private val confidence: Float) : Finder {
             "电器", "家居", "服饰", "食品", "商城", "旗舰店", "专卖店", "官方", "门店", "易购", "出行", "地图",
             "打车", "外卖", "优选", "严选", "影城", "影院", "学校", "学院", "大学", "中学", "小学", "店", "馆",
         )
+
+        /** 紧跟在名字后面的分店括号：「（望京店）」「(中关村店)」。 */
+        private val BRANCH = Regex("""^[（(][^）)]{0,10}店[）)]""")
 
         /** 人名几乎不以这些字结尾，地址里却到处都是：「祁门路」「梅园村」。 */
         private const val PLACE_ENDINGS = "路街道巷弄村镇乡区县市省栋幢室号楼"

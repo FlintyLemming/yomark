@@ -197,10 +197,7 @@ fun TextRuleSettingsScreen(
                         modifier = Modifier.testTag("unanchored-names"),
                     )
                 }
-                FooterText(
-                    "旁证是同一行或上下相邻一行的电话、证件号、地址，或者「收货人」「乘车人」这类字段。" +
-                        "有旁证的按上面的设置处理；没有的大多是商品名、店名，默认不圈。"
-                )
+                FooterText(RuleCatalog.nameAnchorNote())
             }
         }
     }

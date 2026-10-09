@@ -15,8 +15,8 @@ import kotlin.math.min
  * 规则永远在 classifiers 列表的第一位且永不缺席——它是全部识别能力的地基。
  *
  * 规则逐行认；只有「要旁证的猜测」（[NeedsAnchor]，目前是从字面猜出的人名）在这里看整页：
- * 同一行、同一排或上下相邻一行有旁证（[anchors]）的照规则的设置出；附近没有的，按 [keepUnanchored]
- * 丢掉或只圈出。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
+ * 有旁证（[anchors]：紧挨着的称呼，或者同一行、同一排、上下相邻一行的电话、证件号……）的照规则的设置出；
+ * 没有的，按 [keepUnanchored] 丢掉或只圈出。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
  */
 class RuleClassifier(
     private val rules: List<Rule>,
@@ -25,8 +25,8 @@ class RuleClassifier(
      * 设置 › 文字 › 人名的页上「没有旁证的也圈出」那个开关。
      */
     private val keepUnanchored: Boolean = false,
-    /** 什么算旁证。见 DefaultRuleSet.nameAnchors。 */
-    private val anchors: Finder = DefaultRuleSet.nameAnchors,
+    /** 什么算旁证、多近才算。见 DefaultRuleSet.nameAnchors。 */
+    private val anchors: List<NameAnchor> = DefaultRuleSet.nameAnchors,
     /**
      * 行置信度下限（spec §15 第 5 条的实测结论）。低于它的行不参与规则判定。
      *
@@ -62,7 +62,7 @@ class RuleClassifier(
                 matches.forEachIndexed { i, m ->
                     val quad = line.quadForRange(m.range)
                     val anchored = !m.needsAnchor ||
-                        anchorsOnPage.any { it.supports(lineIndex, m.range, quad.bounds()) }
+                        anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, quad.bounds()) }
                     if (!anchored && !keepUnanchored) return@forEachIndexed
                     out += Candidate(
                         id = "rule-${rule.id}-$lineIndex-${m.range.first}-$i",
@@ -79,17 +79,42 @@ class RuleClassifier(
         out
     }
 
-    private fun findAnchors(lines: List<TextLine>): List<Anchor> = lines.flatMapIndexed { lineIndex, line ->
+    private fun findAnchors(lines: List<TextLine>): List<FoundAnchor> = lines.flatMapIndexed { lineIndex, line ->
         if (line.confidence < minLineConfidence) return@flatMapIndexed emptyList()
-        runCatching { anchors.findIn(line.text) }.getOrElse { emptyList() }
-            .map { Anchor(lineIndex, it.range, line.quadForRange(it.range).bounds()) }
+        anchors.flatMap { anchor ->
+            // 单条旁证出错，当它没找到
+            runCatching { anchor.finder.findIn(line.text) }.getOrElse { emptyList() }
+                .map { FoundAnchor(anchor.reach, lineIndex, it.range, line.quadForRange(it.range).bounds()) }
+        }
     }
 
-    private class Anchor(val lineIndex: Int, val range: IntRange, val box: RectF) {
+    /** 页面上找到的一处旁证：第 [lineIndex] 行的 [range]，框为 [box]。 */
+    private class FoundAnchor(
+        val reach: NameAnchor.Reach,
+        val lineIndex: Int,
+        val range: IntRange,
+        val box: RectF,
+    ) {
+
+        /** 这处旁证撑不撑得住 [lineIndex] 行（文字是 [text]）[range] 上、框为 [box] 的那个猜测。 */
+        fun supports(text: String, lineIndex: Int, range: IntRange, box: RectF): Boolean = when (reach) {
+            NameAnchor.Reach.ATTACHED -> lineIndex == this.lineIndex && touches(text, range)
+            NameAnchor.Reach.NEARBY -> isNearby(lineIndex, range, box)
+        }
 
         /**
-         * 这处旁证撑不撑得住 [lineIndex] 行 [range] 上、框为 [box] 的那个猜测。
-         *
+         * 紧挨着：落在猜测里头（「王女士」），或者和它之间只隔着空格（「王小明先生」「王小明 先生」，
+         * 逐字切分的「王 小 明 先 生」也是）。
+         */
+        private fun touches(text: String, range: IntRange): Boolean {
+            if (range.overlaps(this.range)) return true
+            val gap = if (this.range.first > range.last) range.last + 1 until this.range.first
+            else this.range.last + 1 until range.first
+            return text.substring(gap).isBlank()
+        }
+
+        /**
+         * 附近：
          * - 同一行：不和它重叠就算。重叠说明猜测就落在旁证里面——地址里的「中山」不因为这条地址就成了人名；
          * - 同一排（竖直方向重叠过半）：算。OCR 常把一排拆成几行，左边的字段名和右边的值各成一行；
          * - 上下相邻：竖直间隙不超过 [ROW_GAP] 个字高、水平方向基本对齐（错开不超过 [COLUMN_GAP] 个字高）。
@@ -97,7 +122,7 @@ class RuleClassifier(
          *
          * 字高取两个框里高的那个：名字常比下面的号码字号大。
          */
-        fun supports(lineIndex: Int, range: IntRange, box: RectF): Boolean {
+        private fun isNearby(lineIndex: Int, range: IntRange, box: RectF): Boolean {
             if (lineIndex == this.lineIndex) return !range.overlaps(this.range)
             val h = max(box.height(), this.box.height())
             if (h <= 0f) return false

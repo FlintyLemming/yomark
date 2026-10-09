@@ -119,6 +119,15 @@ object DefaultRuleSet {
     )
 
     /**
+     * 跟在名字后面的称呼。认名字时拿它补全「赵」+「师傅」、放过「张三老师」「张老师好」（见 PersonNameRecognizer）；
+     * 紧挨着一个猜出来的名字，它就是这个名字的旁证（见 nameAnchors）。
+     */
+    internal val PERSON_TITLES = listOf(
+        "先生", "女士", "小姐", "师傅", "老师", "同学", "经理", "总监", "主任", "医生", "大夫", "护士",
+        "律师", "教授", "博士", "阿姨", "叔叔", "伯伯", "大爷", "大妈", "老板", "同志",
+    )
+
+    /**
      * 姓名 = 字段名后面的值 + 电话前面的名字 + 从字面认出的名字。
      *
      * 后两种都是真机漏检补的。电话前面的：菜鸟快递详情页的收件人一行是「沐晨冉 86-186****3392」，
@@ -138,7 +147,7 @@ object DefaultRuleSet {
         enabledByDefault = true,
         LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
-        NeedsAnchor(PersonNameRecognizer(confidence = 0.6f)),
+        NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
     )
 
     /**
@@ -315,33 +324,39 @@ object DefaultRuleSet {
     private val MASKED_NUMBER = Regex("""(?<![\d*＊])\d{2,6}\s?[*＊•●]{3,}\s?\d{2,4}[\dXx]?(?![\d*＊])""")
 
     /**
-     * 说明「这里是一个人」的字段名：姓名规则的字段名，加上出行、住宿、就诊、保险、转账页上的。
-     * 后面这些不拿来锚定取值——「乘客 1 位」「抄送 3 人」后面跟的不是名字——只当旁证。
-     * 票种也算：滴滴出票页那一行就是「沐晨冉 成人」。
+     * 说明「这里是一个人」的字段名，姓名规则的字段名之外的：出行、住宿、就诊、保险、转账页上的。
+     * 它们不拿来锚定取值——「乘客 1 位」「抄送 3 人」后面跟的不是名字——只当旁证。
      */
-    private val PERSON_FIELD = run {
-        val fields = NAME_LABELS + listOf(
-            "乘车人", "乘客", "旅客", "乘机人", "出行人", "入住人", "住客", "预订人", "订票人", "购票人",
-            "就诊人", "患者", "投保人", "被保险人", "受益人", "审批人", "经办人", "抄送", "对方账户", "收款方",
-        )
-        Regex(
-            "(?<![\\u4e00-\\u9fa5A-Za-z])(?:" +
-                fields.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) } + ")" +
-                "|(?<![\\u4e00-\\u9fa5])(?:成人|儿童|学生|婴儿)票?(?![\\u4e00-\\u9fa5])"
-        )
+    private val PERSON_FIELDS = listOf(
+        "乘车人", "乘客", "旅客", "乘机人", "出行人", "入住人", "住客", "预订人", "订票人", "购票人",
+        "就诊人", "患者", "投保人", "被保险人", "受益人", "审批人", "经办人", "抄送", "对方账户", "收款方",
+    )
+
+    /** 票种：滴滴出票页那一行就是「沐晨冉 成人」。 */
+    private val TICKET_TYPES = listOf("成人票", "儿童票", "学生票", "婴儿票", "成人", "儿童", "学生", "婴儿")
+
+    /** 正则找形状，[valid] 再验一道。 */
+    private fun shape(pattern: Regex, valid: (String) -> Boolean = { true }) = Finder { text ->
+        pattern.findAll(text).filter { valid(it.value) }.map { RuleMatch(it.range, 1f) }.toList()
     }
 
     /**
-     * 从字面猜出的人名要有旁证（见 NeedsAnchor、RuleClassifier）：电话、邮箱、地址、证件号、
-     * 打了星的号码、说明「这里是一个人」的字段名。
+     * 人名的旁证表。从字面猜出的人名（NeedsAnchor）要有其中一处才算数，见 NameAnchor、RuleClassifier。
+     * **加一种旁证就是在这里加一行**，再到 NameAnchorPageTest 的例子表里配一个例子。
      *
      * 与姓名规则拿电话找锚同一个道理：电话、地址规则被用户关掉时照样算旁证——关的是「遮」，不是「认」。
      */
-    val nameAnchors: Finder = Finder { text ->
-        val view = HanView.of(text)
-        val numbers = ID_NUMBER.findAll(text).filter { Checksums.chineseIdValid(it.value) } + MASKED_NUMBER.findAll(text)
-        listOf(PHONE, EMAIL, ADDRESS).flatMap { it.findIn(text) } +
-            numbers.map { RuleMatch(it.range, 1f) } +
-            PERSON_FIELD.findAll(view.text).map { RuleMatch(view.toSource(it.range), 1f) }
-    }
+    val nameAnchors: List<NameAnchor> = listOf(
+        NameAnchor("先生、女士这类称呼", NameAnchor.Reach.ATTACHED, Words(PERSON_TITLES)),
+        NameAnchor("电话", NameAnchor.Reach.NEARBY, PHONE),
+        NameAnchor("邮箱", NameAnchor.Reach.NEARBY, EMAIL),
+        NameAnchor("地址", NameAnchor.Reach.NEARBY, ADDRESS),
+        NameAnchor("证件号", NameAnchor.Reach.NEARBY, shape(ID_NUMBER, Checksums::chineseIdValid)),
+        NameAnchor("打了星的号码", NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
+        NameAnchor(
+            "「收货人」「乘车人」这类字段", NameAnchor.Reach.NEARBY,
+            Words(NAME_LABELS + PERSON_FIELDS, boundedBefore = true),
+        ),
+        NameAnchor("票种", NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
+    )
 }

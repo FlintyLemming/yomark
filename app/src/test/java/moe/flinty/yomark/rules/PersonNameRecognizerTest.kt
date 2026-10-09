@@ -12,7 +12,7 @@ import org.junit.Test
  */
 class PersonNameRecognizerTest {
 
-    private val recognizer = PersonNameRecognizer(confidence = 0.6f)
+    private val recognizer = PersonNameRecognizer(confidence = 0.6f, titles = DefaultRuleSet.PERSON_TITLES)
 
     private fun names(text: String): List<String> = recognizer.findIn(text).map { text.substring(it.range) }
 
@@ -111,6 +111,31 @@ class PersonNameRecognizerTest {
         assertThat(names("您的快件已由李师傅揽收")).containsExactly("李师傅")
     }
 
+    /**
+     * 姓 + 称呼，HanLP 自己常常认不出：「张先生」整个被当成专名，「张」「老师」被拆开、「张」还被标成量词。
+     * 常见的姓后面紧跟称呼的照样认。
+     */
+    @Test fun `a surname with a title is a name even when HanLP misses it`() {
+        assertThat(names("张先生")).containsExactly("张先生")
+        assertThat(names("周先生您好")).containsExactly("周先生")
+        assertThat(names("刘老师")).containsExactly("刘老师")
+        assertThat(names("张老师好")).containsExactly("张老师")
+        assertThat(names("于老师 明天见")).containsExactly("于老师")
+        assertThat(names("黄师傅")).containsExactly("黄师傅")
+        assertThat(names("赵小姐")).containsExactly("赵小姐")
+    }
+
+    /**
+     * 不是姓的字加称呼是普通的词；「向」更多是介词；后面紧贴名词、跟着分店括号的是店名；
+     * 核心词典收了的「康师傅」是品牌。
+     */
+    @Test fun `titles after words that are not surnames are not names`() {
+        listOf(
+            "向老师请教", "班主任", "副教授", "总经理", "女老师", "男老师", "老先生", "大小姐", "各位先生",
+            "李先生牛肉面", "先生您好", "康师傅红烧牛肉面 5连包", "康师傅", "李先生（望京店）", "张亮麻辣烫(中关村店)",
+        ).forEach { assertThat(names(it)).isEmpty() }
+    }
+
     @Test fun `a single character is never a name on its own`() {
         assertThat(names("冉")).isEmpty()
     }
@@ -146,6 +171,6 @@ class PersonNameRecognizerTest {
     @Test fun `the settings row is one plain name row that explains the evidence`() {
         assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
         assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
-        assertThat(RuleCatalog.description(rule)).contains("旁边得有电话、证件号、地址")
+        assertThat(RuleCatalog.description(rule)).contains("要有旁证才算")
     }
 }
