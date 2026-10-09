@@ -96,7 +96,7 @@ fun SettingsScreen(
             SettingsGroup {
                 NavigationRow(
                     title = "AI",
-                    summary = "Gemini Nano 与 PP-OCR 模型",
+                    summary = "Gemini Nano、PP-OCR、ML Kit",
                     icon = Icons.Outlined.AutoAwesome,
                     iconColors = SettingsIconColors.yellow,
                     onClick = { onOpen(SettingsPage.AI) },
