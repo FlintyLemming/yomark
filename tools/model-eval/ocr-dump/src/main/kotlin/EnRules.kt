@@ -39,7 +39,10 @@ private fun nearby(a: Box, b: Box): Boolean {
 }
 
 /** [lines] 上 [finder] 认出的东西，按 RuleClassifier 的口径过一遍旁证。 */
-private fun runRules(lines: List<Box>, findIn: (String) -> List<RuleMatch>, anchors: List<NameAnchor>): List<String> {
+/** [unanchored] 不为 null 时，没有旁证的猜测不丢，放进它（弱一档：只圈不打码）。 */
+private fun runRules(
+    lines: List<Box>, findIn: (String) -> List<RuleMatch>, anchors: List<NameAnchor>, unanchored: MutableList<String>? = null,
+): List<String> {
     val found = lines.map { l -> anchors.map { a -> runCatching { a.finder.findIn(l.text) }.getOrElse { emptyList() } } }
     val out = ArrayList<String>()
     lines.forEachIndexed { i, line ->
@@ -55,7 +58,7 @@ private fun runRules(lines: List<Box>, findIn: (String) -> List<RuleMatch>, anch
                     }
                 }
             }
-            if (ok) out += line.text.substring(m.range)
+            if (ok) out += line.text.substring(m.range) else unanchored?.add(line.text.substring(m.range))
         }
     }
     return out
@@ -81,7 +84,9 @@ fun main(args: Array<String>) {
         }
         if (proto != null && enAnchors != null) {
             byRule["en-address"] = runRules(lines, proto.address::findIn, enAnchors)
-            byRule["en-name"] = runRules(lines, proto.nameLine::findIn, enAnchors)
+            val weak = ArrayList<String>()
+            byRule["en-name"] = runRules(lines, proto.nameLine::findIn, enAnchors, weak)
+            byRule["en-name-weak"] = weak + lines.flatMap { l -> proto.standaloneName(l.text).map { l.text.substring(it.range) } }
             // 顶栏：页面最上面一成
             val pageH = SIZE.find(f.readText())!!.groupValues[2].toFloat()
             byRule["en-title"] = lines.filter { it.t < 0.1f * pageH }.flatMap { l -> proto.titleName(l.text).map { l.text.substring(it.range) } }

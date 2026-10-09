@@ -10,7 +10,9 @@
 import json, os, re, sys
 
 # 出厂规则以外的认法：EnProto 的几种，加上 GLiNER
-EN_KEYS = {"en-address", "en-name", "en-title", "en-phone", "en-below-label", "gliner", "ner"}
+EN_KEYS = {"en-address", "en-name", "en-name-weak", "en-title", "en-phone", "en-below-label", "gliner", "ner"}
+# 弱一档：只圈不打码。没有旁证的名单人名、单独一行的名单人名、模型（GLiNER 等）认出来的
+WEAK_KEYS = {"en-name-weak", "gliner", "ner"}
 
 
 def norm(s):
@@ -59,7 +61,9 @@ def main(truth_dir, paths):
     for p in paths:
         for page, v in json.load(open(p, encoding="utf-8")).items():
             d.setdefault(page, {}).update(v)
-    combos = {"出厂规则": lambda k: k not in EN_KEYS, "全部（出厂 + 原型 / GLiNER）": lambda k: True}
+    combos = {"出厂规则": lambda k: k not in EN_KEYS,
+              "打码一档（出厂 + 原型的强认法）": lambda k: k not in WEAK_KEYS,
+              "打码 + 圈出（全部）": lambda k: True}
     for name, keep in combos.items():
         by_kind, fps, others, missed = {}, [], [], []
         for page in sorted(d):

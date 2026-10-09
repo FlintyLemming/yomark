@@ -145,8 +145,47 @@ class EnProto(namesDir: File) {
         beforeEmail.findAll(text).forEach { add(it.range, 0.8f) }
         honorific.findAll(text).forEach { add(it.range, 0.8f) }
         greeting.find(text)?.let { m -> if (m.groupValues[1] in first) add(m.groups[1]!!.range, 0.7f) }
+        roleName.findAll(text).forEach { m -> if (m.groupValues[1] in first) add(m.groups[1]!!.range.first..m.range.last, 0.7f) }
+        senderLabel.find(text)?.let { m -> if (isNameLike(m.groupValues[1])) add(m.groups[1]!!.range, 0.7f) }
+        systemMessage.find(text)?.let { m -> if (isNameLike(m.groupValues[1])) add(m.groups[1]!!.range, 0.7f) }
         dictionaryNames(text).forEach { add(it.range, it.confidence, anchor = true) }
         out
+    }
+
+    /**
+     * 原型 v2（在第二轮基准出来之前定稿）：几种界面上常见、不靠名单旁证的人名写法。
+     * 「Your driver Marcus」「Your Dasher, Marcus,」「rode with Carlos M.」：身份词后面紧跟一个常见名（可带缩写）。
+     */
+    private val roleName = Regex(
+        """(?i:\b(?:driver|dasher|courier|shopper|rider|host|guide|agent|representative|rep|technician|tech|instructor|stylist|""" +
+            """nurse|teacher|coach|landlord|tenant|seller|buyer|carrier|partner|rode with|delivered by|handled by|assigned to))""" +
+            """\s*,?\s+([A-Z][a-z]+)(?:\s+[A-Z]\.)?"""
+    )
+
+    /** WhatsApp 群里没存联系人的发送者「~ Rob Fletcher」。 */
+    private val senderLabel = Regex("""^\s*~\s*([A-Z][A-Za-z'.-]+(?:\s+[A-Z][A-Za-z'.-]+){0,2})\s*$""")
+
+    /** 聊天、转账的系统消息：「Sophie Lambert joined」「Jordan paid Alex」「Priya added you」。 */
+    private val systemMessage = Regex(
+        """^\s*([A-Z][a-z]+(?:\s+[A-Z][a-z'-]+){0,2})\s+(?:joined|left|added|removed|changed the|created|paid|charged|sent you|sent|requested|""" +
+            """shared|reacted|liked|mentioned you|invited you|is typing|accepted|declined)\b"""
+    )
+
+    /** 一两个大写词，第一个是常见的名（第二个若有，要像姓：在姓表里或者首字母大写的一个词）。 */
+    private fun isNameLike(s: String): Boolean {
+        val w = s.split(Regex("\\s+"))
+        return w.isNotEmpty() && cap(w[0]) in first && cap(w[0]) !in NOT_FIRST
+    }
+
+    /**
+     * 弱一档（只圈不打码）：一整行只有一个名单人名，比如联系人页、个人主页顶上的大字号名字、收件箱里的发件人。
+     * 品牌也常是人名（Ralph Lauren、Martha Stewart），所以不打码。
+     */
+    fun standaloneName(text: String): List<RuleMatch> {
+        val t = text.trim()
+        val lead = text.indexOf(t)
+        return dictionaryNames(t).filter { it.range.first == 0 && it.range.last == t.length - 1 }
+            .map { RuleMatch((it.range.first + lead)..(it.range.last + lead), 0.5f) }
     }
 
     private fun looksLikeNameValue(v: String): Boolean {
