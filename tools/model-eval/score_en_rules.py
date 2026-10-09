@@ -5,12 +5,12 @@
 
 命中口径与 run_eval.hits 相同：去掉空格后互相包含，且找到的不比真值长出一倍以上（整行照抄不算）；
 另外，几段找到的文字合起来盖住真值的 80% 以上也算（英文地址常被分成街道、城市、邮编几段）。
-误报只算落在 avoid 上的；其余多认出来的列在「另外」里，人工看是不是真误报。
+误报只算落在 avoid 上的；落在 neutral（遮不遮都行的公开信息）上的不计；其余多认出来的列在「另外」里，人工看是不是真误报。
 """
 import json, os, re, sys
 
 # 出厂规则以外的认法：EnProto 的几种，加上 GLiNER
-EN_KEYS = {"en-address", "en-name", "en-title", "en-phone", "en-below-label", "gliner"}
+EN_KEYS = {"en-address", "en-name", "en-title", "en-phone", "en-below-label", "gliner", "ner"}
 
 
 def norm(s):
@@ -47,7 +47,10 @@ def score(found, truth):
     for t in found:
         if any(hits(t, i) or (len(norm(t)) >= 2 and norm(t) in norm(i["text"])) for i in truth["find"]):
             continue
-        (fp if any(norm(a) in norm(t) or norm(t) in norm(a) for a in truth["avoid"]) else other).append(t)
+        if any(norm(a) in norm(t) or norm(t) in norm(a) for a in truth["avoid"]):
+            fp.append(t)
+        elif not any(norm(a) in norm(t) or norm(t) in norm(a) for a in truth.get("neutral", [])):
+            other.append(t)
     return hit, sorted(set(fp)), sorted(set(other))
 
 
