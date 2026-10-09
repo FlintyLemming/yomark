@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lan
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PersonSearch
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
@@ -49,6 +51,7 @@ import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.engine.genai.NanoStatus
+import moe.flinty.yomark.engine.ppocr.PpOcrModels
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.ColorSwatch
@@ -62,7 +65,7 @@ import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 外观和导出两页不影响识别，换它们不重跑。AI 页眼下只显示本机的 Gemini Nano，没有可改的。
+ * 外观和导出两页不影响识别，换它们不重跑。AI 页只显示本机的 Gemini Nano 和随包的 PP-OCR，没有可改的。
  */
 
 /**
@@ -273,8 +276,9 @@ fun BarcodeSettingsScreen(
 }
 
 /**
- * AI：眼下只显示本机的 Gemini Nano——有没有、是哪一版、模型下好了没有，还没有可设的项。
- * AI 复查的开关在「文字」页的「文字识别」一组里，和识别引擎在一起。
+ * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
+ * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。都只显示，没有可设的项。
+ * AI 复查的开关和识别引擎的选择都在「文字」页的「文字识别」一组里。
  *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
  */
@@ -286,7 +290,7 @@ fun AiSettingsScreen(
 ) {
     SettingsScaffold(title = "AI", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            PageIntro("Gemini Nano 是 Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 复查」用的就是它。")
+            SectionHeader("大模型", first = true)
             SettingsGroup {
                 SettingsRow(
                     title = "Gemini Nano",
@@ -294,7 +298,40 @@ fun AiSettingsScreen(
                     leading = { RowIcon(Icons.Outlined.AutoAwesome) },
                 )
             }
-            nanoNote(nano)?.let { FooterText(it) }
+            FooterText(
+                "Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 复查」用的就是它。" +
+                    nanoNote(nano)?.let { "\n\n$it" }.orEmpty(),
+            )
+        }
+        item {
+            SectionHeader("文字识别模型")
+            SettingsGroup {
+                SettingsRow(
+                    title = "PP-OCR",
+                    summary = "${PpOcrModels.VERSION} · 随安装包内置",
+                    leading = { RowIcon(Icons.Outlined.DocumentScanner) },
+                )
+            }
+            FooterText("百度飞桨的开源文字识别模型，检测、识别各一个，由 ONNX Runtime 在本机离线运行。识别引擎选「PP-OCR」时用的就是它。")
+        }
+        item {
+            SectionHeader("ML Kit 模型")
+            SettingsGroup {
+                SettingsRow(
+                    title = "ML Kit",
+                    summary = mlKitSummary(
+                        text = BuildConfig.MLKIT_TEXT_VERSION,
+                        textChinese = BuildConfig.MLKIT_TEXT_CHINESE_VERSION,
+                        face = BuildConfig.MLKIT_FACE_VERSION,
+                        barcode = BuildConfig.MLKIT_BARCODE_VERSION,
+                    ),
+                    leading = { RowIcon(Icons.Outlined.Memory) },
+                )
+            }
+            FooterText(
+                "Google 的端侧机器学习工具包，里面是几个各管一件事的小模型：文字识别（英文、中文各一个）、人脸、条码，" +
+                    "都随安装包内置、离线运行。版本号是 ML Kit 库的版本，Google 不单独公布模型的版本。",
+            )
         }
     }
 }
@@ -504,6 +541,15 @@ internal fun nanoNote(nano: NanoStatus?): String? = when (nano) {
         NanoStatus.Model.NOT_DOWNLOADED ->
             "模型还没下载到本机。开着 AI 复查时打开一张图，会请系统下载；下载完，编辑页才出现「AI 复查」按钮。"
     }
+}
+
+/**
+ * ML Kit 的几个模型写成一行：「文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0」。
+ * 英文、中文两个文字模型多半同版，同版只写一次，不同才分开写。
+ */
+internal fun mlKitSummary(text: String, textChinese: String, face: String, barcode: String): String {
+    val textVersions = if (text == textChinese) text else "$text（英文）/ $textChinese（中文）"
+    return "文字 $textVersions · 人脸 $face · 条码 $barcode"
 }
 
 internal fun textEngineLabel(option: TextEngineOption) = when (option) {
