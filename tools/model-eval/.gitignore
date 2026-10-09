@@ -1,3 +1,8 @@
 out/
 models/
 __pycache__/
+out-en/
+out-ocr/
+models-en/
+names/
+out-*.json

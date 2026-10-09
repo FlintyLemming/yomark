@@ -31,7 +31,7 @@ def page(name, rows, find, avoid, bubbles=()):
         d.text((x, y), text, font=font(size), fill=color)
     img.save(f"{OUT}/{name}.png")
     with open(f"{TRUTH}/{name}.json", "w") as f:
-        json.dump({"find": find, "avoid": avoid}, f, ensure_ascii=False, indent=1)
+        json.dump({"find": find, "avoid": avoid, "rows": [r[2] for r in rows]}, f, ensure_ascii=False, indent=1)
 
 
 # A. 火车票：名字没有字段名，证件号打了星
