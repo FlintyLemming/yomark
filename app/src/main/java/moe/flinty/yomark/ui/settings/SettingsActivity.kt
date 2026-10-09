@@ -9,11 +9,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.rules.RuleCatalog
+import moe.flinty.yomark.engine.genai.NanoClient
+import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.launch
@@ -90,6 +93,11 @@ class SettingsPageActivity : ComponentActivity() {
             }
             SettingsPage.BARCODE -> WithRecognitionConfig(store) { config, onChange ->
                 BarcodeSettingsScreen(config, onChange, onNavigateUp = ::finish)
+            }
+            SettingsPage.AI -> {
+                // 进页时问一次 AICore；只看不下，见 NanoStatus
+                val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
+                AiSettingsScreen(nano, onNavigateUp = ::finish)
             }
             SettingsPage.EXPORT -> {
                 val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)

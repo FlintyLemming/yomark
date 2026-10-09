@@ -48,6 +48,7 @@ import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.ColorSwatch
@@ -56,12 +57,12 @@ import moe.flinty.yomark.ui.theme.colorScheme
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、导出、外观。
+ * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、导出、外观。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 外观和导出两页不影响识别，换它们不重跑。
+ * 外观和导出两页不影响识别，换它们不重跑。AI 页眼下只显示本机的 Gemini Nano，没有可改的。
  */
 
 /**
@@ -272,6 +273,33 @@ fun BarcodeSettingsScreen(
 }
 
 /**
+ * AI：眼下只显示本机的 Gemini Nano——有没有、是哪一版、模型下好了没有，还没有可设的项。
+ * AI 复查的开关在「文字」页的「文字识别」一组里，和识别引擎在一起。
+ *
+ * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
+ */
+@Composable
+fun AiSettingsScreen(
+    nano: NanoStatus?,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsScaffold(title = "AI", onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            PageIntro("Gemini Nano 是 Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 复查」用的就是它。")
+            SettingsGroup {
+                SettingsRow(
+                    title = "Gemini Nano",
+                    summary = nanoSummary(nano),
+                    leading = { RowIcon(Icons.Outlined.AutoAwesome) },
+                )
+            }
+            nanoNote(nano)?.let { FooterText(it) }
+        }
+    }
+}
+
+/**
  * 导出：导出前提醒。它兜的正是「圈出」这一态——关掉它，圈出的内容导出时就没人再问了。
  * 不在识别方案里：拨这个开关编辑器不重跑识别。
  */
@@ -447,6 +475,35 @@ internal fun handlingLabel(state: RuleState) = when (state) {
     RuleState.MASKED -> "打码"
     RuleState.OUTLINED -> "仅圈出"
     RuleState.OFF -> "关闭"
+}
+
+/** 「nano-v3 · 已就绪」：先回答是哪一版，再说模型在不在本机。本机没有就只写「本机没有」。 */
+internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
+    null -> "正在检测…"
+    is NanoStatus.Unavailable -> "本机没有"
+    is NanoStatus.Present -> "${nano.version ?: "版本未知"} · " + when (nano.model) {
+        NanoStatus.Model.READY -> "已就绪"
+        NanoStatus.Model.DOWNLOADING -> "下载中"
+        NanoStatus.Model.NOT_DOWNLOADED -> "未下载"
+    }
+}
+
+/**
+ * 卡片下面那句：这个状态对 AI 复查意味着什么。还没问完时不写。
+ *
+ * 未下载时不在这里摆下载按钮：开着 AI 复查打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
+ */
+internal fun nanoNote(nano: NanoStatus?): String? = when (nano) {
+    null -> null
+    is NanoStatus.Unavailable ->
+        "只有部分机型有 Gemini Nano（如 Pixel 9 及以后）。本机用不了 AI 复查，其余识别照常。" +
+            nano.errorCode?.let { "AICore 返回错误码 $it。" }.orEmpty()
+    is NanoStatus.Present -> when (nano.model) {
+        NanoStatus.Model.READY -> "模型已在本机，AI 复查可以用。"
+        NanoStatus.Model.DOWNLOADING -> "系统正在下载模型，下载完就能用 AI 复查。"
+        NanoStatus.Model.NOT_DOWNLOADED ->
+            "模型还没下载到本机。开着 AI 复查时打开一张图，会请系统下载；下载完，编辑页才出现「AI 复查」按钮。"
+    }
 }
 
 internal fun textEngineLabel(option: TextEngineOption) = when (option) {

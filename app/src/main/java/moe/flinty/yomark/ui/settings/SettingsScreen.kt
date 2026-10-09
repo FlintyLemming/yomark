@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Palette
@@ -33,7 +34,7 @@ const val PRIVACY_POLICY_URL = "https://yomark.flinty.moe/privacy/"
  * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
  * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
  */
-enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, EXPORT, APPEARANCE }
+enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPORT, APPEARANCE }
 
 /**
  * 设置的一级页（2026-10-07 起，见 docs/superpowers/specs/2026-10-07-yomark-settings-pages-design.md）。
@@ -42,8 +43,11 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, EXPORT, A
  * 直接铺在一级页上，规则却收在二级页里，层级对不齐；现在一律收进二级页，一级页每一项下面写着它眼下的状态。
  *
  * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
- * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是导出和外观，与识别无关。
+ * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、导出和外观。
  * 再往下是隐私权政策，最后一项恢复默认，点了先问一句。
+ *
+ * AI 那一行的小字是固定的，不写本机 Gemini Nano 眼下的情况：那得去问系统的 AICore 服务，
+ * 不值得每次打开设置都问一遍，点进去再看。
  *
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  */
@@ -90,6 +94,13 @@ fun SettingsScreen(
         item {
             GroupSpacer()
             SettingsGroup {
+                NavigationRow(
+                    title = "AI",
+                    summary = "Gemini Nano 状态",
+                    icon = Icons.Outlined.AutoAwesome,
+                    iconColors = SettingsIconColors.yellow,
+                    onClick = { onOpen(SettingsPage.AI) },
+                )
                 NavigationRow(
                     title = "导出",
                     summary = if (exportReminder) "导出前提醒已开启" else "导出前提醒已关闭",

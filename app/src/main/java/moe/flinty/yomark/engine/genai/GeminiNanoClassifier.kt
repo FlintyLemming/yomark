@@ -99,6 +99,9 @@ object NanoClient {
         }
     }.getOrDefault(false)
 
+    /** 本机 Gemini Nano 的情况，设置的「AI」页用。只看不下，见 [NanoStatus]。 */
+    suspend fun status(): NanoStatus = NanoStatus.probe({ model.checkStatus() }, { model.getBaseModelName() })
+
     private fun startDownload() {
         if (downloadStarted) return
         downloadStarted = true

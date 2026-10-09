@@ -21,8 +21,10 @@ import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
+import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
@@ -66,7 +68,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
+        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -125,8 +127,11 @@ class SettingsScreenTest {
         home(onOpen = { opened += it })
         compose.onNodeWithText("人脸").performClick()
         compose.onNodeWithText("文字").performClick()
+        compose.onNodeWithText("AI").performClick()
         compose.onNodeWithText("外观").performClick()
-        assertThat(opened).containsExactly(SettingsPage.FACE, SettingsPage.TEXT, SettingsPage.APPEARANCE).inOrder()
+        assertThat(opened)
+            .containsExactly(SettingsPage.FACE, SettingsPage.TEXT, SettingsPage.AI, SettingsPage.APPEARANCE)
+            .inOrder()
     }
 
     /** 恢复默认在一级页上就是普通的一行，误点一下不能就把设置全清了。 */
@@ -327,6 +332,47 @@ class SettingsScreenTest {
     @Test fun theUnanchoredNamesSwitchIsDisabledWhileNamesAreOff() {
         rulePage("name", RecognitionConfig().withRule("name", RuleState.OFF, RuleCatalog.factoryState("name")))
         compose.onNodeWithTag("unanchored-names").assertIsNotEnabled()
+    }
+
+    // ---------- AI ----------
+
+    private fun ai(nano: NanoStatus?) = show { AiSettingsScreen(nano, onNavigateUp = {}) }
+
+    /** 进页时先问 AICore，问完之前不能空着，也不能先说「没有」。 */
+    @Test fun theAiPageSaysItIsStillChecking() {
+        ai(nano = null)
+        compose.onNodeWithText("正在检测…").assertIsDisplayed()
+        compose.onNodeWithText("本机没有").assertDoesNotExist()
+    }
+
+    @Test fun theAiPageSaysWhichNanoThisPhoneHas() {
+        ai(NanoStatus.Present("nano-v3", NanoStatus.Model.READY))
+        compose.onNodeWithText("Gemini Nano").assertIsDisplayed()
+        compose.onNodeWithText("nano-v3 · 已就绪").assertIsDisplayed()
+    }
+
+    @Test fun theAiPageSaysWhenThisPhoneHasNoNano() {
+        ai(NanoStatus.Unavailable())
+        compose.onNodeWithText("本机没有").assertIsDisplayed()
+        compose.onNodeWithText("Pixel 9", substring = true).assertIsDisplayed()
+    }
+
+    /** AICore 报了错就把错误码写出来，真机上排查时用得上。 */
+    @Test fun theAiPageShowsTheAicoreErrorCode() {
+        ai(NanoStatus.Unavailable(errorCode = 606))
+        compose.onNodeWithText("本机没有").assertIsDisplayed()
+        compose.onNodeWithText("错误码 606", substring = true).assertIsDisplayed()
+    }
+
+    /** 模型还没下到本机时也报版本：版本是机型定的，不是下载定的。 */
+    @Test fun aNanoNotYetDownloadedStillShowsItsVersion() {
+        ai(NanoStatus.Present("nano-v2", NanoStatus.Model.NOT_DOWNLOADED))
+        compose.onNodeWithText("nano-v2 · 未下载").assertIsDisplayed()
+    }
+
+    @Test fun aNanoWhoseVersionCannotBeReadSaysSo() {
+        ai(NanoStatus.Present(null, NanoStatus.Model.DOWNLOADING))
+        compose.onNodeWithText("版本未知 · 下载中").assertIsDisplayed()
     }
 
     // ---------- 导出、外观 ----------
