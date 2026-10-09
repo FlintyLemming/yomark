@@ -25,6 +25,7 @@ const SEEDS = [
   ['purple', 0xff6750a4, null],
   ['teal', 0xff00897b, null],
   ['pink', 0xffd81b60, null],
+  ['yellow', 0xfffbbc04, null],
   ['gray', 0xff1a73e8, 6],
 ];
 
