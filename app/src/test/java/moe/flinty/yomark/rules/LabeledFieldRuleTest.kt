@@ -15,13 +15,13 @@ import org.junit.Test
 class LabeledFieldRuleTest {
 
     /**
-     * 只看锚定出来的。人名规则里还有一种从字面认的（只圈不打码），「张三去了北京」它照样认得出，
+     * 只看锚定出来的。人名规则里还有一种从字面认的（要旁证才算），「张三去了北京」它照样认得出，
      * 那一种见 PersonNameRecognizerTest。
      */
     private fun matched(id: String, text: String): List<String> =
         DefaultRuleSet.rules.first { it.id == id }
             .findIn(text)
-            .filterNot { it.outlineOnly }
+            .filterNot { it.needsAnchor }
             .map { text.substring(it.range.first, it.range.last + 1) }
 
     // ---------- 人名 ----------

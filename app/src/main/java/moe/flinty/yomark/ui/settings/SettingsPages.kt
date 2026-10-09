@@ -14,6 +14,7 @@ import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Domain
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
@@ -25,12 +26,12 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.PersonSearch
 import androidx.compose.material.icons.outlined.Phone
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -56,7 +57,8 @@ import moe.flinty.yomark.ui.theme.colorScheme
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置的七个二级页。每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
+ * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、导出、外观。
+ * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
@@ -64,12 +66,21 @@ import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
  */
 
 /**
- * 文字：每一类文字三态，关 / 圈出 / 打码。右上角的「恢复默认」只管这一页的规则。
+ * 文字：上面一组是「怎么认字」（识别引擎、AI 复查），下面一组是认出来的各类敏感信息，
+ * 每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
+ *
+ * 各类原先在行尾直接摆一排「关 / 圈出 / 打码」；人名多了一个只属于它的开关之后，行尾放不下，
+ * 一类一页又和人脸、条码的页是同一个样子：先是「识别到时怎么办」，再是这一类自己的选项和认法。
+ * 原先单独一页的「文字识别」并进来：认字和认出来怎么处理都是「文字」的事，分在两处找不到。
+ *
+ * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、AI 复查、各类的处理方式和人名的开关。
  */
 @Composable
-fun TextRulesScreen(
+fun TextSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
+    onOpenEngine: () -> Unit,
+    onOpenRule: (ruleId: String) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -78,40 +89,117 @@ fun TextRulesScreen(
         onNavigateUp = onNavigateUp,
         modifier = modifier,
         actions = {
-            TextButton(
-                onClick = { onChange(config.copy(ruleOverrides = emptyMap())) },
-                enabled = config.ruleOverrides.isNotEmpty(),
-            ) { Text("恢复默认") }
+            val reset = config.withTextDefaults()
+            TextButton(onClick = { onChange(reset) }, enabled = config != reset) { Text("恢复默认") }
         },
     ) {
         item {
-            PageIntro("识别到的文字按类型处理：打码是直接遮住，圈出是只画虚线框、点一下才打码，关掉的类型不识别。")
+            SectionHeader("文字识别", first = true)
+            SettingsGroup {
+                LinkRow(
+                    title = "识别引擎",
+                    summary = textEngineLabel(config.textEngine),
+                    icon = Icons.Outlined.DocumentScanner,
+                    onClick = onOpenEngine,
+                )
+                SwitchRow(
+                    title = "AI 复查",
+                    summary = "编辑页多一个按钮，点了由端侧 Gemini Nano 补查人名和地址，结果只圈出",
+                    icon = Icons.Outlined.AutoAwesome,
+                    checked = config.semantic != SemanticOption.OFF,
+                    onCheckedChange = { on ->
+                        onChange(config.copy(semantic = if (on) SemanticOption.GEMINI_NANO else SemanticOption.OFF))
+                    },
+                )
+            }
+            FooterText("AI 复查离线运行，仅支持部分机型（如 Pixel 9 及以后）。")
+            SectionHeader("敏感信息")
         }
-        val rules = RuleCatalog.all
+        val rules = RuleCatalog.inSettingsOrder
         itemsIndexed(rules, key = { _, rule -> rule.id }) { i, rule ->
-            SettingsRow(
+            LinkRow(
                 title = RuleCatalog.label(rule),
+                summary = ruleSummary(config, rule.id),
+                icon = rule.kind.settingsIcon(),
+                onClick = { onOpenRule(rule.id) },
                 modifier = Modifier.lazyGroupInset().testTag("rule-${rule.id}"),
                 shape = groupItemShape(i, rules.size),
-                leading = { RowIcon(rule.kind.settingsIcon()) },
-                trailing = {
-                    RuleStateSelector(
-                        selected = RuleCatalog.stateOf(config, rule.id),
-                        onSelect = { onChange(config.withRule(rule.id, it, RuleCatalog.factoryState(rule.id))) },
-                    )
-                },
-                below = RuleCatalog.note(rule)?.let { note ->
-                    {
-                        Text(
-                            note,
-                            modifier = Modifier.padding(start = 40.dp, top = 6.dp),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
             )
             if (i < rules.lastIndex) RowGapSpacer()
+        }
+    }
+}
+
+/** 识别引擎：OCR 用哪一家。从「文字」页点进来。 */
+@Composable
+fun TextEngineSettingsScreen(
+    config: RecognitionConfig,
+    onChange: (RecognitionConfig) -> Unit,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsScaffold(title = "识别引擎", onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            PageTopSpacer()
+            SettingsGroup(Modifier.selectableGroup()) {
+                TextEngineOption.entries.forEach { option ->
+                    RadioRow(
+                        title = textEngineLabel(option),
+                        summary = when (option) {
+                            TextEngineOption.PADDLE -> "中文最准，速度稍慢"
+                            TextEngineOption.LATIN -> "不支持中文"
+                            TextEngineOption.CHINESE -> "中英文都能认"
+                            TextEngineOption.BOTH -> "两个模型一起跑，最慢"
+                        },
+                        selected = config.textEngine == option,
+                        onClick = { onChange(config.copy(textEngine = option)) },
+                    )
+                }
+            }
+            FooterText("只管怎么把截图里的字读出来。读出来的字算不算敏感信息，由「文字」页下面的各类决定。")
+        }
+    }
+}
+
+/**
+ * 文字里的一类，样子和人脸、条码的页一样：先是「识别到时」打码 / 仅圈出 / 关闭，再是这一类怎么认的。
+ * 人名多一组：没有旁证、只凭字面猜出的名字要不要也圈出。
+ */
+@Composable
+fun TextRuleSettingsScreen(
+    ruleId: String,
+    config: RecognitionConfig,
+    onChange: (RecognitionConfig) -> Unit,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val rule = RuleCatalog.all.first { it.id == ruleId }
+    val label = RuleCatalog.label(rule)
+    val state = RuleCatalog.stateOf(config, rule.id)
+    SettingsScaffold(title = label, onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            SectionHeader("识别到${label}时", first = true)
+            HandlingGroup(state, offSummary = "不识别$label") {
+                onChange(config.withRule(rule.id, it, RuleCatalog.factoryState(rule.id)))
+            }
+            FooterText(RuleCatalog.description(rule))
+        }
+        if (rule.id == NAME_RULE) {
+            item {
+                SectionHeader("从字面猜出的人名")
+                SettingsGroup {
+                    SwitchRow(
+                        title = "没有旁证的也圈出",
+                        summary = "圈出，不打码。会多圈到药名、品牌名",
+                        icon = Icons.Outlined.PersonSearch,
+                        checked = config.outlineUnanchoredNames,
+                        enabled = state != RuleState.OFF,
+                        onCheckedChange = { onChange(config.copy(outlineUnanchoredNames = it)) },
+                        modifier = Modifier.testTag("unanchored-names"),
+                    )
+                }
+                FooterText(RuleCatalog.nameAnchorNote())
+            }
         }
     }
 }
@@ -184,54 +272,9 @@ fun BarcodeSettingsScreen(
     }
 }
 
-/** 文字识别：OCR 用哪一家，以及要不要 AI 复查。两项都是「怎么认字」，认出来怎么处理在「文字」那一页。 */
-@Composable
-fun TextRecognitionSettingsScreen(
-    config: RecognitionConfig,
-    onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SettingsScaffold(title = "文字识别", onNavigateUp = onNavigateUp, modifier = modifier) {
-        item {
-            SectionHeader("识别引擎", first = true)
-            SettingsGroup(Modifier.selectableGroup()) {
-                TextEngineOption.entries.forEach { option ->
-                    RadioRow(
-                        title = textEngineLabel(option),
-                        summary = when (option) {
-                            TextEngineOption.PADDLE -> "中文最准，速度稍慢"
-                            TextEngineOption.LATIN -> "不支持中文"
-                            TextEngineOption.CHINESE -> "中英文都能认"
-                            TextEngineOption.BOTH -> "两个模型一起跑，最慢"
-                        },
-                        selected = config.textEngine == option,
-                        onClick = { onChange(config.copy(textEngine = option)) },
-                    )
-                }
-            }
-        }
-        item {
-            SectionHeader("AI 复查（实验）")
-            SettingsGroup {
-                SwitchRow(
-                    title = "使用 AI 复查",
-                    summary = "编辑页多一个按钮，点了由端侧 Gemini Nano 补查人名和地址，结果只圈出",
-                    icon = Icons.Outlined.AutoAwesome,
-                    checked = config.semantic != SemanticOption.OFF,
-                    onCheckedChange = { on ->
-                        onChange(config.copy(semantic = if (on) SemanticOption.GEMINI_NANO else SemanticOption.OFF))
-                    },
-                )
-            }
-            FooterText("离线运行，仅支持部分机型（如 Pixel 9 及以后）。")
-        }
-    }
-}
-
 /**
  * AI：眼下只显示本机的 Gemini Nano——有没有、是哪一版、模型下好了没有，还没有可设的项。
- * AI 复查的开关仍在「文字识别」页。
+ * AI 复查的开关在「文字」页的「文字识别」一组里，和识别引擎在一起。
  *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
  */
@@ -356,7 +399,7 @@ fun AppearanceSettingsScreen(
     }
 }
 
-/** 人脸、条码共用：打码 / 仅圈出 / 关闭，出厂项（打码）排第一。 */
+/** 人脸、条码、文字的各类共用：打码 / 仅圈出 / 关闭，打码排第一。 */
 @Composable
 private fun HandlingGroup(selected: RuleState, offSummary: String, onSelect: (RuleState) -> Unit) {
     SettingsGroup(Modifier.selectableGroup()) {
@@ -375,7 +418,7 @@ private fun HandlingGroup(selected: RuleState, offSummary: String, onSelect: (Ru
     }
 }
 
-/** 文字规则行首的图标，按类型给。 */
+/** 文字各类行首的图标，按类型给。 */
 internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.PHONE -> Icons.Outlined.Phone
     SensitiveKind.EMAIL -> Icons.Outlined.AlternateEmail
@@ -399,7 +442,35 @@ internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.MANUAL -> Icons.Outlined.Edit
 }
 
-/** 人脸、条码认出来之后怎么处理。文字规则行里地方小，用的是更短的 [ruleStateLabel]。 */
+/** 人名一类的规则 id：它的页上多一个开关，「文字」页上它那一行的小字也多一截。 */
+private const val NAME_RULE = "name"
+
+/**
+ * 「文字」页上一类的小字：怎么处理。人名再写上没有旁证的那些怎么办——
+ * 不写的话，聊天里的人名不圈了，用户只看得到「打码」两个字。
+ */
+internal fun ruleSummary(config: RecognitionConfig, ruleId: String): String {
+    val state = RuleCatalog.stateOf(config, ruleId)
+    val handling = handlingLabel(state)
+    if (ruleId != NAME_RULE || state == RuleState.OFF) return handling
+    return handling + if (config.outlineUnanchoredNames) " · 没有旁证的只圈出" else " · 没有旁证的不圈"
+}
+
+/**
+ * 「文字」页右上角的「恢复默认」：这一页和它下面各页的项回到出厂值，人脸、条码不动。
+ * 出厂值取自 [RecognitionConfig] 的缺省值，不另抄一份。
+ */
+internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
+    val factory = RecognitionConfig()
+    return copy(
+        textEngine = factory.textEngine,
+        semantic = factory.semantic,
+        outlineUnanchoredNames = factory.outlineUnanchoredNames,
+        ruleOverrides = emptyMap(),
+    )
+}
+
+/** 打码 / 仅圈出 / 关闭。人脸、条码、文字的各类共用。 */
 internal fun handlingLabel(state: RuleState) = when (state) {
     RuleState.MASKED -> "打码"
     RuleState.OUTLINED -> "仅圈出"

@@ -35,6 +35,7 @@ class RecognitionConfigStoreTest {
             face = FaceOption.ACCURATE,
             faceState = RuleState.OFF,
             semantic = SemanticOption.OFF,
+            outlineUnanchoredNames = true,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )
         store.setRecognitionConfig(cfg)
@@ -96,6 +97,7 @@ class RecognitionConfigStoreTest {
                 textEngine = TextEngineOption.LATIN,
                 faceState = RuleState.OUTLINED,
                 barcodeState = RuleState.OFF,
+                outlineUnanchoredNames = true,
                 ruleOverrides = mapOf("ip" to RuleState.OFF),
             ),
         )

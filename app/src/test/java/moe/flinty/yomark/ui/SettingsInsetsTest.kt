@@ -21,7 +21,7 @@ import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.SettingsScreen
-import moe.flinty.yomark.ui.settings.TextRulesScreen
+import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -73,9 +73,9 @@ class SettingsInsetsTest {
     }
 
     /** 列表可以从导航条底下滚过去，但滚到底时最后一行得整个露在它上面。 */
-    @Test fun `the last rule scrolls clear of the navigation bar`() {
-        show { TextRulesScreen(RecognitionConfig(), {}, onNavigateUp = {}) }
-        val last = RuleCatalog.all.last()
+    @Test fun `the last kind scrolls clear of the navigation bar`() {
+        show { TextSettingsScreen(RecognitionConfig(), {}, {}, {}, onNavigateUp = {}) }
+        val last = RuleCatalog.inSettingsOrder.last()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey(last.id)
         val row = compose.onNodeWithText(RuleCatalog.label(last)).getUnclippedBoundsInRoot()
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
@@ -97,8 +97,8 @@ class SettingsInsetsTest {
         assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
     }
 
-    @Test fun `the rules page leaves system back to the activity`() {
-        show { TextRulesScreen(RecognitionConfig(), {}, onNavigateUp = {}) }
+    @Test fun `the text page leaves system back to the activity`() {
+        show { TextSettingsScreen(RecognitionConfig(), {}, {}, {}, onNavigateUp = {}) }
         assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
     }
 }

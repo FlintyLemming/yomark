@@ -111,6 +111,22 @@ object DefaultRuleSet {
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
+    /** 人名字段名。姓名规则拿它锚定取值，从字面猜出的名字也拿它当旁证（见 nameAnchors）。 */
+    private val NAME_LABELS = listOf(
+        "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
+        "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
+        "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
+    )
+
+    /**
+     * 跟在名字后面的称呼。认名字时拿它补全「赵」+「师傅」、放过「张三老师」「张老师好」（见 PersonNameRecognizer）；
+     * 紧挨着一个猜出来的名字，它就是这个名字的旁证（见 nameAnchors）。
+     */
+    internal val PERSON_TITLES = listOf(
+        "先生", "女士", "小姐", "师傅", "老师", "同学", "经理", "总监", "主任", "医生", "大夫", "护士",
+        "律师", "教授", "博士", "阿姨", "叔叔", "伯伯", "大爷", "大妈", "老板", "同志",
+    )
+
     /**
      * 姓名 = 字段名后面的值 + 电话前面的名字 + 从字面认出的名字。
      *
@@ -118,8 +134,10 @@ object DefaultRuleSet {
      * 没有任何字段名，见 NameBeforePhone。从字面认的（HanLP，见 PersonNameRecognizer）补既没有字段名、
      * 旁边也没有电话的：滴滴出票页的乘车人一行是「沐晨冉 成人」，下面是打了星的身份证号。
      *
-     * 从字面认的误报率比前两种高一个量级：「申通快递」「瑞幸咖啡」这类拿人名、姓氏起头的商号会被认成人名。
-     * 所以它排在最后，只补前两种够不着的地方，命中只圈不打码（OutlineOnly），按 §6「按误报率划线」。
+     * 从字面认的误报率比前两种高一个量级：药名、品牌名、规格词都会被认成人名（真机上一整页商品规格被圈满）。
+     * 所以它排在最后，只补前两种够不着的地方，而且只算猜测（NeedsAnchor）：同一行或上下相邻一行有
+     * 电话、证件号、地址、「乘车人」这类字段的才算数，照这一行的设置打码；附近什么都没有的，出厂丢掉，
+     * 设置 › 文字 › 人名里打开「没有旁证的也圈出」才只圈不打码。
      * 它原先单独成一条规则，设置页上另有一行「人名（无字段名）」；两行都是人名，用户分不清关的是哪一个，
      * 于是并了回来：一行「人名」管三种认法，一起开关。
      */
@@ -127,17 +145,9 @@ object DefaultRuleSet {
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
-        LabeledField(
-            labels = listOf(
-                "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
-                "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
-                "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
-            ),
-            value = NAME_VALUE,
-            confidence = 0.8f,
-        ),
+        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
-        OutlineOnly(PersonNameRecognizer(confidence = 0.6f)),
+        NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
     )
 
     /**
@@ -300,5 +310,53 @@ object DefaultRuleSet {
     val rules: List<Rule> = listOf(
         CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
+    )
+
+    // ---------- 人名的旁证 ----------
+
+    /** 18 位身份证号，查校验码。 */
+    private val ID_NUMBER = Regex("""(?<![0-9A-Za-z])\d{17}[\dXx](?![0-9A-Za-z])""")
+
+    /**
+     * 打了星的号码：证件号「3201**********1234」、卡号「6222****1234」、手机号「138****6612」。
+     * 打星本身就说明 app 认为这是某个人的号码。
+     */
+    private val MASKED_NUMBER = Regex("""(?<![\d*＊])\d{2,6}\s?[*＊•●]{3,}\s?\d{2,4}[\dXx]?(?![\d*＊])""")
+
+    /**
+     * 说明「这里是一个人」的字段名，姓名规则的字段名之外的：出行、住宿、就诊、保险、转账页上的。
+     * 它们不拿来锚定取值——「乘客 1 位」「抄送 3 人」后面跟的不是名字——只当旁证。
+     */
+    private val PERSON_FIELDS = listOf(
+        "乘车人", "乘客", "旅客", "乘机人", "出行人", "入住人", "住客", "预订人", "订票人", "购票人",
+        "就诊人", "患者", "投保人", "被保险人", "受益人", "审批人", "经办人", "抄送", "对方账户", "收款方",
+    )
+
+    /** 票种：滴滴出票页那一行就是「沐晨冉 成人」。 */
+    private val TICKET_TYPES = listOf("成人票", "儿童票", "学生票", "婴儿票", "成人", "儿童", "学生", "婴儿")
+
+    /** 正则找形状，[valid] 再验一道。 */
+    private fun shape(pattern: Regex, valid: (String) -> Boolean = { true }) = Finder { text ->
+        pattern.findAll(text).filter { valid(it.value) }.map { RuleMatch(it.range, 1f) }.toList()
+    }
+
+    /**
+     * 人名的旁证表。从字面猜出的人名（NeedsAnchor）要有其中一处才算数，见 NameAnchor、RuleClassifier。
+     * **加一种旁证就是在这里加一行**，再到 NameAnchorPageTest 的例子表里配一个例子。
+     *
+     * 与姓名规则拿电话找锚同一个道理：电话、地址规则被用户关掉时照样算旁证——关的是「遮」，不是「认」。
+     */
+    val nameAnchors: List<NameAnchor> = listOf(
+        NameAnchor("先生、女士这类称呼", NameAnchor.Reach.ATTACHED, Words(PERSON_TITLES)),
+        NameAnchor("电话", NameAnchor.Reach.NEARBY, PHONE),
+        NameAnchor("邮箱", NameAnchor.Reach.NEARBY, EMAIL),
+        NameAnchor("地址", NameAnchor.Reach.NEARBY, ADDRESS),
+        NameAnchor("证件号", NameAnchor.Reach.NEARBY, shape(ID_NUMBER, Checksums::chineseIdValid)),
+        NameAnchor("打了星的号码", NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
+        NameAnchor(
+            "「收货人」「乘车人」这类字段", NameAnchor.Reach.NEARBY,
+            Words(NAME_LABELS + PERSON_FIELDS, boundedBefore = true),
+        ),
+        NameAnchor("票种", NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
     )
 }

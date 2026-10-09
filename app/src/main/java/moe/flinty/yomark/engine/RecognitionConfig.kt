@@ -59,6 +59,12 @@ data class RecognitionConfig(
     val faceState: RuleState = RuleState.MASKED,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
+     * 没有旁证、只凭字面猜出的人名要不要圈出来。出厂不圈：HanLP 会把药名、品牌名、规格词都猜成人名，
+     * 附近没有电话、证件号、地址、「收货人」这类字段的，十有八九不是人（见 RuleClassifier）。
+     * 打开后这些也圈出，但不打码。人名一行选「关」时它不起作用。
+     */
+    val outlineUnanchoredNames: Boolean = false,
+    /**
      * **只存与出厂默认不同的项。** 存全表的话，出厂默认改了之后老安装会读到
      * 一份冻结的旧全表，变成一个需要迁移的问题；只存差异则新规则天然继承新默认。
      */

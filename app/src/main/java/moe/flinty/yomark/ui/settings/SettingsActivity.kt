@@ -14,6 +14,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.engine.RecognitionConfig
+import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.engine.genai.NanoClient
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
@@ -49,8 +50,8 @@ class SettingsActivity : ComponentActivity() {
 }
 
 /**
- * 设置的二级页。七页共用这一个 Activity，打开哪一页由 [SettingsPage] 参数决定；
- * 每次打开都是一个新实例，预见式返回照样是跨 Activity 的动画。
+ * 设置一级页以下的各页。共用这一个 Activity，打开哪一页由 [SettingsPage] 参数决定，
+ * 文字里的一类另带规则 id；每次打开都是一个新实例，预见式返回照样是跨 Activity 的动画。
  */
 class SettingsPageActivity : ComponentActivity() {
 
@@ -59,28 +60,39 @@ class SettingsPageActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val page = intent.getStringExtra(EXTRA_PAGE)
             ?.let { name -> SettingsPage.entries.firstOrNull { it.name == name } }
-        if (page == null) {
+        val ruleId = intent.getStringExtra(EXTRA_RULE)
+        // 文字里的一类：认不出的规则 id（比如改名前留下的快捷方式）就不打开
+        if (page == null || (page == SettingsPage.TEXT_RULE && RuleCatalog.all.none { it.id == ruleId })) {
             finish()
             return
         }
         val store = SettingsStore(applicationContext)
-        setSettingsContent(store) { SettingsPageContent(page, store) }
+        setSettingsContent(store) { SettingsPageContent(page, ruleId, store) }
     }
 
     @Composable
-    private fun SettingsPageContent(page: SettingsPage, store: SettingsStore) {
+    private fun SettingsPageContent(page: SettingsPage, ruleId: String?, store: SettingsStore) {
         when (page) {
-            SettingsPage.TEXT_RULES -> WithRecognitionConfig(store) { config, onChange ->
-                TextRulesScreen(config, onChange, onNavigateUp = ::finish)
+            SettingsPage.TEXT -> WithRecognitionConfig(store) { config, onChange ->
+                TextSettingsScreen(
+                    config = config,
+                    onChange = onChange,
+                    onOpenEngine = { startActivity(intent(this, SettingsPage.TEXT_ENGINE)) },
+                    onOpenRule = { id -> startActivity(intent(this, SettingsPage.TEXT_RULE, id)) },
+                    onNavigateUp = ::finish,
+                )
+            }
+            SettingsPage.TEXT_ENGINE -> WithRecognitionConfig(store) { config, onChange ->
+                TextEngineSettingsScreen(config, onChange, onNavigateUp = ::finish)
+            }
+            SettingsPage.TEXT_RULE -> WithRecognitionConfig(store) { config, onChange ->
+                TextRuleSettingsScreen(checkNotNull(ruleId), config, onChange, onNavigateUp = ::finish)
             }
             SettingsPage.FACE -> WithRecognitionConfig(store) { config, onChange ->
                 FaceSettingsScreen(config, onChange, onNavigateUp = ::finish)
             }
             SettingsPage.BARCODE -> WithRecognitionConfig(store) { config, onChange ->
                 BarcodeSettingsScreen(config, onChange, onNavigateUp = ::finish)
-            }
-            SettingsPage.TEXT_RECOGNITION -> WithRecognitionConfig(store) { config, onChange ->
-                TextRecognitionSettingsScreen(config, onChange, onNavigateUp = ::finish)
             }
             SettingsPage.AI -> {
                 // 进页时问一次 AICore；只看不下，见 NanoStatus
@@ -115,7 +127,7 @@ class SettingsPageActivity : ComponentActivity() {
         }
     }
 
-    /** 识别方案的四页都直接读写 DataStore，不经过编辑器：编辑器的 ViewModel 自己在收这个 flow。 */
+    /** 识别方案的各页都直接读写 DataStore，不经过编辑器：编辑器的 ViewModel 自己在收这个 flow。 */
     @Composable
     private fun WithRecognitionConfig(
         store: SettingsStore,
@@ -129,9 +141,13 @@ class SettingsPageActivity : ComponentActivity() {
 
     companion object {
         private const val EXTRA_PAGE = "moe.flinty.yomark.settings.PAGE"
+        private const val EXTRA_RULE = "moe.flinty.yomark.settings.RULE"
 
-        fun intent(context: Context, page: SettingsPage): Intent =
-            Intent(context, SettingsPageActivity::class.java).putExtra(EXTRA_PAGE, page.name)
+        /** [ruleId] 只有 [SettingsPage.TEXT_RULE] 用：文字里的哪一类。 */
+        fun intent(context: Context, page: SettingsPage, ruleId: String? = null): Intent =
+            Intent(context, SettingsPageActivity::class.java)
+                .putExtra(EXTRA_PAGE, page.name)
+                .apply { if (ruleId != null) putExtra(EXTRA_RULE, ruleId) }
     }
 }
 

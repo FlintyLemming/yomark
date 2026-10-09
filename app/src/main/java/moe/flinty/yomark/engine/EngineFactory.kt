@@ -29,7 +29,9 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
             add(MlKitBarcodeDetector(config.barcode, masked = config.barcodeState == RuleState.MASKED))
         }
     },
-    classifiers = listOf(RuleClassifier(RuleCatalog.rulesFor(config))),
+    classifiers = listOf(
+        RuleClassifier(RuleCatalog.rulesFor(config), keepUnanchored = config.outlineUnanchoredNames),
+    ),
     refiners = when (config.semantic) {
         SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier())
         SemanticOption.OFF -> emptyList()

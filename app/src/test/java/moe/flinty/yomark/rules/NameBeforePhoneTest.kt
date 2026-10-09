@@ -13,9 +13,9 @@ class NameBeforePhoneTest {
 
     private val nameRule = DefaultRuleSet.rules.first { it.id == "name" }
 
-    /** 只看锚定出来的：人名规则里从字面认的那一种（只圈不打码）见 PersonNameRecognizerTest。 */
+    /** 只看锚定出来的：人名规则里从字面认的那一种（要旁证才算）见 PersonNameRecognizerTest。 */
     private fun names(text: String): List<String> =
-        nameRule.findIn(text).filterNot { it.outlineOnly }.map { text.substring(it.range) }
+        nameRule.findIn(text).filterNot { it.needsAnchor }.map { text.substring(it.range) }
 
     /** libphonenumber 按地区校验，大陆手机号得用 CN 才认；打了星的号码不看地区。 */
     private val cn = NameBeforePhone(PhoneRule(defaultRegion = "CN"), confidence = 0.7f)

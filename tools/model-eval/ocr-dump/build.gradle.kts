@@ -20,7 +20,7 @@ sourceSets {
                 "moe/flinty/yomark/rules/Rule.kt", "moe/flinty/yomark/rules/DefaultRuleSet.kt",
                 "moe/flinty/yomark/rules/PhoneRule.kt", "moe/flinty/yomark/rules/NameBeforePhone.kt",
                 "moe/flinty/yomark/rules/LabeledField.kt", "moe/flinty/yomark/rules/HanView.kt",
-                "moe/flinty/yomark/rules/PersonNameRecognizer.kt",
+                "moe/flinty/yomark/rules/PersonNameRecognizer.kt", "moe/flinty/yomark/rules/NameAnchor.kt",
                 "moe/flinty/yomark/rules/AddressShape.kt", "moe/flinty/yomark/rules/DateTimeRule.kt",
                 "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )

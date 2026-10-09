@@ -1,7 +1,5 @@
 package moe.flinty.yomark.ui.settings
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,14 +22,11 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -40,7 +35,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
@@ -49,8 +43,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -65,7 +57,6 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import moe.flinty.yomark.engine.RuleState
 
 /*
  * 设置各页共用的部件，照 Android 16 的系统设置排：
@@ -354,14 +345,22 @@ internal fun SwitchRow(
     modifier: Modifier = Modifier,
     summary: String? = null,
     icon: ImageVector? = null,
+    enabled: Boolean = true,
 ) {
     SettingsRow(
         title = title,
         summary = summary,
         modifier = modifier,
-        interaction = Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
+        enabled = enabled,
+        interaction = Modifier.toggleable(
+            value = checked,
+            enabled = enabled,
+            role = Role.Switch,
+            onValueChange = onCheckedChange,
+        ),
         leading = icon?.let { { RowIcon(it) } },
         trailing = {
+            // 滑块按「可用」画，灰掉交给整行的透明度，理由同 RadioRow 的圆点
             Switch(
                 checked = checked,
                 onCheckedChange = null,
@@ -378,51 +377,24 @@ internal fun SwitchRow(
 }
 
 /**
- * 关 / 圈出 / 打码 三选一，排成一排连在一起的按钮（Material 3 Expressive 的 connected button group）：
- * 两端是半圆，相邻处小圆角，选中的那个变成整颗胶囊、填主题色。
- * 文字规则每行一个，摆在行尾，一眼扫下来就看得出每一类现在是什么状态。
+ * 二级页上点进下一页的一行：行首单色图标，小字写这一项眼下的状态。
+ * 和一级页的 [NavigationRow] 一样不画右箭头。
  */
 @Composable
-internal fun RuleStateSelector(
-    selected: RuleState,
-    onSelect: (RuleState) -> Unit,
+internal fun LinkRow(
+    title: String,
+    summary: String?,
+    icon: ImageVector,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(InnerCorner),
 ) {
-    val states = RuleState.entries
-    Row(modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
-        states.forEachIndexed { i, state ->
-            val isSelected = state == selected
-            val inner by animateDpAsState(if (isSelected) SegmentHeight / 2 else 6.dp, label = "segment corner")
-            val outer = CornerSize(50)
-            val start = if (i == 0) outer else CornerSize(inner)
-            val end = if (i == states.lastIndex) outer else CornerSize(inner)
-            val container by animateColorAsState(
-                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest,
-                label = "segment container",
-            )
-            val content = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-            Box(
-                Modifier
-                    .height(SegmentHeight)
-                    .widthIn(min = 48.dp)
-                    .clip(RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end))
-                    .background(container)
-                    .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onSelect(state) })
-                    .padding(horizontal = 10.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                CompositionLocalProvider(LocalContentColor provides content) {
-                    Text(ruleStateLabel(state), style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-private val SegmentHeight = 40.dp
-
-internal fun ruleStateLabel(state: RuleState) = when (state) {
-    RuleState.OFF -> "关"
-    RuleState.OUTLINED -> "圈出"
-    RuleState.MASKED -> "打码"
+    SettingsRow(
+        title = title,
+        summary = summary,
+        modifier = modifier,
+        shape = shape,
+        interaction = Modifier.clickable(onClick = onClick),
+        leading = { RowIcon(icon) },
+    )
 }
