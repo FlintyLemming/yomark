@@ -18,7 +18,8 @@ import kotlin.math.roundToInt
 
 /**
  * 评测台里的 PpOcrEngine 副本（app 原文件由 sed 生成，只多了两个开关，见 [spaces]、[db]），用来试 app 里还没有的做法：
- * - OCR_SPACES=pixel（同 app）| model（只要模型自己输出的空格）| latin（两边都是拉丁字母、数字时门槛提高，挨着标点不补）；
+ * - OCR_SPACES=pixel（同 app）| model（只要模型自己输出的空格）| latin（挨着拉丁标点不补；两个数字之间照 app；
+ *   其余拉丁字母、数字之间门槛提高到 OCR_LATIN_BREAK 倍字高，默认 0.45；有汉字的照 app）；
  * - OCR_DB=thresh,boxThresh,unclip（DB 后处理阈值，默认同 app 的 0.3,0.6,1.5）。
  *
  * 以下是原文件的说明。
@@ -155,6 +156,8 @@ class PpOcrEngineX(
             val r = right.singleOrNull()
             if (l == null || r == null || l.code > 0x7F || r.code > 0x7F) WordGaps.isBreak(left, right, leftX, rightX, found)
             else if (!l.isLatinOrDigit() || !r.isLatinOrDigit()) false
+            // 两个数字之间照 app 原样（0.45 倍字高）：「2026-09-30 14:22:05」的日期和时间要分开
+            else if (l.isDigit() && r.isDigit()) WordGaps.isBreak(left, right, leftX, rightX, found)
             else {
                 val widest = found.gaps.filter { it.center > leftX && it.center < rightX }.maxOfOrNull { it.width }
                 widest != null && widest >= found.textHeight * LATIN_BREAK
