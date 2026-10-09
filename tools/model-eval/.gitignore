@@ -6,3 +6,6 @@ out-ocr/
 models-en/
 names/
 out-*.json
+fonts/
+out-stress/
+out-ner/

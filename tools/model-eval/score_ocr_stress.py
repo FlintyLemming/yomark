@@ -5,7 +5,8 @@
 每个配置按文种（en / zh）给：
   CER         字符错误率（去掉空格算；每行原文对 OCR 输出里最像的一段）；
   行全对       一字不差，含空格（规则靠空格分词，空格错了也算错）；
-  关键片段     人名、地址、邮箱、电话、编号在 OCR 输出里一字不差地出现（空格按单个空格比；这是规则能不能认出它的前提）；
+  关键片段     人名、地址、邮箱、电话、编号在 OCR 输出里一字不差地出现（空格按单个空格比，汉字之间的空格不算——规则先用
+               HanView 拼回；这是规则能不能认出它的前提）；
 再按条件（主题、字号档、字体、JPEG、屏幕）分组给 CER，看哪种截图最伤。
 """
 import json, os, sys
@@ -13,8 +14,12 @@ from collections import defaultdict
 from score_ocr import semi_global
 
 
+HAN_GAP = __import__("re").compile(r"(?<=[\u4e00-\u9fff]) +(?=[\u4e00-\u9fff])")
+
+
 def squash(s):
-    return " ".join(s.split())
+    """连续空白并成一个；两个汉字之间的空格去掉——app 的规则跑在 HanView 上，逐字切开的「河 北 省」先拼回「河北省」。"""
+    return HAN_GAP.sub("", " ".join(s.split()))
 
 
 def page_metrics(truth, lines):
