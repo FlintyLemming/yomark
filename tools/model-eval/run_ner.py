@@ -44,6 +44,18 @@ def chunked(run_block):
     return run
 
 
+def merge_adjacent(text, spans):
+    """同一行里首尾相接、或只隔一个空格的几段并成一段：BPE 模型的 simple 聚合会把一个词切成几截（「Sh」「ored」「itch」），
+    名和姓（first_name、last_name）也各报一段。跨行不并。"""
+    out = []
+    for a, b in spans:
+        if out and 0 <= a - out[-1][1] <= 1 and text[out[-1][1]:a] in ("", " "):
+            out[-1] = (out[-1][0], max(b, out[-1][1]))
+        else:
+            out.append((a, b))
+    return out
+
+
 def keep_label(g):
     return KEEP.search(g) and not DROP.search(g)
 
@@ -99,8 +111,9 @@ def load(spec):
         nlp = pipeline("token-classification", model=rest, aggregation_strategy="simple", device=-1)
 
         def block(text, thr):
-            return [text[e["start"]:e["end"]] for e in nlp(text)
-                    if e["score"] >= thr and keep_label(e.get("entity_group") or e.get("entity", ""))]
+            spans = sorted((e["start"], e["end"]) for e in nlp(text)
+                           if e["score"] >= thr and keep_label(e.get("entity_group") or e.get("entity", "")))
+            return [text[a:b] for a, b in merge_adjacent(text, spans)]
         return chunked(block)
     raise SystemExit(f"不认得的模型写法：{spec}")
 
