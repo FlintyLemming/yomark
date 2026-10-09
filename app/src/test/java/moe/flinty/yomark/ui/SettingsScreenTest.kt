@@ -375,6 +375,13 @@ class SettingsScreenTest {
         compose.onNodeWithText("版本未知 · 下载中").assertIsDisplayed()
     }
 
+    /** 随包的 PP-OCR 不用问谁：版本是打包时定的，进页就写出来。 */
+    @Test fun theAiPageShowsTheBundledPpOcrVersion() {
+        ai(nano = null)
+        compose.onNodeWithText("PP-OCR").assertIsDisplayed()
+        compose.onNodeWithText("PP-OCRv5 mobile · 随安装包内置").assertIsDisplayed()
+    }
+
     // ---------- 导出、外观 ----------
 
     @Test fun theExportReminderSwitchTurnsItOff() {
