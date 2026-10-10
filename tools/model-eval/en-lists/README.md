@@ -15,3 +15,14 @@
 用法：两个词都在 `ambiguous_*` 里的「名 + 姓」不当人名（「Will Park」），单个的模糊名后面要跟一个姓才算；
 整段正好是品牌名的不当猜出的人名（「Calvin Klein」「Tommy Hilfiger」这类以人名命名的品牌）。
 `summarize_bench.py`、`score_en_rules.py` 的 `--veto-brands` 也用 `brands_nsi.txt` 过滤模型的结果。
+
+## app 里的那一份
+
+出厂规则（`EnglishLists`、`EnglishNameCues`、`EnglishNameGuess`、`EnglishAddressShape`）读的是
+`app/src/main/resources/moe/flinty/yomark/rules/en/`，内容来自这里和普查局的名单：
+
+- `first_names.txt`（20420 条）= `download_en_eval.sh` 生成的 `names/first.txt`（普查局 1990 年常见名）∪ 这里的 `ssa_first.txt`；
+- `last_names.txt`（30000 条）= `names/last.txt`（普查局 2010 年姓氏前 3 万）；
+- `brands.txt` 就是这里的 `brands_nsi.txt`，改了个名；两份许可文件也一起拷了过去，随包发行。
+
+改这里的名单时，app 那份一起改，再跑 `en-rules`（不带名单目录，就是出厂规则）对照分数。
