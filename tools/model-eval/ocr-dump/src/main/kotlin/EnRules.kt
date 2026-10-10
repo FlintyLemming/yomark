@@ -14,7 +14,7 @@ import kotlin.math.min
  * 规则逐行跑，与 RuleClassifier 同口径：行置信度 < 0.5 的不跑；要旁证的猜测（NeedsAnchor）按整页找旁证，
  * 旁证的「附近」用行框近似（app 里用的是字级框，差别只在同一行里的左右位置）。
  *
- * 用法：en-rules <ocr目录> <输出.json> [<地区，默认 CN>] [<名单目录：给了就加跑 EnProto>]
+ * 用法：en-rules <ocr目录> <输出.json> [<地区，默认 CN>] [<名单目录：给了就加跑 EnProto>] [v3]
  *   地区决定 libphonenumber 的默认国家：中文系统上是 CN，美国号码不带 +1 时按中国号码解析。
  */
 
@@ -67,7 +67,8 @@ private fun runRules(
 fun main(args: Array<String>) {
     val region = args.getOrNull(2) ?: "CN"
     Locale.setDefault(if (region == "CN") Locale.CHINA else Locale.US)
-    val proto = args.getOrNull(3)?.let { EnProto(File(it)) }
+    // 第五个参数 v3：用第二轮调研补的名单和式子（见 EnProto 的 v3）
+    val proto = args.getOrNull(3)?.let { EnProto(File(it), v3 = args.getOrNull(4) == "v3") }
     val enAnchors = proto?.let { p ->
         DefaultRuleSet.nameAnchors + listOf(
             NameAnchor("英文地址", NameAnchor.Reach.NEARBY, p.address),
