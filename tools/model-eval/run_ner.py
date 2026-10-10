@@ -5,7 +5,7 @@
     gliner:<HF 仓库>[:<onnx 文件名>]   GLiNER 系列；不给 onnx 文件名就用 PyTorch 权重（fp32），给了就用该 ONNX（如 onnx/model_quint8.onnx）
     gliner+org:<同上>                  同上，另加 organization / brand / store / product 几个「对手」标签：店名、品牌被它们认走，就不会落到 person 上
     hf:<HF 仓库>                       普通的 token classification 模型（BERT / DeBERTa / ModernBERT 类），transformers 的 pipeline
-    ort:<HF 仓库>:<onnx 文件名>        只发了 ONNX 的 token classification 模型（如 Rampart 的 onnx/model_q4.onnx）：
+    ort:<HF 仓库>:<onnx 文件名|本地路径>  只发了 ONNX 的 token classification 模型（如 Rampart 的 onnx/model_q4.onnx）：
                                       tokenizer.json + config.json 的 id2label，ONNX Runtime 推理，BIO 拼段
 只跑 en- 开头的页。环境变量 NER_MODE=page（默认）把整页的行用换行连起来送进去，=line 一行一送；
 hf / ort 模型超长时按行切块（每块不超过约 350 个词）。
@@ -79,7 +79,8 @@ def load(spec):
         tok = Tokenizer.from_file(hf_hub_download(repo, "tokenizer.json"))
         tok.no_padding(); tok.enable_truncation(512)
         id2label = {int(k): v for k, v in json.load(open(hf_hub_download(repo, "config.json")))["id2label"].items()}
-        sess = ort.InferenceSession(hf_hub_download(repo, onnx), providers=["CPUExecutionProvider"])
+        local = os.path.exists(onnx)    # 也可以给本地的 .onnx（比如自己量化出来的），分词器和标签仍从仓库取
+        sess = ort.InferenceSession(onnx if local else hf_hub_download(repo, onnx), providers=["CPUExecutionProvider"])
         names = [i.name for i in sess.get_inputs()]
 
         def block(text, thr):
@@ -104,7 +105,8 @@ def load(spec):
                 cur = [typ, a, b, p[i].max(), 1] if typ else None
             if cur:
                 out.append(cur)
-            return [text[a:b] for typ, a, b, sc, n in out if keep_label(typ) and sc / n >= thr]
+            spans = sorted((a, b) for typ, a, b, sc, n in out if keep_label(typ) and sc / n >= thr)
+            return [text[a:b] for a, b in merge_adjacent(text, spans)]
         return chunked(block)
     if kind == "hf":
         from transformers import pipeline
