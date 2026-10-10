@@ -5,7 +5,7 @@
 # 与自己用 paddle2onnx 转的逐位一致（输出最大差 1e-6），直接用。字典从 inference.yml 里抽出来
 # （一行一个字，与 app 的 dict.txt 同格式），需要 pyyaml。
 #
-# 名单：美国人口普查局的公开数据（公有领域）。1990 年的名、2010 年的姓（取前 30000 个）。
+# 名单：美国人口普查局的公开数据（公有领域）。1990 年的名、2010 年的姓（取前 30000 个）。原型 v3 另用的几份名单在 en-lists/。
 #
 # 字体：压力测试页（make_ocr_stress.py）、名址基准页（make_ner_bench.py）用的 Roboto、Noto Sans SC 等，
 # 都是 OFL，从 jsDelivr 取 google/fonts 仓库里的文件。
@@ -40,6 +40,8 @@ open(f"{n}/first.txt", "w").write("\n".join(sorted(first)) + "\n")
 open(f"{n}/last.txt", "w").write("\n".join(last) + "\n")
 print(f"names: {len(first)} first, {len(last)} last")
 EOF
+# 原型 v3 的名单（SSA 名、模糊名姓、NSI 品牌、USPS 街道后缀与房号）随仓库放在 en-lists/，来源与许可见那里的 README
+cp "$(dirname "$0")"/en-lists/*.txt "$N/"
 
 G=https://cdn.jsdelivr.net/gh/google/fonts@main/ofl
 curl -sSL --fail -o "$F/Roboto.ttf" "$G/roboto/Roboto%5Bwdth,wght%5D.ttf"
