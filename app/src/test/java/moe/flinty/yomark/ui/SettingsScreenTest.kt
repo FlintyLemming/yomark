@@ -216,7 +216,7 @@ class SettingsScreenTest {
     @Test fun theTextPageReadsTextAndListsEveryKind() {
         textPage()
         compose.onNodeWithText("识别引擎").assertIsDisplayed()
-        compose.onNodeWithText("AI 复查").assertIsDisplayed()
+        compose.onNodeWithText("AI 增强识别").assertIsDisplayed()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
         compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
@@ -255,11 +255,11 @@ class SettingsScreenTest {
     @Test fun theAiReviewSwitchTurnsItOff() {
         var latest: RecognitionConfig? = null
         textPage(onChange = { latest = it })
-        compose.onNodeWithText("AI 复查").performClick()
+        compose.onNodeWithText("AI 增强识别").performClick()
         assertThat(latest?.semantic).isEqualTo(SemanticOption.OFF)
     }
 
-    /** 恢复默认管这一页和它下面的各页：引擎、AI 复查、各类、人名的开关。人脸、条码不动。 */
+    /** 恢复默认管这一页和它下面的各页：引擎、AI 增强识别、各类、人名的开关。人脸、条码不动。 */
     @Test fun resettingTheTextPageKeepsFacesAndBarcodes() {
         var latest: RecognitionConfig? = null
         val config = RecognitionConfig(

@@ -188,7 +188,7 @@ class RedactionEngineTest {
 
     @Test
     fun `an unavailable or exploding slow classifier reports that it did not run`() = runTest {
-        // 复查是用户点出来的：「没跑成」不能说成「跑了没发现」，否则用户会以为这一页是干净的
+        // 增强识别是用户点出来的：「没跑成」不能说成「跑了没发现」，否则用户会以为这一页是干净的
         val off = FakeClassifier("off", available = false, out = listOf(at("x", 50f)))
         val boom = FakeClassifier("boom", available = true, out = emptyList(), boom = true)
         val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(off, boom))
