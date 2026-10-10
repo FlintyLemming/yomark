@@ -380,7 +380,7 @@ class SettingsScreenTest {
     @Test fun theAiPageShowsTheBundledPpOcrVersion() {
         ai(nano = null)
         compose.onNodeWithText("PP-OCR").assertIsDisplayed()
-        compose.onNodeWithText("PP-OCRv5 mobile · 随安装包内置").assertIsDisplayed()
+        compose.onNodeWithText("PP-OCRv6 small · 随安装包内置").assertIsDisplayed()
     }
 
     /** ML Kit 的几个模型并成一行，不是一个模型一项。 */

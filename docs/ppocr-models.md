@@ -19,7 +19,7 @@
 - 预处理与 v5 相同，`PpOcrEngine` 不用改：检测按 ImageNet 均值方差、BGR 通道序；识别高 48、`(x/255 − 0.5)/0.5`。
   DB 后处理沿用 app 原来的阈值（0.3 / 0.6 / 1.5）；v6 配置里的 0.2 / 0.45 / 1.4 在评测里没有更好。
 
-换模型时同时换三个文件并更新上表；`PaddleTextRecognizerTest` 会在 JVM 上用真模型读一张合成页，
+换模型时同时换三个文件，更新上表和 `PpOcrModels.VERSION`（设置「AI」页显示的版本）；`PaddleTextRecognizerTest` 会在 JVM 上用真模型读一张合成页，
 识别质量明显退化时它会先失败。
 
 ## 2026-10-10：PP-OCRv5 mobile → PP-OCRv6 small
