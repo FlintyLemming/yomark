@@ -1,8 +1,11 @@
 <resources>
     <!--
-      界面只有浅色一套：系统栏透明、图标深色。运行时 EditorActivity 用 enableEdgeToEdge 再设一遍；
-      写在主题里是为了冷启动的启动窗口那一下也对——父主题的状态栏是深灰底配白色图标，
+      界面只有浅色一套：系统栏透明、图标深色。各 Activity 的边到边由 enableLightEdgeToEdge 打开，
+      系统栏的颜色和图标只在这里设，代码里不再调已弃用的 Window.setStatusBarColor 之类。
+      写在主题里也让冷启动的启动窗口那一下就是对的——父主题的状态栏是深灰底配白色图标，
       Android 15 起底色被系统换成透明，白色图标就落在浅色窗口背景上了。
+      statusBarColor / navigationBarColor 这两个属性在 Android 15 起被系统忽略（强制透明），
+      留着只为 Android 10–14。
     -->
     <style name="Theme.Yomark" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
