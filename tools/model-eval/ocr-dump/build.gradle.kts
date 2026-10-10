@@ -10,7 +10,7 @@ sourceSets {
         kotlin {
             srcDir("../../../app/src/main/java")
             include(
-                "OcrDump.kt", "RuleProto.kt",
+                "OcrDump.kt", "RuleProto.kt", "OcrBench.kt", "EnRules.kt", "EnProto.kt", "PpOcrEngineX.kt",
                 "moe/flinty/yomark/engine/ppocr/CtcDecoder.kt", "moe/flinty/yomark/engine/ppocr/DbPostProcess.kt",
                 "moe/flinty/yomark/engine/ppocr/OcrTypes.kt", "moe/flinty/yomark/engine/ppocr/PpOcrEngine.kt",
                 "moe/flinty/yomark/engine/ppocr/WordGaps.kt",

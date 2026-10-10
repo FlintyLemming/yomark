@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * PP-OCRv5 mobile 接到 TextRecognizer 接口上（spec §14 第一行：「新增一个实现 + §4.4 换一行」）。
+ * PP-OCRv6 small 接到 TextRecognizer 接口上（spec §14 第一行：「新增一个实现 + §4.4 换一行」）。
  *
  * 与 ML Kit 那个实现的两处不同，都是为了规则层：
  * - element 是**单个字**，框由 CTC 时间步切出来。quadForRange 因此精确到字，
@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
  */
 class PaddleTextRecognizer(private val context: Context) : TextRecognizer {
 
-    override val id = "ppocr-v5-mobile"
+    override val id = "ppocr-v6-small"
 
     override suspend fun recognize(image: SourceImage): List<TextLine> = withContext(Dispatchers.Default) {
         val bmp = image.bitmap
@@ -44,13 +44,13 @@ private fun Pt.toPointF() = PointF(x, y)
 
 /**
  * 模型只加载一次。配置一变 buildEngine 就会重建引擎（2026-09-04 增补设计 §2），
- * 而两个模型加起来 21 MB、建 session 要几百毫秒——跟着引擎重建就太浪费了。
+ * 而两个模型加起来 31 MB、建 session 要几百毫秒——跟着引擎重建就太浪费了。
  * 进程活着就一直留着；模型随包发行，不联网。
  */
 object PpOcrModels {
 
     /** assets 里这套模型是哪一版，设置的「AI」页显示用。换模型时和 docs/ppocr-models.md 一起改。 */
-    const val VERSION = "PP-OCRv5 mobile"
+    const val VERSION = "PP-OCRv6 small"
 
     @Volatile private var cached: PpOcrEngine? = null
 

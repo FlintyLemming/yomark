@@ -7,7 +7,7 @@ import moe.flinty.yomark.core.model.TextLine
 
 /**
  * 定位层（spec §4.3）。唯一职责：把一张图变成带坐标的文本行。
- * 首版实现 = MlKitTextRecognizer。PP-OCRv5 + ONNX Runtime 走这个接口接入，
+ * 首版实现 = MlKitTextRecognizer。PP-OCR + ONNX Runtime 走这个接口接入，
  * 引擎和上层一行都不用改。
  */
 interface TextRecognizer {
