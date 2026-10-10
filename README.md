@@ -77,7 +77,7 @@
 - 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。
 - 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
     - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。开源版不连 Play Billing，留给以后上架的版本。
-    - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 复查」绑定系统的 AICore，模型在本机运行。
+    - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 增强识别」绑定系统的 AICore，模型在本机运行。
     - `moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
 
 ## 实现
@@ -85,7 +85,7 @@
 - **文字识别**：默认使用 PP-OCRv6 small（ONNX Runtime，模型随安装包分发）。它对中文截图里带星号的号码、生僻字人名识别效果好，并能给出单字级别的框。设置里可以切换到 ML Kit 的拉丁或中文模型，也可以让两者同时运行。
 - **敏感信息判断**：由规则决定，不交给模型。规则由正则和校验位组成（银行卡 Luhn、IBAN mod 97、UPS 单号等），电话用 libphonenumber 解析，人名用 HanLP 的离线词典。每条命中都可以解释原因，也都有单元测试。
 - **人脸与条码**：ML Kit 的 bundled 版本，模型同样随包分发。
-- **AI 复查**：在支持 AICore 的机型上，编辑器里会多出这个按钮。点击后由本机的 Gemini Nano 把整页文字再读一遍，新发现的内容只圈出，不会自动打码。本机有没有 Gemini Nano、是哪一版（nano-v2、nano-v3 等），可以在设置的「AI」里看到。
+- **AI 增强识别**：在支持 AICore 的机型上，编辑器里会多出这个按钮。点击后由本机的 Gemini Nano 把整页文字再读一遍，新发现的内容只圈出，不会自动打码。本机有没有 Gemini Nano、是哪一版（nano-v2、nano-v3 等），可以在设置的「AI」里看到。
 
 ## 下载
 

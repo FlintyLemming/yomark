@@ -17,7 +17,7 @@ import moe.flinty.yomark.rules.RuleClassifier
  * 不知道背后是拉丁还是中文、是宽松还是严格。
  *
  * Gemini Nano 语义判定走 refiners 而不是 classifiers：它慢，不能挡在第一批结果前面，
- * 而且只在用户点「AI 复查」时才跑。
+ * 而且只在用户点「AI 增强识别」时才跑。
  */
 fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig()) = RedactionEngine(
     recognizer = textRecognizerFor(context, config.textEngine),

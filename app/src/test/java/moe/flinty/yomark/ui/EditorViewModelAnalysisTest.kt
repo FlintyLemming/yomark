@@ -204,7 +204,7 @@ class EditorViewModelAnalysisTest {
         assertThat(vm.state.value.plan.items).hasSize(1)     // 手动打码仍然可用
     }
 
-    // ---------- AI 复查（端侧大模型，用户点了才跑） ----------
+    // ---------- AI 增强识别（端侧大模型，用户点了才跑） ----------
 
     private class Nano(
         private val available: Boolean = true,

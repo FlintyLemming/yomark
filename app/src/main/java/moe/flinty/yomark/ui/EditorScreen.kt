@@ -140,7 +140,7 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
             )
-            // 底栏的按钮已经写着「复查中…」，这里只给一条进度，不再重复说一遍
+            // 底栏的按钮已经写着「增强识别中…」，这里只给一条进度，不再重复说一遍
             if (state.aiReview == AiReview.RUNNING) LinearProgressIndicator(Modifier.fillMaxWidth())
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()

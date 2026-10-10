@@ -231,7 +231,7 @@ class EditorViewModel(
     }
 
     fun onImageChosen(uri: Uri) {
-        aiReviewJob?.cancel()                             // 上一张图的复查作废，按钮随之收起
+        aiReviewJob?.cancel()                             // 上一张图的增强识别作废，按钮随之收起
         uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.HIDDEN)
         viewModelScope.launch {
             // 换图时先清掉上一张的私有副本。清理时机从 onCleared 挪到这里：
@@ -378,13 +378,13 @@ class EditorViewModel(
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn)
     }
 
-    /** 最近一次识别出的整页文字，「AI 复查」要把它送给模型。只活在内存里，重建后就没有了。 */
+    /** 最近一次识别出的整页文字，「AI 增强识别」要把它送给模型。只活在内存里，重建后就没有了。 */
     private var reviewLines: List<TextLine>? = null
 
     private var aiReviewJob: Job? = null
 
     /**
-     * 「AI 复查」不再自动跑（PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒）。
+     * 「AI 增强识别」不再自动跑（PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒）。
      * 这里只探测模型在不在：在，按钮才出现；机型不支持就什么都不出现。
      */
     private fun offerAiReview(image: SourceImage, ranWith: RecognitionConfig, ranOn: RedactionEngine) {
@@ -398,7 +398,7 @@ class EditorViewModel(
     }
 
     /**
-     * 用户点了「AI 复查」：端侧大模型（Gemini Nano）把整页文字再看一遍，
+     * 用户点了「AI 增强识别」：端侧大模型（Gemini Nano）把整页文字再看一遍，
      * 新发现的追加进 plan，只圈出、标「AI」。
      *
      * 是用户点出来的，所以进撤销栈——不想要这批框，撤销一下就整批拿掉。
@@ -420,7 +420,7 @@ class EditorViewModel(
             if (extra == null) {
                 uiState = now.copy(
                     aiReview = AiReview.READY,
-                    message = EditorMessage.Error("AI 复查失败，请重试"),
+                    message = EditorMessage.Error("AI 增强识别失败，请重试"),
                 )
                 return@launch
             }
@@ -431,8 +431,8 @@ class EditorViewModel(
                 aiReview = AiReview.DONE,
                 plan = now.plan.copy(items = now.plan.items + added),
                 message = EditorMessage.Notice(
-                    if (added.isEmpty()) "AI 复查没有发现新内容"
-                    else "AI 复查找到 ${added.size} 处，已圈出，没有打码"
+                    if (added.isEmpty()) "AI 增强识别没有发现新内容"
+                    else "AI 增强识别找到 ${added.size} 处，已圈出，没有打码"
                 ),
             ).withHistoryFlags()
         }
