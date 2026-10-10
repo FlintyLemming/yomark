@@ -101,10 +101,24 @@ def main(truth_dir, rules_path, model_paths, brands, places=None, gate=None):
         print(row(f"规则 + {tag}", tally(truth_dir, {p: strong.get(p, []) + mod.get(p, []) for p in set(strong) | set(mod)})))
 
 
+
+def load_brands(path):
+    """NSI 品牌表，小写。多词的品牌再收一份去掉所有格的（表里是「Trader Joe's」，模型常只认出「Trader Joe」）；
+    单个词的不收：「Gabe's」「Daniel's」去掉所有格就是常见的名字。"""
+    out = set()
+    for line in open(path, encoding="utf-8"):
+        b = line.strip().lower()
+        if b:
+            out.add(b)
+            if " " in b:
+                out.add(b.removesuffix("'s"))
+    return out
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     bf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-brands=")), None)
-    brands = {l.strip().lower() for l in open(bf, encoding="utf-8") if l.strip()} if bf else None
+    brands = load_brands(bf) if bf else None
     pf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-places=")), None)
     places = {l.strip().lower() for l in open(pf, encoding="utf-8") if l.strip()} if pf else None
     rest = [a for a in args if not a.startswith("--")]

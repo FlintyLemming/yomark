@@ -122,10 +122,24 @@ def main(truth_dir, paths, strong=(), brands=None):
         print(f"   漏 {len(missed)}: {missed}")
 
 
+
+def load_brands(path):
+    """NSI 品牌表，小写。多词的品牌再收一份去掉所有格的（表里是「Trader Joe's」，模型常只认出「Trader Joe」）；
+    单个词的不收：「Gabe's」「Daniel's」去掉所有格就是常见的名字。"""
+    out = set()
+    for line in open(path, encoding="utf-8"):
+        b = line.strip().lower()
+        if b:
+            out.add(b)
+            if " " in b:
+                out.add(b.removesuffix("'s"))
+    return out
+
+
 if __name__ == "__main__":
     args = sys.argv[1:]
     strong = next((a.split("=", 1)[1].split(",") for a in args if a.startswith("--strong=")), ())
     bf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-brands=")), None)
-    brands = {l.strip().lower() for l in open(bf, encoding="utf-8") if l.strip()} if bf else None
+    brands = load_brands(bf) if bf else None
     rest = [a for a in args if not a.startswith("--")]
     main(rest[0], rest[1:], strong, brands)
