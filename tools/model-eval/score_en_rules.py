@@ -19,19 +19,42 @@ WEAK_KEYS = {"en-name-weak", "gliner", "ner", "ner-name", "ner-address", "ner-ot
 
 
 def norm(s):
+    """去空白、不分大小写（网页常用 CSS 把字转成大写，遮的还是同一块）；掩码符号统一成 *。"""
     s = re.sub(r"\s+", "", s)
     s = re.sub(r"[*＊•●xX]+", "*", s)
-    return s.replace("￥", "¥")
+    return s.replace("￥", "¥").lower()
 
 
-def hits(found_text, item):
+def hits(found_text, item, known=()):
+    """找到的一段算命中这一条：两者互为子串、短的至少是真值的一半，且找到的不比真值长太多（整段整段地遮不算认对）。
+    只有一种例外可以长：多出来的部分全是同页别的真值、或者遮不遮都行的公开信息（known），比如真值只标了邮编，
+    找到的是整行「South Brenda, PA 76715-7608」，多出的城市、州在 neutral 里。"""
     f = norm(found_text)
     for g in [item["text"]] + item.get("alias", []):
         g = norm(g)
+        if ("@" in f) != ("@" in g):      # 邮箱只算命中邮箱：遮了「markturner@yahoo.com」不等于遮了页面别处的「Mark Turner」
+            continue
         short, long_ = (f, g) if len(f) <= len(g) else (g, f)
-        if len(short) >= 2 and short in long_ and len(short) >= 0.5 * len(g) and len(f) <= max(2 * len(g), len(g) + 6):
+        if len(short) >= 2 and short in long_ and len(short) >= 0.5 * len(g) and (
+                len(f) <= max(2 * len(g), len(g) + 6) or rest_known(f, g, known)):
             return True
     return False
+
+
+def rest_known(f, g, known):
+    """f 里除了 g 以外的字，是否都被 known 里的别的段盖住（标点、单个字母之类最多剩 3 个）。
+    盖的段不能压到 g 本身：邮箱「nina.hoffmann@web.de」不能拿自己当已知，去算命中了页面上另一处的「Nina」。"""
+    at = f.find(g)
+    mask = [at <= i < at + len(g) for i in range(len(f))]
+    for k in (norm(x) for x in known):
+        if len(k) < 2:
+            continue
+        j = f.find(k)
+        while j >= 0:
+            if j + len(k) <= at or j >= at + len(g):
+                mask[j:j + len(k)] = [True] * len(k)
+            j = f.find(k, j + 1)
+    return mask.count(False) <= 3
 
 
 def covered(found, item):
@@ -47,10 +70,11 @@ def covered(found, item):
 
 
 def score(found, truth):
-    hit = [any(hits(t, i) for t in found) or covered(found, i) >= 0.8 for i in truth["find"]]
+    known = [i["text"] for i in truth["find"]] + truth.get("neutral", [])
+    hit = [any(hits(t, i, known) for t in found) or covered(found, i) >= 0.8 for i in truth["find"]]
     fp, other = [], []
     for t in found:
-        if any(hits(t, i) or (len(norm(t)) >= 2 and norm(t) in norm(i["text"])) for i in truth["find"]):
+        if any(hits(t, i, known) or (len(norm(t)) >= 2 and norm(t) in norm(i["text"])) for i in truth["find"]):
             continue
         if any(norm(a) in norm(t) or norm(t) in norm(a) for a in truth["avoid"]):
             fp.append(t)
