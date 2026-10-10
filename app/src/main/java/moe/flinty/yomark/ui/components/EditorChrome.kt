@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
@@ -17,7 +16,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -108,27 +106,29 @@ fun EditorBottomBar(
 private const val SHORT_SCREEN_DP = 480
 
 /**
- * 「AI 复查」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持、设置里关了时整个不出现。
- * 跑完就停在「已复查」——同一页再跑一遍结果一样，不该让人以为多点几次能多找出点什么。
+ * 「AI 增强识别」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持、设置里关了时整个不出现。
+ * 跑的时候两颗星转起来，代替转圈的进度条。
+ * 跑完就停在「已增强识别」——同一页再跑一遍结果一样，不该让人以为多点几次能多找出点什么。
  */
 @Composable
 private fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
     when (state) {
         AiReview.HIDDEN -> Unit
         AiReview.READY -> TextButton(onClick = onClick) {
-            Icon(Icons.Filled.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+            SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("AI 复查")
+            Text("AI 增强识别")
         }
         AiReview.RUNNING -> TextButton(onClick = {}, enabled = false) {
-            CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
-            Spacer(Modifier.width(8.dp))
-            Text("复查中…")
+            // 按钮灰掉了，星星仍着主题色，看得出它在干活
+            SparkleIcon(animating = true, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(6.dp))
+            Text("增强识别中…")
         }
         AiReview.DONE -> TextButton(onClick = {}, enabled = false) {
             Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("已复查")
+            Text("已增强识别")
         }
     }
 }

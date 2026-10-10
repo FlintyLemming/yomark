@@ -13,12 +13,12 @@ sealed interface EditorMessage {
     data class Exported(val uri: Uri, val downscaled: Boolean, val width: Int, val height: Int) : EditorMessage
     data class BatchExported(val count: Int) : EditorMessage
     data class Error(val text: String) : EditorMessage
-    /** 不是出错，只是告诉用户一件事的结果（如「AI 复查没有新发现」）。 */
+    /** 不是出错，只是告诉用户一件事的结果（如「AI 增强识别没有新发现」）。 */
     data class Notice(val text: String) : EditorMessage
 }
 
 /**
- * 「AI 复查」（Gemini Nano 第二遍）在当前这张图上的状态。
+ * 「AI 增强识别」（Gemini Nano 第二遍）在当前这张图上的状态。
  *
  * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
  * 还会在画面上冒出一批不打码的框。现在是用户点了才跑。
@@ -28,7 +28,7 @@ enum class AiReview {
     HIDDEN,
     READY,
     RUNNING,
-    /** 这张图已经复查过。再跑一遍结果一样（温度 0），按钮就不再可点。 */
+    /** 这张图已经增强识别过。再跑一遍结果一样（温度 0），按钮就不再可点。 */
     DONE,
 }
 

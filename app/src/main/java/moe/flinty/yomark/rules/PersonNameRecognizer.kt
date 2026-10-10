@@ -11,7 +11,7 @@ import com.hankcs.hanlp.seg.common.Term
  * 不看字段名、不看电话，从字面上认中文人名：HanLP 的人名识别（词典加角色标注）。
  *
  * 起因：滴滴出票页的乘车人一行是「沐晨冉 成人」，下面是打了星的身份证号。没有字段名，后面也不是电话，
- * LabeledField 和 NameBeforePhone 都接不住，只有按需跑的 AI 复查（Gemini Nano）圈了出来——
+ * LabeledField 和 NameBeforePhone 都接不住，只有按需跑的 AI 增强识别（Gemini Nano）圈了出来——
  * 而 Nano 只在少数旗舰上有。HanLP 是纯 Java 的词典与统计模型，jar 8 MB，一行零点几毫秒，所有设备都能跑。
  *
  * HanLP 的角色标注不看上下文，凡是「姓氏用字 + 一两个字」都可能认成人名。真机反馈：淘宝商品规格页上
