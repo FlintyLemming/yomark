@@ -332,6 +332,10 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 
 ## 建议
 
+**2026-10-10 的决定**：不加 GLiNER 这类人名地址模型。海外机型上 Gemini Nano 覆盖较多，英文人名交给 AI 复查（前提是先修
+`SemanticPrompt.MAX_NAME`，见第 1 条）；OCR 换成 PP-OCRv6 small，只换了模型，空格逻辑没动（见 `docs/ppocr-models.md`）。
+下面第 4、5、6 条因此暂不做，第 2 条的混合空格、第 3 条的英文规则仍是可选的后续。
+
 按先后：
 
 1. **小修**（各一天以内，与英文模型无关）：
