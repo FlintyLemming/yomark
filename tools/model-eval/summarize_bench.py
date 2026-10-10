@@ -1,6 +1,8 @@
 """名址基准的汇总表：每个结果文件一行，人名、地址的召回，加上误报。
 
-用法：python summarize_bench.py <truth目录> <规则结果.json> [--veto-brands=<品牌表>] <模型结果.json> [...]
+用法：python summarize_bench.py <truth目录> <规则结果.json> [--veto-brands=<品牌表>] [--veto-places=<地名表>] <模型结果.json> [...]
+  --veto-brands  整段就是一个品牌名（NSI 品牌表）的不要；
+  --veto-places  模型的地址类整段就是一个大城市、国家名的不要（只到城市一级，认不出是谁）。
 
 每个模型结果算三行：
   单独        模型认出的人名、地址（ner-name、ner-address）都打码；
@@ -49,7 +51,13 @@ def row(label, t):
     return f"| {label} | {nh}/{nt} ({nh / max(nt, 1):.0%}) | {ah}/{at} ({ah / max(at, 1):.0%}) | {fp} | {other} |"
 
 
-def main(truth_dir, rules_path, model_paths, brands):
+def drop_places(xs, places):
+    if not places:
+        return xs
+    return [x for x in xs if x.strip(" .,").lower() not in places]
+
+
+def main(truth_dir, rules_path, model_paths, brands, places=None):
     rules = load(rules_path)
     strong = {p: [x for k, xs in v.items() if k not in ("en-name-weak",) for x in xs] for p, v in rules.items()}
     weak = {p: veto(v.get("en-name-weak", []), brands) for p, v in rules.items()}
@@ -60,7 +68,7 @@ def main(truth_dir, rules_path, model_paths, brands):
     for mp in model_paths:
         m = load(mp)
         tag = os.path.basename(mp)[:-5]
-        mod = {p: veto(v.get("ner-name", []) + v.get("ner-address", []), brands) for p, v in m.items()}
+        mod = {p: veto(v.get("ner-name", []) + drop_places(v.get("ner-address", []), places), brands) for p, v in m.items()}
         print(row(f"{tag} 单独", tally(truth_dir, mod)))
         print(row(f"规则 + {tag}", tally(truth_dir, {p: strong.get(p, []) + mod.get(p, []) for p in set(strong) | set(mod)})))
 
@@ -69,5 +77,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     bf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-brands=")), None)
     brands = {l.strip().lower() for l in open(bf, encoding="utf-8") if l.strip()} if bf else None
+    pf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-places=")), None)
+    places = {l.strip().lower() for l in open(pf, encoding="utf-8") if l.strip()} if pf else None
     rest = [a for a in args if not a.startswith("--")]
-    main(rest[0], rest[1], rest[2:], brands)
+    main(rest[0], rest[1], rest[2:], brands, places)

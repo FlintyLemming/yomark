@@ -45,12 +45,18 @@ def chunked(run_block):
     return run
 
 
+# 地址的几段之间允许隔着逗号、连字符和一个州、省的缩写：「Toronto」「M5J 0C3」中间是「 ON 」，「Bengaluru」「Karnataka 560087」中间是「, 」
+ADDRESS_GAP = re.compile(r"^[ ,\-–]{0,3}([A-Z]{2,3}[ ,\-–]{1,3})?$")
+
+
 def merge_adjacent(text, spans):
     """同一行里首尾相接、或只隔一个空格的同类几段并成一段：BPE 模型的 simple 聚合会把一个词切成几截（「Sh」「ored」「itch」），
-    名和姓（first_name、last_name）也各报一段。跨行不并。spans 是 (起, 止, 类别)。"""
+    名和姓（first_name、last_name）也各报一段。地址的几段（城市、州、邮编）隔着逗号、州缩写也并。跨行不并。spans 是 (起, 止, 类别)。"""
     out = []
     for a, b, c in spans:
-        if out and out[-1][2] == c and 0 <= a - out[-1][1] <= 1 and text[out[-1][1]:a] in ("", " "):
+        gap = text[out[-1][1]:a] if out else None
+        if out and out[-1][2] == c and a >= out[-1][1] and "\n" not in gap and (
+                gap in ("", " ") or (c == "address" and ADDRESS_GAP.match(gap))):
             out[-1] = (out[-1][0], max(b, out[-1][1]), c)
         else:
             out.append((a, b, c))
@@ -85,8 +91,12 @@ def load(spec):
         else:
             m = GLiNER.from_pretrained(repo)
         labels = GLINER_LABELS + (GLINER_RIVALS if kind == "gliner+org" else [])
-        return lambda text, thr: [(label_class(e["label"]), e["text"]) for e in m.predict_entities(text, labels, threshold=thr)
-                                  if e["label"] in GLINER_LABELS]
+
+        def predict(text, thr):
+            spans = sorted((e["start"], e["end"], label_class(e["label"])) for e in m.predict_entities(text, labels, threshold=thr)
+                           if e["label"] in GLINER_LABELS)
+            return [(c, text[a:b]) for a, b, c in merge_adjacent(text, spans)]
+        return predict
     if kind == "ort":
         import numpy as np, onnxruntime as ort
         from huggingface_hub import hf_hub_download

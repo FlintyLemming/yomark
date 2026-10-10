@@ -8,7 +8,8 @@ WebPII 是合成的电商网页截图（1280 宽），每个元素带 key、valu
           邮编（PII_POSTCODE*）、电话、邮箱；
   neutral 单独的城市、州、国家，门店地址（PII_LOCATIONn_*，公开信息），礼品留言、卡号末四位、优惠码，订单里的各项；
   avoid   商品品牌（PRODUCT*_BRAND，「Generic」除外）。
-只收可见、没被截断的元素。识别要用 OcrBench 的 full 口径（不降采样），高的页切条、识别后用 merge_tiles.py 拼回。值是 Faker 造的（「Georgebury」这种城市），按邮编和州是否对得上做校验的规则在这里会吃亏。
+只收可见、没被截断的元素。表单里输入框（element_type = input）的值，在 empty、partial_* 两种变体的截图上是空的、或者只填了一部分，
+标注里却照样有值：这类条目记上 "input": true，识别之后用 webpii_filled.py 按 OCR 里找不找得到它筛一遍。识别要用 OcrBench 的 full 口径（不降采样），高的页切条、识别后用 merge_tiles.py 拼回。值是 Faker 造的（「Georgebury」这种城市），按邮编和州是否对得上做校验的规则在这里会吃亏。
 """
 import json, os, re, sys
 from PIL import Image
@@ -43,7 +44,7 @@ def main(meta_path, img_dir, out):
                 continue
             m = FIND.match(e["key"])
             if m:
-                find.append({"kind": KIND[m.group(1)], "text": v})
+                find.append({"kind": KIND[m.group(1)], "text": v, **({"input": True} if e.get("element_type") == "input" else {})})
             else:
                 neutral.append(v)
         for e in json.loads(r["product_elements_json"]):
