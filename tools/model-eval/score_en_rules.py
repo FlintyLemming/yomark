@@ -12,9 +12,10 @@
 import json, os, re, sys
 
 # 出厂规则以外的认法：EnProto 的几种，加上 GLiNER
-EN_KEYS = {"en-address", "en-name", "en-name-weak", "en-title", "en-phone", "en-below-label", "gliner", "ner"}
+EN_KEYS = {"en-address", "en-name", "en-name-weak", "en-title", "en-phone", "en-below-label", "gliner", "ner",
+           "ner-name", "ner-address", "ner-other"}
 # 弱一档：只圈不打码。没有旁证的名单人名、单独一行的名单人名、模型（GLiNER 等）认出来的
-WEAK_KEYS = {"en-name-weak", "gliner", "ner"}
+WEAK_KEYS = {"en-name-weak", "gliner", "ner", "ner-name", "ner-address", "ner-other"}
 
 
 def norm(s):

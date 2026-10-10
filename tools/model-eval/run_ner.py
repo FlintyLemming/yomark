@@ -1,4 +1,5 @@
-"""用 NER / PII 模型读 OCR 行，输出与 EnRules 同格式的 JSON（键 "ner"），供 score_en_rules.py 打分、与规则合并。
+"""用 NER / PII 模型读 OCR 行，输出与 EnRules 同格式的 JSON（按类分三个键：ner-name、ner-address、ner-other），
+供 score_en_rules.py 打分、与规则合并。
 
 用法：python run_ner.py <ocr目录> <输出.json> <模型> [<阈值，默认 0.3>]
   模型写法：
@@ -45,19 +46,33 @@ def chunked(run_block):
 
 
 def merge_adjacent(text, spans):
-    """同一行里首尾相接、或只隔一个空格的几段并成一段：BPE 模型的 simple 聚合会把一个词切成几截（「Sh」「ored」「itch」），
-    名和姓（first_name、last_name）也各报一段。跨行不并。"""
+    """同一行里首尾相接、或只隔一个空格的同类几段并成一段：BPE 模型的 simple 聚合会把一个词切成几截（「Sh」「ored」「itch」），
+    名和姓（first_name、last_name）也各报一段。跨行不并。spans 是 (起, 止, 类别)。"""
     out = []
-    for a, b in spans:
-        if out and 0 <= a - out[-1][1] <= 1 and text[out[-1][1]:a] in ("", " "):
-            out[-1] = (out[-1][0], max(b, out[-1][1]))
+    for a, b, c in spans:
+        if out and out[-1][2] == c and 0 <= a - out[-1][1] <= 1 and text[out[-1][1]:a] in ("", " "):
+            out[-1] = (out[-1][0], max(b, out[-1][1]), c)
         else:
-            out.append((a, b))
+            out.append((a, b, c))
     return out
 
 
 def keep_label(g):
     return KEEP.search(g) and not DROP.search(g)
+
+
+NAME_CLASS = re.compile(r"PER|NAME|GIVEN|SURNAME|FIRST|LAST|MIDDLE", re.I)
+ADDRESS_CLASS = re.compile(r"ADDR|STREET|BUILDING|CITY|ZIP|POSTCODE|POSTAL|STATE|SECONDARY|COUNTY", re.I)
+
+
+def label_class(g):
+    """实体名归成三类：人名、地址、其他（电话、邮箱、证件号……）。规则已经把电话邮箱认得很好，模型主要比前两类。"""
+    g = g.lower()
+    if g in ("person",) or NAME_CLASS.search(g):
+        return "name"
+    if g in ("address", "street address", "city", "postal code") or ADDRESS_CLASS.search(g):
+        return "address"
+    return "other"
 
 
 def load(spec):
@@ -70,7 +85,8 @@ def load(spec):
         else:
             m = GLiNER.from_pretrained(repo)
         labels = GLINER_LABELS + (GLINER_RIVALS if kind == "gliner+org" else [])
-        return lambda text, thr: [e["text"] for e in m.predict_entities(text, labels, threshold=thr) if e["label"] in GLINER_LABELS]
+        return lambda text, thr: [(label_class(e["label"]), e["text"]) for e in m.predict_entities(text, labels, threshold=thr)
+                                  if e["label"] in GLINER_LABELS]
     if kind == "ort":
         import numpy as np, onnxruntime as ort
         from huggingface_hub import hf_hub_download
@@ -105,17 +121,17 @@ def load(spec):
                 cur = [typ, a, b, p[i].max(), 1] if typ else None
             if cur:
                 out.append(cur)
-            spans = sorted((a, b) for typ, a, b, sc, n in out if keep_label(typ) and sc / n >= thr)
-            return [text[a:b] for a, b in merge_adjacent(text, spans)]
+            spans = sorted((a, b, label_class(typ)) for typ, a, b, sc, n in out if keep_label(typ) and sc / n >= thr)
+            return [(c, text[a:b]) for a, b, c in merge_adjacent(text, spans)]
         return chunked(block)
     if kind == "hf":
         from transformers import pipeline
         nlp = pipeline("token-classification", model=rest, aggregation_strategy="simple", device=-1)
 
         def block(text, thr):
-            spans = sorted((e["start"], e["end"]) for e in nlp(text)
+            spans = sorted((e["start"], e["end"], label_class(e.get("entity_group") or e.get("entity", ""))) for e in nlp(text)
                            if e["score"] >= thr and keep_label(e.get("entity_group") or e.get("entity", "")))
-            return [text[a:b] for a, b in merge_adjacent(text, spans)]
+            return [(c, text[a:b]) for a, b, c in merge_adjacent(text, spans)]
         return chunked(block)
     raise SystemExit(f"不认得的模型写法：{spec}")
 
@@ -133,7 +149,10 @@ def main(ocr_dir, out_path, spec, threshold=0.3):
         else:
             found = predict("\n".join(lines), threshold)
         times.append(time.time() - t0)
-        out[fn[:-5]] = {"ner": [p for f in found for p in pieces(f)]}
+        page = {"ner-name": [], "ner-address": [], "ner-other": []}
+        for cls, f in found:
+            page["ner-" + cls] += pieces(f)
+        out[fn[:-5]] = page
     json.dump(out, open(out_path, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"{spec}: {len(times)} pages, median {sorted(times)[len(times) // 2] * 1000:.0f} ms/page")
 
