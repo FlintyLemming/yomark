@@ -1,0 +1,37 @@
+<!doctype html>
+<!-- 一次性商品「去除水印」（yomark_remove_watermark）的商品图标，512×512。
+     node docs/play/src/render.cjs iap-icon 渲染成 docs/play/iap-remove-watermark.png
+     Play 要求商品图标不含文字、促销信息或品牌信息，所以不用应用图标，也不写「有码 Yomark」：
+     一张照片，右下角原本放水印的位置只剩虚线框，旁边一颗星表示「擦掉了」。底色与应用图标同为 #101014。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 512px; height: 512px; overflow: hidden; background: #101014; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <clipPath id="photo"><rect x="97" y="127" width="318" height="258" rx="23"/></clipPath>
+  </defs>
+  <rect width="512" height="512" fill="#101014"/>
+  <g clip-path="url(#photo)">
+    <circle cx="172" cy="200" r="28" fill="#6b6b78"/>
+    <path d="M60 400 L196 262 L262 330 L306 288 L460 400 Z" fill="#3a3a45"/>
+    <!-- 原本放水印的位置：只剩虚线框 -->
+    <rect x="276" y="316" width="122" height="52" rx="10" fill="#101014"
+          stroke="#8a8a96" stroke-width="5" stroke-dasharray="11 8"/>
+  </g>
+  <rect x="88" y="118" width="336" height="276" rx="32" fill="none" stroke="#fff" stroke-width="18"/>
+  <!-- 星星压在照片右上角的边框上，先垫一圈底色把边框断开 -->
+  <circle cx="420" cy="300" r="40" fill="#101014"/>
+  <path transform="translate(420 300)" fill="#fff"
+        d="M0 -44 Q4 -4 44 0 Q4 4 0 44 Q-4 4 -44 0 Q-4 -4 0 -44 Z"/>
+  <path transform="translate(458 250)" fill="#fff"
+        d="M0 -18 Q2 -2 18 0 Q2 2 0 18 Q-2 2 -18 0 Q-2 -2 0 -18 Z"/>
+</svg>
+</body>
+</html>
