@@ -1,7 +1,9 @@
 """给 EnRules 的输出打分：出厂规则、出厂 + 英文原型，各认出几处、误报几处。
 
-用法：python score_en_rules.py <truth目录> <结果.json> [<结果.json> ...]
-  几个结果文件（EnRules、run_gliner 的输出）按页合并后一起打分，看两种认法合用的效果。
+用法：python score_en_rules.py <truth目录> <结果.json> [<结果.json> ...] [--strong=ner] [--veto-brands=<品牌表>]
+  几个结果文件（EnRules、run_ner 的输出）按页合并后一起打分，看几种认法合用的效果。
+  --strong=k1,k2       把这几个键算进打码一档（默认模型的输出 ner 只算圈出）；
+  --veto-brands=文件    弱一档和模型认出的段，整段正好是品牌名（一行一个）的丢掉。
 
 命中口径与 run_eval.hits 相同：去掉空格后互相包含，且找到的不比真值长出一倍以上（整行照抄不算）；
 另外，几段找到的文字合起来盖住真值的 80% 以上也算（英文地址常被分成街道、城市、邮编几段）。
@@ -56,13 +58,20 @@ def score(found, truth):
     return hit, sorted(set(fp)), sorted(set(other))
 
 
-def main(truth_dir, paths):
+def main(truth_dir, paths, strong=(), brands=None):
     d = {}
     for p in paths:
         for page, v in json.load(open(p, encoding="utf-8")).items():
             d.setdefault(page, {}).update(v)
+    weak = WEAK_KEYS - set(strong)
+    if brands:
+        # 品牌否决：弱一档和模型认出的，整段正好是品牌名的丢掉
+        for page in d.values():
+            for k in list(page):
+                if k in WEAK_KEYS or k in strong:
+                    page[k] = [x for x in page[k] if x.strip().lower() not in brands and x.strip().lower().removesuffix("'s") not in brands]
     combos = {"出厂规则": lambda k: k not in EN_KEYS,
-              "打码一档（出厂 + 原型的强认法）": lambda k: k not in WEAK_KEYS,
+              "打码一档（出厂 + 原型的强认法）": lambda k: k not in weak,
               "打码 + 圈出（全部）": lambda k: True}
     for name, keep in combos.items():
         by_kind, fps, others, missed = {}, [], [], []
@@ -89,4 +98,9 @@ def main(truth_dir, paths):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1], sys.argv[2:])
+    args = sys.argv[1:]
+    strong = next((a.split("=", 1)[1].split(",") for a in args if a.startswith("--strong=")), ())
+    bf = next((a.split("=", 1)[1] for a in args if a.startswith("--veto-brands=")), None)
+    brands = {l.strip().lower() for l in open(bf, encoding="utf-8") if l.strip()} if bf else None
+    rest = [a for a in args if not a.startswith("--")]
+    main(rest[0], rest[1:], strong, brands)
