@@ -106,6 +106,13 @@ class NameAnchorPageTest {
             .containsExactly("刘洋" to true, "沐晨冉" to true)
     }
 
+    /** 英文页同一个道理：名单人名下面一行是地址，算数；聊天里提到的品牌、地名附近什么都没有，不圈。 */
+    @Test fun `an english name above an address is masked and a lone one is not`() = runTest {
+        val lines = page("Olivia Bennett", "Flat 4, 27 Kingsley Road", "Manchester M14 6PL")
+        assertThat(names(lines).map { it.text(lines) to it.enabledByDefault }).containsExactly("Olivia Bennett" to true)
+        assertThat(names(page("Loved the Ralph Lauren cap", "see you at Grace Church"))).isEmpty()
+    }
+
     // ---------- 旁证表：每一种一个例子 ----------
 
     /**
@@ -123,6 +130,7 @@ class NameAnchorPageTest {
         "打了星的号码" to Example("李思雨", "李思雨", "3201**********1234"),
         "「收货人」「乘车人」这类字段" to Example("李思雨", "乘车人", "李思雨"),
         "票种" to Example("李思雨", "李思雨 成人"),
+        "「Passenger」「Ship to」这类英文字段" to Example("Emily Carter", "Passenger", "Emily Carter"),
     )
 
     private class Example(val name: String, vararg val page: String)
