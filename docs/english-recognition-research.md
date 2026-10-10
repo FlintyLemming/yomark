@@ -16,18 +16,18 @@
    两个模型错在同样的地方，多一个 7.85 MB 的模型换不来提升。网页截图上 v6 small 的提升更明显：规则认出的人名 30 → 40（共 55）。
 2. **规则还是主体，但人名的天花板很低。** 按第二轮调研的公开资料补的规则（v3：SSA 名单、模糊名、品牌否决、USPS 街道后缀、
    英加澳爱新的邮编）在 70 页基准上直接打码的一档人名 30%、地址 71%、只有 4 处误报；连「只圈出」的猜测算上，人名也只到 47%。
-   漏的大头是名单外的名字：不在美国名单里的 51 个人名（尼日利亚、印度、越南、毛利、爱尔兰盖尔语……）规则只认出 7 个。
+   漏的大头是名单外的名字：有词不在美国名单里的 53 个人名（尼日利亚、印度、越南、毛利、爱尔兰盖尔语……）规则只认出 5 个。
 3. **要把人名做上去只能靠模型，用 GLiNER-PII。** 规则 + 模型之后人名 85–95%、地址 82–97%，三套样本上都成立。两个可选的：
    - **edge（Ettin-32m 底座），fp16，91 MB：召回最稳。** 70 页基准上人名 93%、地址 95%，真实 OCR 91% / 96%，没见过的 WebPII 网页 93% / 94%，
-     三套都在最前面，也是最小的。代价是误报：70 页 74 处，多是品牌、店名被当成人名（Ralph Lauren、Trader Joe's）。
-     官方 fp16 文件加载不了、官方 uint8 人名掉到 60%，fp16 要用 `fp16_onnx.py` 自己转（结果与 fp32 一致）；
-   - **base（DeBERTa-v3-small 底座）加「机构、品牌、商店、商品」几个对手标签：误报最少。** 70 页误报 18，几乎只剩名人和以人名命名的店
-     （LeBron、Frida Kahlo、Dan Murphy's），人名 89%、地址 92%；但网页上地址只有 82%，文件也大：fp16 333 MB（同样要自己转），
+     三套都在最前面，也是最小的。代价是误报：70 页 74 处，多是品牌、店名被当成人名（Ralph Lauren、Wendy's、Jumia、Lalamove）。
+     官方 fp16 文件加载不了、官方 uint8 人名掉得厉害（规则 + 模型 93% → 72%），fp16 要用 `fp16_onnx.py` 自己转（结果与 fp32 一致）；
+   - **base（DeBERTa-v3-small 底座）加「机构、品牌、商店、商品」几个对手标签：误报最少。** 70 页误报 18，多是名人和以人名命名的品牌、店
+     （LeBron、Taylor Swift、Frida Kahlo、Peter Jones 百货），另有几个公开地名，其中 4 处还是规则自己的；人名 89%、地址 92%；但网页上地址只有 82%，文件也大：fp16 333 MB（同样要自己转），
      官方 uint8 197 MB 在网页上地址再掉到 70%；
    - Ettin PII、Rampart、Horizon、gravitee 这些 token 分类模型都不如 GLiNER：要么误报多（品牌、词的碎片），要么地址弱。
 4. **模型的结果放在「圈出」一档，不自动打码。** 这与 app「敏感信息由规则决定、AI 复查只圈出」的原则一致，也让 edge 的误报只是多一个虚线框
    （点一下就能切换，导出前会提醒）。规则那部分照旧打码。另加两道便宜的过滤：品牌表否决，以及模型的地址必须「像地址」
-   （有数字、两个词以上或是邮编，否则要紧挨着像地址的一行）：edge 的状态栏「5G 82%」「9:41」这类多认因此从 158 处降到 46 处，召回只掉 2 处。
+   （有字母词又有数字、两个词以上，或者整段是邮编；否则要紧挨着像地址的一行）：edge 的状态栏「5G 82%」「9:41」这类多认因此从 158 处降到 46 处，召回只掉 2 处。
 5. **体积是要拍板的地方。** 现在包里 PP-OCRv5 两个模型 21 MB；换 v6 small 是 31 MB；再加 GLiNER-PII edge fp16 是 +91 MB
    （base 是 +333 MB）。`docs/release-checklist.md` 里 25 MB 的下发预算是放 PP-OCR 之前定的，早已不适用，需要重新定。
 6. **几处小修，与上面无关、马上能做：** `SemanticPrompt.MAX_NAME = 8` 把英文全名整条丢掉；中文系统上 `PhoneRule` 认不出不带国家码的美国号码；
@@ -45,7 +45,7 @@
 | 地址·形状 | `AddressShape` | 只认中文门牌（路 + 号、栋、单元、室），整个跑在汉字上 |
 | 电话 | `PhoneRule(defaultRegion = 系统地区)` | 中文系统上是 CN：不带 +1 的美国号码（`(614) 293-7781`）认不出。英国的 `07700 900123` 倒是认出了，但那是被当成了广西的座机号，碰巧 |
 | AI 复查 | `SemanticPrompt.MAX_NAME = 8` | 超过 8 个字符的人名整条丢掉，「Jennifer Walsh」是 14 个 |
-| OCR 的空格 | `WordGaps` | 按像素间隙补空格（≥ 0.45 倍字高就断词）。字距宽的全大写字被拆开（`P L A C E OR D E R`），字距紧的两个词又粘上（`8529Graham`、`TateMeadow`） |
+| OCR 的空格 | `WordGaps` | 识别模型输出的空格之外，再按像素间隙补（≥ 0.3 倍字高就断词，两个数字之间 0.45 倍）。英文上补多了：字距宽的全大写字被拆开（网页截图上 `P L A C E OR D E R`） |
 
 ## 第一轮实测
 
@@ -84,7 +84,7 @@
 - PaddlePaddle 自己的数字方向一致：PP-OCRv6 论文的英文榜（表 11）上 v6 small 86.3%、en_PP-OCRv5 86.0%、PP-OCRv5 mobile 78.3%。
 
 换 v6 small 时 `CtcDecoder` 的约定（输出 = 空白 + 字典 + 空格）照样成立，不用改代码。要注意：v6 small 的字典比 v5 少了 35 个字符，
-大多是西里尔字母和国旗表情，但也少了一个「兔」。
+大多是西里尔字母和国旗表情，汉字只少了一个兼容表意字 U+2F80F（字形同「兔」，常用的「兔」U+5154 仍在）。
 
 ### 规则与模型
 
@@ -145,18 +145,22 @@ OCR 用 v6 small，系统地区按中文系统（CN）。误报只算落在「�
 | 按页分流 + 模型的空格 | 0.15% | 1763 / 1804 | 771 / 795（97.0%） | 0.29% | 291 / 291 |
 | 逐行择优：v6 small 混合空格 / en_PP-OCRv5，取置信度高的 | 0.10% | 1776 / 1804 | 776 / 795（97.6%） | 0.29% | 290 / 291 |
 
-- **空格是英文这边最大的一笔账。** app 的 `WordGaps` 按像素间隙补空格（间隙 ≥ 0.45 倍字高就断词），中文页上它是对的，
-  英文上两头出错：字距宽的字体、全大写的按钮字被拆开（`P L A C E OR D E R`），字距紧的又把两个词粘上（`8529Graham`、`TateMeadow`）。
-  而 PP-OCR 的识别模型自己就会输出拉丁字母之间的空格（CTC 的最后一类）。**混合空格**的做法（`PpOcrEngineX` 的 `OCR_SPACES=latin`）：
-  - 两个字里有一个不是 ASCII（汉字、全角标点）：照 `WordGaps`，与现在一模一样；
-  - 两个数字之间：照 `WordGaps`（「2026-09-30 14:22:05」的日期和时间要分开，模型自己常常不出这个空格）；
+- **空格是英文这边最大的一笔账。** app 保留识别模型自己输出的空格（CTC 的最后一类），再由 `WordGaps` 按像素间隙补：
+  间隙 ≥ 0.3 倍字高就断词，两个数字之间要 0.45 倍。中文页上这样是对的；英文上补多了，字距宽的字体、全大写的按钮字、
+  打码的号码被拆开（网页截图上 v5 读成 `P L A C E OR D E R`，压力页上 `187* * * * 9157`）。**混合空格**（`PpOcrEngineX` 的 `OCR_SPACES=latin`）
+  只收紧拉丁字符之间按像素补的空格，模型自己的空格照旧保留：
+  - 两个字里有一个不是 ASCII（汉字、全角标点、中点）：照 `WordGaps`，与现在一样；
+  - 两个数字之间：照 `WordGaps`（「2026-09-30 14:22:05」的日期和时间要分开）；
   - 挨着 ASCII 标点：不按像素补；
-  - 两个拉丁字母、字母和数字之间：以模型的空格为准，像素间隙要到 0.6 倍字高才另补一个。
-  英文行全对 1714 → 1778、关键片段 94.2% → 97.6%，中文结果不变（汉字两侧的空格逻辑没动）。
-  只用模型的空格英文关键片段差不多（97.7%），但行全对低 23 行：模型在「Parker Group · Operative」「Tue, Oct 28 · 12:41 PM」这种中点分隔符两边不出空格，混合空格对非 ASCII 字符照 `WordGaps`，补上了；
-  中文行全对它反而更高，因为 `WordGaps` 会在中文标点两边补空格、真值里没有——但中文规则是照着 `WordGaps` 的输出写的，
-  那边要不要动是另一件事，混合空格刻意让中文一字不变；
-- **v6 small 几乎在每一种条件下都比 v5 好**（例外是英文 1080×2400 一档，0.10% 对 0.08%）：英文差得最多的是 Open Sans（v5 0.48%、v6 small 0.07%）和深色模式（0.35% 对 0.07%）；
+  - 两个拉丁字母、字母和数字之间：像素间隙要到 0.6 倍字高才补。
+  英文行全对 1714 → 1778、关键片段 94.2% → 97.6%；中文字符错误率不变（0.29%），汉字两侧的空格没动，746 行里只变了 4 行，
+  都在 ASCII 标点旁（打码的手机号「187****9157」不再被拆开），中文关键片段 288 → 290。网页上的 `P L A C E OR D E R` 变成 `PLAC E ORDER`，好了大半。
+  只用模型的空格（完全不按像素补）英文关键片段差不多（97.7%），但行全对低 23 行：模型在「Parker Group · Operative」「Tue, Oct 28 · 12:41 PM」
+  这种中点两边不出空格，混合空格对非 ASCII 字符照 `WordGaps`，补上了；中文行全对它反而更高，因为 `WordGaps` 会在中文标点两边补空格、
+  真值里没有——但中文规则是照着 `WordGaps` 的输出写的，那边要不要动是另一件事，混合空格刻意不动汉字两侧；
+  反过来的粘连（网页上出厂 v5 读出的 `8529Graham`、`TateMeadow`）是识别模型没出空格、像素间隙又不到门槛，改空格逻辑救不了，
+  换 v6 small 就好了（它自己出这个空格）；
+- **v6 small 几乎在每一种条件下都比 v5 好**（例外是英文 1080×2400 一档，0.10% 对 0.08%）：英文差得最多的是 Open Sans（v5 0.48%、v6 small 0.07%）和 Roboto Mono（0.48% 对 0.14%），配色里是深色模式（0.35% 对 0.07%）；
   中文 v5 在各条件下都在 1.3–2.5%，v6 small 除了 1080×2340 一档（1.39%）都在 1% 以下；
 - **v6 官方的 DB 阈值（0.2 / 0.45 / 1.4）不比 app 现在的（0.3 / 0.6 / 1.5）好**，英文关键片段 93.8% 对 94.2%，沿用 app 的；
 - **v6 medium 识别不值**：76.6 MB，整页 6–9 秒（small 不到 1 秒），这批页上英文反而比 small 差一点（0.14% 对 0.08%）；
@@ -171,9 +175,9 @@ en_PP-OCRv5（7.85 MB）再识别一遍（`route_ocr.py`）。判定本身毫无
 - 用 app 的空格，分流后英文关键片段 93.5%，比 v6 small 不分流（94.2%）还低；配模型的空格或混合空格 96.7–97.0%，仍低于 v6 small 混合空格的 97.6%；
   字符错误率 0.15% 对 0.08%；
 - 再退一步，逐行比两个模型的置信度、取高的（`ensemble_ocr.py`）：97.6%，与 v6 small 单独一样，字符错误率还略高（0.10%）。
-  两个模型大多错在同样的地方（订单号里的 O/0、I/l）：1804 行里 en_PP-OCRv5 对、v6 small 错的只有 7 行，反过来是 26 行，两边都错 19 行，
-  按置信度也挑不出那 7 行；
-- 第一轮的干净页上 en_PP-OCRv5 英文 146/150 行全对，v6 small 147/150，结论相同。
+  两个模型大多错在同样的地方（订单号里的 O/0、I/l）：1804 行里 en_PP-OCRv5 对、v6 small 错的只有 7 行，反过来是 26 行，两边都错 19 行。
+  按置信度能把那 7 行里的 5 行换对，却同时把 v6 small 本来对的 7 行换成 en_PP-OCRv5 的错读，净少 2 行；
+- 第一轮的干净页上分不出：v5 检测 + en_PP-OCRv5 识别 146/150 行全对，v6 small（检测 + 识别）147/150；同用 v5 检测时 en_PP-OCRv5 识别 146、v6 small 识别 144，都在噪声以内。
 
 所以 en_PP-OCRv5 不加：多 7.85 MB、英文页多一遍识别，换不来任何提升。PaddleOCR 论文的英文榜（v6 small 86.3、en_PP-OCRv5 86.0）也是这个意思。
 
@@ -227,15 +231,16 @@ v2（第一轮的原型）在基准出题之前冻结；v3 只用第二轮调研
 | v6 small 混合空格，打码 + 圈出 | 43（78%） | 40（61%） | 16 | 72 |
 
 v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」读成「051 TateMeadow」，街道后缀就对不上了；
-人名、地址整段一字不差读出来的比例 v5 132 / 142、v6 small 136 / 142。
+人名、地址整段读对（不分大小写）的 v5 112 / 121、v6 small 116 / 121。
 
 规则还漏的，基本是名单和形状够不着的：
 
-- **名单外的名字**：基准里有 51 个人名的词不在美国名单里，规则只认出 7 个（Oluwaseun、Adeyemi-Clarke、Raghunathan、Aroha Ngata、
-  Gráinne Ní Mhurchú、Seo-yeon Choi……）；带重音、连字符、撇号的（Schäfer-Brandt、O'Driscoll）也常断开；
+- **名单外的名字**：基准里有 53 个人名至少有一个词（称谓、单个字母的缩写不算）不在美国名单（普查局名、姓 + SSA 前两万）里，
+  规则只认出 5 个（漏的如 Adeyemi-Clarke、Raghunathan、Aroha Ngata、Gráinne Ní Mhurchú、Seo-yeon Choi……）；
+  带重音、连字符、撇号的也常漏（Schäfer-Brandt、O'Driscoll 整个没认出），认出的有时只截到一半（「Rosa Delgado-Mu」「Ms. Eze」）；
 - **姓在前**：「NGUYEN, THU HA」「HUYNH, KHANH LINH」「Oyelaran, B.」；
-- **没有旁证的单个名**：聊天里的「Kemi」「Tunde」「Jess」，签名档的「Rhys」；
-- **地址**：单独一行的城市、邮编（「Ballincollig」「P31 KX92」），印度式地址（「New No. 14, Old No. 7, 2nd Cross St」「B-604, Sea Breeze CHS」），
+- **没有旁证的单个名**：礼品留言、送货备注里的「Kemi」，账单问候语里的「Tunde」，聊天里的「Jess」，邮件开头称呼的「Rhys」；
+- **地址**：单独一行的城市（「Ballincollig」），印度式地址（「B-604, Sea Breeze CHS」），
   网页顶栏的「Deliver to Angela · Port Emily 24847」；
 - **WebPII 特有的**：「Hello, William」这类问候、表单里小写的名字（「megan newman」）、搜索框里的邮编。
 
@@ -263,13 +268,14 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 | GLiNER-PII edge，官方 uint8 | 46 MB | Apache-2.0 | 151（72%） | 135（93%） | 44 | 57 | 126（60%） | 113 | 41 |
 | GLiNER-PII small | fp32 327 MB | Apache-2.0 | 189（90%） | 139（96%） | 64 | 53 | 184（88%） | 130 | 60 |
 | GLiNER-PII large | uint8 648 MB / fp32 1.76 GB | Apache-2.0 | 182（87%） | 127（88%） | 13 | 22 | 168（80%） | 86 | 9 |
-| Ettin-32m Nemotron PII | fp32 128 MB | MIT | 180（86%） | 136（94%） | 51 | 29 | 173（82%） | 115 | 47 |
-| Ettin-68m Nemotron PII | fp32 274 MB | MIT | 177（84%） | 135（93%） | 40 | 26 | 167（80%） | 126 | 36 |
-| Horizon pii-redactor-small | int8 268 MB | Apache-2.0 | 195（93%） | 118（81%） | 29 | 28 | 191（91%） | 79 | 25 |
+| Ettin-32m Nemotron PII | bf16 64 MB（fp32 ONNX 128 MB） | MIT | 180（86%） | 136（94%） | 51 | 29 | 173（82%） | 115 | 47 |
+| Ettin-68m Nemotron PII | bf16 137 MB（fp32 ONNX 274 MB） | MIT | 177（84%） | 135（93%） | 40 | 26 | 167（80%） | 126 | 36 |
+| Horizon pii-redactor-small | fp32 563 MB（另有 int8 268 MB，没测） | Apache-2.0 | 195（93%） | 118（81%） | 29 | 28 | 191（91%） | 79 | 25 |
 | Rampart | q4 15 MB | CC BY 4.0 | 169（80%） | 121（83%） | 53 | 32 | 162（77%） | 63 | 50 |
 | gravitee bert-small | int8 29 MB | Apache-2.0 | 190（90%） | 103（71%） | 46 | 43 | 182（87%） | 0（没有地址类） | 42 |
 
-**真实 OCR（v6 small 混合空格）**上各模型的人名掉 2–6 个百分点、地址基本不变，排序不变：规则 + base 对手标签 人名 85%、地址 91%、误报 16，
+**真实 OCR（v6 small 混合空格）**上 GLiNER 各型号的人名掉 2–5 个百分点，Ettin、Rampart 只掉 0–1 个点，地址基本不变；
+前几名（edge、small、base）的排序不变：规则 + base 对手标签 人名 85%、地址 91%、误报 16，
 阈值 0.2 时 88%、97%、误报 19（官方 uint8：0.3 时 83%、90%、14，0.2 时 88%、95%、21）；规则 + edge 91%、96%、误报 74；
 规则 + edge 对手标签 81%、95%、误报 34。
 
@@ -294,15 +300,17 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 
 「另外」里规则自己就占 61（大半是出厂地址字段名规则的「Book」「line 1:」），模型多出来的是表单的提示字（「Street address, P.O. box」「claim code」）、
 州名列表（「Colorado, Oklahoma, South Dakota」）、商品名，以及真值只标了一部分的 Faker 地址的其余片段。这一套上 Ettin-68m 人名最好，
-但它在 70 页基准上误报是 base 的两倍多；几套合起来看，GLiNER-PII base 和 edge 仍是两头。base 放到 0.2，网页上多出来的 186 个框
-大多是自提柜页面地图上的街名（「Mission Street」「Post Street」）、州名列表和「United States」，召回只多 2 处地址。
+但它在 70 页基准上误报是 base 的两倍多；几套合起来看，GLiNER-PII base 和 edge 仍是两头。base 放到 0.2，网页上多出来的 186 个框，
+大多（净增约 134 个）是自提柜页面地图上的街名和地名碎片（「Mission Street」「Fulton Street」「383, East」），其余是表单字段名
+（「billing address」「Address line 1」）、「you」和几处「United States」；召回只多 2 处地址。
 
-- **名单外的名字是模型的主要收益**：上面那 51 个不在美国名单里的人名，GLiNER-PII base 认出 43 个，规则 7 个；
-  名单里的 159 个，模型 135、规则 92；
+- **名单外的名字是模型的主要收益**：上面那 53 个有词不在美国名单里的人名，GLiNER-PII base + 对手标签单独认出 42 个，规则（打码 + 圈出）5 个；
+  名单里的 157 个，模型 135、规则 94；
 - **对手标签**：给 GLiNER 多几个「organization、brand、store、product」标签，品牌和店名被这些标签认走，就不会落到 person 上。
   edge 的误报 71 → 31，代价是人名 91% → 80%；base 本来就不太混，误报 18 → 14，人名不变；
-- **剩下的误报**：base 几乎只剩名人和以人名命名的店（LeBron、Taylor Swift、Frida Kahlo、Peter Jones 百货、Dan Murphy's、R.M. Williams）；
-  edge 还会把 Ralph Lauren、Trader Joe's、Wendy's、Jumia、Lalamove 这类品牌当人名，品牌表只挡住一部分；
+- **剩下的误报**：base + 对手标签单独 14 处，人名类 7 处几乎都是名人和以人名命名的店（LeBron、Taylor Swift、Frida Kahlo、Peter Jones 百货、
+  R.M. Williams、Sir John Soane），地址类 7 处是公开的地名、店名（Melbourne、Sydney、Hong Kong、Tan Tock Seng 医院）；Dan Murphy's、Trader Joe's
+  模型也认成了人名，被品牌表挡掉了。edge 还会把 Ralph Lauren、Wendy's、Jumia、Lalamove 这类品牌当人名，品牌表只挡住一部分；
 - **「另外」**：edge 最多的是状态栏（「5G 82%」「9:41」）和单个词（「Town」「Mobile」），地址门槛之前 158 处，之后 46 处，召回只掉了 2 处；
 - **token 分类模型**（Ettin、Rampart、Horizon、gravitee）：BPE / WordPiece 的子词会被切成几截报出来（「Hil」「ield」「ong」），
   品牌、店的地址（「Walgreens, 1554 N Milwaukee Ave」）也算进去；Rampart 和 Horizon 的地址类只认到街道，城市、邮编常常漏；
@@ -319,7 +327,7 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 - **官方 uint8**：edge 掉得厉害（人名 91% → 60%）；base 是 DeBERTa，70 页上量化友好得多（加对手标签，0.3 时人名 85% → 82%，0.2 时 89% → 88%），
   但 WebPII 网页上地址从 82% 掉到 70%；
   Ettin 只把词表 int8 也掉十几个点；
-- **速度**（桌面 x86 4 核，Python 版 ONNX Runtime，单页中位数，只作相对比较）：edge uint8 约 80 ms、fp16 约 100 ms，base uint8 约 130–170 ms、
+- **速度**（x86 服务器 4 vCPU 的容器，Python 版 ONNX Runtime，单页中位数，CPU 有争用，只作相对比较）：edge uint8 约 80 ms、fp16 约 100 ms，base uint8 约 130–170 ms、
   fp16 约 190 ms，Rampart 20 ms。手机上大概慢 2–4 倍，与 OCR 的一秒左右相比不是瓶颈；fp16 在 ARM 上走不走 fp16 的算子要真机看。
 
 ## 建议
@@ -332,9 +340,9 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
    - 出厂的地址、人名字段名规则：值不能以冒号结尾、不能是另一个字段名或「Book」「Details」这类界面词，字段名后面要有分隔（冒号、换行、两个以上空格）；
 2. **OCR 换 PP-OCRv6 small + 混合空格**：换三个文件（`docs/ppocr-models.md` 跟着改），`WordGaps.isBreak` 里拉丁字母、数字之间的判断改成
    `PpOcrEngineX` 的 latin 口径（两个拉丁字母之间以模型的空格为准、像素门槛 0.6 倍字高；挨着 ASCII 标点不补；两个数字、凡是有非 ASCII 字符的照旧）。
-   DB 阈值不动。上线前：真机量速度和内存（只在 x86 上量过）、跑 `PaddleTextRecognizerTest`、看一眼字典里少掉的「兔」；
+   DB 阈值不动。上线前：真机量速度和内存（只在 x86 上量过）、跑 `PaddleTextRecognizerTest`（字典少的 35 个字符里没有常用汉字）；
 3. **英文规则**：把原型 v3 搬进 `rules/`，照现有的写法一条认法一个类、一组单测（第一轮建议里的四项，加上 v3 的名单和邮编格式）。
-   名单约 400 KB 文本（`en-lists/`），可以只留常用的再压缩。**只跑没有汉字的行**，不靠「这一页是英文页」的判断：中文页里夹的英文地址照样能认；
+   名单约 650 KB 文本（`en-lists/` 约 390 KB，加上 `download_en_eval.sh` 生成的普查局名、姓约 260 KB），可以只留常用的再压缩。**只跑没有汉字的行**，不靠「这一页是英文页」的判断：中文页里夹的英文地址照样能认；
 4. **英文人名地址模型，放在「圈出」一档**：
    - 首选 **GLiNER-PII edge fp16 + 品牌表 + 地址门槛**（91 MB，阈值 0.3）：三套样本上召回都在最前面，体积最小；多出来的误报是虚线框；
    - 如果试用下来嫌框多，换 **GLiNER-PII base fp16 + 对手标签**（333 MB，阈值 0.3，「宽松」0.2）：手机截图上误报只有 edge 的四分之一，
@@ -353,9 +361,9 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 |---|---|
 | en_PP-OCRv5，单独用或按页分流 | 中文全坏；按页分流后英文仍不如 v6 small 混合空格，逐行择优也没有提升，两个模型错在同样的地方 |
 | PP-OCRv6 medium 识别 | 76.6 MB，整页 6–9 秒，这批页上不比 small 好 |
-| GLiNER-PII edge 的官方 uint8 | 人名召回掉三分之一（base 的 uint8 可以用） |
+| GLiNER-PII 的官方 uint8 | edge 人名召回掉三分之一；base 的手机截图上掉得少，但网页地址掉 12 个点 |
 | Rampart（15 MB） | 小，但人名 80%、地址类只认到街道，误报与 edge 相当 |
-| Horizon、Ettin、gravitee | 体积与 GLiNER 相当或更大，不如它；gravitee 没有地址类 |
+| Horizon、Ettin、gravitee | Horizon、Ettin 体积与 GLiNER 相当或更大，效果不如它；gravitee 虽小（int8 29 MB），但没有地址类，误报也比 base 多 |
 | GLiNER-PII large | 最准但最慢（单页十几秒），uint8 也有 648 MB |
 | Desert Ant redact、Piiranha | 许可不行（遥测与设备数上限；CC BY-NC-ND） |
 | ML Kit 实体抽取 | 不认人名；语言模型要在运行时下载，与「没有网络权限」冲突 |
@@ -374,7 +382,8 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 
 ## 怎么复现
 
-脚本在 `tools/model-eval/`，与 app 的构建无关。Python 3.12 的虚拟环境装 `onnxruntime gliner transformers torch faker pyyaml pillow`（CPU 版即可）。
+脚本在 `tools/model-eval/`，与 app 的构建无关。Python 3.12 的虚拟环境装 `onnxruntime onnx gliner transformers torch faker pyyaml pillow segno`（CPU 版即可）；
+另需系统字体 Inter、Liberation Sans、DejaVu Sans Mono、文泉驿正黑（Debian：`fonts-inter fonts-liberation fonts-dejavu-core fonts-wqy-zenhei`）。
 
 ```bash
 cd tools/model-eval
@@ -382,7 +391,7 @@ PY=python3.12 ./download_en_eval.sh                       # OCR 候选模型、�
 MODEL_EVAL_OUT=out-en python3 make_en_samples.py         # 第一轮：英文合成页 + 真值（含留出页 en-h-*）
 MODEL_EVAL_OUT=out python3 make_samples.py               # 第一轮：中文页
 MODEL_EVAL_OUT=out-stress python3 make_ocr_stress.py     # 第二轮：OCR 压力页
-MODEL_EVAL_OUT=out-ner python3 make_ner_bench.py <页面描述.json>   # 第二轮：名址基准（samples、truth、oracle）
+MODEL_EVAL_OUT=out-ner python3 make_ner_bench.py ner-bench-pages.json   # 第二轮：名址基准 70 页（samples、truth、oracle）
 
 # OCR：同一套 PpOcrEngine 换检测、识别、字典；第五个参数 device 按设备口径降采样，full 不降；可以给目录。
 # OCR_SPACES=latin OCR_LATIN_BREAK=0.6 是混合空格（PpOcrEngineX）。gradle run 的工作目录是 ocr-dump/，路径写绝对的
@@ -399,7 +408,8 @@ python3 route_ocr.py <中文模型ocr目录> <英文模型ocr目录> <输出目�
 python3 run_ner.py out-ner/oracle ner-edge.json gliner:knowledgator/gliner-pii-edge-v1.0 0.3
 python3 summarize_bench.py out-ner/truth rules-oracle.json --veto-brands=names/brands_nsi.txt --addr-gate=out-ner/oracle ner-edge.json
 
-# WebPII：convert_webpii.py 转格式（高的页切条），full 口径识别，merge_tiles.py 拼回，webpii_filled.py 筛掉截图上空着的输入框
+# WebPII：fetch_webpii.py 取样（文中的 57 页），convert_webpii.py 转格式（高的页切条），full 口径识别，merge_tiles.py 拼回，
+# webpii_filled.py 筛掉截图上空着的输入框
 ```
 
 参考：[PP-OCRv6 论文](https://arxiv.org/abs/2606.13108)、[PaddleOCR 3.7.0 发布说明](https://github.com/PaddlePaddle/PaddleOCR/releases)、

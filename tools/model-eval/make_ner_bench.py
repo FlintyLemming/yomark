@@ -3,7 +3,7 @@
 用法：python make_ner_bench.py <页面描述.json> [<页面描述.json> ...]
 
 页面描述由几个互不知情的代理按 app 类别分头写、再由另一个代理逐页核对真值（见 docs/english-recognition-research.md 第二轮），
-写的人没看过原型规则，避免「照着规则出题」。格式：[{group, pages: [{name, app, region, theme, rows: [{x, y, size, role, text}],
+写的人没看过原型规则，避免「照着规则出题」。第二轮调研用的 70 页就是同目录的 ner-bench-pages.json。格式：[{group, pages: [{name, app, region, theme, rows: [{x, y, size, role, text}],
 find: [{kind, text}], avoid: [str], neutral: [str]}]}]。
 
 每页写出：
