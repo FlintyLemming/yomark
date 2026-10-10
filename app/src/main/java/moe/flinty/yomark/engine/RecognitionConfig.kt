@@ -1,7 +1,7 @@
 package moe.flinty.yomark.engine
 
 /**
- * OCR 后端。PADDLE = PP-OCRv5 mobile（ONNX Runtime，随包发行）；
+ * OCR 后端。PADDLE = PP-OCRv6 small（ONNX Runtime，随包发行）；
  * 其余三档是 ML Kit：BOTH 并行跑两个再取并集，去重交给 CandidateMerger。
  */
 enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }

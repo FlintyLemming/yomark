@@ -11,7 +11,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * PP-OCRv5 mobile（检测 + 识别）跑在 ONNX Runtime 上（spec §14 的预留位）。
+ * PP-OCRv6 small（检测 + 识别）跑在 ONNX Runtime 上（spec §14 的预留位）。
  *
  * 输入是 ARGB 像素数组而不是 Bitmap：核心不碰 android.graphics，单测才能在 JVM 上跑真模型。
  *
@@ -176,7 +176,7 @@ class PpOcrEngine(
         const val DET_LIMIT = 1536f
         const val REC_HEIGHT = 48
         const val REC_MIN_WIDTH = 16
-        /** 超长行按比例压扁。上限决定一行输出的大小：2000 宽 × 18385 类 ≈ 18 MB。 */
+        /** 超长行按比例压扁。上限决定一行输出的大小：2000 宽（250 个时间步）× 18710 类 ≈ 19 MB。 */
         const val REC_MAX_WIDTH = 2000
         /** PaddleOCR 的 drop_score。 */
         const val DROP_SCORE = 0.5f

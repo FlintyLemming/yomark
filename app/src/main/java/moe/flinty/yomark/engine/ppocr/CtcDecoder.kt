@@ -5,7 +5,7 @@ import java.nio.FloatBuffer
 /**
  * 识别头的 CTC 贪心解码。
  *
- * PP-OCRv5 的类别表：0 是 blank，1..N 是字典里的字，N+1 是空格（use_space_char）。
+ * PP-OCR 识别头的类别表：0 是 blank，1..N 是字典里的字，N+1 是空格（use_space_char）。
  * 每个时间步取 argmax，连续相同的合并，blank 丢掉。
  *
  * 除了字本身，还记下每个字占了哪几个时间步——字在行里的横向位置由它推出来，

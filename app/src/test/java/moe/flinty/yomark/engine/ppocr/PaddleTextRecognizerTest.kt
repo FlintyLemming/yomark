@@ -16,7 +16,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 真模型、真图：随包的 PP-OCRv5 mobile 跑在桌面版 ONNX Runtime 上，读一张合成的快递详情页。
+ * 真模型、真图：随包的 PP-OCRv6 small 跑在桌面版 ONNX Runtime 上，读一张合成的快递详情页。
  *
  * 图是照着真机漏检的菜鸟快递详情页排的版，内容全是编的——用户的截图含个人信息，不进仓库。
  * 字体是文泉驿正黑，与手机上的系统字体不同，所以只断言结果，不断言坐标。
