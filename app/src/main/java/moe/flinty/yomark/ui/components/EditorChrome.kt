@@ -85,21 +85,43 @@ fun EditorBottomBar(
     val short = LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_DP
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         StyleBar(model = styleBar, actions = styleActions)
-        if (!(short && styleBar.panelOpen)) Row(
-            Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AiReviewButton(aiReview, onAiReview)
-            Spacer(Modifier.weight(1f))
-            if (batchLabel != null) {
-                Text(batchLabel, style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.width(12.dp))
-            }
-            if (onNext != null) {
-                Button(onClick = onNext) { Text("下一张") }
-            } else {
-                Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
-            }
+        if (!(short && styleBar.panelOpen)) EditorActionRow(
+            onExport = onExport,
+            exporting = exporting,
+            batchLabel = batchLabel,
+            onNext = onNext,
+            aiReview = aiReview,
+            onAiReview = onAiReview,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+    }
+}
+
+/**
+ * 底栏的最后一行：左边「AI 复查」，右边批量进度和主按钮（「导出」，批量里后面还有图时是「下一张」）。
+ * 手机的底栏和宽屏的样式列表那一块（WideEditorPanel）共用。
+ */
+@Composable
+fun EditorActionRow(
+    onExport: () -> Unit,
+    exporting: Boolean,
+    modifier: Modifier = Modifier,
+    batchLabel: String? = null,
+    onNext: (() -> Unit)? = null,
+    aiReview: AiReview = AiReview.HIDDEN,
+    onAiReview: () -> Unit = {},
+) {
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        AiReviewButton(aiReview, onAiReview)
+        Spacer(Modifier.weight(1f))
+        if (batchLabel != null) {
+            Text(batchLabel, style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(12.dp))
+        }
+        if (onNext != null) {
+            Button(onClick = onNext) { Text("下一张") }
+        } else {
+            Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
         }
     }
 }

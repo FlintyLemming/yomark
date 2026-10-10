@@ -486,9 +486,8 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
     })
 }
 
-/** 类型小标签的文字：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */
-private fun kindLabelText(item: MaskItem) =
-    SensitiveKindLabels.display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
+/** 类型小标签的文字，与宽屏的框列表同一套。 */
+private fun kindLabelText(item: MaskItem) = SensitiveKindLabels.display(item)
 
 /** 琥珀色小标签的画笔与尺寸。字号按缩放反算，视觉大小恒定。 */
 private class LabelPaints(val scale: Float) {

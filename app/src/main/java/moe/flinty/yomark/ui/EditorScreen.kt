@@ -52,6 +52,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.flinty.yomark.billing.Edition
@@ -61,15 +66,20 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
+import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
 import moe.flinty.yomark.ui.components.FreeEditionDialog
+import moe.flinty.yomark.ui.components.MaskItemList
 import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.components.PendingExportDialog
 import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
+import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.eraseDegradeNote
+import moe.flinty.yomark.ui.components.purposePanelMaxHeight
+import moe.flinty.yomark.ui.components.wideSidePanelWidth
 
 @Composable
 fun EditorScreen(
@@ -121,6 +131,11 @@ fun EditorScreen(
         PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
     }
 
+    // 手机、宽屏竖着拿、宽屏横着拿（见 EditorLayouts）。转向时 Configuration 变了，这里跟着重组
+    val config = LocalConfiguration.current
+    val layout = EditorLayouts.choose(config.screenWidthDp, config.screenHeightDp, config.smallestScreenWidthDp)
+    val atSide = layout == EditorLayout.WIDE_SIDE
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
@@ -142,27 +157,6 @@ fun EditorScreen(
             )
             // 底栏的按钮已经写着「复查中…」，这里只给一条进度，不再重复说一遍
             if (state.aiReview == AiReview.RUNNING) LinearProgressIndicator(Modifier.fillMaxWidth())
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                if (state.loading) CircularProgressIndicator()
-                ImageCanvas(
-                    state = state,
-                    registry = registry,
-                    onTap = vm::onTap,
-                    onManualBox = vm::onManualBox,
-                    onResize = vm::previewSelectedQuad,
-                    onCommitDrag = vm::commitDrag,
-                    onDeleteSelected = vm::deleteSelected,
-                    scanStyle = scanStyle,
-                )
-                Column(
-                    Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    AnalyzingPill(visible = state.analyzing && state.image != null)
-                    ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
-                }
-            }
             val batch = state.batch
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
             BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)
@@ -170,34 +164,143 @@ fun EditorScreen(
                 enabled = state.colorPick == null && state.stylePanelOpen && !state.purposeSheetVisible,
                 onBack = vm::dismissStylePanel,
             )
-            if (state.purposeSheetVisible) {
-                // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
-                BackHandler(onBack = vm::dismissPurposeSheet)
-                PurposeWatermarkPanel(
-                    text = state.purposeText,
-                    style = state.purposeStyle,
-                    onTextChange = vm::setPurposeText,
-                    onStyleChange = vm::setPurposeStyle,
-                    onReset = vm::resetPurposeStyle,
-                    onRemove = vm::removePurposeWatermark,
-                    onDone = vm::dismissPurposeSheet,
-                    modifier = Modifier.imePadding(),
-                )
-            } else EditorBottomBar(
-                styleBar = styleBarModel(state),
-                styleActions = styleActions,
-                onExport = {
-                    if (batch != null) vm.exportBatch() else vm.requestExport()
+            // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
+            if (state.purposeSheetVisible) BackHandler(onBack = vm::dismissPurposeSheet)
+            CanvasAndPanel(
+                panelAtSide = atSide,
+                // 横着拿时用途水印面板在右边，输入法弹起来时整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
+                modifier = Modifier
+                    .weight(1f)
+                    .then(if (atSide && state.purposeSheetVisible) Modifier.imePadding() else Modifier),
+                canvas = {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        if (state.loading) CircularProgressIndicator()
+                        ImageCanvas(
+                            state = state,
+                            registry = registry,
+                            onTap = vm::onTap,
+                            onManualBox = vm::onManualBox,
+                            onResize = vm::previewSelectedQuad,
+                            onCommitDrag = vm::commitDrag,
+                            onDeleteSelected = vm::deleteSelected,
+                            scanStyle = scanStyle,
+                        )
+                        Column(
+                            Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            AnalyzingPill(visible = state.analyzing && state.image != null)
+                            ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
+                        }
+                    }
                 },
-                exporting = state.exporting,
-                batchLabel = batch?.let { "${it.index + 1} / ${it.total}" },
-                onNext = if (batch != null && !batch.isLast) vm::nextImage else null,
-                aiReview = state.aiReview,
-                onAiReview = vm::runAiReview,
+                panel = {
+                    val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+                    val batchLabel = batch?.let { "${it.index + 1} / ${it.total}" }
+                    val onNext = if (batch != null && !batch.isLast) vm::nextImage else null
+                    when {
+                        state.purposeSheetVisible -> PurposeWatermarkPanel(
+                            text = state.purposeText,
+                            style = state.purposeStyle,
+                            onTextChange = vm::setPurposeText,
+                            onStyleChange = vm::setPurposeStyle,
+                            onReset = vm::resetPurposeStyle,
+                            onRemove = vm::removePurposeWatermark,
+                            onDone = vm::dismissPurposeSheet,
+                            modifier = if (atSide) Modifier.wideSidePanelWidth() else Modifier.imePadding(),
+                            // 在右边那一栏里时整栏都给它，多出来的滚动
+                            maxHeight = if (atSide) Dp.Unspecified else purposePanelMaxHeight(),
+                        )
+                        layout == EditorLayout.PHONE -> EditorBottomBar(
+                            styleBar = styleBarModel(state),
+                            styleActions = styleActions,
+                            onExport = onExport,
+                            exporting = state.exporting,
+                            batchLabel = batchLabel,
+                            onNext = onNext,
+                            aiReview = state.aiReview,
+                            onAiReview = vm::runAiReview,
+                        )
+                        else -> WideEditorPanel(
+                            atSide = atSide,
+                            styleBar = styleBarModel(state),
+                            styleActions = styleActions,
+                            list = { modifier ->
+                                MaskItemList(
+                                    image = state.image,
+                                    plan = state.plan,
+                                    // 换图时先载入、再识别：载入的那一下也算还没出结果，不该说「没有识别到」
+                                    analyzing = state.analyzing || state.loading,
+                                    selectedId = state.selectedManualId,
+                                    onItemClick = vm::onListItemClick,
+                                    modifier = modifier,
+                                )
+                            },
+                            actionRow = { modifier ->
+                                EditorActionRow(
+                                    onExport = onExport,
+                                    exporting = state.exporting,
+                                    batchLabel = batchLabel,
+                                    onNext = onNext,
+                                    aiReview = state.aiReview,
+                                    onAiReview = vm::runAiReview,
+                                    modifier = modifier,
+                                )
+                            },
+                        )
+                    }
+                },
             )
         }
     }
 }
+
+/**
+ * 画布和它旁边的那一块（手机的底栏，宽屏的样式与列表，用途水印面板）。
+ *
+ * 旁边那一块先量：在下面时高度由它自己定，在右边（[panelAtSide]）时宽度由它自己定，画布占剩下的。
+ * 画布永远是第一个孩子：平板转个方向，那一块从下面挪到右边，画布还是原来那一个，放大到哪儿、识别动效走到哪儿都接着来。
+ * 分开写成 Column 和 Row 的话，一转就换成了一块新画布。
+ */
+@Composable
+private fun CanvasAndPanel(
+    panelAtSide: Boolean,
+    canvas: @Composable () -> Unit,
+    panel: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Layout(
+        content = {
+            Box(Modifier.layoutId(CANVAS), propagateMinConstraints = true) { canvas() }
+            Box(Modifier.layoutId(PANEL), propagateMinConstraints = true) { panel() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val height = constraints.maxHeight
+        val panelPart = measurables.first { it.layoutId == PANEL }
+        val canvasPart = measurables.first { it.layoutId == CANVAS }
+        if (panelAtSide) {
+            val p = panelPart.measure(Constraints(maxWidth = width, minHeight = height, maxHeight = height))
+            val c = canvasPart.measure(Constraints.fixed((width - p.width).coerceAtLeast(0), height))
+            layout(width, height) {
+                c.place(0, 0)
+                p.place(width - p.width, 0)
+            }
+        } else {
+            val p = panelPart.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = height))
+            val c = canvasPart.measure(Constraints.fixed(width, (height - p.height).coerceAtLeast(0)))
+            layout(width, height) {
+                c.place(0, 0)
+                p.place(0, height - p.height)
+            }
+        }
+    }
+}
+
+private const val CANVAS = "canvas"
+private const val PANEL = "panel"
 
 /**
  * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、「应用到全部」能改几处、抹除降级了几处。

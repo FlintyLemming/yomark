@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.flinty.yomark.core.image.SourceImage
@@ -133,7 +134,7 @@ fun StyleBar(
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut(),
         ) {
-            StylePanel(model, actions)
+            StylePanel(model, actions, Modifier.padding(horizontal = 12.dp, vertical = 4.dp), phonePanelMaxHeight())
         }
     }
 }
@@ -212,9 +213,9 @@ private fun StyleTool(
     }
 }
 
-/** 样式栏上每一项的小样子。 */
+/** 样式栏上每一项的小样子。宽屏的样式圆钮（StyleGrid）也用它。 */
 @Composable
-private fun StyleGlyph(style: MaskStyle, options: MaskOptions) {
+internal fun StyleGlyph(style: MaskStyle, options: MaskOptions) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     when (style) {
@@ -257,21 +258,30 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 
 // ---------- 调节面板 ----------
 
-/**
- * 当前样式的调节面板，就在样式那一排下面展开。画布留在上面不被盖住，每动一下，
- * 选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
- */
+/** 手机上面板最多占四成高度（横屏时屏幕矮，三成），多出来的滚动，画布总有地方留着。 */
 @Composable
-private fun StylePanel(model: StyleBarModel, actions: StyleBarActions) {
-    val look = model.look
-    // 面板最多占四成高度（横屏时屏幕矮，三成），多出来的滚动，画布总有地方留着
+private fun phonePanelMaxHeight(): Dp {
     val config = LocalConfiguration.current
     val landscape = config.screenWidthDp > config.screenHeightDp
-    val maxHeight = (config.screenHeightDp * if (landscape) 0.3f else 0.4f).dp
+    return (config.screenHeightDp * if (landscape) 0.3f else 0.4f).dp
+}
+
+/**
+ * 当前样式的调节面板。手机上就在样式那一排下面展开；宽屏上占框列表的位置（见 WideEditorPanel）。
+ * 画布留在旁边不被盖住，每动一下，选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
+ *
+ * @param maxHeight 再高就滚动。宽屏上不限，由放它的那一格定。
+ */
+@Composable
+internal fun StylePanel(
+    model: StyleBarModel,
+    actions: StyleBarActions,
+    modifier: Modifier = Modifier,
+    maxHeight: Dp = Dp.Unspecified,
+) {
+    val look = model.look
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {

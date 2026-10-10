@@ -1,7 +1,11 @@
 package moe.flinty.yomark.core.model
 
-/** 类型的显示名。画布小标签与导出拦截对话框共用同一套措辞。 */
+/** 类型的显示名。画布小标签、宽屏的框列表与导出拦截对话框共用同一套措辞。 */
 object SensitiveKindLabels {
+
+    /** 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */
+    fun display(item: MaskItem): String =
+        display(item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
 
     fun display(kind: SensitiveKind): String = when (kind) {
         SensitiveKind.PHONE -> "电话"
