@@ -32,7 +32,6 @@ import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -140,8 +139,6 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
             )
-            // 底栏的按钮已经写着「增强识别中…」，这里只给一条进度，不再重复说一遍
-            if (state.aiReview == AiReview.RUNNING) LinearProgressIndicator(Modifier.fillMaxWidth())
             Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
                 if (state.loading) CircularProgressIndicator()
                 ImageCanvas(
