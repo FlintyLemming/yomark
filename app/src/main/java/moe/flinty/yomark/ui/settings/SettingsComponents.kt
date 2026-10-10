@@ -163,17 +163,6 @@ internal fun SectionHeader(text: String, modifier: Modifier = Modifier, first: B
     )
 }
 
-/** 页面最上面的一段说明，写这一页管什么。 */
-@Composable
-internal fun PageIntro(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text,
-        modifier.fillMaxWidth().padding(start = TextInset, end = TextInset, top = 4.dp, bottom = 16.dp),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
-}
-
 /** 页面以卡片开头（上面没有分组标题、没有说明）时，卡片和标题栏之间的那点空。 */
 @Composable
 internal fun PageTopSpacer() {

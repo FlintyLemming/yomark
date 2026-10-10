@@ -35,6 +35,7 @@ import moe.flinty.yomark.ui.settings.SettingsScreen
 import moe.flinty.yomark.ui.settings.TextEngineSettingsScreen
 import moe.flinty.yomark.ui.settings.TextRuleSettingsScreen
 import moe.flinty.yomark.ui.settings.TextSettingsScreen
+import moe.flinty.yomark.ui.settings.mlKitSummary
 import moe.flinty.yomark.ui.theme.ThemeColor
 import org.junit.Rule
 import org.junit.Test
@@ -373,6 +374,27 @@ class SettingsScreenTest {
     @Test fun aNanoWhoseVersionCannotBeReadSaysSo() {
         ai(NanoStatus.Present(null, NanoStatus.Model.DOWNLOADING))
         compose.onNodeWithText("版本未知 · 下载中").assertIsDisplayed()
+    }
+
+    /** 随包的 PP-OCR 不用问谁：版本是打包时定的，进页就写出来。 */
+    @Test fun theAiPageShowsTheBundledPpOcrVersion() {
+        ai(nano = null)
+        compose.onNodeWithText("PP-OCR").assertIsDisplayed()
+        compose.onNodeWithText("PP-OCRv5 mobile · 随安装包内置").assertIsDisplayed()
+    }
+
+    /** ML Kit 的几个模型并成一行，不是一个模型一项。 */
+    @Test fun theAiPageListsMlKitModelsInOneRow() {
+        ai(nano = null)
+        compose.onNodeWithText("ML Kit").assertIsDisplayed()
+        compose.onNodeWithText("文字 ", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("人脸 ", substring = true).assertIsDisplayed()
+    }
+
+    @Test fun mlKitTextVersionsAreWrittenOnceWhenTheyMatch() {
+        assertThat(mlKitSummary("16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
+        assertThat(mlKitSummary("16.0.1", "16.0.2", "16.1.7", "17.3.0"))
+            .isEqualTo("文字 16.0.1（英文）/ 16.0.2（中文） · 人脸 16.1.7 · 条码 17.3.0")
     }
 
     // ---------- 导出、外观 ----------

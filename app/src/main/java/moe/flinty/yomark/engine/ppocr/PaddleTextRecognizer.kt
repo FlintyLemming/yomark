@@ -49,6 +49,9 @@ private fun Pt.toPointF() = PointF(x, y)
  */
 object PpOcrModels {
 
+    /** assets 里这套模型是哪一版，设置的「AI」页显示用。换模型时和 docs/ppocr-models.md 一起改。 */
+    const val VERSION = "PP-OCRv5 mobile"
+
     @Volatile private var cached: PpOcrEngine? = null
 
     fun engine(context: Context): PpOcrEngine =

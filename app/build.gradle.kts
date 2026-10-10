@@ -69,6 +69,11 @@ android {
         // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
         val freeEdition = providers.gradleProperty("yomark.freeEdition").orNull?.toBooleanStrict() ?: true
         buildConfigField("boolean", "FREE_EDITION", "$freeEdition")
+        // 设置的「AI」页报 ML Kit 各模型的版本：直接取版本目录里的号，升级依赖时不用再改代码
+        buildConfigField("String", "MLKIT_TEXT_VERSION", "\"${libs.versions.mlkitText.get()}\"")
+        buildConfigField("String", "MLKIT_TEXT_CHINESE_VERSION", "\"${libs.versions.mlkitTextChinese.get()}\"")
+        buildConfigField("String", "MLKIT_FACE_VERSION", "\"${libs.versions.mlkitFace.get()}\"")
+        buildConfigField("String", "MLKIT_BARCODE_VERSION", "\"${libs.versions.mlkitBarcode.get()}\"")
     }
 
     // 固定签名：CI 从 Secrets 解出 keystore 并通过环境变量传进来。
