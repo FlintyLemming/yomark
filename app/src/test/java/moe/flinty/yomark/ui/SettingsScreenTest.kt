@@ -14,6 +14,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToKey
+import androidx.compose.ui.test.performScrollToNode
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
@@ -397,11 +398,17 @@ class SettingsScreenTest {
         onDebugTraceChange: (Boolean) -> Unit = {},
         openUrl: (String) -> Unit = {},
         notify: (String) -> Unit = {},
+        traceCapacity: Int = 20,
+        onTraceCapacityChange: (Int) -> Unit = {},
+        onOpenTraceHistory: () -> Unit = {},
     ) = show {
         AboutSettingsScreen(
             debugTrace = debugTrace,
             onDebugTraceChange = onDebugTraceChange,
             onNavigateUp = {},
+            traceCapacity = traceCapacity,
+            onTraceCapacityChange = onTraceCapacityChange,
+            onOpenTraceHistory = onOpenTraceHistory,
             version = "0.11.1 (19)",
             openUrl = openUrl,
             notify = notify,
@@ -459,6 +466,22 @@ class SettingsScreenTest {
         about(debugTrace = true, onDebugTraceChange = { latest = it })
         compose.onNodeWithText("调试信息").performClick()
         assertThat(latest).isFalse()
+    }
+
+    @Test fun theDeveloperGroupPicksHowManyRunsToKeep() {
+        val picked = mutableListOf<Int>()
+        about(debugTrace = true, traceCapacity = 20, onTraceCapacityChange = { picked += it })
+        compose.onNodeWithText("最近 20 次识别，换了图、重开应用都还在").assertExists()
+        compose.onNode(hasScrollToKeyAction()).performScrollToNode(hasText("50 次"))
+        compose.onNodeWithText("50 次").performClick()
+        assertThat(picked).containsExactly(50)
+    }
+
+    @Test fun theDeveloperGroupOpensTheHistory() {
+        var opened = false
+        about(debugTrace = true, onOpenTraceHistory = { opened = true })
+        compose.onNodeWithText("调试记录").performClick()
+        assertThat(opened).isTrue()
     }
 
     /** 已经打开了，再点版本号只说一句，不再数。 */

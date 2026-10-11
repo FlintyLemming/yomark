@@ -2,8 +2,10 @@ package moe.flinty.yomark.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.runtime.Composable
@@ -15,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import moe.flinty.yomark.BuildConfig
+import moe.flinty.yomark.debug.TraceLog
 
 /**
  * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
@@ -29,8 +32,8 @@ internal const val TAPS_TO_DEBUG = 7
  * 关于：应用的版本号，和隐私权政策（原先单独一行摆在一级页上，2026-10-11 挪进来）。
  *
  * 版本号连点七下打开调试信息，照着 Android 系统设置里打开开发者选项的样子：点到第三下起提示还差几下，
- * 打开后这一页多一个开关，编辑页顶栏多一个按钮（见 DebugTraceSheet）。藏起来是因为它只给排查问题用；
- * 不想要了把开关拨回去，开关也跟着收起来。
+ * 打开后这一页多一个「开发者」分组：开关、保留最近几次、查看调试记录；编辑页顶栏也多一个按钮（见 DebugTraceSheet）。
+ * 藏起来是因为它只给排查问题用；不想要了把开关拨回去，整组跟着收起来，记下的也一并删掉。
  *
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  *
@@ -41,6 +44,9 @@ fun AboutSettingsScreen(
     debugTrace: Boolean,
     onDebugTraceChange: (Boolean) -> Unit,
     onNavigateUp: () -> Unit,
+    traceCapacity: Int = TraceLog.DEFAULT_CAPACITY,
+    onTraceCapacityChange: (Int) -> Unit = {},
+    onOpenTraceHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
     version: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
     openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
@@ -92,8 +98,29 @@ fun AboutSettingsScreen(
                         checked = true,
                         onCheckedChange = onDebugTraceChange,
                     )
+                    LinkRow(
+                        title = "调试记录",
+                        summary = "最近 $traceCapacity 次识别，换了图、重开应用都还在",
+                        icon = Icons.Outlined.History,
+                        onClick = onOpenTraceHistory,
+                    )
                 }
-                FooterText("记录只留在编辑页的内存里，不写入系统日志、不保存成文件，关掉编辑页就清空。")
+            }
+            item {
+                SectionHeader("保留最近几次识别")
+                SettingsGroup(Modifier.selectableGroup()) {
+                    TraceLog.CAPACITY_OPTIONS.forEach { count ->
+                        RadioRow(
+                            title = "$count 次",
+                            selected = traceCapacity == count,
+                            onClick = { onTraceCapacityChange(count) },
+                        )
+                    }
+                }
+                FooterText(
+                    "记录存在应用自己的目录里，不写入系统日志、不进备份；里面有截图上识别出的原文。" +
+                        "超出的旧记录自动删掉，关掉调试信息时全部删掉。",
+                )
             }
         }
     }

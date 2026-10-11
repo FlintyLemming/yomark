@@ -5,15 +5,22 @@ import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.core.model.TextLine
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.updateAndGet
+import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
@@ -24,9 +31,9 @@ import kotlin.math.roundToInt
  * 调试信息（设置 → 关于，连点版本号打开）：每次识别在各环节看到了什么——
  * PP-OCR 读出的每一行和它的框、规则命中了什么、送给 Gemini Nano 的提示词和它的原始回答。
  *
- * 只在内存里：不写 logcat、不落盘，跟着编辑器的 ViewModel 走，关掉编辑页就没了。
- * 公开发布的 APK 就是 debug 构建，往 logcat 里打识别出的文字，等于把用户截图里的隐私送进系统日志；
- * 这里的记录只在应用自己的界面上给用户本人看。
+ * 不写 logcat：公开发布的 APK 就是 debug 构建，往 logcat 里打识别出的文字，等于把用户截图里的隐私送进系统日志。
+ * 记录存在应用私有目录里（见 TraceStore.kt），不进备份，只在应用自己的界面上给用户本人看；
+ * 关掉调试信息时连文件一并删掉。整个进程共用一份（见 TraceHistory.kt），换一张图、重开应用，之前的都还在。
  *
  * 记录器挂在协程上下文里一路往下传（[TraceRecorder]）：识别器、检测器、判定器各自往里记一段，
  * 不用在各个接口上多开一个参数。调试信息没开时上下文里没有它，各处一个字都不记。
@@ -50,13 +57,17 @@ data class TraceSection(
     val blocks: List<TraceBlock> = emptyList(),
 )
 
-/** 一次识别（或一次 AI 增强识别）的整份记录。[durationMs] 为 null 是还没跑完。 */
+/**
+ * 一次识别（或一次 AI 增强识别）的整份记录。[durationMs] 为 null 是还没跑完；
+ * [interrupted] 是从磁盘读回来时还没跑完——应用在那次识别中途退出了，不会再跑完。
+ */
 data class TraceRun(
     val number: Int,
     val title: String,
     val startedAt: Long,
     val durationMs: Long? = null,
     val sections: List<TraceSection> = emptyList(),
+    val interrupted: Boolean = false,
 )
 
 /**
@@ -123,36 +134,115 @@ private fun failure(stage: TraceStage, title: String, ms: Long, error: Throwable
 )
 
 /**
- * 最近几次识别的记录，最新的在前。编辑器的 ViewModel 持有一份，只在内存里，ViewModel 没了它也就没了。
- * 只留 [capacity] 次：每次都带着整页的文字，攒多了没用。
+ * 最近几次识别的记录，最新的在前。只留 [capacity] 次（设置 → 关于里选），挤出去的连文件一起删。
+ *
+ * 给了 [store] 就落盘：每次有改动，把改了的那几次各自重写一遍（[persist]），进程起来时读回来（[restore]）。
+ * 没给（单测、引擎各环节的单测）就只在内存里。
  */
 class TraceLog(
-    private val capacity: Int = DEFAULT_CAPACITY,
+    capacity: Int = DEFAULT_CAPACITY,
     internal val clock: () -> Long = System::currentTimeMillis,
+    private val store: TraceStore? = null,
+    /** 读写磁盘用的线程。单测里换成测试的调度器，好等它写完。 */
+    private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
     private val _runs = MutableStateFlow<List<TraceRun>>(emptyList())
     val runs: StateFlow<List<TraceRun>> = _runs.asStateFlow()
 
-    private val counter = AtomicInteger()
+    @Volatile var capacity: Int = capacity.coerceAtLeast(1)
+        private set
+
+    // 编号接着磁盘上最大的那个往下数：读回来之前就开始的识别，编号也不会和读回来的撞上
+    private val counter = AtomicInteger(store?.maxNumber() ?: 0)
+
+    /** 改过、还没写盘的几次（写的时候在 [_runs] 里找不到就是被挤掉或清空了，删文件）。 */
+    private val dirty: MutableSet<Int> = ConcurrentHashMap.newKeySet()
+    private val wake = Channel<Unit>(Channel.CONFLATED)
+    @Volatile private var wipe = false
+    /** 每清空一次加一：清空之前开始读的那批，读完了也不往回放。 */
+    private val generation = AtomicInteger()
 
     /** 开始记一次。返回的记录器要挂到跑识别的那个协程的上下文里（withContext）。 */
     fun start(title: String): TraceRecorder {
         val number = counter.incrementAndGet()
-        _runs.update { (listOf(TraceRun(number, title, clock())) + it).take(capacity) }
+        val before = _runs.getAndUpdate { (listOf(TraceRun(number, title, clock())) + it).take(capacity) }
+        touch(listOf(number) + before.drop(capacity - 1).map { it.number })
         return TraceRecorder(this, number)
     }
 
     fun clear() {
+        generation.incrementAndGet()
         _runs.value = emptyList()
+        dirty.clear()
+        wipe = true
+        wake.trySend(Unit)
+    }
+
+    /** 改保留几次。改少了，多出来的旧记录马上删掉。 */
+    fun setCapacity(value: Int) {
+        capacity = value.coerceAtLeast(1)
+        val before = _runs.getAndUpdate { it.take(capacity) }
+        touch(before.drop(capacity).map { it.number })
     }
 
     /** 改第 [number] 次的记录。已经被挤出去、或者清空了的，改了也没处放，直接丢。 */
     internal fun edit(number: Int, change: (TraceRun) -> TraceRun) {
         _runs.update { runs -> runs.map { if (it.number == number) change(it) else it } }
+        touch(listOf(number))
     }
 
-    private companion object {
-        const val DEFAULT_CAPACITY = 8
+    /**
+     * 把磁盘上的读回来，并进内存里已有的（读的时候可能已经开始了新的一次）。先 [setCapacity] 再调：
+     * 超出保留次数的旧记录在这里删掉，次数还没定就读，会把用户想留的删了。
+     * 读回来时还没跑完的，标成 [TraceRun.interrupted]。
+     */
+    suspend fun restore() {
+        val store = store ?: return
+        val gen = generation.get()
+        val loaded = withContext(io) { store.readAll() }.map {
+            if (it.durationMs == null) it.copy(interrupted = true) else it
+        }
+        var merged = false
+        val after = _runs.updateAndGet { current ->
+            merged = generation.get() == gen
+            if (!merged) return@updateAndGet current
+            val known = current.map { it.number }.toSet()
+            (current + loaded.filter { it.number !in known }).sortedByDescending { it.number }.take(capacity)
+        }
+        val kept = after.map { it.number }.toSet()
+        touch(loaded.map { it.number }.filter { it !in kept || !merged })
+    }
+
+    /** 一直写下去：有改动就把改了的那几次写盘。挂在进程级的协程里跑，不会返回。 */
+    suspend fun persist() {
+        val store = store ?: return
+        for (signal in wake) {
+            withContext(io) {
+                if (wipe) {
+                    wipe = false
+                    runCatching { store.deleteAll() }
+                }
+                val numbers = dirty.toList()
+                dirty.removeAll(numbers.toSet())
+                val current = _runs.value.associateBy { it.number }
+                numbers.forEach { n ->
+                    // 写不进去（磁盘满了）也不能连累识别，下次有改动再试
+                    runCatching { current[n]?.let(store::write) ?: store.delete(n) }.onFailure { it.printStackTrace() }
+                }
+            }
+        }
+    }
+
+    private fun touch(numbers: List<Int>) {
+        if (store == null || numbers.isEmpty()) return
+        dirty += numbers
+        wake.trySend(Unit)
+    }
+
+    companion object {
+        /** 保留几次可以选的档。每次都带着整页的文字和提示词，一次几十 KB 到几百 KB。 */
+        val CAPACITY_OPTIONS = listOf(10, 20, 50, 100)
+        const val DEFAULT_CAPACITY = 20
     }
 }
 
@@ -161,10 +251,14 @@ class TraceLog(
 /** 「识别 #3」 */
 val TraceRun.heading: String get() = "$title #$number"
 
-/** 「14:02:31 · 共 2.3 s」，还没跑完是「14:02:31 · 进行中…」。 */
+/** 「10-11 14:02:31 · 共 2.3 s」，还没跑完是「10-11 14:02:31 · 进行中…」。记录跨天留着，所以带上日期。 */
 val TraceRun.subheading: String
     get() = CLOCK.format(Instant.ofEpochMilli(startedAt)) + " · " +
-        (durationMs?.let { "共 ${formatDuration(it)}" } ?: "进行中…")
+        when {
+            durationMs != null -> "共 ${formatDuration(durationMs)}"
+            interrupted -> "没跑完（应用中途退出了）"
+            else -> "进行中…"
+        }
 
 /** 整份记录写成纯文本：「复制」「分享」用，贴到哪儿都看得懂。 */
 fun TraceRun.toText(): String = buildString {
@@ -225,4 +319,4 @@ fun textUnder(quad: Quad, lines: List<TextLine>): String = lines.mapNotNull { li
 /** 异常写成一行：类名加消息。 */
 fun Throwable.describe(): String = javaClass.simpleName + (message?.let { "：$it" } ?: "")
 
-private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm:ss").withZone(ZoneId.systemDefault())
+private val CLOCK: DateTimeFormatter = DateTimeFormatter.ofPattern("MM-dd HH:mm:ss").withZone(ZoneId.systemDefault())
