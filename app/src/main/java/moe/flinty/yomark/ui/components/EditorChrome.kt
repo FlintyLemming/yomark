@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.components
 
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
@@ -47,6 +49,10 @@ fun EditorTopBar(
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
+    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现。 */
+    compare: MutableInteractionSource? = null,
+    /** 有前后可比：打了码，或者设了用途水印。没有时「对比」灰掉。 */
+    canCompare: Boolean = false,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // 向上回到首页，放在 Android 约定的左上角
@@ -63,6 +69,12 @@ fun EditorTopBar(
                 if (purposeOn) "用途水印（已开启）" else "用途水印",
                 tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
+        }
+        if (compare != null) {
+            // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
+            IconButton(onClick = {}, enabled = canCompare, interactionSource = compare) {
+                Icon(Icons.Filled.Compare, "按住对比原图")
+            }
         }
         if (onDebug != null) {
             IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, "调试信息") }

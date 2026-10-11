@@ -75,6 +75,7 @@ import kotlin.math.roundToInt
  * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
+ * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
  */
 @Composable
 fun ImageCanvas(
@@ -87,6 +88,7 @@ fun ImageCanvas(
     onDeleteSelected: () -> Unit,
     modifier: Modifier = Modifier,
     scanStyle: ScanStyle = ScanStyle.SWEEP,
+    showOriginal: Boolean = false,
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
@@ -147,6 +149,7 @@ fun ImageCanvas(
     // 手势循环里必须读这个「永远最新」的引用，否则点选手动框后立刻拖手柄，
     // 循环里看到的 selectedManualId 还是 null，于是拖出来一个新框而不是改选中框。
     val latest by rememberUpdatedState(state)
+    val latestShowOriginal by rememberUpdatedState(showOriginal)
 
     // viewport 是按哪个画布尺寸摆的。用途水印面板顶替底栏、输入法弹起时画布会变矮，
     // 这时要重新摆，否则图的下半截就被挤出画布，调水印时看不到效果。
@@ -175,10 +178,12 @@ fun ImageCanvas(
                 .pointerInput(image) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
+                        // 一指按着「对比」看原图时，另一指在画布上只能缩放平移，不改码：改了也看不见
+                        val editable = !latestShowOriginal
 
                         // 选中态优先：手柄 > 框体，都不中才轮到画框 / 点击。
                         // 删除在框上方的工具条里，那是叠在画布上的另一个控件，按它的手势到不了这里
-                        val selected = latest.selectedManualId?.let { latest.plan.find(it) }
+                        val selected = latest.selectedManualId?.takeIf { editable }?.let { latest.plan.find(it) }
                         val downImage = viewport.screenToImage(PointF(down.position.x, down.position.y))
                         var grabbedHandle: HandleCorner? = null
                         var grabOffset = PointF(0f, 0f)
@@ -237,7 +242,7 @@ fun ImageCanvas(
                                 }
                                 // 过了 touch slop 才动手，没动的话这一下是点击。
                                 // 改框一律按起手那一刻的框加手指的总位移算：框紧跟手指，不丢 slop 那一段
-                                if (mode == Mode.DRAG) {
+                                if (mode == Mode.DRAG && editable) {
                                     val now = viewport.screenToImage(PointF(c.position.x, c.position.y))
                                     val handle = grabbedHandle
                                     if (selected != null && handle != null) {
@@ -273,7 +278,7 @@ fun ImageCanvas(
                                 if (q != null && GestureRules.acceptsBox(q, minInImage)) onManualBox(q)
                             }
                             // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了
-                            mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null -> {
+                            mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null && editable -> {
                                 val p = viewport.screenToImage(PointF(last.x, last.y))
                                 val now = System.currentTimeMillis()
                                 // 按得久的一下也是点击（Android 上没有长按动作的控件都这样），只是不拿来凑双击
@@ -313,6 +318,13 @@ fun ImageCanvas(
                 val save = canvas.save()
                 canvas.concat(viewport.matrix())
 
+                if (showOriginal) {
+                    // 打码、圈出框、用途水印、选中框和识别动效一概不画
+                    canvas.drawBitmap(image.bitmap, 0f, 0f, null)
+                    canvas.restoreToCount(save)
+                    return@drawIntoCanvas
+                }
+
                 // 识别中，时间轴的第一帧还没到（或手里还是上一遍收尾的帧）也按「识别中」画：
                 // 换方案重跑时旧结果不该闪一下
                 val time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime
@@ -346,7 +358,7 @@ fun ImageCanvas(
         val lastSelectedQuad = remember { QuadHolder() }
         if (selectedQuad != null) lastSelectedQuad.quad = selectedQuad
         AnimatedVisibility(
-            visible = selectedQuad != null && !editingSelection && !drafting,
+            visible = selectedQuad != null && !editingSelection && !drafting && !showOriginal,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.matchParentSize(),

@@ -10,6 +10,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,6 +100,9 @@ fun EditorScreen(
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
     val styleActions = remember(vm) { ViewModelStyleActions(vm) }
+    // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
+    val compare = remember { MutableInteractionSource() }
+    val comparing by compare.collectIsPressedAsState()
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -169,6 +174,9 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
                 onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
+                compare = compare,
+                canCompare = state.image != null &&
+                    (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED }),
             )
             val batch = state.batch
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
@@ -197,12 +205,14 @@ fun EditorScreen(
                             onCommitDrag = vm::commitDrag,
                             onDeleteSelected = vm::deleteSelected,
                             scanStyle = scanStyle,
+                            showOriginal = comparing,
                         )
                         Column(
                             Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
+                            OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
@@ -370,6 +380,20 @@ private fun ColorPickHint(visible: Boolean, onCancel: () -> Unit) {
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.inversePrimary),
                 ) { Text("取消") }
             }
+        }
+    }
+}
+
+/** 按住「对比」时浮在画布顶上的标签：现在看的是原图。和识别中的提示条一样用 Box 画底色，不吃触摸。 */
+@Composable
+private fun OriginalPill(visible: Boolean) {
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut()) {
+        Box(
+            Modifier
+                .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f), RoundedCornerShape(50))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text("原图", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
         }
     }
 }
