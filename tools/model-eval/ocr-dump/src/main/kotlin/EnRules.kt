@@ -1,8 +1,11 @@
 package moe.flinty.yomark
 
+import moe.flinty.yomark.rules.Bounds
 import moe.flinty.yomark.rules.DefaultRuleSet
+import moe.flinty.yomark.rules.Finder
 import moe.flinty.yomark.rules.NameAnchor
-import moe.flinty.yomark.rules.RuleMatch
+import moe.flinty.yomark.rules.Page
+import moe.flinty.yomark.rules.PageMatch
 import java.io.File
 import java.util.Locale
 import kotlin.math.max
@@ -11,8 +14,8 @@ import kotlin.math.min
 /**
  * 出厂规则在英文页上认出了什么（只在评测台里）。
  *
- * 规则逐行跑，与 RuleClassifier 同口径：行置信度 < 0.5 的不跑；要旁证的猜测（NeedsAnchor）按整页找旁证，
- * 旁证的「附近」用行框近似（app 里用的是字级框，差别只在同一行里的左右位置）。
+ * 规则按整页跑，与 RuleClassifier 同口径：行置信度 < 0.5 的不跑；字段名在上、值在下的认法看整页（字框按行框等宽近似）；
+ * 要旁证的猜测（NeedsAnchor）按整页找旁证，旁证的「附近」用行框近似（app 里用的是字级框，差别只在同一行里的左右位置）。
  *
  * 用法：en-rules <ocr目录> <输出.json> [<地区，默认 CN>] [<名单目录：给了就加跑 EnProto>] [v3]
  *   地区决定 libphonenumber 的默认国家：中文系统上是 CN，美国号码不带 +1 时按中国号码解析。
@@ -38,15 +41,28 @@ private fun nearby(a: Box, b: Box): Boolean {
     return -overlap <= 1.5f * h && gap <= 2f * h
 }
 
-/** [lines] 上 [finder] 认出的东西，按 RuleClassifier 的口径过一遍旁证。 */
+/** 一页 OCR 行拼成规则层的 Page：行里每个字按行框等宽排开。 */
+private fun pageOf(lines: List<Box>) = Page(lines.map { it.text }) { i, r ->
+    val l = lines[i]
+    val w = (l.r - l.l) / max(1, l.text.length)
+    Bounds(l.l + r.first * w, l.t, l.l + (r.last + 1) * w, l.b)
+}
+
+/** 逐行的认法（原型里的）也按整页的接口跑。 */
+private fun perLine(f: Finder): (Page) -> List<PageMatch> = { p ->
+    p.texts.indices.flatMap { i -> runCatching { f.findIn(p.texts[i]) }.getOrElse { emptyList() }.map { PageMatch(i, it) } }
+}
+
+/** [lines] 上 [find] 认出的东西，按 RuleClassifier 的口径过一遍旁证。 */
 /** [unanchored] 不为 null 时，没有旁证的猜测不丢，放进它（弱一档：只圈不打码）。 */
 private fun runRules(
-    lines: List<Box>, findIn: (String) -> List<RuleMatch>, anchors: List<NameAnchor>, unanchored: MutableList<String>? = null,
+    lines: List<Box>, find: (Page) -> List<PageMatch>, anchors: List<NameAnchor>, unanchored: MutableList<String>? = null,
 ): List<String> {
     val found = lines.map { l -> anchors.map { a -> runCatching { a.finder.findIn(l.text) }.getOrElse { emptyList() } } }
     val out = ArrayList<String>()
+    val matches = runCatching { find(pageOf(lines)) }.getOrElse { emptyList() }.groupBy({ it.line }, { it.match })
     lines.forEachIndexed { i, line ->
-        runCatching { findIn(line.text) }.getOrElse { emptyList() }.forEach { m ->
+        matches[i].orEmpty().forEach { m ->
             val ok = !m.needsAnchor || anchors.indices.any { k ->
                 lines.indices.any { j ->
                     found[j][k].any { a ->
@@ -81,17 +97,17 @@ fun main(args: Array<String>) {
         val lines = loadLines(f).filter { it.conf >= 0.5f }
         val byRule = LinkedHashMap<String, List<String>>()
         DefaultRuleSet.rules.filter { it.id != "datetime" }.forEach { rule ->
-            byRule[rule.id] = runRules(lines, rule::findIn, DefaultRuleSet.nameAnchors)
+            byRule[rule.id] = runRules(lines, rule::findOnPage, DefaultRuleSet.nameAnchors)
         }
         if (proto != null && enAnchors != null) {
-            byRule["en-address"] = runRules(lines, proto.address::findIn, enAnchors)
+            byRule["en-address"] = runRules(lines, perLine(proto.address), enAnchors)
             val weak = ArrayList<String>()
-            byRule["en-name"] = runRules(lines, proto.nameLine::findIn, enAnchors, weak)
+            byRule["en-name"] = runRules(lines, perLine(proto.nameLine), enAnchors, weak)
             byRule["en-name-weak"] = weak + lines.flatMap { l -> proto.standaloneName(l.text).map { l.text.substring(it.range) } }
             // 顶栏：页面最上面一成
             val pageH = SIZE.find(f.readText())!!.groupValues[2].toFloat()
             byRule["en-title"] = lines.filter { it.t < 0.1f * pageH }.flatMap { l -> proto.titleName(l.text).map { l.text.substring(it.range) } }
-            byRule["en-phone"] = runRules(lines, proto.foreignPhone::findIn, enAnchors)
+            byRule["en-phone"] = runRules(lines, perLine(proto.foreignPhone), enAnchors)
             val page = lines.map { EnProto.PageLine(it.text, it.l, it.t, it.r, it.b) }
             byRule["en-below-label"] = proto.pageFinds(page).map { (i, r) -> lines[i].text.substring(r) }
         }
