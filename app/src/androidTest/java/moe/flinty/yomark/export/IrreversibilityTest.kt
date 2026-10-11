@@ -16,6 +16,7 @@ import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
+import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
@@ -61,7 +62,7 @@ class IrreversibilityTest {
         return f to rect
     }
 
-    private suspend fun exportWith(style: MaskStyle): Bitmap {
+    private suspend fun exportWith(style: MaskStyle, options: MaskOptions = MaskOptions()): Bitmap {
         val (src, rect) = sourceWithSecret()
         val intake = ImageIntake(context)
         val taken = intake.copyToPrivate(src.toUri())
@@ -74,7 +75,7 @@ class IrreversibilityTest {
                     rect.right * image.scale, rect.bottom * image.scale,
                 )),
                 SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED,
-                MaskLook(style),
+                MaskLook(style, options),
             )),
         )
 
@@ -124,8 +125,8 @@ class IrreversibilityTest {
     }
 
     @Test
-    fun erase_output_is_unreadable() = runTest {
-        assertThat(ocrText(exportWith(MaskStyle.ERASE))).doesNotContain("4111")
+    fun near_color_output_is_unreadable() = runTest {
+        assertThat(ocrText(exportWith(MaskStyle.SOLID, MaskOptions(solidNear = true)))).doesNotContain("4111")
     }
 
     @Test

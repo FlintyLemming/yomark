@@ -82,7 +82,7 @@ import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.WideEditorPanel
-import moe.flinty.yomark.ui.components.eraseDegradeNote
+import moe.flinty.yomark.ui.components.nearColorsOf
 import moe.flinty.yomark.ui.components.purposePanelMaxHeight
 import moe.flinty.yomark.ui.components.wideSidePanelWidth
 
@@ -327,22 +327,24 @@ private const val CANVAS = "canvas"
 private const val PANEL = "panel"
 
 /**
- * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、「应用到全部」能改几处、抹除降级了几处。
- * 降级要逐块采样，只在样式栏停在抹除上时才数。
+ * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、「应用到全部」能改几处、这张图上取到的近似色。
+ * 近似色要逐块采样，只在用得上时取：面板开在色块上（「近似色」那一颗要画它），或者开着近似色（色块的小样子要画它）。
  */
 @Composable
 private fun styleBarModel(state: EditorUiState): StyleBarModel {
     val look = state.barLook
-    val degradeNote = remember(state.image, state.plan, look.style) {
-        if (look.style == MaskStyle.ERASE) eraseDegradeNote(state.image, state.plan) else null
+    val wantNear = look.options.solidNear || (look.style == MaskStyle.SOLID && state.stylePanelOpen)
+    val selected = state.selectedItem
+    val nearColors = remember(state.image, state.plan, selected?.candidateId, wantNear) {
+        if (wantNear) nearColorsOf(state.image, state.plan, selected) else emptyList()
     }
     return StyleBarModel(
         look = look,
         panelOpen = state.stylePanelOpen,
-        editingSelection = state.selectedItem != null,
+        editingSelection = selected != null,
         colorPick = state.colorPick,
         applicable = state.plan.items.count { it.state == MaskState.MASKED && it.look != look },
-        degradeNote = degradeNote,
+        nearColors = nearColors,
     )
 }
 

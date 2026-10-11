@@ -49,6 +49,7 @@ class SettingsStoreTest {
         val store = store()
         val tuned = MaskOptions(
             solidColor = 0xFF000000.toInt(),
+            solidNear = true,
             pixelBlockDivisor = 4,
             blurRadiusRatio = 0.2f,
             markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f),
@@ -58,6 +59,26 @@ class SettingsStoreTest {
         )
         store.setMaskOptions(tuned)
         assertThat(store.maskOptions.first()).isEqualTo(tuned)
+    }
+
+    /** 抹除并进了色块：旧安装里上次用的是抹除，读回来是色块开着近似色，抹除降级时用的颜色还记着。 */
+    @Test
+    fun `a brush left on the old erase style comes back as near colour`() = runTest {
+        val store = store()
+        store.writeRawStyleForTest("ERASE")
+        store.writeRawMaskOptionsForTest(markerColor = MaskOptions.DEFAULT_MARKER_COLOR, pixelDivisor = 8, solidColor = 0xFF000000.toInt())
+        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.SOLID)
+        assertThat(store.maskOptions.first().solidNear).isTrue()
+        assertThat(store.maskOptions.first().solidColor).isEqualTo(0xFF000000.toInt())
+    }
+
+    /** 画笔动过一次之后近似色就记下了：关掉的不会因为旧的样式名又被打开。 */
+    @Test
+    fun `once written, near colour is read as written`() = runTest {
+        val store = store()
+        store.writeRawStyleForTest("ERASE")
+        store.setMaskOptions(MaskOptions(solidNear = false))
+        assertThat(store.maskOptions.first().solidNear).isFalse()
     }
 
     /** 手改过的、以后改了范围的旧值读回来收进范围：色块不会半透明，马克笔不会不透明，马赛克不比出厂细。 */

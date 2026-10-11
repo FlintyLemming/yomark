@@ -120,20 +120,20 @@ class ExporterTest {
     }
 
     /**
-     * 读像素的样式（抹除）画在直接上色的样式之前，与预览同一个顺序（MaskOrder）：
-     * 抹除的采样环要是先读到隔壁已经画上去的色块，导出就会降级成色块，而预览读的是原图、不降级。
+     * 读像素的（近似色）画在直接上色的之前，与预览同一个顺序（MaskOrder）：
+     * 近似色的采样环要是先读到隔壁已经画上去的色块，导出就取成了偏蓝的颜色，而预览读的是原图。
      */
     @Test
-    fun `erase next to a solid block samples the original background, as the preview does`() = runTest {
+    fun `near colour next to a solid block samples the original background, as the preview does`() = runTest {
         val sink = FakeSink()
-        val src = writeSource("erase.png", 400, 400, png = true)        // 下半部分是白底
-        // 两块上下紧挨着：抹除的采样环会伸进下面那块色块里
-        val erase = maskedItem(100f, 250f, 300f, 280f).copy(
-            candidateId = "erase", look = MaskLook(MaskStyle.ERASE),
+        val src = writeSource("near.png", 400, 400, png = true)        // 下半部分是白底
+        // 两块上下紧挨着：近似色的采样环会伸进下面那块色块里
+        val near = maskedItem(100f, 250f, 300f, 280f).copy(
+            candidateId = "near", look = MaskLook(MaskStyle.SOLID, MaskOptions(solidNear = true)),
         )
         val solid = maskedItem(100f, 282f, 300f, 330f).copy(candidateId = "solid")
-        exporter(sink).export(ExportRequest(src, "image/png", planWith(solid, erase), 1f, false))
-        // 抹除取到的是白底，没有降级成天蓝色块
+        exporter(sink).export(ExportRequest(src, "image/png", planWith(solid, near), 1f, false))
+        // 近似色取到的是白底，没有掺进天蓝
         assertThat(sink.bitmap!!.getPixel(200, 265)).isEqualTo(Color.WHITE)
         assertThat(sink.bitmap!!.getPixel(200, 300)).isEqualTo(MaskOptions.SKY_BLUE)
     }

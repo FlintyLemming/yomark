@@ -34,8 +34,6 @@ import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.AutoFixHigh
-import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -61,6 +59,8 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -71,13 +71,13 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
-import moe.flinty.yomark.render.EraseRenderer
 import moe.flinty.yomark.render.MaskStyleInfo
+import moe.flinty.yomark.render.NearColor
 import moe.flinty.yomark.ui.ColorTarget
 import kotlin.math.roundToInt
 
@@ -93,8 +93,8 @@ data class StyleBarModel(
     val colorPick: ColorTarget? = null,
     /** 「应用到全部」会改动的已打码块数。0 时按钮不可点。 */
     val applicable: Int = 0,
-    /** 抹除在这张图上降级成色块时的说明。 */
-    val degradeNote: String? = null,
+    /** 这张图上取到的近似色，最多三种：面板上「近似色」那一颗、开着近似色时色块的小样子都画它们（见 [nearColorsOf]）。 */
+    val nearColors: List<Int> = emptyList(),
 )
 
 /** 样式栏上的动作。都有空实现，测试只接自己关心的。 */
@@ -113,12 +113,12 @@ interface StyleBarActions {
 }
 
 /**
- * 样式栏（spec §7.5 修订）：一排六种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
+ * 样式栏（spec §7.5 修订）：一排五种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
  *
  * 样式栏是「画笔」：换了样式、调了颜色，从下一次打码起生效——新画的框、点了打码的虚线框都用它，
  * 已经打好的码不变；选中了手动框时，改动也落在那个框上。面板上的「应用到全部」把这张图上打好的码全换成这样。
  *
- * 安全性说明与降级说明贴在样式下面，面板收起时也在——用户切到模糊的那一刻就该知道模糊不是安全手段，
+ * 安全性说明贴在样式下面，面板收起时也在——用户切到模糊的那一刻就该知道模糊不是安全手段，
  * 而不是导出之后才发现。
  */
 @Composable
@@ -128,7 +128,7 @@ fun StyleBar(
     modifier: Modifier = Modifier,
 ) {
     Column(modifier.fillMaxWidth()) {
-        StylePalette(model.look, panelOpen = model.panelOpen, onClick = actions::onStyleClick)
+        StylePalette(model.look, model.nearColors, panelOpen = model.panelOpen, onClick = actions::onStyleClick)
         val note = styleNote(model)
         if (note != null) {
             Text(
@@ -142,18 +142,18 @@ fun StyleBar(
     StyleSheet(model, actions)
 }
 
-/** 贴在样式下面的说明：模糊、马赛克、马克笔的安全性说明，或抹除降级成色块的说明。 */
-private fun styleNote(model: StyleBarModel): String? = MaskStyleInfo.note(model.look.style) ?: model.degradeNote
+/** 贴在样式下面的说明：模糊、马赛克、马克笔的安全性说明。 */
+private fun styleNote(model: StyleBarModel): String? = MaskStyleInfo.note(model.look.style)
 
 // ---------- 样式那一排 ----------
 
 /**
- * 六种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
- * 小样子跟着参数走：色块是当前的颜色，表情是当前的表情——不点开面板也看得出下一笔是什么样。
+ * 五种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
+ * 小样子跟着参数走：色块是当前的颜色（近似色是图上取到的颜色），表情是当前的表情——不点开面板也看得出下一笔是什么样。
  * 选中的那一项名字后面有个小箭头：再点它一下，面板就弹出来。面板从下面往上弹，所以收着时箭头朝上、弹出来后朝下。
  */
 @Composable
-private fun StylePalette(look: MaskLook, panelOpen: Boolean, onClick: (MaskStyle) -> Unit) {
+private fun StylePalette(look: MaskLook, nearColors: List<Int>, panelOpen: Boolean, onClick: (MaskStyle) -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -164,6 +164,7 @@ private fun StylePalette(look: MaskLook, panelOpen: Boolean, onClick: (MaskStyle
             StyleTool(
                 style = style,
                 options = look.options,
+                nearColors = nearColors,
                 selected = style == look.style,
                 panelOpen = panelOpen,
                 onClick = { onClick(style) },
@@ -177,6 +178,7 @@ private fun StylePalette(look: MaskLook, panelOpen: Boolean, onClick: (MaskStyle
 private fun StyleTool(
     style: MaskStyle,
     options: MaskOptions,
+    nearColors: List<Int>,
     selected: Boolean,
     panelOpen: Boolean,
     onClick: () -> Unit,
@@ -197,7 +199,7 @@ private fun StyleTool(
                 .background(if (selected) colors.secondaryContainer else Color.Transparent, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
-            StyleGlyph(style, options)
+            StyleGlyph(style, options, nearColors)
         }
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -221,26 +223,51 @@ private fun StyleTool(
 
 /**
  * 样式栏上每一项的小样子。宽屏的样式方块（StyleGrid）也用它，方块大时按 [scale] 放大。
+ *
+ * @param nearColors 色块开着近似色时，小样子画的是图上取到的这几种颜色（见 [NearSolidGlyph]）
  */
 @Composable
-internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, scale: Float = 1f) {
+internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, nearColors: List<Int> = emptyList(), scale: Float = 1f) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     when (style) {
-        MaskStyle.SOLID -> Box(
+        MaskStyle.SOLID -> if (options.solidNear) NearSolidGlyph(nearColors, scale) else Box(
             Modifier
                 .size(width = 22.dp * scale, height = 16.dp * scale)
                 .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
                 .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
         )
         MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp * scale)
-        MaskStyle.ERASE -> Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
         MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
         MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
         MaskStyle.MARKER -> Box(
             Modifier
                 .size(width = 22.dp * scale, height = 12.dp * scale)
                 .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
+        )
+    }
+}
+
+/**
+ * 开着近似色的色块：和固定颜色的色块一样大的圆角矩形，填的是图上取到最多的那种近似色，描一圈虚线——
+ * 白底页面上取到的多半是白色，看上去就是一个快要融进底色的虚线框，正是近似色的意思。
+ * 不像面板上那颗圆那样轮着换颜色：样式栏一直在眼前，一直在动会分心。
+ */
+@Composable
+private fun NearSolidGlyph(nearColors: List<Int>, scale: Float) {
+    val dash = MaterialTheme.colorScheme.outline
+    val fill = nearColors.firstOrNull()?.let(::Color) ?: NEAR_PLACEHOLDER
+    Canvas(Modifier.size(width = 22.dp * scale, height = 16.dp * scale)) {
+        val corner = CornerRadius(4.dp.toPx() * scale)
+        drawRoundRect(fill, cornerRadius = corner)
+        val stroke = 1.dp.toPx()
+        val on = 2.dp.toPx() * scale
+        drawRoundRect(
+            dash,
+            topLeft = Offset(stroke / 2f, stroke / 2f),
+            size = Size(size.width - stroke, size.height - stroke),
+            cornerRadius = corner,
+            style = Stroke(stroke, pathEffect = PathEffect.dashPathEffect(floatArrayOf(on, on * 0.75f))),
         )
     }
 }
@@ -402,7 +429,7 @@ private fun PanelHeader(model: StyleBarModel, actions: StyleBarActions, title: S
 private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions) {
     val look = model.look
     Column(Modifier.padding(end = 12.dp)) {
-        StyleControls(look, model.colorPick, actions)
+        StyleControls(look, model.colorPick, model.nearColors, actions)
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = actions::onReset, enabled = !look.options.isDefaultFor(look.style)) {
@@ -418,12 +445,12 @@ private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions) {
 }
 
 @Composable
-private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, actions: StyleBarActions) {
+private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: List<Int>, actions: StyleBarActions) {
     val options = look.options
     fun emit(next: MaskOptions, inProgress: Boolean = false) = actions.onLookChange(look.copy(options = next), inProgress)
 
     @Composable
-    fun Colors(target: ColorTarget, palette: List<NamedColor>, label: String) {
+    fun Colors(target: ColorTarget, palette: List<NamedColor>, label: String, near: NearChoice? = null) {
         PanelLabel(label)
         ColorPicker(
             color = target.colorOf(options),
@@ -432,11 +459,14 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, actions: Styl
             onColor = { rgb, inProgress -> emit(target.withColor(options, rgb), inProgress) },
             onColorFinished = actions::onLookChangeFinished,
             onEyedropper = { actions.onPickColor(if (colorPick == target) null else target) },
+            near = near,
+            onNear = { emit(options.copy(solidNear = true)) },
         )
     }
 
     when (look.style) {
-        MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, "颜色")
+        // 近似色排在色板最前面：原先的「抹除」，并进色块之后就是色块的一种取色方式
+        MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, "颜色", NearChoice(options.solidNear, nearColors))
 
         MaskStyle.EMOJI -> {
             PanelLabel("表情")
@@ -456,15 +486,6 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, actions: Styl
                     )
                 }
             }
-        }
-
-        MaskStyle.ERASE -> {
-            Text(
-                "用四周的颜色把这块填平，看不出打过码。背景太复杂的地方填不平，会改用色块。",
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 4.dp),
-            )
-            Colors(ColorTarget.SOLID, SOLID_PALETTE, "改用色块时的颜色")
         }
 
         MaskStyle.PIXELATE -> {
@@ -557,18 +578,20 @@ private fun EmojiPicker(selected: String, onPick: (String) -> Unit) {
 }
 
 /**
- * 抹除在这张图上有几处降级成了色块（spec §8）。用户需要知道为什么，
- * 而不是导出后发现「怎么和预览不一样」。只数用抹除打的码。
+ * 「近似色」那一颗和色块的小样子上画的颜色：这张图上真取到的近似色，最多三种，块数多的排前面。
+ *
+ * 选中了框时只取它的——面板改的就是它。否则取图上每一块的（打了码的、圈出的都算，画笔下一笔多半落在它们身上），
+ * 相近的并成一种。一块也没有时取整张图上占地最多的颜色，多半就是页面的底色，下一块多半也画在它上面。
  */
-internal fun eraseDegradeNote(image: SourceImage?, plan: MaskPlan): String? {
-    image ?: return null
-    val eraser = EraseRenderer()
-    val degrading = plan.items.count {
-        it.state == MaskState.MASKED && it.look.style == MaskStyle.ERASE &&
-            eraser.willDegrade(image.bitmap, it.quad, image.scale)
-    }
-    return if (degrading == 0) null else "$degrading 处背景太复杂，已改用色块"
+internal fun nearColorsOf(image: SourceImage?, plan: MaskPlan, selected: MaskItem?): List<Int> {
+    image ?: return emptyList()
+    val quads = selected?.let { listOf(it.quad) } ?: plan.items.map { it.quad }
+    if (quads.isEmpty()) return listOfNotNull(NearColor.dominant(image.bitmap))
+    val found = quads.mapNotNull { NearColor.around(image.bitmap, it, image.scale) }
+    return NearColor.heaps(found).take(MAX_NEAR_COLORS).map { it.color }
 }
+
+private const val MAX_NEAR_COLORS = 3
 
 // ---------- 色板与表情 ----------
 

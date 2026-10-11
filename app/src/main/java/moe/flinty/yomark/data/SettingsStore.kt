@@ -40,7 +40,8 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     val lastStyle: Flow<MaskStyle> = store.data.map { prefs ->
         val raw = prefs[KEY_STYLE] ?: return@map MaskStyle.SOLID
         // 枚举名是持久化格式的一部分：删掉或改名一个样式后，旧安装里的值会读不回来。
-        // 读不回来就退回 SOLID，而不是崩在启动路径上。
+        // 读不回来就退回 SOLID，而不是崩在启动路径上。抹除并进色块（近似色）后，旧安装里的抹除也走这一条，
+        // 近似色由 maskOptions 接上
         runCatching { MaskStyle.valueOf(raw) }.getOrDefault(MaskStyle.SOLID)
     }
 
@@ -49,16 +50,20 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     }
 
     /**
-     * 画笔里各样式的参数：色块颜色、马赛克粗细、模糊强度、马克笔颜色与浓淡、表情与它的底色和排法。
+     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡、表情与它的底色和排法。
      * 与 lastStyle 一样是编辑器里记住的偏好，不是设置页上的项，「恢复默认设置」不动它。
      *
      * 读回来一律 normalized()：手改过的或以后改了范围的旧值收回范围内，色块不会变成半透明的，
      * 马克笔也不会变成不透明的。
+     *
+     * 近似色还没记过、上次的样式是抹除（旧安装），就当开着：抹除就是现在的近似色，画笔照旧是那个样子。
+     * 画笔动过一次之后两项都写下了，这一条就不再起作用。
      */
     val maskOptions: Flow<MaskOptions> = store.data.map { prefs ->
         val fallback = MaskOptions()
         MaskOptions(
             solidColor = prefs[KEY_SOLID_COLOR] ?: fallback.solidColor,
+            solidNear = prefs[KEY_SOLID_NEAR] ?: (prefs[KEY_STYLE] == LEGACY_ERASE),
             pixelBlockDivisor = prefs[KEY_PIXEL_DIVISOR] ?: fallback.pixelBlockDivisor,
             blurRadiusRatio = prefs[KEY_BLUR_RATIO] ?: fallback.blurRadiusRatio,
             markerColor = prefs[KEY_MARKER_COLOR] ?: fallback.markerColor,
@@ -72,6 +77,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val o = options.normalized()
         store.edit {
             it[KEY_SOLID_COLOR] = o.solidColor
+            it[KEY_SOLID_NEAR] = o.solidNear
             it[KEY_PIXEL_DIVISOR] = o.pixelBlockDivisor
             it[KEY_BLUR_RATIO] = o.blurRadiusRatio
             it[KEY_MARKER_COLOR] = o.markerColor
@@ -274,6 +280,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     private companion object {
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_SOLID_COLOR = intPreferencesKey("mask_solid_color")
+        val KEY_SOLID_NEAR = booleanPreferencesKey("mask_solid_near")
         val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor")
         val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio")
         val KEY_MARKER_COLOR = intPreferencesKey("mask_marker_color")
@@ -307,5 +314,8 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
         /** 人脸、条码的识别模式里原先那个「关」。只在读老安装时认它，见 recognitionConfig。 */
         const val LEGACY_OFF = "OFF"
+
+        /** 原先的样式「抹除」，现在是色块的近似色。只在读老安装时认它，见 lastStyle、maskOptions。 */
+        const val LEGACY_ERASE = "ERASE"
     }
 }

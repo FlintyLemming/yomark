@@ -63,11 +63,13 @@ class MaskOptionsTest {
         assertThat(tuned.resetFor(MaskStyle.SOLID).emoji).isEqualTo("🐱")
     }
 
-    @Test fun `erase shares the solid color, the color it falls back to`() {
-        val tuned = MaskOptions(solidColor = 0xFF000000.toInt())
-        assertThat(tuned.isDefaultFor(MaskStyle.ERASE)).isFalse()
-        assertThat(tuned.resetFor(MaskStyle.ERASE).solidColor).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(tuned.isDefaultFor(MaskStyle.BLUR)).isTrue()
+    /** 近似色是色块的一项：色块的「恢复默认」把它关掉，固定的颜色也回到天蓝。 */
+    @Test fun `near colour belongs to the solid style`() {
+        val near = MaskOptions(solidNear = true)
+        assertThat(near.isDefaultFor(MaskStyle.SOLID)).isFalse()
+        assertThat(near.isDefaultFor(MaskStyle.BLUR)).isTrue()
+        assertThat(near.resetFor(MaskStyle.SOLID)).isEqualTo(MaskOptions())
+        assertThat(near.resetFor(MaskStyle.EMOJI).solidNear).isTrue()
     }
 
     @Test fun `withAlpha keeps the color and replaces only the alpha`() {

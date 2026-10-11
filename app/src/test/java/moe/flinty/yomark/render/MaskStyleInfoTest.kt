@@ -6,7 +6,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-// 最后一条会构造全部六个渲染器，它们在构造期就碰 android.graphics.Paint —— 纯 JUnit 下 not mocked。
+// 最后一条会构造全部五个渲染器，它们在构造期就碰 android.graphics.Paint —— 纯 JUnit 下 not mocked。
 // 不读像素，所以不需要 NATIVE 图形模式。
 @RunWith(RobolectricTestRunner::class)
 class MaskStyleInfoTest {
@@ -15,8 +15,8 @@ class MaskStyleInfoTest {
         MaskStyle.entries.forEach { assertThat(MaskStyleInfo.label(it)).isNotEmpty() }
     }
 
-    @Test fun `solid emoji and erase are irreversible`() {
-        listOf(MaskStyle.SOLID, MaskStyle.EMOJI, MaskStyle.ERASE).forEach {
+    @Test fun `solid and emoji are irreversible`() {
+        listOf(MaskStyle.SOLID, MaskStyle.EMOJI).forEach {
             assertThat(MaskStyleInfo.safety(it)).isEqualTo(MaskSafety.IRREVERSIBLE)
         }
     }
@@ -52,8 +52,8 @@ class MaskStyleInfoTest {
 
     @Test fun `the style bar offers every style once, irreversible ones first`() {
         assertThat(MaskStyleInfo.ORDER).containsExactlyElementsIn(MaskStyle.entries)
-        assertThat(MaskStyleInfo.ORDER.take(3).map { MaskStyleInfo.safety(it) })
-            .containsExactly(MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE)
+        assertThat(MaskStyleInfo.ORDER.take(2).map { MaskStyleInfo.safety(it) })
+            .containsExactly(MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE)
     }
 
     @Test fun `the registry implements every style`() {

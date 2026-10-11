@@ -11,6 +11,7 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
@@ -75,11 +76,12 @@ class StyleBarTest {
 
     // ---------- 样式那一排 ----------
 
-    @Test fun allSixStylesAreOffered() {
+    @Test fun allFiveStylesAreOffered() {
         show(StyleBarModel(MaskLook()))
-        listOf("色块", "表情", "抹除", "马赛克", "模糊", "马克笔").forEach {
+        listOf("色块", "表情", "马赛克", "模糊", "马克笔").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
+        compose.onNodeWithText("抹除").assertDoesNotExist()      // 并进了色块，是色块的近似色
         compose.onNodeWithText("色块").assertIsSelected()
     }
 
@@ -98,11 +100,6 @@ class StyleBarTest {
     @Test fun markerShowsTheAnnotationOnlyWarning() {
         show(StyleBarModel(MaskLook(MaskStyle.MARKER)))
         compose.onNodeWithText("马克笔只做标记，盖不住下面的内容").assertIsDisplayed()
-    }
-
-    @Test fun eraseDegradationNoteIsShownWhenPresent() {
-        show(StyleBarModel(MaskLook(MaskStyle.ERASE), degradeNote = "3 处背景太复杂，已改用色块"))
-        compose.onNodeWithText("3 处背景太复杂，已改用色块").assertIsDisplayed()
     }
 
     @Test fun thePanelStaysOutOfTheWayUntilOpened() {
@@ -201,14 +198,50 @@ class StyleBarTest {
         assertThat(looks[2].emojiBackground).isEqualTo(0xFFFFE082.toInt())
     }
 
-    @Test fun eraseOffersTheColorItFallsBackTo() {
+    // ---------- 近似色 ----------
+
+    /** 近似色排在色块的色板最前面；点了还是色块，只是打开近似色，固定的颜色记着不动。 */
+    @Test fun pickingNearColorKeepsTheSolidStyle() {
         val actions = Recorder()
-        show(open(MaskStyle.ERASE), actions)
-        compose.onNodeWithText("改用色块时的颜色").assertIsDisplayed()
-        compose.onNodeWithContentDescription("黑色").performClick()
-        val look = actions.looks.single().first
-        assertThat(look.style).isEqualTo(MaskStyle.ERASE)
+        show(open(MaskStyle.SOLID, MaskOptions(solidColor = 0xFF000000.toInt())), actions)
+        compose.onNodeWithContentDescription("黑色").assertIsSelected()
+        compose.onNodeWithText("近似色").performClick()
+        val (look, inProgress) = actions.looks.single()
+        assertThat(look.style).isEqualTo(MaskStyle.SOLID)
+        assertThat(look.options.solidNear).isTrue()
         assertThat(look.options.solidColor).isEqualTo(0xFF000000.toInt())
+        assertThat(inProgress).isFalse()
+    }
+
+    /** 开着近似色时选中的是它，色板上哪一格都不算选中（连「自定义」也不算），下面说一句它是怎么取色的。 */
+    @Test fun nearColorIsTheOnlySelectedSwatchWhileOn() {
+        show(open(MaskStyle.SOLID, MaskOptions(solidNear = true)).copy(nearColors = listOf(0xFFFFFFFF.toInt())))
+        compose.onNodeWithText("近似色").assertIsSelected()
+        compose.onNodeWithContentDescription("天蓝").assertIsNotSelected()
+        compose.onNodeWithContentDescription("自定义颜色").assertIsNotSelected()
+        compose.onNodeWithText("每一块取它四周的颜色填上，纯色背景上几乎看不出打过码").assertIsDisplayed()
+    }
+
+    @Test fun theNearColorHintStaysHiddenWhileOff() {
+        show(open(MaskStyle.SOLID))
+        compose.onNodeWithText("近似色").assertIsNotSelected()
+        compose.onNodeWithText("每一块取它四周的颜色填上，纯色背景上几乎看不出打过码").assertDoesNotExist()
+    }
+
+    /** 开着近似色时点色板上的颜色：换回固定的颜色。 */
+    @Test fun pickingAPresetColorTurnsNearColorOff() {
+        val actions = Recorder()
+        show(open(MaskStyle.SOLID, MaskOptions(solidNear = true)), actions)
+        compose.onNodeWithContentDescription("黑色").performClick()
+        val options = actions.looks.single().first.options
+        assertThat(options.solidNear).isFalse()
+        assertThat(options.solidColor).isEqualTo(0xFF000000.toInt())
+    }
+
+    /** 近似色只有色块有：表情的底色、马克笔的颜色都是一种固定的颜色。 */
+    @Test fun onlyTheSolidStyleOffersNearColor() {
+        show(open(MaskStyle.EMOJI))
+        compose.onNodeWithText("近似色").assertDoesNotExist()
     }
 
     @Test fun mosaicAndBlurHaveTheirSliders() {
@@ -284,10 +317,5 @@ class StyleBarTest {
         val note = "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
         compose.onAllNodesWithText(note).assertCountEquals(2)
         compose.onNode(hasText(note) and hasAnyAncestor(isDialog())).assertIsDisplayed()
-    }
-
-    @Test fun theSheetRepeatsTheEraseDegradationNote() {
-        show(open(MaskStyle.ERASE).copy(degradeNote = "3 处背景太复杂，已改用色块"))
-        compose.onNode(hasText("3 处背景太复杂，已改用色块") and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 }

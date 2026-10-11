@@ -37,13 +37,13 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 宽屏的样式按钮：六种样式排成两行三列的圆角方块（宽屏增补设计）。
+ * 宽屏的样式按钮：五种样式排成两行三列的圆角方块（宽屏增补设计）。
  *
  * 方块跟着给它的地方变大变小，不在旁边空出一块：竖着拿时铺满下面那一块的左半边（[fillHeight]），
  * 横着拿时铺满右边那一栏的宽、高取宽的四分之三。方块大了，里面的小样子和名字跟着放大。
  *
- * 照草图一列一列地放：第一列是色块和表情，往右依次是抹除、马赛克，模糊、马克笔——
- * 左边盖得严，越往右越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
+ * 照草图一列一列地放：色块是出厂的那一种，抹除并进来成了它的近似色之后，独占第一列、两格高；
+ * 往右依次是表情、马赛克，模糊、马克笔——左边盖得严，越往右越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
  * 点一种换样式，再点当前那一种才弹出或收起调节面板；安全性说明贴在方块下面。
  *
  * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
@@ -58,7 +58,7 @@ fun StyleGrid(
     holdHeight: Boolean = false,
 ) {
     val look = model.look
-    val note = MaskStyleInfo.note(look.style) ?: model.degradeNote
+    val note = MaskStyleInfo.note(look.style)
     val held = remember { HeldHeight() }
     Layout(
         content = {
@@ -66,6 +66,7 @@ fun StyleGrid(
                 StyleTile(
                     style = style,
                     options = look.options,
+                    nearColors = model.nearColors,
                     selected = style == look.style,
                     panelOpen = model.panelOpen,
                     onClick = { actions.onStyleClick(style) },
@@ -98,13 +99,21 @@ fun StyleGrid(
                 .coerceAtLeast(0)
                 .also { held.px = it }
         }
-        val tiles = measurables.take(STYLES).map { it.measure(Constraints.fixed(tileW, tileH)) }
         val gridH = tileH * ROWS + gap * (ROWS - 1)
+        // 第一个（色块）占满第一列的两格，其余的一列一列地排
+        val tiles = measurables.take(STYLES).mapIndexed { i, m ->
+            m.measure(Constraints.fixed(tileW, if (i == 0) gridH else tileH))
+        }
         val height = (gridH + noteH).coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, height) {
             tiles.forEachIndexed { i, tile ->
-                // 一列一列地放：先排满第一列的两个，再到下一列
-                tile.place((i / ROWS) * (tileW + gap), (i % ROWS) * (tileH + gap))
+                if (i == 0) {
+                    tile.place(0, 0)
+                } else {
+                    // 一列一列地放：先排满第二列的两个，再到下一列
+                    val cell = i - 1
+                    tile.place((1 + cell / ROWS) * (tileW + gap), (cell % ROWS) * (tileH + gap))
+                }
             }
             note?.place(0, gridH)
         }
@@ -117,7 +126,7 @@ private class HeldHeight {
 }
 
 /**
- * 一个方块：上面是这种样式的小样子（跟着参数走，色块是当前的颜色），下面是名字。
+ * 一个方块：上面是这种样式的小样子（跟着参数走，色块是当前的颜色或取到的近似色），下面是名字。
  * 选中的那一个垫上底色、描一圈主题色，名字后面的小箭头说明再点一下就展开（或收起）调节面板：
  * 收着时朝上，开着时朝下。
  * 圆角随方块大小走，小方块圆一些，大方块是圆角矩形。
@@ -126,6 +135,7 @@ private class HeldHeight {
 private fun StyleTile(
     style: MaskStyle,
     options: MaskOptions,
+    nearColors: List<Int>,
     selected: Boolean,
     panelOpen: Boolean,
     onClick: () -> Unit,
@@ -150,7 +160,7 @@ private fun StyleTile(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            StyleGlyph(style, options, scale)
+            StyleGlyph(style, options, nearColors, scale)
             Spacer(Modifier.height(4.dp * scale))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -172,7 +182,7 @@ private fun StyleTile(
     }
 }
 
-private const val STYLES = 6
+private val STYLES = MaskStyleInfo.ORDER.size
 private const val ROWS = 2
 private const val COLUMNS = 3
 

@@ -20,6 +20,13 @@ class ColorTargetTest {
         assertThat(ColorTarget.EMOJI_BACKGROUND.withColor(o, 0x0000FF00).emojiBackground).isEqualTo(Color.GREEN)
     }
 
+    /** 色块挑了一种颜色（色板、自定义、吸管）就是要这个颜色：近似色跟着关掉，别的样式的不动。 */
+    @Test fun `picking a solid color turns near colour off`() {
+        val near = MaskOptions(solidNear = true)
+        assertThat(ColorTarget.SOLID.withColor(near, Color.RED).solidNear).isFalse()
+        assertThat(ColorTarget.EMOJI_BACKGROUND.withColor(near, Color.RED).solidNear).isTrue()
+    }
+
     @Test fun `the marker keeps its opacity when its color changes`() {
         val o = MaskOptions(markerColor = MaskOptions.withAlpha(Color.YELLOW, 0.3f))
         val next = ColorTarget.MARKER.withColor(o, Color.BLUE)

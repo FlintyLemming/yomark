@@ -8,10 +8,14 @@ import kotlin.math.roundToInt
 /** 未圈出的区域根本不在 plan 里，因此只有两个枚举值。 */
 enum class MaskState { MASKED, OUTLINED }
 
-enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, EMOJI, ERASE }
+/**
+ * 枚举名是持久化格式的一部分（SettingsStore 记着画笔的样式名）。
+ * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）。
+ */
+enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, EMOJI }
 
 /**
- * 各样式的参数。一份里装着全部六种样式的参数，每块码只读它自己那种样式的几项；
+ * 各样式的参数。一份里装着全部五种样式的参数，每块码只读它自己那种样式的几项；
  * 编辑器里调好的参数记在 SettingsStore，下次打开沿用。
  *
  * 能调的项都有范围（见 [normalized]），范围的边界是安全底线，不是审美：
@@ -22,9 +26,15 @@ data class MaskOptions(
     /**
      * 色块的颜色，出厂天蓝色。预览与导出是同一个渲染器，所以导出图上也是这个颜色。
      * 只换颜色不换安全性：SolidRenderer 强制不透明，换什么颜色都与原来的黑块一样不可还原；
-     * 像素化太小、抹除遇到复杂背景时降级成的色块也用这个颜色。
+     * 像素化太小时降级成的色块也用这个颜色。开着 [solidNear] 时不用它，但它还记着，关掉近似色就回到它。
      */
     val solidColor: Int = SKY_BLUE,
+    /**
+     * 近似色：色块不填 [solidColor]，每一块各取它四周的颜色（见 NearColor），在纯色背景上看不太出打过码。
+     * 照样是不透明的一整块，安全性与色块相同。原先的「抹除」就是它，只是背景太杂时降级成色块；
+     * 现在不降级——它只说颜色相近，不说看不出来，杂的背景上取到的颜色也比一块天蓝更融得进去。
+     */
+    val solidNear: Boolean = false,
     /**
      * 马赛克的粗细：块边长约为区域短边 / divisor，再受 12px 下限约束（spec §8）。
      * 出厂的 8 就是最细的一档，只能往粗调（见 [PIXEL_DIVISOR_RANGE]、PixelateRenderer.blockSizeFor）。
@@ -42,7 +52,7 @@ data class MaskOptions(
     /**
      * 当前渲染坐标系相对**原图**的比例。预览画在降采样的分析图上（< 1），导出画在原图上（= 1）。
      *
-     * 渲染器里的绝对像素常数（像素化的 12px 块下限、抹除的 4px 采样环）按它换算。
+     * 渲染器里的绝对像素常数（像素化的 12px 块下限、近似色的 4px 采样环）按它换算。
      * 不换算的话，长边超过 2048 的图上预览会比导出更糊——而预览是用户判断
      * 「这块到底遮没遮住」的唯一依据，预览比导出安全等于在骗用户。
      *
@@ -71,8 +81,7 @@ data class MaskOptions(
     fun resetFor(style: MaskStyle): MaskOptions {
         val factory = MaskOptions()
         return when (style) {
-            // 抹除的面板上调的是它降级时用的色块颜色，与色块是同一项
-            MaskStyle.SOLID, MaskStyle.ERASE -> copy(solidColor = factory.solidColor)
+            MaskStyle.SOLID -> copy(solidColor = factory.solidColor, solidNear = factory.solidNear)
             MaskStyle.PIXELATE -> copy(pixelBlockDivisor = factory.pixelBlockDivisor)
             MaskStyle.BLUR -> copy(blurRadiusRatio = factory.blurRadiusRatio)
             MaskStyle.MARKER -> copy(markerColor = factory.markerColor)
