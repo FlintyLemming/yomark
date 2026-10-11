@@ -2,22 +2,25 @@ package moe.flinty.yomark.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.BugReport
-import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Policy
+import androidx.compose.material.icons.outlined.SettingsBackupRestore
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import moe.flinty.yomark.BuildConfig
-import moe.flinty.yomark.debug.TraceLog
 
 /**
  * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
@@ -29,11 +32,12 @@ const val PRIVACY_POLICY_URL = "https://yomark.flinty.moe/privacy/"
 internal const val TAPS_TO_DEBUG = 7
 
 /**
- * 关于：应用的版本号，和隐私权政策（原先单独一行摆在一级页上，2026-10-11 挪进来）。
+ * 关于：应用的版本号、隐私权政策（原先单独一行摆在一级页上，2026-10-11 挪进来），
+ * 和恢复默认设置（原先在一级页的最后一项，同日挪进来），点了先问一句。
  *
  * 版本号连点七下打开调试信息，照着 Android 系统设置里打开开发者选项的样子：点到第三下起提示还差几下，
- * 打开后这一页多一个「开发者」分组：开关、保留最近几次、查看调试记录；编辑页顶栏也多一个按钮（见 DebugTraceSheet）。
- * 藏起来是因为它只给排查问题用；不想要了把开关拨回去，整组跟着收起来，记下的也一并删掉。
+ * 打开后一级页多一项「开发者」（开关、保留最近几次、查看调试记录都在那一页，见 [DeveloperSettingsScreen]），
+ * 编辑页顶栏也多一个按钮（见 DebugTraceSheet）。
  *
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  *
@@ -43,16 +47,15 @@ internal const val TAPS_TO_DEBUG = 7
 fun AboutSettingsScreen(
     debugTrace: Boolean,
     onDebugTraceChange: (Boolean) -> Unit,
+    onReset: () -> Unit,
     onNavigateUp: () -> Unit,
-    traceCapacity: Int = TraceLog.DEFAULT_CAPACITY,
-    onTraceCapacityChange: (Int) -> Unit = {},
-    onOpenTraceHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
     version: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
     openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
     notify: (String) -> Unit = rememberToast(),
 ) {
     var taps by remember { mutableIntStateOf(0) }
+    var confirmReset by rememberSaveable { mutableStateOf(false) }
 
     SettingsScaffold(title = "关于", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -63,7 +66,7 @@ fun AboutSettingsScreen(
                     summary = version,
                     interaction = Modifier.clickable {
                         if (debugTrace) {
-                            notify("调试信息已经打开")
+                            notify("调试信息已经打开，在设置的「开发者」里")
                             return@clickable
                         }
                         taps++
@@ -72,7 +75,7 @@ fun AboutSettingsScreen(
                             left <= 0 -> {
                                 taps = 0
                                 onDebugTraceChange(true)
-                                notify("已打开调试信息")
+                                notify("已打开调试信息，设置里多了「开发者」一项")
                             }
                             left <= TAPS_TO_DEBUG - 3 -> notify("再点 $left 次即可打开调试信息")
                         }
@@ -87,42 +90,33 @@ fun AboutSettingsScreen(
                 )
             }
         }
-        if (debugTrace) {
-            item {
-                SectionHeader("开发者")
-                SettingsGroup {
-                    SwitchRow(
-                        title = "调试信息",
-                        summary = "编辑页顶栏多一个按钮，查看每次识别的文字识别结果、规则命中，以及 AI 增强识别的提示词和模型的原始回答",
-                        icon = Icons.Outlined.BugReport,
-                        checked = true,
-                        onCheckedChange = onDebugTraceChange,
-                    )
-                    LinkRow(
-                        title = "调试记录",
-                        summary = "最近 $traceCapacity 次识别，换了图、重开应用都还在",
-                        icon = Icons.Outlined.History,
-                        onClick = onOpenTraceHistory,
-                    )
-                }
-            }
-            item {
-                SectionHeader("保留最近几次识别")
-                SettingsGroup(Modifier.selectableGroup()) {
-                    TraceLog.CAPACITY_OPTIONS.forEach { count ->
-                        RadioRow(
-                            title = "$count 次",
-                            selected = traceCapacity == count,
-                            onClick = { onTraceCapacityChange(count) },
-                        )
-                    }
-                }
-                FooterText(
-                    "记录存在应用自己的目录里，不写入系统日志、不进备份；里面有截图上识别出的原文。" +
-                        "超出的旧记录自动删掉，关掉调试信息时全部删掉。",
+        item {
+            GroupSpacer()
+            SettingsGroup {
+                LinkRow(
+                    title = "恢复默认设置",
+                    summary = "除外观外，全部恢复出厂值",
+                    icon = Icons.Outlined.SettingsBackupRestore,
+                    onClick = { confirmReset = true },
                 )
             }
         }
+    }
+
+    if (confirmReset) {
+        AlertDialog(
+            onDismissRequest = { confirmReset = false },
+            icon = { Icon(Icons.Outlined.SettingsBackupRestore, contentDescription = null) },
+            title = { Text("恢复默认设置？") },
+            text = { Text("文字、人脸、条码和导出的设置都会恢复出厂值。主题色和识别动效不变。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmReset = false
+                    onReset()
+                }) { Text("恢复") }
+            },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("取消") } },
+        )
     }
 }
 

@@ -38,7 +38,7 @@ import moe.flinty.yomark.ui.components.share
 import moe.flinty.yomark.ui.components.toText
 
 /**
- * 设置 → 关于 → 调试记录：不用先打开一张图，也看得到之前几次识别的记录。内容和编辑页顶栏的面板是同一份。
+ * 设置 → 开发者 → 调试记录：不用先打开一张图，也看得到之前几次识别的记录。内容和编辑页顶栏的面板是同一份。
  *
  * 记录一次一张卡片，自己就是一个长列表，套不进 [SettingsScaffold] 的 LazyColumn 里，所以这一页用普通的小标题栏。
  * 「清空」先问一句：删了就找不回来。

@@ -30,6 +30,7 @@ import moe.flinty.yomark.ui.settings.AboutSettingsScreen
 import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
+import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
@@ -64,16 +65,22 @@ class SettingsScreenTest {
         config: RecognitionConfig = RecognitionConfig(),
         exportReminder: Boolean = true,
         onOpen: (SettingsPage) -> Unit = {},
-        onReset: () -> Unit = {},
-    ) = show { SettingsScreen(config, exportReminder, onOpen, onReset, onNavigateUp = {}) }
+        developer: Boolean = false,
+    ) = show { SettingsScreen(config, exportReminder, onOpen, onNavigateUp = {}, developer = developer) }
 
     // ---------- 一级页 ----------
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "关于", "恢复默认设置").forEach {
+        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
+    }
+
+    /** 恢复默认设置挪进了「关于」，一级页上不再单独一行。 */
+    @Test fun resetIsNoLongerOnTheFirstPage() {
+        home()
+        compose.onNodeWithText("恢复默认设置").assertDoesNotExist()
     }
 
     /** 「文字识别」并进了「文字」：认字和认出来怎么处理不再分在两处。 */
@@ -82,10 +89,10 @@ class SettingsScreenTest {
         compose.onNode(hasText("文字识别")).assertDoesNotExist()
     }
 
-    /** 隐私权政策挪进了「关于」：一级页上那一行写着版本号，也提一句隐私权政策在里面。 */
-    @Test fun theAboutRowSaysTheVersionAndWhereThePrivacyPolicyWent() {
+    /** 隐私权政策、恢复默认都挪进了「关于」：一级页上那一行写着版本号，也提一句这两样在里面。 */
+    @Test fun theAboutRowSaysTheVersionAndWhatMovedIn() {
         home()
-        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策").assertIsDisplayed()
+        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置").assertIsDisplayed()
         compose.onNode(hasText("yomark.flinty.moe/privacy/")).assertDoesNotExist()
     }
 
@@ -129,23 +136,17 @@ class SettingsScreenTest {
             .inOrder()
     }
 
-    /** 恢复默认在一级页上就是普通的一行，误点一下不能就把设置全清了。 */
-    @Test fun resetAsksFirst() {
-        var resets = 0
-        home(onReset = { resets++ })
-        compose.onNodeWithText("恢复默认设置").performClick()
-        assertThat(resets).isEqualTo(0)
-        compose.onNodeWithText("恢复").performClick()
-        assertThat(resets).isEqualTo(1)
+    /** 开发者那一项平常用不着，连点版本号打开调试信息之后才出现。 */
+    @Test fun theDeveloperTopicIsHiddenUntilDebugInfoIsOn() {
+        home()
+        compose.onNodeWithText("开发者").assertDoesNotExist()
     }
 
-    @Test fun resetCanBeCancelled() {
-        var resets = 0
-        home(onReset = { resets++ })
-        compose.onNodeWithText("恢复默认设置").performClick()
-        compose.onNodeWithText("取消").performClick()
-        compose.onNodeWithText("恢复").assertDoesNotExist()
-        assertThat(resets).isEqualTo(0)
+    @Test fun theDeveloperTopicOpensItsPage() {
+        val opened = mutableListOf<SettingsPage>()
+        home(developer = true, onOpen = { opened += it })
+        compose.onNodeWithText("开发者").performClick()
+        assertThat(opened).containsExactly(SettingsPage.DEVELOPER)
     }
 
     // ---------- 人脸 ----------
@@ -396,19 +397,15 @@ class SettingsScreenTest {
     private fun about(
         debugTrace: Boolean = false,
         onDebugTraceChange: (Boolean) -> Unit = {},
+        onReset: () -> Unit = {},
         openUrl: (String) -> Unit = {},
         notify: (String) -> Unit = {},
-        traceCapacity: Int = 20,
-        onTraceCapacityChange: (Int) -> Unit = {},
-        onOpenTraceHistory: () -> Unit = {},
     ) = show {
         AboutSettingsScreen(
             debugTrace = debugTrace,
             onDebugTraceChange = onDebugTraceChange,
+            onReset = onReset,
             onNavigateUp = {},
-            traceCapacity = traceCapacity,
-            onTraceCapacityChange = onTraceCapacityChange,
-            onOpenTraceHistory = onOpenTraceHistory,
             version = "0.11.1 (19)",
             openUrl = openUrl,
             notify = notify,
@@ -437,7 +434,26 @@ class SettingsScreenTest {
         compose.onNodeWithText("隐私权政策").assertIsDisplayed()
     }
 
-    /** 和系统设置里打开开发者选项一样：连点七下版本号，第三下起提示还差几下。 */
+    /** 恢复默认在「关于」里也是普通的一行，误点一下不能就把设置全清了。 */
+    @Test fun resetAsksFirst() {
+        var resets = 0
+        about(onReset = { resets++ })
+        compose.onNodeWithText("恢复默认设置").performClick()
+        assertThat(resets).isEqualTo(0)
+        compose.onNodeWithText("恢复").performClick()
+        assertThat(resets).isEqualTo(1)
+    }
+
+    @Test fun resetCanBeCancelled() {
+        var resets = 0
+        about(onReset = { resets++ })
+        compose.onNodeWithText("恢复默认设置").performClick()
+        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("恢复").assertDoesNotExist()
+        assertThat(resets).isEqualTo(0)
+    }
+
+    /** 和系统设置里打开开发者选项一样：连点七下版本号，第三下起提示还差几下，打开后说一句去哪找。 */
     @Test fun tappingTheVersionSevenTimesTurnsOnDebugInfo() {
         val changes = mutableListOf<Boolean>()
         val notes = mutableListOf<String>()
@@ -452,46 +468,78 @@ class SettingsScreenTest {
         ).inOrder()
         compose.onNodeWithText("版本").performClick()
         assertThat(changes).containsExactly(true)
-        assertThat(notes.last()).isEqualTo("已打开调试信息")
+        assertThat(notes.last()).isEqualTo("已打开调试信息，设置里多了「开发者」一项")
     }
 
-    /** 开关只在打开之后出现：平常用不着，不摆在外面。 */
-    @Test fun theDebugSwitchIsHiddenUntilTurnedOn() {
-        about(debugTrace = false)
-        compose.onNodeWithText("调试信息").assertDoesNotExist()
+    /** 调试的设置都挪去了「开发者」，打开了「关于」里也不多出东西。 */
+    @Test fun theAboutPageHoldsNoDebugSettings() {
+        about(debugTrace = true)
+        listOf("调试信息", "调试记录", "保留最近几次识别").forEach {
+            compose.onNodeWithText(it).assertDoesNotExist()
+        }
     }
 
-    @Test fun theDebugSwitchTurnsItOffAgain() {
-        var latest: Boolean? = null
-        about(debugTrace = true, onDebugTraceChange = { latest = it })
-        compose.onNodeWithText("调试信息").performClick()
-        assertThat(latest).isFalse()
-    }
-
-    @Test fun theDeveloperGroupPicksHowManyRunsToKeep() {
-        val picked = mutableListOf<Int>()
-        about(debugTrace = true, traceCapacity = 20, onTraceCapacityChange = { picked += it })
-        compose.onNodeWithText("最近 20 次识别，换了图、重开应用都还在").assertExists()
-        compose.onNode(hasScrollToKeyAction()).performScrollToNode(hasText("50 次"))
-        compose.onNodeWithText("50 次").performClick()
-        assertThat(picked).containsExactly(50)
-    }
-
-    @Test fun theDeveloperGroupOpensTheHistory() {
-        var opened = false
-        about(debugTrace = true, onOpenTraceHistory = { opened = true })
-        compose.onNodeWithText("调试记录").performClick()
-        assertThat(opened).isTrue()
-    }
-
-    /** 已经打开了，再点版本号只说一句，不再数。 */
+    /** 已经打开了，再点版本号只说一句开关在哪，不再数。 */
     @Test fun tappingTheVersionWhenAlreadyOnJustSaysSo() {
         val changes = mutableListOf<Boolean>()
         val notes = mutableListOf<String>()
         about(debugTrace = true, onDebugTraceChange = { changes += it }, notify = { notes += it })
         repeat(7) { compose.onNodeWithText("版本").performClick() }
         assertThat(changes).isEmpty()
-        assertThat(notes.distinct()).containsExactly("调试信息已经打开")
+        assertThat(notes.distinct()).containsExactly("调试信息已经打开，在设置的「开发者」里")
+    }
+
+    // ---------- 开发者 ----------
+
+    private fun developer(
+        debugTrace: Boolean = true,
+        onDebugTraceChange: (Boolean) -> Unit = {},
+        traceCapacity: Int = 20,
+        onTraceCapacityChange: (Int) -> Unit = {},
+        onOpenTraceHistory: () -> Unit = {},
+    ) = show {
+        DeveloperSettingsScreen(
+            debugTrace = debugTrace,
+            onDebugTraceChange = onDebugTraceChange,
+            onNavigateUp = {},
+            traceCapacity = traceCapacity,
+            onTraceCapacityChange = onTraceCapacityChange,
+            onOpenTraceHistory = onOpenTraceHistory,
+        )
+    }
+
+    @Test fun theDebugSwitchTurnsItOffAgain() {
+        var latest: Boolean? = null
+        developer(onDebugTraceChange = { latest = it })
+        compose.onNodeWithText("调试信息").performClick()
+        assertThat(latest).isFalse()
+    }
+
+    /** 关掉之后这一页不自己退出，只剩开关，下面几组收起来，说一句怎么再打开。 */
+    @Test fun turnedOffOnlyTheSwitchIsLeft() {
+        var latest: Boolean? = null
+        developer(debugTrace = false, onDebugTraceChange = { latest = it })
+        compose.onNodeWithText("调试记录").assertDoesNotExist()
+        compose.onNodeWithText("保留最近几次识别").assertDoesNotExist()
+        compose.onNodeWithText("在「关于」里连点版本号七下", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("调试信息").performClick()
+        assertThat(latest).isTrue()
+    }
+
+    @Test fun theDeveloperPagePicksHowManyRunsToKeep() {
+        val picked = mutableListOf<Int>()
+        developer(traceCapacity = 20, onTraceCapacityChange = { picked += it })
+        compose.onNodeWithText("最近 20 次识别，换了图、重开应用都还在").assertExists()
+        compose.onNode(hasScrollToKeyAction()).performScrollToNode(hasText("50 次"))
+        compose.onNodeWithText("50 次").performClick()
+        assertThat(picked).containsExactly(50)
+    }
+
+    @Test fun theDeveloperPageOpensTheHistory() {
+        var opened = false
+        developer(onOpenTraceHistory = { opened = true })
+        compose.onNodeWithText("调试记录").performClick()
+        assertThat(opened).isTrue()
     }
 
     // ---------- 导出、外观 ----------

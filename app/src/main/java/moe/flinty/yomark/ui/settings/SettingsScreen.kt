@@ -2,22 +2,14 @@ package moe.flinty.yomark.ui.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.IosShare
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.QrCode2
-import androidx.compose.material.icons.outlined.SettingsBackupRestore
 import androidx.compose.material.icons.outlined.TextFields
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.engine.RecognitionConfig
@@ -28,7 +20,7 @@ import moe.flinty.yomark.rules.RuleCatalog
  * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
  * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
  */
-enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPORT, APPEARANCE, ABOUT, DEBUG_TRACE }
+enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPORT, APPEARANCE, DEVELOPER, ABOUT, DEBUG_TRACE }
 
 /**
  * 设置的一级页（2026-10-07 起，见 docs/superpowers/specs/2026-10-07-yomark-settings-pages-design.md）。
@@ -38,7 +30,8 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPOR
  *
  * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
  * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、导出和外观。
- * 再往下是关于（版本号、隐私权政策；隐私权政策原先单独一行，2026-10-11 挪进去），最后一项恢复默认，点了先问一句。
+ * 最后是关于：版本号、隐私权政策、恢复默认设置（隐私权政策原先单独一行，恢复默认原先是一级页的最后一项，2026-10-11 都挪了进去）。
+ * 在关于里连点版本号打开调试信息之后（[developer]），关于上面多一项「开发者」，照着 Android 系统设置里开发者选项的样子。
  *
  * AI 那一行的小字是固定的，不写本机 Gemini Nano 眼下的情况：那得去问系统的 AICore 服务，
  * 不值得每次打开设置都问一遍，点进去再看。
@@ -48,12 +41,10 @@ fun SettingsScreen(
     config: RecognitionConfig,
     exportReminder: Boolean,
     onOpen: (SettingsPage) -> Unit,
-    onReset: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
+    developer: Boolean = false,
 ) {
-    var confirmReset by rememberSaveable { mutableStateOf(false) }
-
     SettingsScaffold(title = "设置", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
@@ -112,44 +103,24 @@ fun SettingsScreen(
         item {
             GroupSpacer()
             SettingsGroup {
+                if (developer) {
+                    NavigationRow(
+                        title = "开发者",
+                        summary = "调试信息、调试记录",
+                        icon = Icons.Outlined.Code,
+                        iconColors = SettingsIconColors.purple,
+                        onClick = { onOpen(SettingsPage.DEVELOPER) },
+                    )
+                }
                 NavigationRow(
                     title = "关于",
-                    summary = "版本 ${BuildConfig.VERSION_NAME} · 隐私权政策",
+                    summary = "版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置",
                     icon = Icons.Outlined.Info,
                     iconColors = SettingsIconColors.gray,
                     onClick = { onOpen(SettingsPage.ABOUT) },
                 )
             }
         }
-
-        item {
-            GroupSpacer()
-            SettingsGroup {
-                NavigationRow(
-                    title = "恢复默认设置",
-                    summary = "除外观外，全部恢复出厂值",
-                    icon = Icons.Outlined.SettingsBackupRestore,
-                    iconColors = SettingsIconColors.gray,
-                    onClick = { confirmReset = true },
-                )
-            }
-        }
-    }
-
-    if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            icon = { Icon(Icons.Outlined.SettingsBackupRestore, contentDescription = null) },
-            title = { Text("恢复默认设置？") },
-            text = { Text("文字、人脸、条码和导出的设置都会恢复出厂值。主题色和识别动效不变。") },
-            confirmButton = {
-                TextButton(onClick = {
-                    confirmReset = false
-                    onReset()
-                }) { Text("恢复") }
-            },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("取消") } },
-        )
     }
 }
 

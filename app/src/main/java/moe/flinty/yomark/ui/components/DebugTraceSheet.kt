@@ -120,7 +120,7 @@ internal fun DebugTraceContent(
             }
         }
         Text(
-            "存在应用自己的目录里，不写系统日志、不进备份；在设置 → 关于里关掉调试信息时一并删掉。",
+            "存在应用自己的目录里，不写系统日志、不进备份；在设置 → 开发者里关掉调试信息时一并删掉。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp),

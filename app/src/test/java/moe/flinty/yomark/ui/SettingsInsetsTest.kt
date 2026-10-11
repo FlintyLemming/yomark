@@ -50,7 +50,7 @@ class SettingsInsetsTest {
 
     private fun show(
         screen: @Composable () -> Unit = {
-            SettingsScreen(RecognitionConfig(), exportReminder = true, onOpen = {}, onReset = {}, onNavigateUp = {})
+            SettingsScreen(RecognitionConfig(), exportReminder = true, onOpen = {}, onNavigateUp = {})
         },
     ) {
         compose.runOnUiThread { compose.activity.enableEdgeToEdge() }

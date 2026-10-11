@@ -35,15 +35,17 @@ class SettingsActivity : ComponentActivity() {
         setSettingsContent(store) {
             val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
             val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
+            val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
             val current = config
             val on = reminder
-            if (current != null && on != null) {
+            val developer = debugTrace
+            if (current != null && on != null && developer != null) {
                 SettingsScreen(
                     config = current,
                     exportReminder = on,
                     onOpen = { page -> startActivity(SettingsPageActivity.intent(this, page)) },
-                    onReset = { lifecycleScope.launch { store.resetSettings() } },
                     onNavigateUp = ::finish,
+                    developer = developer,
                 )
             }
         }
@@ -125,19 +127,30 @@ class SettingsPageActivity : ComponentActivity() {
                     )
                 }
             }
-            SettingsPage.ABOUT -> {
+            SettingsPage.DEVELOPER -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
                 val capacity by store.debugTraceCapacity.collectAsStateWithLifecycle(initialValue = null)
                 val on = debugTrace
                 val keep = capacity
                 if (on != null && keep != null) {
-                    AboutSettingsScreen(
+                    DeveloperSettingsScreen(
                         debugTrace = on,
                         onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
                         onNavigateUp = ::finish,
                         traceCapacity = keep,
                         onTraceCapacityChange = { next -> lifecycleScope.launch { store.setDebugTraceCapacity(next) } },
                         onOpenTraceHistory = { startActivity(intent(this, SettingsPage.DEBUG_TRACE)) },
+                    )
+                }
+            }
+            SettingsPage.ABOUT -> {
+                val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
+                debugTrace?.let { on ->
+                    AboutSettingsScreen(
+                        debugTrace = on,
+                        onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
+                        onReset = { lifecycleScope.launch { store.resetSettings() } },
+                        onNavigateUp = ::finish,
                     )
                 }
             }

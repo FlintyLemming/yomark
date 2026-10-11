@@ -134,7 +134,7 @@ private fun failure(stage: TraceStage, title: String, ms: Long, error: Throwable
 )
 
 /**
- * 最近几次识别的记录，最新的在前。只留 [capacity] 次（设置 → 关于里选），挤出去的连文件一起删。
+ * 最近几次识别的记录，最新的在前。只留 [capacity] 次（设置 → 开发者里选），挤出去的连文件一起删。
  *
  * 给了 [store] 就落盘：每次有改动，把改了的那几次各自重写一遍（[persist]），进程起来时读回来（[restore]）。
  * 没给（单测、引擎各环节的单测）就只在内存里。

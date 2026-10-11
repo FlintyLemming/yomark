@@ -10,7 +10,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 /**
- * 整个进程共用的那一份调试记录：每个编辑页都往这里记，设置 → 关于 → 调试记录也看这一份。
+ * 整个进程共用的那一份调试记录：每个编辑页都往这里记，设置 → 开发者 → 调试记录也看这一份。
  * 第一次用时建起来，从磁盘读回之前的记录，之后一直跟着设置走——保留几次改了就裁，调试信息关了就连文件一起清掉。
  */
 fun sharedTraceLog(context: Context): TraceLog =
