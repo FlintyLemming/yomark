@@ -454,13 +454,33 @@ class EditorViewModel(
             return
         }
         val hit = GestureRules.hitTest(_state.value.plan.items, imagePoint)
-        if (hit?.source == DetectorSource.MANUAL) {
-            finishLookEdit()
-            uiState = _state.value.copy(selectedManualId = hit.candidateId)
+        if (hit != null) {
+            tapItem(hit)
             return
         }
-        // 点空白、点候选都算点了别处：选中态收起
-        if (hit != null) mutate { it.toggle(hit.candidateId, _state.value.brush) }
+        // 点空白算点了别处：选中态收起
+        finishLookEdit()
+        uiState = _state.value.copy(selectedManualId = null)
+    }
+
+    /**
+     * 宽屏的列表上点了一行：和在画布上点那一块一样，识别出的切换打码、手动框选中。
+     * 吸管在等着取色时点的是列表不是图，先收起吸管，这一下照常算数。
+     */
+    fun onListItemClick(id: String) {
+        val item = _state.value.plan.find(id) ?: return
+        cancelColorPick()
+        tapItem(item)
+    }
+
+    private fun tapItem(item: MaskItem) {
+        if (item.source == DetectorSource.MANUAL) {
+            finishLookEdit()
+            uiState = _state.value.copy(selectedManualId = item.candidateId)
+            return
+        }
+        // 点候选也算点了别处：选中态收起
+        mutate { it.toggle(item.candidateId, _state.value.brush) }
         finishLookEdit()
         uiState = _state.value.copy(selectedManualId = null)
     }

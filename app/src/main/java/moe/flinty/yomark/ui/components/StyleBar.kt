@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import moe.flinty.yomark.core.image.SourceImage
@@ -133,7 +134,7 @@ fun StyleBar(
             enter = expandVertically() + fadeIn(),
             exit = shrinkVertically() + fadeOut(),
         ) {
-            StylePanel(model, actions)
+            StylePanel(model, actions, Modifier.padding(horizontal = 12.dp, vertical = 4.dp), phonePanelMaxHeight())
         }
     }
 }
@@ -212,34 +213,36 @@ private fun StyleTool(
     }
 }
 
-/** 样式栏上每一项的小样子。 */
+/**
+ * 样式栏上每一项的小样子。宽屏的样式方块（StyleGrid）也用它，方块大时按 [scale] 放大。
+ */
 @Composable
-private fun StyleGlyph(style: MaskStyle, options: MaskOptions) {
+internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, scale: Float = 1f) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     when (style) {
         MaskStyle.SOLID -> Box(
             Modifier
-                .size(width = 22.dp, height = 16.dp)
-                .background(Color(options.solidColor), RoundedCornerShape(4.dp))
-                .border(1.dp, outline, RoundedCornerShape(4.dp)),
+                .size(width = 22.dp * scale, height = 16.dp * scale)
+                .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
+                .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
         )
-        MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp)
-        MaskStyle.ERASE -> Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp), tint = ink)
-        MaskStyle.PIXELATE -> MosaicGlyph(ink)
-        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp), tint = ink)
+        MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp * scale)
+        MaskStyle.ERASE -> Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
+        MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
+        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
         MaskStyle.MARKER -> Box(
             Modifier
-                .size(width = 22.dp, height = 12.dp)
-                .background(Color(options.markerColor), RoundedCornerShape(3.dp)),
+                .size(width = 22.dp * scale, height = 12.dp * scale)
+                .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
         )
     }
 }
 
 /** 马赛克的小样子：3×3 的格子，深浅错开。 */
 @Composable
-private fun MosaicGlyph(ink: Color) {
-    Canvas(Modifier.size(18.dp)) {
+private fun MosaicGlyph(ink: Color, side: Dp) {
+    Canvas(Modifier.size(side)) {
         val cell = size.width / 3f
         for (i in 0 until 3) for (j in 0 until 3) {
             val alpha = MOSAIC_SHADES[(i + 2 * j) % MOSAIC_SHADES.size]
@@ -257,21 +260,30 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 
 // ---------- 调节面板 ----------
 
-/**
- * 当前样式的调节面板，就在样式那一排下面展开。画布留在上面不被盖住，每动一下，
- * 选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
- */
+/** 手机上面板最多占四成高度（横屏时屏幕矮，三成），多出来的滚动，画布总有地方留着。 */
 @Composable
-private fun StylePanel(model: StyleBarModel, actions: StyleBarActions) {
-    val look = model.look
-    // 面板最多占四成高度（横屏时屏幕矮，三成），多出来的滚动，画布总有地方留着
+private fun phonePanelMaxHeight(): Dp {
     val config = LocalConfiguration.current
     val landscape = config.screenWidthDp > config.screenHeightDp
-    val maxHeight = (config.screenHeightDp * if (landscape) 0.3f else 0.4f).dp
+    return (config.screenHeightDp * if (landscape) 0.3f else 0.4f).dp
+}
+
+/**
+ * 当前样式的调节面板。手机上就在样式那一排下面展开；宽屏上占框列表的位置（见 WideEditorPanel）。
+ * 画布留在旁边不被盖住，每动一下，选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
+ *
+ * @param maxHeight 再高就滚动。宽屏上不限，由放它的那一格定。
+ */
+@Composable
+internal fun StylePanel(
+    model: StyleBarModel,
+    actions: StyleBarActions,
+    modifier: Modifier = Modifier,
+    maxHeight: Dp = Dp.Unspecified,
+) {
+    val look = model.look
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {

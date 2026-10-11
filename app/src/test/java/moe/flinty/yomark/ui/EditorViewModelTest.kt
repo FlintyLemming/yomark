@@ -203,6 +203,61 @@ class EditorViewModelTest {
         assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
     }
 
+    // ---------- 宽屏的框列表 ----------
+
+    @Test
+    fun `a list tap toggles a detected box like a tap on the canvas`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+
+        vm.onListItemClick("rule")
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.selectedManualId).isNull()       // 点了别处，选中态收起
+
+        vm.onListItemClick("rule")
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.MASKED)
+        vm.undo()
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+    }
+
+    @Test
+    fun `a list tap on a manual box selects it and keeps it masked`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
+        val id = vm.state.value.plan.items.single().candidateId
+        vm.clearSelection()
+
+        vm.onListItemClick(id)
+        assertThat(vm.state.value.selectedManualId).isEqualTo(id)
+        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.MASKED)
+    }
+
+    /** 吸管在等着取色时点了列表：点的不是图，收起吸管，这一下照常切换。 */
+    @Test
+    fun `a list tap puts the eyedropper away and still toggles`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
+        vm.startColorPick(ColorTarget.SOLID)
+
+        vm.onListItemClick("rule")
+        assertThat(vm.state.value.colorPick).isNull()
+        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+    }
+
+    @Test
+    fun `a list tap on a box that is gone does nothing`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.startColorPick(ColorTarget.SOLID)
+        vm.onListItemClick("gone")
+        assertThat(vm.state.value.colorPick).isEqualTo(ColorTarget.SOLID)
+        assertThat(vm.state.value.canUndo).isFalse()
+    }
+
     @Test
     fun `undo restores the plan before the last box`() = runTest(dispatcher) {
         val vm = vm()

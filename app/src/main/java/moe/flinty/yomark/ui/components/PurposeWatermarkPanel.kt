@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import kotlin.math.roundToInt
@@ -31,9 +32,11 @@ import kotlin.math.roundToInt
 /**
  * 用途水印的调节面板：文案、颜色、角度、透明度、密度。
  *
- * 它顶替编辑器的底栏，而不是弹一个对话框或带遮罩的底部弹层——画布留在上面不被盖住，
- * 每动一下滑条，图上的水印就跟着变，所见即导出。
+ * 它顶替编辑器的底栏（宽屏横着拿时顶替右边那一栏），而不是弹一个对话框或带遮罩的底部弹层——
+ * 画布留在旁边不被盖住，每动一下滑条，图上的水印就跟着变，所见即导出。
  * 输入法弹起时编辑器整体让开（见 EditorScreen），打字时也看得到效果。
+ *
+ * @param maxHeight 再高就滚动，出厂见 [purposePanelMaxHeight]
  */
 @Composable
 fun PurposeWatermarkPanel(
@@ -45,12 +48,11 @@ fun PurposeWatermarkPanel(
     onRemove: () -> Unit,
     onDone: () -> Unit,
     modifier: Modifier = Modifier,
+    maxHeight: Dp = purposePanelMaxHeight(),
 ) {
     // 输入框自己持有正在编辑的文字：清空时 ViewModel 那边是 null（暂不加水印），
     // 但框里该是空的，而不是跳回上一句。
     var draft by remember { mutableStateOf(text.orEmpty()) }
-    // 横屏时屏幕矮，面板最多占一半高度，多出来的滚动，画布总有地方留着
-    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
 
     Column(
         modifier
@@ -114,6 +116,10 @@ fun PurposeWatermarkPanel(
         )
     }
 }
+
+/** 面板在画布下面时最多占屏幕高度的一半：横屏时屏幕矮，画布总有地方留着。 */
+@Composable
+internal fun purposePanelMaxHeight(): Dp = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
 
 private fun densityText(density: Float) = when {
     density < 0.8f -> "稀疏"
