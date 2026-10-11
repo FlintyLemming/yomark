@@ -61,6 +61,11 @@ class EditorViewModel(
     private val settings: SettingsStore,
     private val savedState: SavedStateHandle,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    /**
+     * 调试记录（见 debug/Trace.kt）。应用里传进程共用、落盘的那一份（sharedTraceLog），
+     * 换一张图、关掉编辑页再开都还在；单测里各用各的、只在内存里。
+     */
+    val traceLog: TraceLog = TraceLog(),
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -72,9 +77,6 @@ class EditorViewModel(
      */
     val scanStyle: StateFlow<ScanStyle> =
         settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.SWEEP)
-
-    /** 最近几次识别的调试记录（见 debug/Trace.kt）。只在内存里，跟着这个 ViewModel 走，关掉编辑页就没了。 */
-    val traceLog = TraceLog()
 
     /**
      * 调试信息开着没有（设置 → 关于，连点版本号）。开着时顶栏多一个按钮，每次识别都在 [traceLog] 里记一份。

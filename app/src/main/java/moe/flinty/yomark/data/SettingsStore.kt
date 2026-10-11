@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.debug.TraceLog
 import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
@@ -156,12 +157,21 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
     /**
      * 调试信息（设置 → 关于，连点版本号打开）：编辑页顶栏多一个按钮，看每次识别各环节的输入输出。出厂关着。
-     * 这里存的只是开没开；记下来的内容只在编辑器的内存里（见 debug/Trace.kt），不落盘。
+     * 这里存的只是开没开和保留几次；记下来的内容存在应用私有目录里（见 debug/TraceStore.kt），关掉时一并删掉。
      */
     val debugTrace: Flow<Boolean> = store.data.map { it[KEY_DEBUG_TRACE] ?: false }
 
     suspend fun setDebugTrace(on: Boolean) {
         store.edit { it[KEY_DEBUG_TRACE] = on }
+    }
+
+    /** 调试记录保留最近几次识别。只认 [TraceLog.CAPACITY_OPTIONS] 里的档，别的值退回出厂的 20 次。 */
+    val debugTraceCapacity: Flow<Int> = store.data.map { prefs ->
+        prefs[KEY_DEBUG_TRACE_CAPACITY]?.takeIf { it in TraceLog.CAPACITY_OPTIONS } ?: TraceLog.DEFAULT_CAPACITY
+    }
+
+    suspend fun setDebugTraceCapacity(count: Int) {
+        store.edit { it[KEY_DEBUG_TRACE_CAPACITY] = count }
     }
 
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
@@ -279,6 +289,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
         val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
         val KEY_DEBUG_TRACE = booleanPreferencesKey("debug_trace")
+        val KEY_DEBUG_TRACE_CAPACITY = intPreferencesKey("debug_trace_capacity")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。

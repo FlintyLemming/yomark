@@ -18,6 +18,7 @@ import moe.flinty.yomark.billing.BillingRepository
 import moe.flinty.yomark.billing.PurchaseStore
 import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.data.SettingsStore
+import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.buildEngine
 import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.MediaStoreSink
@@ -55,6 +56,7 @@ class EditorActivity : ComponentActivity() {
                     engineProvider = { cfg -> buildEngine(app, cfg) },
                     settings = SettingsStore(app),
                     savedState = createSavedStateHandle(),
+                    traceLog = sharedTraceLog(app),
                 )
             }
         }

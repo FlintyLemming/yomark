@@ -120,28 +120,43 @@ internal fun DebugTraceContent(
             }
         }
         Text(
-            "只记在内存里，不写日志、不存文件，关掉编辑页就清空。",
+            "存在应用自己的目录里，不写系统日志、不进备份；在设置 → 关于里关掉调试信息时一并删掉。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 24.dp),
         )
-        LazyColumn(
-            Modifier.fillMaxWidth(),
+        TraceRunList(
+            runs = runs,
+            emptyText = "还没有记录。打开调试信息之后识别的图才有记录；点「重新识别」，把当前这张图再跑一遍。",
             contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (runs.isEmpty()) {
-                item {
-                    Text(
-                        "还没有记录。打开调试信息之后识别的图才有记录；点「重新识别」，把当前这张图再跑一遍。",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                    )
-                }
+        )
+    }
+}
+
+/** 一次一张卡片，最新的在最上面、默认展开。编辑页的面板和设置里的「调试记录」共用。 */
+@Composable
+internal fun TraceRunList(
+    runs: List<TraceRun>,
+    emptyText: String,
+    contentPadding: PaddingValues,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier.fillMaxWidth(),
+        contentPadding = contentPadding,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (runs.isEmpty()) {
+            item {
+                Text(
+                    emptyText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                )
             }
-            itemsIndexed(runs, key = { _, run -> run.number }) { i, run ->
-                RunCard(run, initiallyExpanded = i == 0)
-            }
+        }
+        itemsIndexed(runs, key = { _, run -> run.number }) { i, run ->
+            RunCard(run, initiallyExpanded = i == 0)
         }
     }
 }
@@ -252,14 +267,14 @@ private fun BlockView(block: TraceBlock) {
 @Composable
 private fun monoStyle(): TextStyle = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace)
 
-private fun List<TraceRun>.toText(): String = joinToString("\n\n") { it.toText() }
+internal fun List<TraceRun>.toText(): String = joinToString("\n\n") { it.toText() }
 
 /**
  * 复制进剪贴板，标成敏感内容（ClipDescription.EXTRA_IS_SENSITIVE，Android 13 起才有这个常量，这里直接写它的值）：
  * 记录里是截图上的原文，系统的剪贴板预览、输入法的粘贴建议里不该露出来。
  * Android 13 起系统自己会提示已复制，之前的版本自己弹一句。
  */
-private fun copyToClipboard(context: Context, text: String) {
+internal fun copyToClipboard(context: Context, text: String) {
     val clip = ClipData.newPlainText("调试信息", text).apply {
         description.extras = PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
     }
@@ -271,7 +286,7 @@ private fun copyToClipboard(context: Context, text: String) {
     }
 }
 
-private fun share(context: Context, text: String) {
+internal fun share(context: Context, text: String) {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
     runCatching { context.startActivity(Intent.createChooser(send, "分享调试信息")) }
 }

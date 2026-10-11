@@ -13,6 +13,7 @@ import androidx.compose.runtime.produceState
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import moe.flinty.yomark.data.SettingsStore
+import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.engine.genai.NanoClient
@@ -126,13 +127,24 @@ class SettingsPageActivity : ComponentActivity() {
             }
             SettingsPage.ABOUT -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
-                debugTrace?.let { on ->
+                val capacity by store.debugTraceCapacity.collectAsStateWithLifecycle(initialValue = null)
+                val on = debugTrace
+                val keep = capacity
+                if (on != null && keep != null) {
                     AboutSettingsScreen(
                         debugTrace = on,
                         onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
                         onNavigateUp = ::finish,
+                        traceCapacity = keep,
+                        onTraceCapacityChange = { next -> lifecycleScope.launch { store.setDebugTraceCapacity(next) } },
+                        onOpenTraceHistory = { startActivity(intent(this, SettingsPage.DEBUG_TRACE)) },
                     )
                 }
+            }
+            SettingsPage.DEBUG_TRACE -> {
+                val log = sharedTraceLog(applicationContext)
+                val runs by log.runs.collectAsStateWithLifecycle()
+                DebugTraceHistoryScreen(runs = runs, onClear = log::clear, onNavigateUp = ::finish)
             }
         }
     }
