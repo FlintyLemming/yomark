@@ -18,9 +18,11 @@ import moe.flinty.yomark.rules.RuleClassifier
  *
  * Gemini Nano 语义判定走 refiners 而不是 classifiers：它慢，不能挡在第一批结果前面，
  * 而且只在用户点「AI 增强识别」时才跑。
+ *
+ * 每一环都套一层 traced()：调试信息开着时记下这一环的输入输出（见 Traced.kt），没开时原样转发。
  */
 fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig()) = RedactionEngine(
-    recognizer = textRecognizerFor(context, config.textEngine),
+    recognizer = textRecognizerFor(context, config.textEngine).traced(),
     regionDetectors = buildList {
         if (config.faceState != RuleState.OFF) {
             add(MlKitFaceDetector(config.face, masked = config.faceState == RuleState.MASKED))
@@ -28,12 +30,12 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
         if (config.barcodeState != RuleState.OFF) {
             add(MlKitBarcodeDetector(config.barcode, masked = config.barcodeState == RuleState.MASKED))
         }
-    },
+    }.map { it.traced() },
     classifiers = listOf(
-        RuleClassifier(RuleCatalog.rulesFor(config), keepUnanchored = config.outlineUnanchoredNames),
+        RuleClassifier(RuleCatalog.rulesFor(config), keepUnanchored = config.outlineUnanchoredNames).traced(),
     ),
     refiners = when (config.semantic) {
-        SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier())
+        SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier().traced())
         SemanticOption.OFF -> emptyList()
     },
 )

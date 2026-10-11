@@ -21,9 +21,11 @@ import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
+import moe.flinty.yomark.ui.settings.AboutSettingsScreen
 import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
@@ -62,14 +64,13 @@ class SettingsScreenTest {
         exportReminder: Boolean = true,
         onOpen: (SettingsPage) -> Unit = {},
         onReset: () -> Unit = {},
-        openUrl: (String) -> Unit = {},
-    ) = show { SettingsScreen(config, exportReminder, onOpen, onReset, onNavigateUp = {}, openUrl = openUrl) }
+    ) = show { SettingsScreen(config, exportReminder, onOpen, onReset, onNavigateUp = {}) }
 
     // ---------- 一级页 ----------
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "隐私权政策", "恢复默认设置").forEach {
+        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "关于", "恢复默认设置").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -80,20 +81,11 @@ class SettingsScreenTest {
         compose.onNode(hasText("文字识别")).assertDoesNotExist()
     }
 
-    /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里。 */
-    @Test fun privacyPolicyOpensInTheBrowser() {
-        var opened: String? = null
-        home(openUrl = { opened = it })
-        compose.onNodeWithText("yomark.flinty.moe/privacy/").assertIsDisplayed()
-        compose.onNodeWithText("隐私权政策").performClick()
-        assertThat(opened).isEqualTo(PRIVACY_POLICY_URL)
-    }
-
-    /** 没有浏览器能接也不能闪退。 */
-    @Test fun privacyPolicySurvivesHavingNoBrowser() {
-        home(openUrl = { throw IllegalStateException("no browser") })
-        compose.onNodeWithText("隐私权政策").performClick()
-        compose.onNodeWithText("隐私权政策").assertIsDisplayed()
+    /** 隐私权政策挪进了「关于」：一级页上那一行写着版本号，也提一句隐私权政策在里面。 */
+    @Test fun theAboutRowSaysTheVersionAndWhereThePrivacyPolicyWent() {
+        home()
+        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策").assertIsDisplayed()
+        compose.onNode(hasText("yomark.flinty.moe/privacy/")).assertDoesNotExist()
     }
 
     /** 一级页不直接摆选项：原先铺在这里的识别模式、引擎都收进了二级页。 */
@@ -130,8 +122,9 @@ class SettingsScreenTest {
         compose.onNodeWithText("文字").performClick()
         compose.onNodeWithText("AI").performClick()
         compose.onNodeWithText("外观").performClick()
+        compose.onNodeWithText("关于").performClick()
         assertThat(opened)
-            .containsExactly(SettingsPage.FACE, SettingsPage.TEXT, SettingsPage.AI, SettingsPage.APPEARANCE)
+            .containsExactly(SettingsPage.FACE, SettingsPage.TEXT, SettingsPage.AI, SettingsPage.APPEARANCE, SettingsPage.ABOUT)
             .inOrder()
     }
 
@@ -395,6 +388,87 @@ class SettingsScreenTest {
         assertThat(mlKitSummary("16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
         assertThat(mlKitSummary("16.0.1", "16.0.2", "16.1.7", "17.3.0"))
             .isEqualTo("文字 16.0.1（英文）/ 16.0.2（中文） · 人脸 16.1.7 · 条码 17.3.0")
+    }
+
+    // ---------- 关于 ----------
+
+    private fun about(
+        debugTrace: Boolean = false,
+        onDebugTraceChange: (Boolean) -> Unit = {},
+        openUrl: (String) -> Unit = {},
+        notify: (String) -> Unit = {},
+    ) = show {
+        AboutSettingsScreen(
+            debugTrace = debugTrace,
+            onDebugTraceChange = onDebugTraceChange,
+            onNavigateUp = {},
+            version = "0.11.1 (19)",
+            openUrl = openUrl,
+            notify = notify,
+        )
+    }
+
+    @Test fun theAboutPageShowsTheVersion() {
+        about()
+        compose.onNodeWithText("版本").assertIsDisplayed()
+        compose.onNodeWithText("0.11.1 (19)").assertIsDisplayed()
+    }
+
+    /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里。 */
+    @Test fun privacyPolicyOpensInTheBrowser() {
+        var opened: String? = null
+        about(openUrl = { opened = it })
+        compose.onNodeWithText("yomark.flinty.moe/privacy/").assertIsDisplayed()
+        compose.onNodeWithText("隐私权政策").performClick()
+        assertThat(opened).isEqualTo(PRIVACY_POLICY_URL)
+    }
+
+    /** 没有浏览器能接也不能闪退。 */
+    @Test fun privacyPolicySurvivesHavingNoBrowser() {
+        about(openUrl = { throw IllegalStateException("no browser") })
+        compose.onNodeWithText("隐私权政策").performClick()
+        compose.onNodeWithText("隐私权政策").assertIsDisplayed()
+    }
+
+    /** 和系统设置里打开开发者选项一样：连点七下版本号，第三下起提示还差几下。 */
+    @Test fun tappingTheVersionSevenTimesTurnsOnDebugInfo() {
+        val changes = mutableListOf<Boolean>()
+        val notes = mutableListOf<String>()
+        about(onDebugTraceChange = { changes += it }, notify = { notes += it })
+        repeat(6) { compose.onNodeWithText("版本").performClick() }
+        assertThat(changes).isEmpty()
+        assertThat(notes).containsExactly(
+            "再点 4 次即可打开调试信息",
+            "再点 3 次即可打开调试信息",
+            "再点 2 次即可打开调试信息",
+            "再点 1 次即可打开调试信息",
+        ).inOrder()
+        compose.onNodeWithText("版本").performClick()
+        assertThat(changes).containsExactly(true)
+        assertThat(notes.last()).isEqualTo("已打开调试信息")
+    }
+
+    /** 开关只在打开之后出现：平常用不着，不摆在外面。 */
+    @Test fun theDebugSwitchIsHiddenUntilTurnedOn() {
+        about(debugTrace = false)
+        compose.onNodeWithText("调试信息").assertDoesNotExist()
+    }
+
+    @Test fun theDebugSwitchTurnsItOffAgain() {
+        var latest: Boolean? = null
+        about(debugTrace = true, onDebugTraceChange = { latest = it })
+        compose.onNodeWithText("调试信息").performClick()
+        assertThat(latest).isFalse()
+    }
+
+    /** 已经打开了，再点版本号只说一句，不再数。 */
+    @Test fun tappingTheVersionWhenAlreadyOnJustSaysSo() {
+        val changes = mutableListOf<Boolean>()
+        val notes = mutableListOf<String>()
+        about(debugTrace = true, onDebugTraceChange = { changes += it }, notify = { notes += it })
+        repeat(7) { compose.onNodeWithText("版本").performClick() }
+        assertThat(changes).isEmpty()
+        assertThat(notes.distinct()).containsExactly("调试信息已经打开")
     }
 
     // ---------- 导出、外观 ----------

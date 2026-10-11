@@ -21,6 +21,8 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.SettingsStore
+import moe.flinty.yomark.debug.TraceLog
+import moe.flinty.yomark.debug.TraceRecorder
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RedactionEngine
 import moe.flinty.yomark.export.ExportOutcome
@@ -41,9 +43,12 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
+import kotlin.coroutines.EmptyCoroutineContext
 
 class EditorViewModel(
     private val intake: ImageIntake,
@@ -67,6 +72,17 @@ class EditorViewModel(
      */
     val scanStyle: StateFlow<ScanStyle> =
         settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.SWEEP)
+
+    /** 最近几次识别的调试记录（见 debug/Trace.kt）。只在内存里，跟着这个 ViewModel 走，关掉编辑页就没了。 */
+    val traceLog = TraceLog()
+
+    /**
+     * 调试信息开着没有（设置 → 关于，连点版本号）。开着时顶栏多一个按钮，每次识别都在 [traceLog] 里记一份。
+     * 不进 EditorUiState，理由同 [scanStyle]。关掉时已经记下的一并清掉。
+     */
+    val debugTrace: StateFlow<Boolean> = settings.debugTrace
+        .onEach { on -> if (!on) traceLog.clear() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
      * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——
@@ -357,7 +373,15 @@ class EditorViewModel(
         val ranWith = config
         val ranOn = engine
         aiReviewJob?.cancel()
-        val result = runCatching { ranOn.analyze(image) }.getOrNull()
+        // 调试信息开着时记下这一次：记录器挂在协程上下文里，识别的各环节自己往里记（见 engine/Traced.kt）
+        val trace = if (debugTrace.value) traceLog.start("识别") else null
+        trace?.add(inputSection(image, ranWith))
+        val outcome = runCatching { withContext(trace ?: EmptyCoroutineContext) { ranOn.analyze(image) } }
+        trace?.run {
+            add(resultSection(outcome))
+            finish()
+        }
+        val result = outcome.getOrNull()
         brushRestored.join()
         // 分析结果不进撤销栈——它是初始状态，不是用户动作。
         // 用户在分析期间画的手动框排在后面，不被覆盖。
@@ -375,7 +399,18 @@ class EditorViewModel(
             aiReview = AiReview.HIDDEN,
             plan = current.plan.copy(items = detected + kept),
         )
-        if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn)
+        if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn, trace)
+    }
+
+    /**
+     * 调试信息里的「重新识别」：当前这张图按眼下的方案再跑一遍，好把这一次记下来——
+     * 打开调试信息之前就识别完的图，不重跑就什么也看不到。走换方案后重跑的那条路，整次压一个撤销快照。
+     */
+    fun rerunRecognition() {
+        val current = _state.value
+        val image = current.image ?: return
+        if (current.analyzing) return
+        reanalyze(image)
     }
 
     /** 最近一次识别出的整页文字，「AI 增强识别」要把它送给模型。只活在内存里，重建后就没有了。 */
@@ -386,9 +421,16 @@ class EditorViewModel(
     /**
      * 「AI 增强识别」不再自动跑（PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒）。
      * 这里只探测模型在不在：在，按钮才出现；机型不支持就什么都不出现。
+     *
+     * 探测也记进这一次识别的调试信息（[trace]）：按钮没出现时，看得到本机的 Nano 是什么情况。
      */
-    private fun offerAiReview(image: SourceImage, ranWith: RecognitionConfig, ranOn: RedactionEngine) {
-        aiReviewJob = viewModelScope.launch {
+    private fun offerAiReview(
+        image: SourceImage,
+        ranWith: RecognitionConfig,
+        ranOn: RedactionEngine,
+        trace: TraceRecorder?,
+    ) {
+        aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
             if (!ranOn.refineReady()) return@launch
             val current = _state.value
             if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
@@ -412,8 +454,14 @@ class EditorViewModel(
         val ranWith = analyzedWith ?: return
         val ranOn = engine
         uiState = current.copy(aiReview = AiReview.RUNNING)
-        aiReviewJob = viewModelScope.launch {
-            val extra = ranOn.refine(lines, current.plan.items.map { it.quad })
+        val trace = if (debugTrace.value) traceLog.start("AI 增强识别") else null
+        aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
+            val extra = try {
+                ranOn.refine(lines, current.plan.items.map { it.quad })
+            } finally {
+                trace?.finish()
+            }
+            trace?.add(refineResultSection(extra, lines))
             ensureActive()
             val now = _state.value
             if (now.image !== image || analyzedWith != ranWith) return@launch

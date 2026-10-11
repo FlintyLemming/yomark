@@ -154,6 +154,16 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         store.edit { it[KEY_THEME_COLOR] = color.name }
     }
 
+    /**
+     * 调试信息（设置 → 关于，连点版本号打开）：编辑页顶栏多一个按钮，看每次识别各环节的输入输出。出厂关着。
+     * 这里存的只是开没开；记下来的内容只在编辑器的内存里（见 debug/Trace.kt），不落盘。
+     */
+    val debugTrace: Flow<Boolean> = store.data.map { it[KEY_DEBUG_TRACE] ?: false }
+
+    suspend fun setDebugTrace(on: Boolean) {
+        store.edit { it[KEY_DEBUG_TRACE] = on }
+    }
+
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -197,7 +207,8 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
 
     /**
      * 设置一级页的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出前提醒回到出厂值。
-     * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动。
+     * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
+     * 调试信息的开关在「关于」里自己关。
      *
      * 做法是删掉这些键，而不是写一份当下的出厂值：读的时候缺省就是出厂值，和新装一样，
      * 出厂值以后再改也不会被这一下冻住（与 RecognitionConfig.ruleOverrides 只存差异同一条理由）。
@@ -267,6 +278,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
         val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
+        val KEY_DEBUG_TRACE = booleanPreferencesKey("debug_trace")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。

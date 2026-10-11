@@ -42,7 +42,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
@@ -65,6 +68,7 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
+import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
@@ -89,6 +93,8 @@ fun EditorScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
+    val debugTrace by vm.debugTrace.collectAsStateWithLifecycle()
+    var debugSheetOpen by rememberSaveable { mutableStateOf(false) }
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
     val styleActions = remember(vm) { ViewModelStyleActions(vm) }
@@ -130,6 +136,16 @@ fun EditorScreen(
         PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
     }
 
+    // 调试信息（设置 → 关于，连点版本号打开）：顶栏的按钮弹出来，盖在画布上
+    if (debugTrace && debugSheetOpen) {
+        val runs by vm.traceLog.runs.collectAsStateWithLifecycle()
+        DebugTraceSheet(
+            runs = runs,
+            onRerun = if (state.image != null && !state.analyzing) vm::rerunRecognition else null,
+            onDismiss = { debugSheetOpen = false },
+        )
+    }
+
     // 手机、宽屏竖着拿、宽屏横着拿（见 EditorLayouts）。转向时 Configuration 变了，这里跟着重组
     val config = LocalConfiguration.current
     val layout = EditorLayouts.choose(config.screenWidthDp, config.screenHeightDp, config.smallestScreenWidthDp)
@@ -153,6 +169,7 @@ fun EditorScreen(
                 // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
+                onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
             )
             val batch = state.batch
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
