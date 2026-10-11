@@ -69,6 +69,21 @@ class SemanticPromptTest {
         assertThat(SemanticPrompt.parse("1|人名|这是一段很长很长很长的普通说明文字", chunk, line)).isEmpty()
     }
 
+    /** 英文全名常常超过 8 个字符，按词数算：4 个词以内的留下，再长的是一句话，不是名字。 */
+    @Test fun `english full names are kept but sentences are not`() {
+        val lines = listOf("Ship to Jennifer Walsh", "María José García López", "please contact our support team for help")
+        val chunk = SemanticPrompt.chunks(lines).single()
+        val reply = """
+            1|人名|Jennifer Walsh
+            2|人名|María José García López
+            3|人名|please contact our support team for help
+        """.trimIndent()
+        assertThat(SemanticPrompt.parse(reply, chunk, lines)).containsExactly(
+            SemanticPrompt.Finding(0, 8..21, SensitiveKind.PERSON_NAME),
+            SemanticPrompt.Finding(1, 0..22, SensitiveKind.PERSON_NAME),
+        )
+    }
+
     @Test fun `the instructions pin the reply format`() {
         assertThat(SemanticPrompt.INSTRUCTIONS).contains("行号|类型|原文")
         assertThat(SemanticPrompt.INSTRUCTIONS).contains("无")

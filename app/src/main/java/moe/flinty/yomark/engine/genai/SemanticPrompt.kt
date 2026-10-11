@@ -54,7 +54,7 @@ object SemanticPrompt {
             val kind = KINDS[m.groupValues[2]] ?: return@mapNotNull null
             val quote = m.groupValues[3].trim().trim(*QUOTES)
             if (quote.length < 2 || quote.length > MAX_SPAN) return@mapNotNull null
-            if (kind == SensitiveKind.PERSON_NAME && quote.length > MAX_NAME) return@mapNotNull null
+            if (kind == SensitiveKind.PERSON_NAME && !plausibleName(quote)) return@mapNotNull null
             val range = locate(texts[lineIndex], quote) ?: return@mapNotNull null
             Finding(lineIndex, range, kind)
         }.distinct().toList()
@@ -90,6 +90,16 @@ object SemanticPrompt {
     private const val MAX_LINE_CHARS = 120
     private const val MAX_SPAN = 60
     private const val MAX_NAME = 8
+    private const val MAX_LATIN_NAME_WORDS = 4
+    private const val MAX_LATIN_NAME = 40
+
+    /**
+     * 人名的长度上限按文种算。有汉字的不超过 8 个字；没有汉字的（英文、拼音）按词数，不超过 4 个词、40 个字符：
+     * 「Jennifer Walsh」有 14 个字符，按汉字的上限会被整条丢掉，「María José García López」也是一个人名。
+     */
+    internal fun plausibleName(quote: String): Boolean =
+        if (quote.any { it in '\u4e00'..'\u9fff' }) quote.length <= MAX_NAME
+        else quote.length <= MAX_LATIN_NAME && quote.trim().split(Regex("\\s+")).size <= MAX_LATIN_NAME_WORDS
 
     internal val INSTRUCTIONS = """
         |你在帮用户给手机截图打码。下面是截图里识别出的文字，每行以「行号: 」开头。

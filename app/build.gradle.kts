@@ -57,13 +57,16 @@ abstract class AssertPermissionsTask : DefaultTask() {
 android {
     namespace = "moe.flinty.yomark"
     compileSdk = 36
+    // 固定 NDK 版本：release 构建要用它从 .so 里抽调试符号（见下面 release 的 ndk {}）。
+    // 选 GitHub ubuntu runner 预装的那一版，CI 不用现下；本地没有时 AGP 会自动装。
+    ndkVersion = "27.3.13750724"
 
     defaultConfig {
         applicationId = "moe.flinty.yomark"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.9.0"
+        versionCode = 17
+        versionName = "0.10.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
         // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
@@ -97,6 +100,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            // ONNX Runtime、ML Kit 带进来原生 .so，Play 会提示「未上传调试符号文件」。
+            // 打 AAB 时把符号表一并放进 BUNDLE-METADATA，上传后 Play 自动关联，原生崩溃与 ANR 的堆栈才能符号化。
+            // 依赖里的 .so 本身已裁掉调试信息，FULL 也抽不出更多，SYMBOL_TABLE 就够了。
+            ndk { debugSymbolLevel = "SYMBOL_TABLE" }
         }
     }
 

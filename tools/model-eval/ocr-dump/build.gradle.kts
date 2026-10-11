@@ -22,9 +22,13 @@ sourceSets {
                 "moe/flinty/yomark/rules/LabeledField.kt", "moe/flinty/yomark/rules/HanView.kt",
                 "moe/flinty/yomark/rules/PersonNameRecognizer.kt", "moe/flinty/yomark/rules/NameAnchor.kt",
                 "moe/flinty/yomark/rules/AddressShape.kt", "moe/flinty/yomark/rules/DateTimeRule.kt",
+                "moe/flinty/yomark/rules/EnglishAddressShape.kt", "moe/flinty/yomark/rules/EnglishNames.kt",
+                "moe/flinty/yomark/rules/EnglishLists.kt",
                 "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )
         }
+        // 英文规则的名单
+        resources.srcDir("../../../app/src/main/resources")
     }
 }
 dependencies {

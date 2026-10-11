@@ -32,7 +32,6 @@ import androidx.compose.material.icons.outlined.Colorize
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -155,8 +154,6 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
             )
-            // 底栏的按钮已经写着「复查中…」，这里只给一条进度，不再重复说一遍
-            if (state.aiReview == AiReview.RUNNING) LinearProgressIndicator(Modifier.fillMaxWidth())
             val batch = state.batch
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
             BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)

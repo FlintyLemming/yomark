@@ -69,14 +69,14 @@ import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
  */
 
 /**
- * 文字：上面一组是「怎么认字」（识别引擎、AI 复查），下面一组是认出来的各类敏感信息，
+ * 文字：上面一组是「怎么认字」（识别引擎、AI 增强识别），下面一组是认出来的各类敏感信息，
  * 每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
  *
  * 各类原先在行尾直接摆一排「关 / 圈出 / 打码」；人名多了一个只属于它的开关之后，行尾放不下，
  * 一类一页又和人脸、条码的页是同一个样子：先是「识别到时怎么办」，再是这一类自己的选项和认法。
  * 原先单独一页的「文字识别」并进来：认字和认出来怎么处理都是「文字」的事，分在两处找不到。
  *
- * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、AI 复查、各类的处理方式和人名的开关。
+ * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、AI 增强识别、各类的处理方式和人名的开关。
  */
 @Composable
 fun TextSettingsScreen(
@@ -106,7 +106,7 @@ fun TextSettingsScreen(
                     onClick = onOpenEngine,
                 )
                 SwitchRow(
-                    title = "AI 复查",
+                    title = "AI 增强识别",
                     summary = "编辑页多一个按钮，点了由端侧 Gemini Nano 补查人名和地址，结果只圈出",
                     icon = Icons.Outlined.AutoAwesome,
                     checked = config.semantic != SemanticOption.OFF,
@@ -115,7 +115,7 @@ fun TextSettingsScreen(
                     },
                 )
             }
-            FooterText("AI 复查离线运行，仅支持部分机型（如 Pixel 9 及以后）。")
+            FooterText("AI 增强识别离线运行，仅支持部分机型（如 Pixel 9 及以后）。")
             SectionHeader("敏感信息")
         }
         val rules = RuleCatalog.inSettingsOrder
@@ -278,7 +278,7 @@ fun BarcodeSettingsScreen(
 /**
  * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
  * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。都只显示，没有可设的项。
- * AI 复查的开关和识别引擎的选择都在「文字」页的「文字识别」一组里。
+ * AI 增强识别的开关和识别引擎的选择都在「文字」页的「文字识别」一组里。
  *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
  */
@@ -299,7 +299,7 @@ fun AiSettingsScreen(
                 )
             }
             FooterText(
-                "Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 复查」用的就是它。" +
+                "Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 增强识别」用的就是它。" +
                     nanoNote(nano)?.let { "\n\n$it" }.orEmpty(),
             )
         }
@@ -526,20 +526,20 @@ internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
 }
 
 /**
- * 卡片下面那句：这个状态对 AI 复查意味着什么。还没问完时不写。
+ * 卡片下面那句：这个状态对 AI 增强识别意味着什么。还没问完时不写。
  *
- * 未下载时不在这里摆下载按钮：开着 AI 复查打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
+ * 未下载时不在这里摆下载按钮：开着 AI 增强识别打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
  */
 internal fun nanoNote(nano: NanoStatus?): String? = when (nano) {
     null -> null
     is NanoStatus.Unavailable ->
-        "只有部分机型有 Gemini Nano（如 Pixel 9 及以后）。本机用不了 AI 复查，其余识别照常。" +
+        "只有部分机型有 Gemini Nano（如 Pixel 9 及以后）。本机用不了 AI 增强识别，其余识别照常。" +
             nano.errorCode?.let { "AICore 返回错误码 $it。" }.orEmpty()
     is NanoStatus.Present -> when (nano.model) {
-        NanoStatus.Model.READY -> "模型已在本机，AI 复查可以用。"
-        NanoStatus.Model.DOWNLOADING -> "系统正在下载模型，下载完就能用 AI 复查。"
+        NanoStatus.Model.READY -> "模型已在本机，AI 增强识别可以用。"
+        NanoStatus.Model.DOWNLOADING -> "系统正在下载模型，下载完就能用 AI 增强识别。"
         NanoStatus.Model.NOT_DOWNLOADED ->
-            "模型还没下载到本机。开着 AI 复查时打开一张图，会请系统下载；下载完，编辑页才出现「AI 复查」按钮。"
+            "模型还没下载到本机。开着 AI 增强识别时打开一张图，会请系统下载；下载完，编辑页才出现「AI 增强识别」按钮。"
     }
 }
 

@@ -39,7 +39,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
 
       - name: Install Android SDK packages
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" > /dev/null
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "ndk;27.3.13750724" > /dev/null
 
       # 用 Secrets 里的固定 keystore 签名，各版 APK 才能互相覆盖安装。
       # 没配 Secrets 时跳过，Gradle 退回 debug 签名（发版那步会拦下）。

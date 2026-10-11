@@ -86,7 +86,7 @@
 - `WideEditorPanel`：宽屏的那一块，竖着拿和横着拿两种排法，以及两种尺寸规则；
 - `StyleGrid`：样式圆钮，小样子沿用手机样式栏的 `StyleGlyph`；
 - `MaskItemList`：框列表，连同 `MaskListOrder`（顺序）、`ItemThumbnails`（缩略图）；
-- `EditorActionRow`：AI 复查、批量进度、导出 / 下一张，从手机底栏里拆出来，两边共用；
+- `EditorActionRow`：AI 增强识别、批量进度、导出 / 下一张，从手机底栏里拆出来，两边共用；
 - 测试：`EditorLayoutTest`（各类设备的尺寸）、`MaskItemListTest`（顺序、缩略图、列表）、
   `EditorScreenLayoutTest`（手机、平板、阔折叠上出不出列表、列表在哪、点一行改不改 plan、面板占不占列表的位置）、
   `EditorViewModelTest`（点列表的四种情况）。

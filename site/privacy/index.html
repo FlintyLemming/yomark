@@ -90,7 +90,7 @@
 <h2>3. 图片如何处理</h2>
 <ul>
   <li><strong>读取</strong>：通过系统照片选择器或「分享」选择图片，本应用只能读到你选中的那几张图，无法访问相册里的其他内容。</li>
-  <li><strong>识别</strong>：文字识别（PP-OCR、Google ML Kit）、人脸和条码识别（Google ML Kit）都使用随应用安装的离线模型，在本机运行。「AI 复查」功能使用手机系统自带的 Gemini Nano（通过 Android AICore），同样在本机运行，本应用不会把图片或文字发送到任何服务器。</li>
+  <li><strong>识别</strong>：文字识别（PP-OCR、Google ML Kit）、人脸和条码识别（Google ML Kit）都使用随应用安装的离线模型，在本机运行。「AI 增强识别」功能使用手机系统自带的 Gemini Nano（通过 Android AICore），同样在本机运行，本应用不会把图片或文字发送到任何服务器。</li>
   <li><strong>临时副本</strong>：编辑期间，图片会复制一份到本应用的私有缓存目录，其他应用无法访问，也不会离开你的手机。打开下一张图片时，上一次的副本会被删除；清除本应用的缓存或卸载本应用也会将其删除。</li>
   <li><strong>导出</strong>：导出的图片保存在手机相册的「Pictures/Yomark」文件夹中，按原图重新绘制，不保留位置、机型、拍摄时间等 EXIF 信息。</li>
 </ul>
@@ -110,7 +110,7 @@
 <p>本应用不申请任何需要你授权的运行时权限（相机、存储、位置、通讯录等）。安装包中仅包含以下不涉及读取个人数据的声明：</p>
 <ul>
   <li><code>com.android.vending.BILLING</code>：用于 Google Play 应用内购买；</li>
-  <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code>：用于调用系统的本机 AI 服务（AI 复查）；</li>
+  <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code>：用于调用系统的本机 AI 服务（AI 增强识别）；</li>
   <li><code>moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code>：Android 组件库自动生成的内部权限，其他应用无法获取。</li>
 </ul>
 

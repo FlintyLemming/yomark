@@ -139,7 +139,11 @@ object DefaultRuleSet {
      * 电话、证件号、地址、「乘车人」这类字段的才算数，照这一行的设置打码；附近什么都没有的，出厂丢掉，
      * 设置 › 文字 › 人名里打开「没有旁证的也圈出」才只圈不打码。
      * 它原先单独成一条规则，设置页上另有一行「人名（无字段名）」；两行都是人名，用户分不清关的是哪一个，
-     * 于是并了回来：一行「人名」管三种认法，一起开关。
+     * 于是并了回来：一行「人名」管这几种认法，一起开关。
+     *
+     * 英文的两种（2026-10）：[EnglishNameCues] 是英文界面上自己说明「这是人」的写法（「Ship to:」「Hi David,」
+     * 「Sarah Johnson <…@…>」），与字段名同一档；[EnglishNameGuess] 按名单从字面猜「Emily Carter」，
+     * 与 HanLP 同一档，要旁证。调研与评测见 docs/english-recognition-research.md。
      */
     private val NAME = CompositeRule(
         id = "name",
@@ -147,7 +151,9 @@ object DefaultRuleSet {
         enabledByDefault = true,
         LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
+        EnglishNameCues(confidence = 0.8f, weakConfidence = 0.7f),
         NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
+        NeedsAnchor(EnglishNameGuess(confidence = 0.6f)),
     )
 
     /**
@@ -163,7 +169,7 @@ object DefaultRuleSet {
      * 地址 = 字段名后面的值 + 长得像门牌的串。
      *
      * 后一种是真机漏检补的：菜鸟快递详情页只写「送至」，淘宝收货卡片什么都不写，
-     * 驿站地址夹在一句通知中间。见 AddressShape。
+     * 驿站地址夹在一句通知中间。见 AddressShape；英文的门牌、城市州邮编、各国邮编见 EnglishAddressShape。
      */
     private val ADDRESS = CompositeRule(
         id = "address",
@@ -180,6 +186,7 @@ object DefaultRuleSet {
             confidence = 0.8f,
         ),
         AddressShape(confidence = 0.7f),
+        EnglishAddressShape(confidence = 0.7f),
     )
 
     /**
@@ -332,6 +339,16 @@ object DefaultRuleSet {
         "就诊人", "患者", "投保人", "被保险人", "受益人", "审批人", "经办人", "抄送", "对方账户", "收款方",
     )
 
+    /**
+     * 英文的人名字段名：只当旁证，同 PERSON_FIELDS。不分大小写，前后要是词边界（「Username」「Guestbook」不算）。
+     * 收货卡片、表单上字段名常单独占一行，名字在下一行：「Passenger」下面是「Emily Carter」。
+     */
+    private val ENGLISH_PERSON_FIELDS = Regex(
+        """(?i)\b(?:full name|first name|last name|legal name|name|recipient|passenger|traveler|traveller|guest|""" +
+            """customer|sender|payee|beneficiary|patient|policy ?holder|card ?holder|account holder|applicant|tenant|""" +
+            """ship to|bill to|deliver to|attn|emergency contact)\b"""
+    )
+
     /** 票种：滴滴出票页那一行就是「沐晨冉 成人」。 */
     private val TICKET_TYPES = listOf("成人票", "儿童票", "学生票", "婴儿票", "成人", "儿童", "学生", "婴儿")
 
@@ -358,5 +375,6 @@ object DefaultRuleSet {
             Words(NAME_LABELS + PERSON_FIELDS, boundedBefore = true),
         ),
         NameAnchor("票种", NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
+        NameAnchor("「Passenger」「Ship to」这类英文字段", NameAnchor.Reach.NEARBY, shape(ENGLISH_PERSON_FIELDS)),
     )
 }

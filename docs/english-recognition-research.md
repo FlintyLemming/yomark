@@ -336,6 +336,22 @@ v5 把「8529 Graham Isle」读成「8529Graham Isle」、「051 Tate Meadow」�
 `SemanticPrompt.MAX_NAME`，见第 1 条）；OCR 换成 PP-OCRv6 small，只换了模型，空格逻辑没动（见 `docs/ppocr-models.md`）。
 下面第 4、5、6 条因此暂不做，第 2 条的混合空格、第 3 条的英文规则仍是可选的后续。
 
+**同日后续**：第 1 条的 `MAX_NAME` 和第 3 条的英文规则已经做了。`SemanticPrompt` 的人名上限改成「有汉字的 8 个字，拉丁字母的 4 个词、40 个字符」；
+原型 v3 搬进了 `rules/`：`EnglishAddressShape`（地址）、`EnglishNameCues`（不要旁证的写法）、`EnglishNameGuess`（名单猜测，要旁证），
+名单在 `app/src/main/resources/moe/flinty/yomark/rules/en/`（约 630 KB），旁证表加了英文字段名一行。没搬的：字段名单独一行、值在下面的
+（`pageFinds`，app 里还没有这种机制）、`PhoneRule` 的 US/GB 再试、混合空格。出厂规则在 v6 small 混合空格的真实 OCR 上（`en-rules … US`）：
+
+| | 人名 | 地址 | 误报 |
+|---|---|---|---|
+| 70 页基准，改前 | 0/210 | 0/145 | 0 |
+| 70 页基准，改后 | 50/210 | 84/145 | 1（聊天里的「Ralph Lauren」） |
+| 原型 v3 打码一档（含 `pageFinds` 和外国电话） | 56/210 | 102/145 | 4 |
+| WebPII 57 页，改前 | 10/55 | 4/66 | 0 |
+| WebPII 57 页，改后 | 42/55 | 38/66 | 0 |
+
+中文系统（`CN`）上人名 51/210、地址不变。第一轮的 15 张页上，中文页的结果与改前逐条相同。漏掉的人名大多不在美国普查名单里
+（尼日利亚、印度、毛利、爱尔兰语的名字）或者在字段名下一行，这部分靠 AI 复查。
+
 按先后：
 
 1. **小修**（各一天以内，与英文模型无关）：
