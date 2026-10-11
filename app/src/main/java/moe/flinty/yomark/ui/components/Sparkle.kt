@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui.components
 
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -28,7 +29,8 @@ import kotlin.math.sin
  *
  * Android 和 Material 只给了静态的 AutoAwesome，没有会动的版本（Gemini、Galaxy AI 那种星星
  * 是各家 App 自己的资源），所以这里自己画：[animating] 时两颗星绕着同一根轴转，一前一后地交错，
- * 前面那颗变大、把后面那颗挡住一部分。星星本身不自转。停下时就是一枚静态图标。
+ * 前面那颗变大、把后面那颗挡住一部分。星星本身不自转。每转半圈都是慢起、加速、再慢慢停回静态图标，
+ * 一拍一拍的，不是一直匀速地转。停下时就是一枚静态图标。
  */
 @Composable
 fun SparkleIcon(
@@ -41,7 +43,7 @@ fun SparkleIcon(
         transition.animateFloat(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = infiniteRepeatable(tween(Sparkle.HALF_TURN_MS, easing = LinearEasing)),
+            animationSpec = infiniteRepeatable(tween(Sparkle.HALF_TURN_MS, easing = Sparkle.EASING)),
             label = "sparkle-progress",
         ).value
     } else 0f
@@ -76,7 +78,14 @@ internal fun SparkleFrame(progress: Float, modifier: Modifier = Modifier, tint: 
  */
 internal object Sparkle {
     /** 转半圈的时长。两颗星长得一样，转半圈两颗正好互换，画面和开始时一样，所以接得上。 */
-    const val HALF_TURN_MS = 1400
+    const val HALF_TURN_MS = 1600
+
+    /**
+     * 每个半圈的快慢：慢起、中间快、慢慢停下，两个半圈之间在静态图标上停约 0.3 秒。
+     * 不用 FastOutSlowIn：它起步太急，交错正好落在最快那一段，遮挡一闪就过去了（不到 0.2 秒）；
+     * 这条两头对称的曲线下，交错能看清约 0.3 秒。
+     */
+    val EASING: Easing = EaseInOut
 
     /** 圈的中心。比图标中心偏右上：静止时大星在左下，整圈走下来也不出图标。 */
     val ORBIT_CENTER = Offset(0.51f, 0.44f)
@@ -103,7 +112,7 @@ internal object Sparkle {
     class Star(val center: Offset, val radius: Float, val depth: Float)
 
     /**
-     * [progress] 在 0..1 里匀速转半圈。前面那颗从左下往右上走，后面那颗反过来。
+     * [progress] 是这半圈转过的比例（快慢由 [EASING] 在动画那边加）。前面那颗从左下往右上走，后面那颗反过来。
      * 先后面再前面：按这个顺序画，前面那颗才盖得住后面那颗。0 和 1 都是静态图标那个样子。
      */
     fun stars(progress: Float): List<Star> {

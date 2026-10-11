@@ -50,6 +50,14 @@ class SparkleTest {
     }
 
     @Test
+    fun `each half turn starts and ends at rest instead of spinning at constant speed`() {
+        assertThat(Sparkle.EASING.transform(0.05f)).isLessThan(0.01f)
+        assertThat(Sparkle.EASING.transform(0.95f)).isGreaterThan(0.99f)
+        // 中间比匀速快
+        assertThat(Sparkle.EASING.transform(0.55f) - Sparkle.EASING.transform(0.45f)).isGreaterThan(0.15f)
+    }
+
+    @Test
     fun `the stars stay inside the icon all the way round`() {
         for (i in 0..200) {
             for (star in Sparkle.stars(i / 200f)) {
