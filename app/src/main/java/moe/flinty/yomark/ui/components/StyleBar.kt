@@ -586,8 +586,8 @@ private fun EmojiPicker(selected: String, onPick: (String) -> Unit) {
 internal fun nearColorsOf(image: SourceImage?, plan: MaskPlan, selected: MaskItem?): List<Int> {
     image ?: return emptyList()
     val quads = selected?.let { listOf(it.quad) } ?: plan.items.map { it.quad }
-    if (quads.isEmpty()) return listOfNotNull(NearColor.dominant(image.bitmap))
-    val found = quads.mapNotNull { NearColor.around(image.bitmap, it, image.scale) }
+    if (quads.isEmpty()) return listOf(NearColor.dominant(image.bitmap))
+    val found = quads.map { NearColor.around(image.bitmap, it, image.scale) }
     return NearColor.heaps(found).take(MAX_NEAR_COLORS).map { it.color }
 }
 

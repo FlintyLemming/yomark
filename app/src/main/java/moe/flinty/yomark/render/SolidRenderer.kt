@@ -10,8 +10,8 @@ import moe.flinty.yomark.core.model.MaskStyle
 /**
  * 实色块（默认）：沿 Quad 描路径填充不透明色。不可还原。
  *
- * 颜色是 [MaskOptions.solidColor]；开了近似色（[MaskOptions.solidNear]）时每块各取四周的颜色（见 [NearColor]），
- * 取不到（框盖满了整张图）就还是 solidColor。
+ * 颜色是 [MaskOptions.solidColor]；开了近似色（[MaskOptions.solidNear]）时每块各取四周的颜色（见 [NearColor]）。
+ * 近似色总能取到一种颜色，开着它就不会再用 solidColor，背景再杂、框盖满整张图也一样。
  */
 class SolidRenderer : MaskRenderer {
     override val style = MaskStyle.SOLID
@@ -25,5 +25,5 @@ class SolidRenderer : MaskRenderer {
     }
 
     private fun colorFor(source: Bitmap, quad: Quad, options: MaskOptions): Int =
-        (if (options.solidNear) NearColor.around(source, quad, options.renderScale) else null) ?: options.solidColor
+        if (options.solidNear) NearColor.around(source, quad, options.renderScale) else options.solidColor
 }

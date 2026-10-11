@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PointF
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.MaskOptions
@@ -15,7 +16,8 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 
 /**
- * 色块的近似色（原先的「抹除」）：每块取四周一圈的中位色填上。背景再杂也不降级成固定颜色。
+ * 色块的近似色（原先的「抹除」）：每块取四周一圈的中位色填上。总能取到一种颜色：
+ * 背景再杂、框贴着图的边、框盖满整张图，都不退回固定颜色。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 模式下 getPixel 恒为 0，断言会假通过
@@ -76,7 +78,6 @@ class NearColorTest {
     @Test fun `a noisy background still gets its near colour, not the fixed one`() {
         val bmp = noisyBackground()
         val expected = NearColor.around(bmp, text)
-        assertThat(expected).isNotNull()
         SolidRenderer().render(Canvas(bmp), bmp, text, near)
         assertThat(bmp.getPixel(100, 100)).isEqualTo(expected)
         assertThat(bmp.getPixel(100, 100)).isNotEqualTo(MaskOptions.SKY_BLUE)
@@ -101,13 +102,32 @@ class NearColorTest {
         SolidRenderer().render(Canvas(bmp), bmp, Quad.fromRect(RectF(180f, 180f, 200f, 200f)), near)
     }
 
-    /** 盖满整张图，四周没有像素可取：退回固定的颜色，而不是取一个谁也说不清的颜色。 */
-    @Test fun `a quad covering the whole image falls back to the fixed colour`() {
+    /** 盖满整张图，四周没有像素可取：取框里面的颜色（这里多半是底色），不退回固定的颜色。 */
+    @Test fun `a quad covering the whole image takes the colour inside it`() {
         val bmp = flatBackground()
-        val whole = Quad.fromRect(RectF(0f, 0f, 200f, 200f))
-        assertThat(NearColor.around(bmp, whole)).isNull()
+        val whole = Quad.fromRect(RectF(-10f, -10f, 210f, 210f))
         SolidRenderer().render(Canvas(bmp), bmp, whole, near.copy(solidColor = Color.BLACK))
-        assertThat(bmp.getPixel(100, 100)).isEqualTo(Color.BLACK)
+        assertClose(bmp.getPixel(100, 100), 245, 245, 247)
+    }
+
+    /**
+     * 大框贴着图的左边和上边：这一圈只剩右边和下边两段还在图里。原先按网格取点，大框的格子比这一圈宽，
+     * 这两段整段漏掉，一个像素也取不到，就退回了固定颜色。
+     */
+    @Test fun `a big box against the image edge still takes the colour around it`() {
+        val bmp = Bitmap.createBitmap(450, 450, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(30, 120, 200)) }
+        Canvas(bmp).drawRect(RectF(0f, 0f, 400f, 400f), Paint().apply { color = Color.rgb(20, 20, 20) })
+        val box = Quad.fromRect(RectF(0f, 0f, 400f, 400f))
+        SolidRenderer().render(Canvas(bmp), bmp, box, near.copy(solidColor = Color.BLACK))
+        assertClose(bmp.getPixel(200, 200), 30, 120, 200)
+    }
+
+    /** 斜着的框：沿着这一圈取色，不管框朝哪个方向歪。 */
+    @Test fun `a tilted box takes the colour around it`() {
+        val bmp = Bitmap.createBitmap(200, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(250, 240, 200)) }
+        Canvas(bmp).drawRect(RectF(85f, 90f, 115f, 110f), Paint().apply { color = Color.rgb(20, 20, 20) })
+        val tilted = Quad(PointF(60f, 100f), PointF(100f, 70f), PointF(140f, 100f), PointF(100f, 130f))
+        assertClose(NearColor.around(bmp, tilted), 250, 240, 200)
     }
 
     /** 白和差几个数的白是同一种；白和聊天截图那种浅灰底（差三十八）是两种。多的排前面。 */
@@ -120,7 +140,7 @@ class NearColorTest {
 
     @Test fun `the dominant colour is the one covering most of the image`() {
         val bmp = flatBackground()
-        assertClose(NearColor.dominant(bmp)!!, 245, 245, 247)
+        assertClose(NearColor.dominant(bmp), 245, 245, 247)
     }
 
     /** 采样环宽度按 renderScale 折算：分析图上与原图上取到的是同一种颜色。 */
