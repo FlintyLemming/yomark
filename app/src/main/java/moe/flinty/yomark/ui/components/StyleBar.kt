@@ -309,14 +309,7 @@ private fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
         ) {
             PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
             // 样式栏下面的说明被面板盖住了，这里再说一遍
-            styleNote(model)?.let {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(end = 12.dp, bottom = 4.dp),
-                )
-            }
+            PanelNote(model)
             StylePanelBody(model, actions)
         }
     }
@@ -341,12 +334,16 @@ internal fun DarkSystemBarIcons() {
 /**
  * 宽屏上的调节面板：占框列表的位置（见 WideEditorPanel），画布留在旁边不被盖住。
  * 每动一下，选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
+ *
+ * @param standalone 顶替了样式方块（手机横着拿，右边那一栏放不下两样）：方块看不见了，和弹出的面板一样
+ *   顶上写出当前样式的名字，方块下面的说明也再说一遍
  */
 @Composable
 internal fun StylePanel(
     model: StyleBarModel,
     actions: StyleBarActions,
     modifier: Modifier = Modifier,
+    standalone: Boolean = false,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -359,10 +356,27 @@ internal fun StylePanel(
                 .animateContentSize()
                 .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         ) {
-            PanelHeader(model, actions)
+            if (standalone) {
+                PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
+                PanelNote(model)
+            } else {
+                PanelHeader(model, actions)
+            }
             StylePanelBody(model, actions)
         }
     }
+}
+
+/** 样式下面的那句说明被面板盖住或顶掉时，面板上再说一遍。 */
+@Composable
+private fun PanelNote(model: StyleBarModel) {
+    val note = styleNote(model) ?: return
+    Text(
+        note,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.error,
+        modifier = Modifier.padding(end = 12.dp, bottom = 4.dp),
+    )
 }
 
 /** 面板顶上：一行小字说清楚改的是什么，右边是收起。弹出的面板上还有个标题，是当前样式的名字。 */

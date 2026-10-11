@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -33,7 +35,10 @@ import kotlin.math.roundToInt
  * 样式的调节面板弹出来时占列表的位置，收起后列表回来。竖着拿时面板比列表那一块高，这一块就跟着长高，
  * 面板不至于挤成一条缝；画布跟着变矮，和手机上面板把画布顶上去是一回事。
  *
- * @param list 框列表，传进来的 Modifier 定好了它的位置和大小
+ * 手机横着拿也用横着的排法，只是没有列表（[list] 为 null）：样式方块在上，导出在最底下。
+ * 这一栏矮，方块底下放不下调节面板，面板弹出来时顶替方块，收起后方块回来；画布照样不被盖住。
+ *
+ * @param list 框列表，传进来的 Modifier 定好了它的位置和大小。手机横着拿时为 null
  * @param actionRow 导出那一行
  */
 @Composable
@@ -41,7 +46,7 @@ fun WideEditorPanel(
     atSide: Boolean,
     styleBar: StyleBarModel,
     styleActions: StyleBarActions,
-    list: @Composable (Modifier) -> Unit,
+    list: (@Composable (Modifier) -> Unit)?,
     actionRow: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,10 +58,21 @@ fun WideEditorPanel(
                 .fillMaxHeight()
                 .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         ) {
-            StyleGrid(styleBar, styleActions, Modifier.fillMaxWidth())
-            Spacer(Modifier.height(16.dp))
-            Box(Modifier.weight(1f).fillMaxWidth()) {
-                if (open) StylePanel(styleBar, styleActions) else list(Modifier.fillMaxSize())
+            if (list != null) {
+                StyleGrid(styleBar, styleActions, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(16.dp))
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (open) StylePanel(styleBar, styleActions) else list(Modifier.fillMaxSize())
+                }
+            } else {
+                Box(Modifier.weight(1f).fillMaxWidth()) {
+                    if (open) {
+                        StylePanel(styleBar, styleActions, standalone = true)
+                    } else {
+                        // 一般放得下；字号调大的矮手机上放不下时，方块和说明在这一块里滚动，不压到导出那一行上
+                        StyleGrid(styleBar, styleActions, Modifier.fillMaxWidth().verticalScroll(rememberScrollState()))
+                    }
+                }
             }
             actionRow(Modifier.padding(top = 8.dp))
         }
@@ -77,7 +93,7 @@ fun WideEditorPanel(
                 StyleGrid(styleBar, styleActions, Modifier.weight(1f), fillHeight = true, holdHeight = open)
                 Spacer(Modifier.width(16.dp))
                 if (open) StylePanel(styleBar, styleActions, Modifier.weight(1f))
-                else list(Modifier.weight(1f).fillMaxHeight())
+                else list?.invoke(Modifier.weight(1f).fillMaxHeight())
             }
             actionRow(Modifier.padding(top = 8.dp))
         }
@@ -87,7 +103,7 @@ fun WideEditorPanel(
 /**
  * 横着拿时右边那一栏的宽度：画布能用的宽度的三成，夹在 320～400 dp 之间。
  * 320 放得下用途水印面板顶上那一排按钮；再宽列表也只是空着，不如留给画布。
- * 用途水印面板在这一栏里时也用它，两者一样宽，切过去不跳。
+ * 用途水印面板在这一栏里时也用它，两者一样宽，切过去不跳。手机横着拿时三成不到 320，就是 320。
  */
 internal fun Modifier.wideSidePanelWidth(): Modifier = layout { measurable, constraints ->
     val available = constraints.maxWidth

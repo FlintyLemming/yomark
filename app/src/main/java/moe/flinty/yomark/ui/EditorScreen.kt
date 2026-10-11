@@ -145,10 +145,10 @@ fun EditorScreen(
         )
     }
 
-    // 手机、宽屏竖着拿、宽屏横着拿（见 EditorLayouts）。转向时 Configuration 变了，这里跟着重组
+    // 手机、宽屏，各自竖着拿、横着拿（见 EditorLayouts）。转向时 Configuration 变了，这里跟着重组
     val config = LocalConfiguration.current
     val layout = EditorLayouts.choose(config.screenWidthDp, config.screenHeightDp, config.smallestScreenWidthDp)
-    val atSide = layout == EditorLayout.WIDE_SIDE
+    val atSide = layout.atSide
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
@@ -239,7 +239,8 @@ fun EditorScreen(
                             atSide = atSide,
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
-                            list = { modifier ->
+                            // 手机横着拿没有列表，右边那一栏只放样式和导出
+                            list = if (layout.listed) ({ modifier ->
                                 MaskItemList(
                                     image = state.image,
                                     plan = state.plan,
@@ -249,7 +250,7 @@ fun EditorScreen(
                                     onItemClick = vm::onListItemClick,
                                     modifier = modifier,
                                 )
-                            },
+                            }) else null,
                             actionRow = { modifier ->
                                 EditorActionRow(
                                     onExport = onExport,
@@ -270,10 +271,10 @@ fun EditorScreen(
 }
 
 /**
- * 画布和它旁边的那一块（手机的底栏，宽屏的样式与列表，用途水印面板）。
+ * 画布和它旁边的那一块（手机的底栏或右边那一栏，宽屏的样式与列表，用途水印面板）。
  *
  * 旁边那一块先量：在下面时高度由它自己定，在右边（[panelAtSide]）时宽度由它自己定，画布占剩下的。
- * 画布永远是第一个孩子：平板转个方向，那一块从下面挪到右边，画布还是原来那一个，放大到哪儿、识别动效走到哪儿都接着来。
+ * 画布永远是第一个孩子：转个方向，那一块从下面挪到右边，画布还是原来那一个，放大到哪儿、识别动效走到哪儿都接着来。
  * 分开写成 Column 和 Row 的话，一转就换成了一块新画布。
  */
 @Composable

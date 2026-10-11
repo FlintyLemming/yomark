@@ -58,8 +58,9 @@ import org.robolectric.shadows.ShadowDialog
 import java.io.File
 
 /**
- * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表；平板、阔折叠在画布下面或右边多出列表，
- * 点列表的一行就切换那一块。哪些尺寸算宽屏的细账在 EditorLayoutTest，列表本身在 MaskItemListTest。
+ * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表，横过来样式和导出挪到画布右边；
+ * 平板、阔折叠在画布下面或右边多出列表，点列表的一行就切换那一块。
+ * 哪些尺寸算宽屏的细账在 EditorLayoutTest，列表本身在 MaskItemListTest。
  *
  * 手机上样式的调节面板是弹出来盖在图上的：弹出时底栏不动，吸管取色时让开再回来，点外面、按返回都收起。
  * 这几条用真的 ViewModel 走一遍，面板自己的控件在 StyleBarTest。
@@ -205,10 +206,32 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
     }
 
+    /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */
     @Config(qualifiers = "sw412dp-w860dp-h412dp-land-xxhdpi")
-    @Test fun `a phone on its side has no list either`() {
+    @Test fun `a phone on its side moves the styles and export right of the image, without the list`() {
         open()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+        val screen = screenBounds()
+        for (label in listOf("色块", "马克笔", "导出")) {
+            assertThat(compose.onNodeWithText(label).getUnclippedBoundsInRoot().left).isGreaterThan(screen.right * 0.6f)
+        }
+    }
+
+    /** 手机横着拿，右边那一栏矮：调节面板弹出来时顶替样式方块，不盖在图上；导出还在底下，收起后方块回来。 */
+    @Config(qualifiers = "sw412dp-w860dp-h412dp-land-xxhdpi")
+    @Test fun `on a phone held sideways the style panel takes the styles' place`() {
+        val vm = open()
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }   // 点当前这一种，弹出面板
+        frames(SETTLE_FRAMES)
+        val reset = compose.onNode(hasText("恢复默认") and !hasAnyAncestor(isDialog()))
+        reset.assertIsDisplayed()
+        assertThat(reset.getUnclippedBoundsInRoot().left).isGreaterThan(screenBounds().right * 0.6f)
+        compose.onNodeWithText("马克笔").assertDoesNotExist()
+        compose.onNodeWithText("导出").assertIsDisplayed()
+        compose.runOnUiThread { vm.dismissStylePanel() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
     }
 
     @Config(qualifiers = "sw800dp-w800dp-h1280dp-port-xhdpi")

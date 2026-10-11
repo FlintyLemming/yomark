@@ -2,35 +2,45 @@ package moe.flinty.yomark.ui
 
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.ui.EditorLayout.PHONE
+import moe.flinty.yomark.ui.EditorLayout.PHONE_SIDE
 import moe.flinty.yomark.ui.EditorLayout.WIDE_BOTTOM
 import moe.flinty.yomark.ui.EditorLayout.WIDE_SIDE
 import org.junit.Test
 
 /**
  * 哪些窗口用宽屏版式。数值是各类设备上 Configuration 报的 dp：Android 15 起含系统栏，之前不含，
- * 两种都列了一些。手机怎么摆都不该用宽屏版式，宽屏转个方向只换列表的位置。
+ * 两种都列了一些。手机怎么摆都不该用宽屏版式，横过来只把样式挪到右边；宽屏转个方向只换列表的位置。
  */
 class EditorLayoutTest {
 
     private fun layout(width: Int, height: Int, smallest: Int = minOf(width, height)) =
         EditorLayouts.choose(width, height, smallest)
 
-    @Test fun `phones keep the phone layout in both orientations`() {
+    @Test fun `phones move the styles beside the image when held sideways`() {
         assertThat(layout(412, 915)).isEqualTo(PHONE)           // Pixel 8
-        assertThat(layout(915, 412)).isEqualTo(PHONE)
+        assertThat(layout(915, 412)).isEqualTo(PHONE_SIDE)
         assertThat(layout(360, 780)).isEqualTo(PHONE)           // 小屏手机
-        assertThat(layout(780, 336, smallest = 360)).isEqualTo(PHONE)   // 横屏，Android 14 不含系统栏
+        assertThat(layout(780, 336, smallest = 360)).isEqualTo(PHONE_SIDE)   // 横屏，Android 14 不含系统栏
         assertThat(layout(412, 1005)).isEqualTo(PHONE)          // 翻盖折叠屏展开
+        assertThat(layout(1005, 412)).isEqualTo(PHONE_SIDE)
         assertThat(layout(344, 882)).isEqualTo(PHONE)           // 书本式折叠屏的外屏
+        assertThat(layout(882, 344)).isEqualTo(PHONE_SIDE)
     }
 
     /** 大屏手机把显示大小调到最小，最短边能到四百八九十；再宽的老款 18:9 手机，长宽比也挡得住。 */
     @Test fun `a phone at the smallest display size is still a phone`() {
         assertThat(layout(485, 1080)).isEqualTo(PHONE)
-        assertThat(layout(1080, 485)).isEqualTo(PHONE)
+        assertThat(layout(1080, 485)).isEqualTo(PHONE_SIDE)
         assertThat(layout(514, 1028)).isEqualTo(PHONE)
         assertThat(layout(514, 956)).isEqualTo(PHONE)          // Android 14 不含状态栏和导航栏，比例 1.86
-        assertThat(layout(956, 466, smallest = 514)).isEqualTo(PHONE)
+        assertThat(layout(956, 466, smallest = 514)).isEqualTo(PHONE_SIDE)
+    }
+
+    /** 近乎方的小窗口：右边那一栏一占，画布只剩窄窄一条，样式还是放在下面。 */
+    @Test fun `a nearly square small window keeps the styles below the image`() {
+        assertThat(layout(450, 411)).isEqualTo(PHONE)           // 横屏手机分屏，各占一半
+        assertThat(layout(400, 380)).isEqualTo(PHONE)           // 小外屏
+        assertThat(layout(600, 411)).isEqualTo(PHONE_SIDE)      // 分屏时分到三分之二
     }
 
     /** 阔折叠（华为 Pura X 内屏 2120×1320，16:10）：按 2.5 和 2.625 两种密度折算。 */
@@ -55,7 +65,7 @@ class EditorLayoutTest {
         assertThat(layout(420, 752)).isEqualTo(PHONE)
         assertThat(layout(636, 752)).isEqualTo(WIDE_BOTTOM)
         assertThat(layout(800, 600)).isEqualTo(WIDE_SIDE)
-        assertThat(layout(1000, 400)).isEqualTo(PHONE)
+        assertThat(layout(1000, 400)).isEqualTo(PHONE_SIDE)
     }
 
     @Test fun `a square window counts as upright`() {
