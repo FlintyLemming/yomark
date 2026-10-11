@@ -82,6 +82,23 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `debug info is off until turned on`() = runTest {
+        val store = store()
+        assertThat(store.debugTrace.first()).isFalse()
+        store.setDebugTrace(true)
+        assertThat(store.debugTrace.first()).isTrue()
+    }
+
+    /** 「恢复默认设置」不管它：它在「关于」里自己关。 */
+    @Test
+    fun `reset leaves debug info alone`() = runTest {
+        val store = store()
+        store.setDebugTrace(true)
+        store.resetSettings()
+        assertThat(store.debugTrace.first()).isTrue()
+    }
+
+    @Test
     fun `purpose watermark style defaults to the original look`() = runTest {
         assertThat(store().purposeWatermarkStyle.first()).isEqualTo(PurposeWatermarkStyle())
     }

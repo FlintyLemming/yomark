@@ -124,6 +124,16 @@ class SettingsPageActivity : ComponentActivity() {
                     )
                 }
             }
+            SettingsPage.ABOUT -> {
+                val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
+                debugTrace?.let { on ->
+                    AboutSettingsScreen(
+                        debugTrace = on,
+                        onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
+                        onNavigateUp = ::finish,
+                    )
+                }
+            }
         }
     }
 

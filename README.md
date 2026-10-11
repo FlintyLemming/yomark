@@ -74,7 +74,7 @@
 
 ## 隐私与权限
 
-完整的[隐私权政策](https://yomark.flinty.moe/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置」里打开。
+完整的[隐私权政策](https://yomark.flinty.moe/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置 → 关于」里打开。
 
 - 不申请任何运行期权限。选图通过系统的 Photo Picker 完成，应用只能拿到你选中的那几张图，读不到相册里的其他图片。
 - 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。

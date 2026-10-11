@@ -327,7 +327,7 @@ private fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
  * 本应用只有浅色界面（见 enableLightEdgeToEdge），深色模式下变白的图标落在浅色的面板和暗幕上看不清：扳回深色。
  */
 @Composable
-private fun DarkSystemBarIcons() {
+internal fun DarkSystemBarIcons() {
     val view = LocalView.current
     SideEffect {
         val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
@@ -43,6 +44,8 @@ fun EditorTopBar(
     purposeOn: Boolean = false,
     /** 去水印的购买入口（开源版是免费版说明与打赏）。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
+    /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
+    onDebug: (() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // 向上回到首页，放在 Android 约定的左上角
@@ -59,6 +62,9 @@ fun EditorTopBar(
                 if (purposeOn) "用途水印（已开启）" else "用途水印",
                 tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
+        }
+        if (onDebug != null) {
+            IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, "调试信息") }
         }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
     }
