@@ -159,7 +159,7 @@ class EditorViewModel(
      */
     private fun reanalyze(image: SourceImage) {
         undoStack.push(_state.value.plan)
-        uiState = _state.value.copy(analyzing = true, aiReview = AiReview.HIDDEN).withHistoryFlags()
+        uiState = _state.value.copy(analyzing = true, aiReview = AiReview.Hidden).withHistoryFlags()
         viewModelScope.launch { analyze(image, keepOnlyManual = true) }
     }
 
@@ -232,7 +232,7 @@ class EditorViewModel(
 
     fun onImageChosen(uri: Uri) {
         aiReviewJob?.cancel()                             // 上一张图的增强识别作废，按钮随之收起
-        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.HIDDEN)
+        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden)
         viewModelScope.launch {
             // 换图时先清掉上一张的私有副本。清理时机从 onCleared 挪到这里：
             // onCleared 会在 Activity 重建时把副本一起删掉，恢复就无从谈起了
@@ -316,7 +316,7 @@ class EditorViewModel(
     private fun loadBatchCurrent() {
         val batch = _state.value.batch ?: return
         aiReviewJob?.cancel()
-        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.HIDDEN)
+        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden)
         viewModelScope.launch {
             val loaded = runCatching {
                 val taken = intake.copyToPrivate(batch.current.uri, ioDispatcher)
@@ -338,7 +338,7 @@ class EditorViewModel(
                 plan = MaskPlan.empty(),
                 loading = false,
                 analyzing = true,
-                aiReview = AiReview.HIDDEN,
+                aiReview = AiReview.Hidden,
                 canUndo = false,
                 canRedo = false,
                 selectedManualId = null,
@@ -372,7 +372,7 @@ class EditorViewModel(
         reviewLines = result?.lines
         uiState = current.copy(
             analyzing = false,
-            aiReview = AiReview.HIDDEN,
+            aiReview = AiReview.Hidden,
             plan = current.plan.copy(items = detected + kept),
         )
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn)
@@ -392,8 +392,8 @@ class EditorViewModel(
             if (!ranOn.refineReady()) return@launch
             val current = _state.value
             if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
-            if (current.aiReview != AiReview.HIDDEN) return@launch
-            uiState = current.copy(aiReview = AiReview.READY)
+            if (current.aiReview != AiReview.Hidden) return@launch
+            uiState = current.copy(aiReview = AiReview.Ready)
         }
     }
 
@@ -406,34 +406,27 @@ class EditorViewModel(
      */
     fun runAiReview() {
         val current = _state.value
-        if (current.aiReview != AiReview.READY) return
+        if (current.aiReview != AiReview.Ready && current.aiReview != AiReview.Failed) return
         val image = current.image ?: return
         val lines = reviewLines ?: return
         val ranWith = analyzedWith ?: return
         val ranOn = engine
-        uiState = current.copy(aiReview = AiReview.RUNNING)
+        uiState = current.copy(aiReview = AiReview.Running)
         aiReviewJob = viewModelScope.launch {
             val extra = ranOn.refine(lines, current.plan.items.map { it.quad })
             ensureActive()
             val now = _state.value
             if (now.image !== image || analyzedWith != ranWith) return@launch
             if (extra == null) {
-                uiState = now.copy(
-                    aiReview = AiReview.READY,
-                    message = EditorMessage.Error("AI 增强识别失败，请重试"),
-                )
+                uiState = now.copy(aiReview = AiReview.Failed)
                 return@launch
             }
             val known = now.plan.items.mapTo(HashSet()) { it.candidateId }
             val added = MaskPlanFactory.itemsFrom(extra, now.brush).filter { it.candidateId !in known }
             if (added.isNotEmpty()) undoStack.push(now.plan)
             uiState = now.copy(
-                aiReview = AiReview.DONE,
+                aiReview = AiReview.Done(found = added.size),
                 plan = now.plan.copy(items = now.plan.items + added),
-                message = EditorMessage.Notice(
-                    if (added.isEmpty()) "AI 增强识别没有发现新内容"
-                    else "AI 增强识别找到 ${added.size} 处，已圈出，没有打码"
-                ),
             ).withHistoryFlags()
         }
     }

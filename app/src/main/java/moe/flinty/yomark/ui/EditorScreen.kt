@@ -91,7 +91,6 @@ fun EditorScreen(
             }
             is EditorMessage.BatchExported -> snackbar.showMessage("已保存 ${m.count} 张到相册", vm)
             is EditorMessage.Error -> snackbar.showMessage(m.text, vm)
-            is EditorMessage.Notice -> snackbar.showMessage(m.text, vm)
             null -> Unit
         }
     }
