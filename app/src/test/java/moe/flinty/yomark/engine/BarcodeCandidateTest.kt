@@ -1,5 +1,6 @@
 package moe.flinty.yomark.engine
 
+import android.graphics.PointF
 import android.graphics.RectF
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.geometry.Quad
@@ -50,5 +51,30 @@ class BarcodeCandidateTest {
     @Test fun `ids are distinct per index`() {
         assertThat(BarcodeCandidates.from(0, quad, true).id)
             .isNotEqualTo(BarcodeCandidates.from(1, quad, true).id)
+    }
+
+    /**
+     * 真机上二维码打完码，色块下沿和右沿露出一条码：ML Kit 的右、下边比真实边界短 1–3 px。
+     * 外扩之后，原框每个角都要落在新框里、离边至少 3 px——四个方向都要，不论倾斜。
+     */
+    @Test fun `quad is padded past the edges ML Kit falls short of`() {
+        val tilted = Quad(PointF(100f, 50f), PointF(190f, 80f), PointF(160f, 170f), PointF(70f, 140f))
+        listOf(quad, tilted).forEach { raw ->
+            val padded = BarcodeCandidates.from(0, raw, decodable = true).quad
+            raw.points().forEach { corner ->
+                assertThat(padded.contains(corner)).isTrue()
+                assertThat(padded.distanceTo(corner)).isAtLeast(3f)
+            }
+        }
+    }
+
+    /**
+     * 外扩不能大过二维码的静区（4 个模块），否则会盖到旁边的字。
+     * 取一个常见的小码：version 3（29 模块），每模块 2 px，静区 8 px。
+     */
+    @Test fun `padding stays inside the quiet zone of a small QR code`() {
+        val side = 29 * 2f
+        val qr = Quad.fromRect(RectF(100f, 100f, 100f + side, 100f + side))
+        assertThat(BarcodeCandidates.marginFor(qr)).isLessThan(4 * 2f)
     }
 }

@@ -33,15 +33,29 @@ object BarcodeCandidates {
      */
     fun from(index: Int, quad: Quad, decodable: Boolean, masked: Boolean = true) = Candidate(
         id = "barcode-$index",
-        quad = quad,
+        quad = quad.expand(marginFor(quad)),
         kind = SensitiveKind.BARCODE,
         source = DetectorSource.BARCODE,
         confidence = if (decodable) CONFIDENCE_DECODED else CONFIDENCE_POTENTIAL,
         enabledByDefault = decodable && masked,
     )
 
+    /**
+     * cornerPoints 直接拿来打码会露边：ML Kit 给的是**整数像素下标**，右、下两边落在
+     * 最后一列/行深色像素上而不是它的外沿，再加上向下取整，框的右边和下边系统性地短
+     * 1–3 px（识别图坐标，模拟器上逐一比对合成二维码的真实边界量出来的；左、上两边反而偏外）。
+     * 识别图是原图降采样来的，导出时按比例放大，原图上就是 2–6 px 的一条码露在色块外面。
+     *
+     * 固定的几个像素兜住取整；按短边再加一点，兜住 ML Kit 对二维码第四个角（没有定位图案，
+     * 靠外推）的估计误差。二维码四周按规范留 4 个模块宽的静区，这点外扩落在静区里，
+     * 盖不到旁边的字。
+     */
+    internal fun marginFor(quad: Quad): Float = MARGIN_PX + quad.shortEdge() * MARGIN_RATIO
+
     private const val CONFIDENCE_DECODED = 0.98f
     private const val CONFIDENCE_POTENTIAL = 0.5f
+    private const val MARGIN_PX = 3f
+    private const val MARGIN_RATIO = 0.02f
 }
 
 /**
@@ -108,6 +122,7 @@ class MlKitBarcodeDetector(
                 // rawValue 只在这里做一次「有没有」的判断，绝不读出来、更不落盘。
                 val decodable = code.rawValue != null
                 // 解不出内容的，像素上不是两种墨色（彩色照片）就整个丢掉，连框都不画。
+                // 这里用的是外扩之前的框：外扩出来的那圈是静区，不该算进墨色统计。
                 // 判不了（读像素出错）就留着：这一步只许少报误报，不许让整个条码检测失败。
                 if (!decodable && !runCatching { TwoInks.looksPrinted(image.bitmap, quad) }.getOrDefault(true)) {
                     return@mapIndexedNotNull null
