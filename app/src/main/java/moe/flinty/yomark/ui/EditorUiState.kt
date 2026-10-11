@@ -13,8 +13,6 @@ sealed interface EditorMessage {
     data class Exported(val uri: Uri, val downscaled: Boolean, val width: Int, val height: Int) : EditorMessage
     data class BatchExported(val count: Int) : EditorMessage
     data class Error(val text: String) : EditorMessage
-    /** 不是出错，只是告诉用户一件事的结果（如「AI 增强识别没有新发现」）。 */
-    data class Notice(val text: String) : EditorMessage
 }
 
 /**
@@ -22,14 +20,19 @@ sealed interface EditorMessage {
  *
  * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
  * 还会在画面上冒出一批不打码的框。现在是用户点了才跑。
+ * 跑的结果就写在按钮上，不另弹提示。
  */
-enum class AiReview {
+sealed interface AiReview {
     /** 不出现：设置里关了、机型不支持、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
-    HIDDEN,
-    READY,
-    RUNNING,
-    /** 这张图已经增强识别过。再跑一遍结果一样（温度 0），按钮就不再可点。 */
-    DONE,
+    data object Hidden : AiReview
+    data object Ready : AiReview
+    data object Running : AiReview
+
+    /** 这张图已经增强识别过，新圈出了 [found] 处（0 就是没有新发现）。再跑一遍结果一样（温度 0），按钮就不再可点。 */
+    data class Done(val found: Int) : AiReview
+
+    /** 没跑成。和「跑了没发现」分开：不能让用户以为这一页是干净的。按钮还能点，再试一次。 */
+    data object Failed : AiReview
 }
 
 data class EditorUiState(
@@ -44,7 +47,7 @@ data class EditorUiState(
     /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
     val analyzing: Boolean = false,
     /** 端侧大模型的第二遍。只在用户点了之后跑，结果追加进 plan，只圈出。 */
-    val aiReview: AiReview = AiReview.HIDDEN,
+    val aiReview: AiReview = AiReview.Hidden,
     val exporting: Boolean = false,
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,

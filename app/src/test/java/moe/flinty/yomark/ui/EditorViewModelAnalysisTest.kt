@@ -208,7 +208,7 @@ class EditorViewModelAnalysisTest {
 
     private class Nano(
         private val available: Boolean = true,
-        private val boom: Boolean = false,
+        var boom: Boolean = false,
         private val out: List<Candidate> = listOf(
             Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
                 SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f, enabledByDefault = false)
@@ -248,7 +248,7 @@ class EditorViewModelAnalysisTest {
         // 规则的结果就是全部；模型只探测在不在，一次都没推理
         assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
         assertThat(nano.calls).isEqualTo(0)
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Ready)
     }
 
     @Test
@@ -263,8 +263,8 @@ class EditorViewModelAnalysisTest {
         assertThat(nano.calls).isEqualTo(1)
         assertThat(items.keys).containsExactly("rule", "llm")
         assertThat(items.getValue("llm").state).isEqualTo(MaskState.OUTLINED)   // 只圈出，不打码
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.DONE)
-        assertThat(vm.state.value.message).isInstanceOf(EditorMessage.Notice::class.java)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
+        assertThat(vm.state.value.message).isNull()                            // 结果写在按钮上，不弹提示
 
         // 是用户点出来的：不想要这批框，撤销一下整批拿掉
         vm.undo()
@@ -279,11 +279,11 @@ class EditorViewModelAnalysisTest {
         vm.onImageChosen(sampleUri("nano-gated.jpg")); advanceUntilIdle()
 
         vm.runAiReview(); advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.RUNNING)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Running)
 
         gate.complete(Unit); advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.DONE)
-        assertThat((vm.state.value.message as EditorMessage.Notice).text).contains("没有发现")
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 0))
+        assertThat(vm.state.value.message).isNull()
         assertThat(vm.state.value.canUndo).isFalse()          // 什么都没加，撤销栈不该多一格
     }
 
@@ -296,12 +296,12 @@ class EditorViewModelAnalysisTest {
         vm.runAiReview(); advanceUntilIdle()
 
         vm.onImageChosen(sampleUri("nano-second.jpg"))
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.HIDDEN)   // 新图还在载入，旧图的按钮先收起
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Hidden)   // 新图还在载入，旧图的按钮先收起
         advanceUntilIdle()
         gate.complete(Unit); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.items.map { it.candidateId }).doesNotContain("llm")
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)   // 新图上可以重新点
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Ready)   // 新图上可以重新点
     }
 
     @Test
@@ -310,21 +310,26 @@ class EditorViewModelAnalysisTest {
         val vm = vmWithNano(nano)
         vm.onImageChosen(sampleUri("nano-none.jpg")); advanceUntilIdle()
 
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.HIDDEN)
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Hidden)
         vm.runAiReview(); advanceUntilIdle()                  // 按钮不在，调了也什么都不发生
         assertThat(nano.calls).isEqualTo(0)
     }
 
     @Test
-    fun `a failed review says so instead of claiming the page is clean`() = runTest(dispatcher) {
-        val vm = vmWithNano(Nano(boom = true))
+    fun `a failed review says so instead of claiming the page is clean, and can be retried`() = runTest(dispatcher) {
+        val nano = Nano(boom = true)
+        val vm = vmWithNano(nano)
         vm.onImageChosen(sampleUri("nano-boom.jpg")); advanceUntilIdle()
 
         vm.runAiReview(); advanceUntilIdle()
 
-        assertThat(vm.state.value.message).isInstanceOf(EditorMessage.Error::class.java)
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.READY)   // 可以再点一次
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Failed)   // 不能说成「没有新发现」
+        assertThat(vm.state.value.message).isNull()                      // 写在按钮上，不弹提示
         assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+
+        nano.boom = false
+        vm.runAiReview(); advanceUntilIdle()                             // 可以再点一次
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
     }
 
     @Test
