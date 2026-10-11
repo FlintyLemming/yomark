@@ -100,6 +100,23 @@ class PpOcrPostProcessTest {
         assertThat(WordGaps.isBreak("码", "1", 15f, 45f, found)).isTrue()
     }
 
+    /** 字距宽的全大写字：间隙 0.36 倍字高，汉字之间算词界，拉丁字母之间不算（「TRAVE L E R」）。 */
+    @Test fun `letters need a wider gap than han characters`() {
+        val found = WordGaps.find(strip(200, 10 until 20, 30 until 60), 200, 48)   // 间隙 10，0.36 倍
+        assertThat(WordGaps.isBreak("E", "R", 15f, 45f, found)).isFalse()
+        assertThat(WordGaps.isBreak("晨", "冉", 15f, 45f, found)).isTrue()
+        val wide = WordGaps.find(strip(200, 10 until 20, 40 until 70), 200, 48)    // 间隙 20，0.71 倍
+        assertThat(WordGaps.isBreak("E", "R", 15f, 55f, wide)).isTrue()
+    }
+
+    /** 挨着 ASCII 标点不按像素补：机读码的「<」、打了星的号码、「3-2-1234」都不该被拆开。 */
+    @Test fun `no pixel space next to ascii punctuation`() {
+        val wide = WordGaps.find(strip(200, 10 until 20, 40 until 70), 200, 48)
+        assertThat(WordGaps.isBreak("<", "U", 15f, 55f, wide)).isFalse()
+        assertThat(WordGaps.isBreak("*", "9", 15f, 55f, wide)).isFalse()
+        assertThat(WordGaps.isBreak("-", "2", 15f, 55f, wide)).isFalse()
+    }
+
     // ---------- 同一行拼接 ----------
 
     private fun line(text: String, x0: Float, y0: Float, h: Float = 20f): OcrLine {
@@ -118,5 +135,29 @@ class PpOcrPostProcessTest {
     @Test fun `different rows and far columns stay apart`() {
         assertThat(RowGrouper.group(listOf(line("上一行", 0f, 0f), line("下一行", 0f, 40f)))).hasSize(2)
         assertThat(RowGrouper.group(listOf(line("左栏", 0f, 0f), line("右栏", 500f, 0f)))).hasSize(2)
+    }
+
+    /**
+     * 护照样张：斜压在版面上的水印「SPECIMEN」框高一百多像素，竖直范围里的几行都和它重叠过半。
+     * 以前它把十来行串成了一行，「Date of birth」和「05 FEB 1965」成了同一行里挨着的两段。
+     */
+    @Test fun `a tall watermark box does not chain the rows it crosses`() {
+        // 两行字紧挨在水印框右边：竖直方向都和它重叠过半，水平间距也近，只有字高差得远
+        val rows = RowGrouper.group(
+            listOf(
+                line("SPECIMEN", 0f, 0f, h = 130f),
+                line("Nationality", 1050f, 20f),
+                line("UNITED STATES", 1050f, 60f),
+            )
+        )
+        assertThat(rows.map { it.text }).containsExactly("SPECIMEN", "Nationality", "UNITED STATES").inOrder()
+    }
+
+    /** 证件上字段名下面紧贴着值，框上下咬住一截（重叠过半），但它们是上下叠着的，不是同一排。 */
+    @Test fun `a label above its value stays apart even when the boxes overlap`() {
+        val label = line("Date of birth", 300f, 265f, h = 23f)
+        val value = line("05 FEB 1965", 300f, 276f, h = 39f)
+        assertThat(RowGrouper.group(listOf(label, value)).map { it.text })
+            .containsExactly("Date of birth", "05 FEB 1965").inOrder()
     }
 }

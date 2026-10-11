@@ -199,6 +199,10 @@ class PpOcrEngine(
  *
  * 两段算同一行：竖直方向重叠超过较矮那段高度的一半，且水平间距不超过行高的 3 倍
  * （再远多半是左右两栏，拼起来会让「名字在电话前面」这类判断串栏）。
+ *
+ * 另有两条是拍的证件照上补的（护照样张上十来行被串成了一行）：
+ * - 字高差一倍以上的不拼：斜着压在版面上的水印「SPECIMEN」，检测框高一百多像素，竖直范围里的每一行都和它重叠过半；
+ * - 左右并排才拼，上下叠着的不拼：证件上字段名下面紧贴着值，框常常上下咬住一截，重叠能过半。
  */
 object RowGrouper {
 
@@ -212,9 +216,16 @@ object RowGrouper {
     }
 
     private fun sameRow(a: OcrLine, b: OcrLine): Boolean {
+        val lower = min(a.box.height, b.box.height)
+        if (max(a.box.height, b.box.height) > MAX_HEIGHT_RATIO * lower) return false
         val overlap = min(a.box.maxY, b.box.maxY) - max(a.box.minY, b.box.minY)
-        return overlap >= 0.5f * min(a.box.maxY - a.box.minY, b.box.maxY - b.box.minY)
+        if (overlap < 0.5f * min(a.box.maxY - a.box.minY, b.box.maxY - b.box.minY)) return false
+        val sideBySide = min(a.box.maxX, b.box.maxX) - max(a.box.minX, b.box.minX)
+        return sideBySide <= 0.5f * lower
     }
+
+    /** 同一排的两段，字高最多差这么多倍。 */
+    private const val MAX_HEIGHT_RATIO = 2f
 
     private fun near(rowRight: Float, line: OcrLine): Boolean {
         val h = line.box.maxY - line.box.minY

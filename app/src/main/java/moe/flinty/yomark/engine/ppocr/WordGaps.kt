@@ -13,6 +13,12 @@ package moe.flinty.yomark.engine.ppocr
  *
  * 例外是两个数字之间：「1」这种窄字形两边留白很宽，0.3 倍会把「101」拆成「1 01」，
  * 数字串被拆开比少一个空格危险得多（卡号、电话规则都要求数字连续），所以要宽过 0.45 倍。
+ *
+ * 拉丁字母另有一套（「混合空格」，docs/english-recognition-research.md 第二轮）：0.3 倍在英文上补多了，
+ * 字距宽的全大写字被拆开——网页上的「P L A C E OR D E R」，护照上的「TRAVE L E R」，
+ * 机读码整行成了「P< U S A T R A V E L E R < <」。英文的词界识别模型自己会出空格，按像素补只是兜底：
+ * 两个字母、字母和数字之间要宽过 0.6 倍，挨着 ASCII 标点的不补（「187****9157」「3-2-1234」不再被拆开）。
+ * 两侧有汉字、全角标点的照旧。72 张压力页上英文的关键片段 94.2% → 97.6%，中文不变。
  */
 object WordGaps {
 
@@ -55,11 +61,19 @@ object WordGaps {
     fun isBreak(left: String, right: String, leftX: Float, rightX: Float, found: Found): Boolean {
         if (left == " " || right == " ") return false
         val widest = found.gaps.filter { it.center > leftX && it.center < rightX }.maxOfOrNull { it.width } ?: return false
-        val digits = left.singleOrNull()?.isAsciiDigit() == true && right.singleOrNull()?.isAsciiDigit() == true
-        return widest >= found.textHeight * if (digits) DIGIT_BREAK else BREAK
+        val l = left.singleOrNull()
+        val r = right.singleOrNull()
+        val threshold = when {
+            l == null || r == null || l.code > 0x7F || r.code > 0x7F -> BREAK
+            l.isAsciiDigit() && r.isAsciiDigit() -> DIGIT_BREAK
+            !l.isAsciiLetterOrDigit() || !r.isAsciiLetterOrDigit() -> return false
+            else -> LATIN_BREAK
+        }
+        return widest >= found.textHeight * threshold
     }
 
     private fun Char.isAsciiDigit() = this in '0'..'9'
+    private fun Char.isAsciiLetterOrDigit() = isAsciiDigit() || this in 'a'..'z' || this in 'A'..'Z'
 
     /** 背景色：截图是大块纯色底，灰度中位数就是底色。直方图求近似，免得整行排序。 */
     private fun median(gray: FloatArray): Float {
@@ -77,4 +91,5 @@ object WordGaps {
     private const val INK_CONTRAST = 0.25f
     private const val BREAK = 0.3f
     private const val DIGIT_BREAK = 0.45f
+    private const val LATIN_BREAK = 0.6f
 }
