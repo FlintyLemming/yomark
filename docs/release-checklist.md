@@ -92,16 +92,20 @@ moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION
 
 ### 3. Play Billing 真机购买未验
 
-本机没有可用的 Play Console 应用与测试账号，以下三条留给上架前人工验：
+本机没有可用的 Play Console 应用与测试账号，以下几条留给上架前人工验：
 
 - [ ] Play Console 建一次性商品，ID 填 `yomark_remove_watermark`
 - [ ] internal testing 轨道用测试账号买一次 → 导出无水印
+- [ ] 买完从 Play 回来：购买框已关、右上角去水印按钮消失、出现感谢页（🎉 和彩纸），
+      点「好的」或返回回到原来那一页；首页、编辑器各买一次，重开应用感谢页不再出现
 - [ ] **杀进程 → 飞行模式 → 重开 → 导出：水印仍不出现**（离线购买态的关键验证）
-- [ ] 清除应用数据 → 联网打开 → `queryPurchasesAsync` 恢复购买态，水印消失
+- [ ] 清除应用数据 → 联网打开 → `queryPurchasesAsync` 恢复购买态，水印消失，**不**出现感谢页
 
-代码侧已由 `PurchaseResolverTest`（4 条）与 `PurchaseStoreTest`（3 条）守住
-「缓存优先 / 断连不降级 / 查得到以查询为准」这三条规则，
-`EditorViewModelWatermarkTest` 守住「免费有水印、付费没有」。
+代码侧已由 `PurchaseResolverTest`（4 条）与 `PurchaseStoreTest`（7 条）守住
+「缓存优先 / 断连不降级 / 查得到以查询为准」这三条规则和「一笔购买只谢一次、恢复不谢」，
+`EditorViewModelWatermarkTest` 守住「免费有水印、付费没有」，
+`ThanksLauncherTest` 守住「感谢页只在前台那一页放、放一次」。
+模拟器上没有 Play 商店，感谢页那条只在临时补丁（模拟 PurchasesUpdatedListener 送来一笔购买）下走通过。
 
 ### 4. 中端真机未上手
 

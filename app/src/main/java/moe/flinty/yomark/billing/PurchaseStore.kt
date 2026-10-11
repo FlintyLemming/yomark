@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 private val Context.billingDataStore: DataStore<Preferences> by preferencesDataStore(name = "purchase")
@@ -24,13 +25,38 @@ class PurchaseStore internal constructor(private val store: DataStore<Preference
 
     constructor(context: Context) : this(context.applicationContext.billingDataStore)
 
-    val isPro: Flow<Boolean> = store.data.map { it[KEY_PRO] ?: false }
+    val isPro: Flow<Boolean> = store.data.map { it[KEY_PRO] ?: false }.distinctUntilChanged()
+
+    /** 刚买成、还没放过感谢页（见 ui.thanks.ThanksActivity）。 */
+    val thanksPending: Flow<Boolean> = store.data.map { it[KEY_THANKS] ?: false }.distinctUntilChanged()
 
     suspend fun setPro(value: Boolean) {
-        store.edit { it[KEY_PRO] = value }
+        store.edit {
+            it[KEY_PRO] = value
+            // 退款 / 撤单：还没来得及看的感谢页也不放了
+            if (!value) it.remove(KEY_THANKS)
+        }
+    }
+
+    /**
+     * 点亮已购。[fresh]：这是一笔刚付的钱，不是重装后恢复的老购买。从未购变成已购的那一下记一笔待谢。
+     *
+     * 判断和写入在同一次 edit 里：首页和编辑器各有一个 BillingClient，同一笔购买两边可能都收到，
+     * 感谢页也只放一次。
+     */
+    suspend fun grant(fresh: Boolean) {
+        store.edit {
+            if (fresh && it[KEY_PRO] != true) it[KEY_THANKS] = true
+            it[KEY_PRO] = true
+        }
+    }
+
+    suspend fun clearThanks() {
+        store.edit { it.remove(KEY_THANKS) }
     }
 
     private companion object {
         val KEY_PRO = booleanPreferencesKey("pro")
+        val KEY_THANKS = booleanPreferencesKey("thanks_pending")
     }
 }

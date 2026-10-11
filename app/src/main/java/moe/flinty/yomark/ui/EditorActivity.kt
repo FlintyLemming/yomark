@@ -15,6 +15,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import moe.flinty.yomark.billing.BillingRepository
+import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.billing.PurchaseStore
 import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.data.SettingsStore
@@ -26,7 +27,9 @@ import moe.flinty.yomark.export.WatermarkDrawer
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.home.HomeActivity
 import moe.flinty.yomark.ui.settings.SettingsActivity
+import moe.flinty.yomark.ui.thanks.showThanksWhenPurchased
 import moe.flinty.yomark.ui.theme.YomarkTheme
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -73,6 +76,9 @@ class EditorActivity : ComponentActivity() {
         // 先用缓存点亮购买态，再尝试联网校验。只在 Play 商店进程里发生（spec §10 / §13）。
         billing.start()
         vm.observePro(billing.isPro)
+        // 买成了（或者联网校验发现早就买过）：购买框跟着关掉，同首页
+        if (!Edition.isFree) lifecycleScope.launch { billing.isPro.filter { it }.collect { vm.dismissPaywall() } }
+        showThanksWhenPurchased(billing)
 
         setContent {
             YomarkTheme(settings) {

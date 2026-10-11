@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -24,6 +25,7 @@ import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.onboarding.OnboardingScreen
 import moe.flinty.yomark.ui.settings.SettingsActivity
+import moe.flinty.yomark.ui.thanks.showThanksWhenPurchased
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -53,6 +55,7 @@ class HomeActivity : ComponentActivity() {
 
         // 先用缓存点亮购买态，再尝试联网校验。只在 Play 商店进程里发生（spec §10 / §13）。
         billing.start()
+        showThanksWhenPurchased(billing)
 
         setContent {
             // null = 还没读到设置。这一瞬间什么都不画：先画首页再切引导页会闪一下，
@@ -65,6 +68,8 @@ class HomeActivity : ComponentActivity() {
             var dismissed by rememberSaveable { mutableStateOf(false) }
             var paywall by rememberSaveable { mutableStateOf(false) }
             val isPro by billing.isPro.collectAsStateWithLifecycle()
+            // 买成了（或者联网校验发现早就买过）：购买框跟着关掉。入口按钮都没了，框不能还开着
+            LaunchedEffect(isPro) { if (isPro && !Edition.isFree) paywall = false }
 
             YomarkTheme(settings) {
                 Surface {

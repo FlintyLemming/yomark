@@ -71,6 +71,11 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />
 
+        <!-- 买成后的感谢页：首页或编辑器在前台时放（见 ui/thanks/ThanksActivity） -->
+        <activity
+            android:name=".ui.thanks.ThanksActivity"
+            android:exported="false" />
+
         <!-- 设置一级页以下的各页共用一个 Activity，打开哪一页由 intent 里的参数决定 -->
         <activity
             android:name=".ui.settings.SettingsPageActivity"

@@ -1,8 +1,11 @@
 package moe.flinty.yomark.billing
 
 sealed interface QueryOutcome {
-    /** 查询成功，Play 明确回答了「有没有」。 */
-    data class Ok(val owned: Boolean) : QueryOutcome
+    /**
+     * 查询成功，Play 明确回答了「有没有」。
+     * [fresh]：有，而且本应用还没确认（acknowledge）过它——刚付的钱，不是重装后恢复的老购买。
+     */
+    data class Ok(val owned: Boolean, val fresh: Boolean = false) : QueryOutcome
     /** 查不到：无网络、服务未连上、Play 服务不可用。 */
     data object Unavailable : QueryOutcome
 }
