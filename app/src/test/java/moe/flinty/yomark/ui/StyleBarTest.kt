@@ -6,11 +6,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -24,6 +30,7 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.ui.components.StyleBar
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
+import moe.flinty.yomark.ui.components.StylePanel
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -33,6 +40,8 @@ import org.robolectric.annotation.Config
 /**
  * 样式栏与它弹出的调节面板（spec §7.5 修订）。面板只发出新的样子，写进画笔、改选中的框由 ViewModel 管，
  * 那一段见 EditorViewModelTest。原先在 androidTest 里的样式栏测试挪到了这里：放在 androidTest 里 CI 不跑。
+ *
+ * 手机上的面板是弹出来的底部动作条，在自己的对话框窗口里；查找节点时各个窗口都会找到。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w412dp-h915dp-xxhdpi")
@@ -155,10 +164,25 @@ class StyleBarTest {
         assertThat((last shr 16) and 0xFF).isGreaterThan(200)
     }
 
-    @Test fun theEyedropperStartsAndStopsPicking() {
+    /** 吸管要点的是底下的图：等着取色时弹出的面板先让开，取完色（或取消了）再弹回来。 */
+    @Test fun theSheetStepsAsideWhileTheEyedropperWaits() {
         val actions = Recorder()
         var model by mutableStateOf(open(MaskStyle.SOLID))
         compose.setContent { MaterialTheme { Surface { StyleBar(model, actions) } } }
+        compose.onNodeWithContentDescription("从图上取色").performClick()
+        assertThat(actions.picks).containsExactly(ColorTarget.SOLID)
+        model = model.copy(colorPick = ColorTarget.SOLID)
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        model = model.copy(colorPick = null)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+        assertThat(actions.collapsed).isEqualTo(0)
+    }
+
+    /** 宽屏的面板不盖画布，取色时还在：再点一下吸管就收起它。 */
+    @Test fun theEyedropperStartsAndStopsPickingInTheWidePanel() {
+        val actions = Recorder()
+        var model by mutableStateOf(open(MaskStyle.SOLID))
+        compose.setContent { MaterialTheme { Surface { StylePanel(model, actions) } } }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         model = model.copy(colorPick = ColorTarget.SOLID)
         compose.onNodeWithContentDescription("从图上取色").performClick()
@@ -232,5 +256,38 @@ class StyleBarTest {
         show(open(MaskStyle.SOLID), actions)
         compose.onNodeWithContentDescription("收起样式面板").performClick()
         assertThat(actions.collapsed).isEqualTo(1)
+    }
+
+    // ---------- 手机上弹出来 ----------
+
+    /** 面板弹在自己的窗口里，盖在画布上，不占底栏的地方；顶上是当前样式的名字。 */
+    @Test fun thePanelPopsUpAsASheetTitledWithTheStyle() {
+        show(open(MaskStyle.SOLID))
+        compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        compose.onNode(hasText("色块") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+    }
+
+    /** 往下拖、点面板外面、按返回、读屏的「关闭」，走的都是这一条：滑下去再报收起，之后面板不在了。 */
+    @Test fun dismissingTheSheetFoldsThePanel() {
+        val actions = Recorder()
+        show(open(MaskStyle.SOLID), actions)
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss))
+            .performSemanticsAction(SemanticsActions.Dismiss)
+        compose.waitForIdle()
+        assertThat(actions.collapsed).isEqualTo(1)
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+    }
+
+    /** 样式栏下面的安全性说明被面板盖住了，面板上再说一遍。 */
+    @Test fun theSheetRepeatsTheSafetyNoteItCovers() {
+        show(open(MaskStyle.PIXELATE))
+        val note = "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
+        compose.onAllNodesWithText(note).assertCountEquals(2)
+        compose.onNode(hasText(note) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+    }
+
+    @Test fun theSheetRepeatsTheEraseDegradationNote() {
+        show(open(MaskStyle.ERASE).copy(degradeNote = "3 处背景太复杂，已改用色块"))
+        compose.onNode(hasText("3 处背景太复杂，已改用色块") and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 }

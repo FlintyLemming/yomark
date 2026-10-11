@@ -3,14 +3,22 @@ package moe.flinty.yomark.ui
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Looper
 import androidx.activity.ComponentActivity
+import androidx.activity.ComponentDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
@@ -46,11 +54,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 import java.io.File
 
 /**
  * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表；平板、阔折叠在画布下面或右边多出列表，
  * 点列表的一行就切换那一块。哪些尺寸算宽屏的细账在 EditorLayoutTest，列表本身在 MaskItemListTest。
+ *
+ * 手机上样式的调节面板是弹出来盖在图上的：弹出时底栏不动，吸管取色时让开再回来，点外面、按返回都收起。
+ * 这几条用真的 ViewModel 走一遍，面板自己的控件在 StyleBarTest。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -134,6 +146,60 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("色块").assertExists()
         compose.onNodeWithText("导出").assertExists()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+    }
+
+    /** 手机上样式的调节面板从底下弹出来盖在图上，不把底栏和画布往上顶。 */
+    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the style panel pops up over the image instead of pushing it up`() {
+        val vm = open()
+        val bar = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.EMOJI) }
+        frames(SETTLE_FRAMES)
+        compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        assertThat(compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()).isEqualTo(bar)
+        compose.runOnUiThread { vm.dismissStylePanel() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+    }
+
+    /** 吸管：弹出的面板先让开，点图取色，面板带着取到的颜色弹回来。 */
+    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the sheet steps aside for the eyedropper and comes back with the colour`() {
+        val vm = open()
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithContentDescription("从图上取色").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNodeWithText("点一下图片，取那里的颜色").assertIsDisplayed()
+        compose.runOnUiThread { vm.onTap(PointF(200f, 200f)) }   // 白图
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.options.solidColor).isEqualTo(Color.WHITE)
+        compose.onNodeWithText("点一下图片，取那里的颜色").assertDoesNotExist()
+        compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        compose.onNodeWithContentDescription("白色").assertIsSelected()
+    }
+
+    /** 点面板外面（Material 3 的暗幕，读屏念「Close sheet」）、按返回，都把面板收起。 */
+    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone tapping outside the sheet or pressing back folds it`() {
+        val vm = open()
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithContentDescription("Close sheet").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+        compose.runOnUiThread {
+            (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
+        }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
     }
 
     @Config(qualifiers = "sw412dp-w860dp-h412dp-land-xxhdpi")

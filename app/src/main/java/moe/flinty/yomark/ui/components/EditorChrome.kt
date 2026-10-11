@@ -25,7 +25,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
@@ -79,11 +78,10 @@ fun EditorBottomBar(
     aiReview: AiReview = AiReview.HIDDEN,
     onAiReview: () -> Unit = {},
 ) {
-    // 横屏的手机上屏幕矮，样式面板开着时再留一行导出按钮，画布就只剩一条缝了：先让给画布，收起面板就回来
-    val short = LocalConfiguration.current.screenHeightDp < SHORT_SCREEN_DP
+    // 样式的调节面板是弹出来盖在画布上的（见 StyleBar），底栏的高度不随它变
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         StyleBar(model = styleBar, actions = styleActions)
-        if (!(short && styleBar.panelOpen)) EditorActionRow(
+        EditorActionRow(
             onExport = onExport,
             exporting = exporting,
             batchLabel = batchLabel,
@@ -123,9 +121,6 @@ fun EditorActionRow(
         }
     }
 }
-
-/** 比这矮的屏幕（横屏的手机）上，样式面板开着时收起导出那一行。 */
-private const val SHORT_SCREEN_DP = 480
 
 /**
  * 「AI 增强识别」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持、设置里关了时整个不出现。
