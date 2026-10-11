@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.RectF
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,16 +28,18 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
@@ -56,7 +59,7 @@ import kotlin.math.min
 
 /**
  * 宽屏的框列表：画面上框出来的每一块——识别出来的和手动画的——按从上到下、从左到右排成一列，
- * 每一行是这一块在原图上的缩略图、类型和状态。
+ * 每一行是这一块在原图上的缩略图、类型和状态；打了码的那几行整行灰下去。
  *
  * 点识别出的一行就是打码 / 取消打码，和在画布上点它一样；点手动框那一行是选中它（手动框不切换，spec §7.3），
  * 选中后照常在图上拖、在样式面板上改、点「删除」。
@@ -168,8 +171,12 @@ private fun EmptyHint() {
 }
 
 /**
- * 一行：缩略图、类型、状态，识别出的那几行右边再带一个开关。整行都是点击区，开关只是显示状态。
- * 圈出未打码的描一道琥珀色的边，和画布上的虚线框同一个颜色。
+ * 一行：缩略图、类型、状态，整行都是点击区。不另放开关：打没打码直接看这一行的样子。
+ *
+ * 打了码的整行灰下去——缩略图褪成灰、变淡，底色退到和面板差不多：这一处已经处理好了。
+ * 圈出没打码的保持彩色，描一道琥珀色的边（和画布上的虚线框同一个颜色），状态前一个琥珀色圆点：
+ * 一眼看得出还剩哪几处要拿主意，导出前会被提醒的也正是这几处。
+ * 灰下去的缩略图还认得出字，码底下原来是什么照样看得见。
  */
 @Composable
 private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, onClick: () -> Unit) {
@@ -180,13 +187,20 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
     val interaction = if (manual) {
         Modifier.selectable(selected = selected, role = Role.Button, onClick = onClick)
     } else {
+        // 没有开关可看，打没打码照样作为开关的状态报给读屏
         Modifier.toggleable(value = masked, role = Role.Switch, onValueChange = { onClick() })
     }
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(if (selected) colors.secondaryContainer else colors.surfaceContainerHigh)
+            .background(
+                when {
+                    selected -> colors.secondaryContainer
+                    masked -> colors.surfaceContainer
+                    else -> colors.surfaceContainerHighest
+                },
+            )
             .then(
                 when {
                     selected -> Modifier.border(2.dp, colors.primary, shape)
@@ -198,40 +212,46 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ItemThumbnail(image, item.quad, Modifier.weight(1f).height(THUMB_HEIGHT))
+        ItemThumbnail(image, item.quad, faded = masked, Modifier.weight(1f).height(THUMB_HEIGHT))
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.widthIn(min = 48.dp, max = 112.dp)) {
+        Column(Modifier.widthIn(min = 56.dp, max = 112.dp)) {
             Text(
                 SensitiveKindLabels.display(item),
                 style = MaterialTheme.typography.labelLarge,
+                color = if (masked && !selected) colors.onSurfaceVariant else colors.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                when {
-                    manual && selected -> "已选中"
-                    manual -> "手动画的框"
-                    masked -> "已打码"
-                    else -> "未打码"
-                },
-                style = MaterialTheme.typography.labelMedium,
-                color = colors.onSurfaceVariant,
-                maxLines = 1,
-            )
-        }
-        if (!manual) {
-            Spacer(Modifier.width(8.dp))
-            // 状态由整行的 toggleable 报给读屏，开关自己不接点击
-            Switch(checked = masked, onCheckedChange = null)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (!masked) {
+                    Box(Modifier.size(6.dp).background(OutlineAmber, CircleShape))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(
+                    when {
+                        manual && selected -> "已选中"
+                        manual -> "手动画的框"
+                        masked -> "已打码"
+                        else -> "未打码"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = colors.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
 
-/** 这一块在原图上的样子。截不到（手动框整个拖出了图外）就只留底色。 */
+/**
+ * 这一块在原图上的样子。截不到（手动框整个拖出了图外）就只留底色。
+ * [faded]（打了码）时褪成灰、变淡；打码、取消打码时褪色和回彩有一个过渡，不是一下子跳过去。
+ */
 @Composable
-private fun ItemThumbnail(image: SourceImage?, quad: Quad, modifier: Modifier) {
+private fun ItemThumbnail(image: SourceImage?, quad: Quad, faded: Boolean, modifier: Modifier) {
     val bitmap = image?.bitmap
     val thumb = remember(bitmap, quad) { bitmap?.let { ItemThumbnails.crop(it, quad) }?.asImageBitmap() }
+    val color by animateFloatAsState(if (faded) 0f else 1f, label = "thumbnailColor")
     Box(
         modifier
             .clip(RoundedCornerShape(8.dp))
@@ -239,10 +259,20 @@ private fun ItemThumbnail(image: SourceImage?, quad: Quad, modifier: Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         if (thumb != null) {
-            Image(thumb, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
+            Image(
+                thumb,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                alpha = FADED_ALPHA + (1f - FADED_ALPHA) * color,
+                colorFilter = if (color < 1f) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(color) }) else null,
+                modifier = Modifier.fillMaxSize(),
+            )
         }
     }
 }
+
+/** 打了码的缩略图淡到这么多：还认得出字，又一眼看得出是灰下去的。 */
+private const val FADED_ALPHA = 0.45f
 
 private val THUMB_HEIGHT = 44.dp
 

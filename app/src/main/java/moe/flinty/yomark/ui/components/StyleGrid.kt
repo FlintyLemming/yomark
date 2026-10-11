@@ -3,16 +3,17 @@ package moe.flinty.yomark.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -20,59 +21,108 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.min
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskStyleInfo
+import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
- * 宽屏的样式栏：六种样式排成两行三列的圆钮（宽屏增补设计）。
+ * 宽屏的样式按钮：六种样式排成两行三列的圆角方块（宽屏增补设计）。
+ *
+ * 方块跟着给它的地方变大变小，不在旁边空出一块：竖着拿时铺满下面那一块的左半边（[fillHeight]），
+ * 横着拿时铺满右边那一栏的宽、高取宽的四分之三。方块大了，里面的小样子和名字跟着放大。
  *
  * 照草图一列一列地放：第一列是色块和表情，往右依次是抹除、马赛克，模糊、马克笔——
  * 左边盖得严，越往右越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
- * 点一种换样式并弹出调节面板，再点当前那一种收起或弹出面板；安全性说明贴在圆钮下面。
+ * 点一种换样式并弹出调节面板，再点当前那一种收起或弹出面板；安全性说明贴在方块下面。
+ *
+ * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
+ * @param holdHeight 调节面板开着、下面那一块跟着面板长高时，方块停在面板打开前的高度，不跟着变高
  */
 @Composable
-fun StyleGrid(model: StyleBarModel, actions: StyleBarActions, modifier: Modifier = Modifier) {
+fun StyleGrid(
+    model: StyleBarModel,
+    actions: StyleBarActions,
+    modifier: Modifier = Modifier,
+    fillHeight: Boolean = false,
+    holdHeight: Boolean = false,
+) {
     val look = model.look
-    Column(modifier) {
-        Row(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(GAP)) {
-            MaskStyleInfo.ORDER.chunked(ROWS).forEach { column ->
-                Column(verticalArrangement = Arrangement.spacedBy(GAP)) {
-                    column.forEach { style ->
-                        StyleCircle(
-                            style = style,
-                            options = look.options,
-                            selected = style == look.style,
-                            panelOpen = model.panelOpen,
-                            onClick = { actions.onStyleClick(style) },
-                        )
-                    }
-                }
+    val note = MaskStyleInfo.note(look.style) ?: model.degradeNote
+    val held = remember { HeldHeight() }
+    Layout(
+        content = {
+            MaskStyleInfo.ORDER.forEach { style ->
+                StyleTile(
+                    style = style,
+                    options = look.options,
+                    selected = style == look.style,
+                    panelOpen = model.panelOpen,
+                    onClick = { actions.onStyleClick(style) },
+                )
             }
-        }
-        val note = MaskStyleInfo.note(look.style) ?: model.degradeNote
-        if (note != null) {
-            Text(
-                note,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.width(WIDTH).padding(top = 8.dp),
+            if (note != null) {
+                Text(
+                    note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            }
+        },
+        modifier = modifier.selectableGroup(),
+    ) { measurables, constraints ->
+        val gap = GAP.roundToPx()
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else (TILE_MIN * 3).roundToPx() + gap * 2
+        val tileW = ((width - gap * 2) / COLUMNS).coerceAtLeast(0)
+        val note = measurables.getOrNull(STYLES)?.measure(Constraints(maxWidth = width))
+        val noteH = note?.height ?: 0
+        val byWidth = (tileW * SIDE_ASPECT).roundToInt().coerceIn(TILE_MIN.roundToPx(), TILE_MAX.roundToPx())
+        val tileH = when {
+            !fillHeight || !constraints.hasBoundedHeight -> byWidth
+            // 面板开着：停在打开前的高度；一次也没量过（开着面板转过来的）就按宽定
+            holdHeight -> (if (held.px > 0) held.px else byWidth).coerceAtMost(
+                ((constraints.maxHeight - noteH - gap) / ROWS).coerceAtLeast(0),
             )
+            else -> min((constraints.maxHeight - noteH - gap) / ROWS, (tileW * MAX_ASPECT).roundToInt())
+                .coerceAtLeast(0)
+                .also { held.px = it }
+        }
+        val tiles = measurables.take(STYLES).map { it.measure(Constraints.fixed(tileW, tileH)) }
+        val gridH = tileH * ROWS + gap * (ROWS - 1)
+        val height = (gridH + noteH).coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, height) {
+            tiles.forEachIndexed { i, tile ->
+                // 一列一列地放：先排满第一列的两个，再到下一列
+                tile.place((i / ROWS) * (tileW + gap), (i % ROWS) * (tileH + gap))
+            }
+            note?.place(0, gridH)
         }
     }
 }
 
+/** 面板打开前方块的高度（像素）。只在量的时候读写，不触发重组。 */
+private class HeldHeight {
+    var px = 0
+}
+
 /**
- * 一个圆钮：上面是这种样式的小样子（跟着参数走，色块是当前的颜色），下面是名字。
+ * 一个方块：上面是这种样式的小样子（跟着参数走，色块是当前的颜色），下面是名字。
  * 选中的那一个垫上底色、描一圈主题色，名字后面的小箭头说明再点一下就展开（或收起）调节面板。
+ * 圆角随方块大小走，小方块圆一些，大方块是圆角矩形。
  */
 @Composable
-private fun StyleCircle(
+private fun StyleTile(
     style: MaskStyle,
     options: MaskOptions,
     selected: Boolean,
@@ -80,46 +130,62 @@ private fun StyleCircle(
     onClick: () -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
-    Column(
-        Modifier
-            .size(CIRCLE)
-            .clip(CircleShape)
-            .background(if (selected) colors.secondaryContainer else colors.surfaceContainerHigh)
-            .border(
-                width = if (selected) 2.dp else 1.dp,
-                color = if (selected) colors.primary else colors.outlineVariant,
-                shape = CircleShape,
-            )
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        StyleGlyph(style, options)
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                MaskStyleInfo.label(style),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
-                maxLines = 1,
-            )
-            if (selected) {
-                Icon(
-                    if (panelOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = colors.onSecondaryContainer,
+    BoxWithConstraints {
+        val side = min(maxWidth, maxHeight)
+        val shape = RoundedCornerShape(min(CORNER_MAX, side * 0.3f))
+        val large = side >= LARGE_TILE
+        val scale = (side / TILE_MIN).coerceIn(1f, GLYPH_MAX_SCALE)
+        Column(
+            Modifier
+                .fillMaxSize()
+                .clip(shape)
+                .background(if (selected) colors.secondaryContainer else colors.surfaceContainerHigh)
+                .border(
+                    width = if (selected) 2.dp else 1.dp,
+                    color = if (selected) colors.primary else colors.outlineVariant,
+                    shape = shape,
                 )
+                .selectable(selected = selected, role = Role.RadioButton, onClick = onClick),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            StyleGlyph(style, options, scale)
+            Spacer(Modifier.height(4.dp * scale))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    MaskStyleInfo.label(style),
+                    style = if (large) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium,
+                    color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
+                    maxLines = 1,
+                )
+                if (selected) {
+                    Icon(
+                        if (panelOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(if (large) 16.dp else 14.dp),
+                        tint = colors.onSecondaryContainer,
+                    )
+                }
             }
         }
     }
 }
 
-/** 两行。 */
+private const val STYLES = 6
 private const val ROWS = 2
+private const val COLUMNS = 3
 
-private val CIRCLE = 64.dp
 private val GAP = 12.dp
 
-/** 三列圆钮的总宽，安全性说明按它折行。 */
-private val WIDTH = CIRCLE * 3 + GAP * 2
+/** 方块高最多是宽的这么多倍：再高就成了细长条，宁可在下面留一点空。 */
+private const val MAX_ASPECT = 1.25f
+
+/** 高按宽定时（横着拿的右边那一栏）取宽的四分之三，夹在 [TILE_MIN]～[TILE_MAX] 之间。 */
+private const val SIDE_ASPECT = 0.75f
+private val TILE_MIN = 64.dp
+private val TILE_MAX = 96.dp
+
+/** 短边到这么大，名字换大一号的字。 */
+private val LARGE_TILE = 88.dp
+private val CORNER_MAX = 24.dp
+private const val GLYPH_MAX_SCALE = 1.6f

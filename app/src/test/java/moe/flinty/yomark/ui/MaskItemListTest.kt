@@ -142,10 +142,13 @@ class MaskItemListTest {
         ),
     )
 
+    /** 没有开关：打没打码写在行里（打了码的整行灰下去），读屏照样把它当开关报。 */
     @Test fun `every box is listed with its kind and state`() {
         show(plan)
         compose.onNodeWithText("电话").assertIsOn()
+        compose.onNodeWithText("已打码").assertIsOn()
         compose.onNodeWithText("网址").assertIsOff()
+        compose.onNodeWithText("未打码").assertIsOff()
         compose.onNodeWithText("手动").assertExists()
         compose.onNodeWithText("框出 3 处").assertExists()
         compose.onNodeWithText("1 处未打码").assertExists()

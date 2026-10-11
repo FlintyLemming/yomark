@@ -213,34 +213,36 @@ private fun StyleTool(
     }
 }
 
-/** 样式栏上每一项的小样子。宽屏的样式圆钮（StyleGrid）也用它。 */
+/**
+ * 样式栏上每一项的小样子。宽屏的样式方块（StyleGrid）也用它，方块大时按 [scale] 放大。
+ */
 @Composable
-internal fun StyleGlyph(style: MaskStyle, options: MaskOptions) {
+internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, scale: Float = 1f) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val ink = MaterialTheme.colorScheme.onSurfaceVariant
     when (style) {
         MaskStyle.SOLID -> Box(
             Modifier
-                .size(width = 22.dp, height = 16.dp)
-                .background(Color(options.solidColor), RoundedCornerShape(4.dp))
-                .border(1.dp, outline, RoundedCornerShape(4.dp)),
+                .size(width = 22.dp * scale, height = 16.dp * scale)
+                .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
+                .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
         )
-        MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp)
-        MaskStyle.ERASE -> Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp), tint = ink)
-        MaskStyle.PIXELATE -> MosaicGlyph(ink)
-        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp), tint = ink)
+        MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp * scale)
+        MaskStyle.ERASE -> Icon(Icons.Outlined.AutoFixHigh, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
+        MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
+        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
         MaskStyle.MARKER -> Box(
             Modifier
-                .size(width = 22.dp, height = 12.dp)
-                .background(Color(options.markerColor), RoundedCornerShape(3.dp)),
+                .size(width = 22.dp * scale, height = 12.dp * scale)
+                .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
         )
     }
 }
 
 /** 马赛克的小样子：3×3 的格子，深浅错开。 */
 @Composable
-private fun MosaicGlyph(ink: Color) {
-    Canvas(Modifier.size(18.dp)) {
+private fun MosaicGlyph(ink: Color, side: Dp) {
+    Canvas(Modifier.size(side)) {
         val cell = size.width / 3f
         for (i in 0 until 3) for (j in 0 until 3) {
             val alpha = MOSAIC_SHADES[(i + 2 * j) % MOSAIC_SHADES.size]

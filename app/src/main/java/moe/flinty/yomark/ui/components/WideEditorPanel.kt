@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
@@ -25,10 +24,11 @@ import androidx.compose.ui.util.lerp
 import kotlin.math.roundToInt
 
 /**
- * 宽屏版式里画布旁边的那一块（宽屏增补设计）：样式圆钮、框列表、导出那一行。
+ * 宽屏版式里画布旁边的那一块（宽屏增补设计）：样式方块、框列表、导出那一行。
  *
- * 竖着拿（[atSide] 为 false）在画布下面：左边样式、右边列表，导出那一行横在最底下，和手机底栏的导出一个位置。
- * 横着拿（[atSide] 为 true）挪到画布右边：样式在上、列表在下，导出在最底下。
+ * 竖着拿（[atSide] 为 false）在画布下面：左半边是样式方块、右半边是列表，导出那一行横在最底下，
+ * 和手机底栏的导出一个位置。横着拿（[atSide] 为 true）挪到画布右边：样式在上、列表在下，导出在最底下。
+ * 样式方块都铺满给它的那一块（见 StyleGrid）。
  *
  * 样式的调节面板弹出来时占列表的位置，收起后列表回来。竖着拿时面板比列表那一块高，这一块就跟着长高，
  * 面板不至于挤成一条缝；画布跟着变矮，和手机上面板把画布顶上去是一回事。
@@ -53,7 +53,7 @@ fun WideEditorPanel(
                 .fillMaxHeight()
                 .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         ) {
-            StyleGrid(styleBar, styleActions, Modifier.align(Alignment.CenterHorizontally))
+            StyleGrid(styleBar, styleActions, Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (open) StylePanel(styleBar, styleActions) else list(Modifier.fillMaxSize())
@@ -72,8 +72,9 @@ fun WideEditorPanel(
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
+            // 左右各一半：样式方块铺满左半边，列表（或调节面板）占右半边
             Row(Modifier.weight(1f, fill = !open).fillMaxWidth()) {
-                StyleGrid(styleBar, styleActions)
+                StyleGrid(styleBar, styleActions, Modifier.weight(1f), fillHeight = true, holdHeight = open)
                 Spacer(Modifier.width(16.dp))
                 if (open) StylePanel(styleBar, styleActions, Modifier.weight(1f))
                 else list(Modifier.weight(1f).fillMaxHeight())

@@ -14,6 +14,8 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import com.google.common.truth.Truth.assertThat
@@ -148,8 +150,12 @@ class EditorScreenLayoutTest {
         val list = listBounds()
         val screen = screenBounds()
         assertThat(list.top).isGreaterThan(screen.bottom * 0.6f)
-        // 样式圆钮在列表左边
-        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().right).isLessThan(list.left)
+        // 样式方块铺满左半边，列表占右半边
+        val solid = compose.onNodeWithText("色块").getUnclippedBoundsInRoot()
+        val marker = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
+        assertThat(marker.right).isLessThan(list.left)
+        assertThat(marker.right).isGreaterThan(screen.right * 0.45f)
+        assertThat(solid.width).isGreaterThan(100.dp)
     }
 
     @Config(qualifiers = "sw800dp-w1280dp-h800dp-land-xhdpi")
@@ -158,7 +164,11 @@ class EditorScreenLayoutTest {
         val list = listBounds()
         val screen = screenBounds()
         assertThat(list.left).isGreaterThan(screen.right * 0.6f)
-        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().bottom).isLessThan(list.top)
+        // 样式方块铺满这一栏的宽，在列表上面
+        val solid = compose.onNodeWithText("色块").getUnclippedBoundsInRoot()
+        val blur = compose.onNodeWithText("模糊").getUnclippedBoundsInRoot()
+        assertThat(solid.bottom).isLessThan(list.top)
+        assertThat(blur.right - solid.left).isGreaterThan(screen.width * 0.25f)
     }
 
     @Config(qualifiers = "sw528dp-w528dp-h848dp-port-xhdpi")
