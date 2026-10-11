@@ -113,7 +113,7 @@ interface StyleBarActions {
 }
 
 /**
- * 样式栏（spec §7.5 修订）：一排六种样式，点一种就从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
+ * 样式栏（spec §7.5 修订）：一排六种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
  *
  * 样式栏是「画笔」：换了样式、调了颜色，从下一次打码起生效——新画的框、点了打码的虚线框都用它，
  * 已经打好的码不变；选中了手动框时，改动也落在那个框上。面板上的「应用到全部」把这张图上打好的码全换成这样。
@@ -150,7 +150,7 @@ private fun styleNote(model: StyleBarModel): String? = MaskStyleInfo.note(model.
 /**
  * 六种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
  * 小样子跟着参数走：色块是当前的颜色，表情是当前的表情——不点开面板也看得出下一笔是什么样。
- * 选中的那一项名字后面有个小箭头：再点它一下，面板就弹出来。
+ * 选中的那一项名字后面有个小箭头：再点它一下，面板就弹出来。面板从下面往上弹，所以收着时箭头朝上、弹出来后朝下。
  */
 @Composable
 private fun StylePalette(look: MaskLook, panelOpen: Boolean, onClick: (MaskStyle) -> Unit) {
@@ -209,7 +209,7 @@ private fun StyleTool(
             )
             if (selected) {
                 Icon(
-                    if (panelOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
                     contentDescription = null,
                     modifier = Modifier.size(14.dp),
                     tint = colors.onSurfaceVariant,

@@ -579,7 +579,8 @@ class EditorViewModel(
     // ---------- 样式（spec §7.5 修订：每块码有自己的样式，样式栏是画笔） ----------
 
     /**
-     * 点样式栏上的一项。换了样式就弹出它的调节面板；点的正是当前这一项，就收起或重新弹出面板。
+     * 点样式栏上的一项。换了样式只是换，面板不跟着弹出来——多数时候换个样式就够了，用不着调参数；
+     * 宽屏上面板本来开着的话照样开着，换成新样式的参数。点的正是当前这一项，才弹出或收起面板。
      * 换样式本身照 [setStyle] 的规矩：管下一次打码，选中了手动框时也管那个框。
      */
     fun onStyleChipClick(style: MaskStyle) {
@@ -589,7 +590,6 @@ class EditorViewModel(
             return
         }
         setStyle(style)
-        _state.value = _state.value.copy(stylePanelOpen = true)
     }
 
     /** 换样式，参数沿用样式栏上那一份里这种样式的参数。 */

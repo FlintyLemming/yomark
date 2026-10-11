@@ -153,7 +153,10 @@ class EditorScreenLayoutTest {
     @Test fun `on a phone the style panel pops up over the image instead of pushing it up`() {
         val vm = open()
         val bar = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
-        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.EMOJI) }
+        compose.runOnUiThread {
+            vm.onStyleChipClick(MaskStyle.EMOJI)   // 换成表情
+            vm.onStyleChipClick(MaskStyle.EMOJI)   // 再点一下才弹出面板
+        }
         frames(SETTLE_FRAMES)
         compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
         assertThat(compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()).isEqualTo(bar)
@@ -257,7 +260,10 @@ class EditorScreenLayoutTest {
     @Config(qualifiers = "sw800dp-w800dp-h1280dp-port-xhdpi")
     @Test fun `the style panel takes the list's place while it is open`() {
         val vm = open()
-        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.EMOJI) }
+        compose.runOnUiThread {
+            vm.onStyleChipClick(MaskStyle.EMOJI)   // 换成表情
+            vm.onStyleChipClick(MaskStyle.EMOJI)   // 再点一下才弹出面板
+        }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("恢复默认").assertExists()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()

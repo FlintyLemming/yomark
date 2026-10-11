@@ -44,7 +44,7 @@ import kotlin.math.roundToInt
  *
  * 照草图一列一列地放：第一列是色块和表情，往右依次是抹除、马赛克，模糊、马克笔——
  * 左边盖得严，越往右越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
- * 点一种换样式并弹出调节面板，再点当前那一种收起或弹出面板；安全性说明贴在方块下面。
+ * 点一种换样式，再点当前那一种才弹出或收起调节面板；安全性说明贴在方块下面。
  *
  * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
  * @param holdHeight 调节面板开着、下面那一块跟着面板长高时，方块停在面板打开前的高度，不跟着变高
@@ -118,7 +118,8 @@ private class HeldHeight {
 
 /**
  * 一个方块：上面是这种样式的小样子（跟着参数走，色块是当前的颜色），下面是名字。
- * 选中的那一个垫上底色、描一圈主题色，名字后面的小箭头说明再点一下就展开（或收起）调节面板。
+ * 选中的那一个垫上底色、描一圈主题色，名字后面的小箭头说明再点一下就展开（或收起）调节面板：
+ * 收着时朝上，开着时朝下。
  * 圆角随方块大小走，小方块圆一些，大方块是圆角矩形。
  */
 @Composable
@@ -160,7 +161,7 @@ private fun StyleTile(
                 )
                 if (selected) {
                     Icon(
-                        if (panelOpen) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
                         contentDescription = null,
                         modifier = Modifier.size(if (large) 16.dp else 14.dp),
                         tint = colors.onSecondaryContainer,

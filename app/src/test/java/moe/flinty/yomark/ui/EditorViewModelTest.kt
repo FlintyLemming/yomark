@@ -422,19 +422,33 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `tapping a style opens its panel and tapping it again closes it`() = runTest(dispatcher) {
+    fun `tapping a style only switches to it, tapping it again opens and closes its panel`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onStyleChipClick(MaskStyle.EMOJI)
-        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
         assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
 
+        vm.onStyleChipClick(MaskStyle.EMOJI)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
         vm.onStyleChipClick(MaskStyle.EMOJI)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         vm.onStyleChipClick(MaskStyle.EMOJI)
         assertThat(vm.state.value.stylePanelOpen).isTrue()
         vm.dismissStylePanel()
         assertThat(vm.state.value.stylePanelOpen).isFalse()
+    }
+
+    /** 宽屏上面板开着时样式方块还点得到：换样式不把面板收起来，面板换成新样式的参数。 */
+    @Test
+    fun `switching style while the panel is open keeps it open`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onStyleChipClick(vm.state.value.barLook.style)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        vm.onStyleChipClick(MaskStyle.MARKER)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.MARKER)
     }
 
     @Test
