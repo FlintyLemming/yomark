@@ -6,30 +6,66 @@ import org.junit.Test
 class SparkleTest {
 
     @Test
-    fun `at rest the stars sit exactly like the static icon`() {
-        val p = Sparkle.pose(0f)
-        assertThat(p.bigDegrees).isWithin(1e-4f).of(0f)
-        assertThat(p.smallDegrees).isWithin(1e-4f).of(0f)
-        assertThat(p.bigScale).isWithin(1e-4f).of(1f)
-        assertThat(p.smallScale).isWithin(1e-4f).of(1f)
+    fun `at rest the big star sits in front at the lower left and the small one behind at the upper right`() {
+        val (back, front) = Sparkle.stars(0f)
+        assertThat(front.radius).isGreaterThan(back.radius)
+        assertThat(front.center.x).isLessThan(back.center.x)
+        assertThat(front.center.y).isGreaterThan(back.center.y)
     }
 
     @Test
-    fun `a cycle ends a half turn later, which a four-point star cannot tell from the start`() {
-        val p = Sparkle.pose(1f)
-        assertThat(p.bigDegrees).isWithin(1e-3f).of(180f)
-        assertThat(p.smallDegrees).isWithin(1e-3f).of(-180f)
-        assertThat(p.bigScale).isWithin(1e-4f).of(1f)
-        assertThat(p.smallScale).isWithin(1e-4f).of(1f)
+    fun `the star drawn last is always the nearer, bigger one, so it covers the other`() {
+        for (i in 0..200) {
+            val (back, front) = Sparkle.stars(i / 200f)
+            assertThat(front.depth).isAtLeast(back.depth)
+            assertThat(front.radius).isAtLeast(back.radius)
+        }
     }
 
     @Test
-    fun `mid-cycle the big star shrinks while the small one grows, and the small one stays inside the icon`() {
-        val p = Sparkle.pose(0.5f)
-        assertThat(p.bigScale).isLessThan(1f)
-        assertThat(p.smallScale).isGreaterThan(1f)
-        val reach = Sparkle.SMALL_RADIUS * p.smallScale
-        assertThat(Sparkle.SMALL_CENTER.y - reach).isAtLeast(0f)
-        assertThat(Sparkle.SMALL_CENTER.x + reach).isAtMost(1f)
+    fun `a quarter of the way the two cross, nearest and farthest, close enough to overlap`() {
+        val (back, front) = Sparkle.stars(0.25f)
+        assertThat(front.radius).isWithin(1e-4f).of(Sparkle.FRONT_RADIUS)
+        assertThat(back.radius).isWithin(1e-4f).of(Sparkle.BACK_RADIUS)
+        assertThat((front.center - back.center).getDistance()).isLessThan(front.radius)
+        // 镜头稍高：后面那颗在前面那颗的左上方露出来
+        assertThat(back.center.x).isLessThan(front.center.x)
+        assertThat(back.center.y).isLessThan(front.center.y)
+    }
+
+    @Test
+    fun `three quarters of the way the two are side by side at the far ends, equally near and equally big`() {
+        val (a, b) = Sparkle.stars(0.75f)
+        assertThat(a.radius).isWithin(1e-4f).of(b.radius)
+        assertThat((a.center - b.center).getDistance()).isWithin(1e-4f).of(2 * Sparkle.TO_END.getDistance())
+    }
+
+    @Test
+    fun `after half a turn the picture is back to the resting icon, so the loop has no seam`() {
+        for ((a, b) in Sparkle.stars(0f).zip(Sparkle.stars(1f))) {
+            assertThat(b.radius).isWithin(1e-4f).of(a.radius)
+            assertThat(b.center.x).isWithin(1e-4f).of(a.center.x)
+            assertThat(b.center.y).isWithin(1e-4f).of(a.center.y)
+        }
+    }
+
+    @Test
+    fun `each half turn starts and ends at rest instead of spinning at constant speed`() {
+        assertThat(Sparkle.EASING.transform(0.05f)).isLessThan(0.01f)
+        assertThat(Sparkle.EASING.transform(0.95f)).isGreaterThan(0.99f)
+        // 中间比匀速快
+        assertThat(Sparkle.EASING.transform(0.55f) - Sparkle.EASING.transform(0.45f)).isGreaterThan(0.15f)
+    }
+
+    @Test
+    fun `the stars stay inside the icon all the way round`() {
+        for (i in 0..200) {
+            for (star in Sparkle.stars(i / 200f)) {
+                assertThat(star.center.x - star.radius).isAtLeast(0f)
+                assertThat(star.center.x + star.radius).isAtMost(1f)
+                assertThat(star.center.y - star.radius).isAtLeast(0f)
+                assertThat(star.center.y + star.radius).isAtMost(1f)
+            }
+        }
     }
 }
