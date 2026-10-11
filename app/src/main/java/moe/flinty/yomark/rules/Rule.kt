@@ -35,6 +35,16 @@ interface Rule : Finder {
     val kind: SensitiveKind
     /** 进编辑器时的初始状态。按误报率划线，不按危害划线（spec §6）。 */
     val enabledByDefault: Boolean
+
+    /**
+     * 让给哪几类：同一行上与它们重叠的命中丢掉。合并只在同类之间做，两类抢同一处就会叠出两个框——
+     * 「Date of birth」下面的「05 FEB 1965」是出生日期，不该再另圈一个日期时间。
+     */
+    val yieldsTo: Set<SensitiveKind> get() = emptySet()
+
+    /** 整页上的命中。默认逐行跑 findIn；有看整页的认法（PageFinder）的规则覆写它。 */
+    fun findOnPage(page: Page): List<PageMatch> =
+        page.texts.indices.flatMap { i -> findIn(page.texts[i]).map { PageMatch(i, it) } }
 }
 
 /**
@@ -53,6 +63,7 @@ class RegexRule(
     private val confidence: Float,
     private val validate: (text: String, m: MatchResult) -> Boolean,
     private val select: (MatchResult) -> IntRange = { it.range },
+    override val yieldsTo: Set<SensitiveKind> = emptySet(),
 ) : Rule {
     override fun findIn(text: String): List<RuleMatch> =
         pattern.findAll(text)
@@ -73,17 +84,35 @@ class RegexRule(
  * 姓名、地址都把标签锚定放在第一位——它知道值从哪里开始；
  * 靠形状、靠邻居猜的认法排在后面，只补标签锚定够不着的地方。
  * 不这样做，同一个名字会被两种认法各框一次，合并后框的边界取决于谁猜得更宽。
+ *
+ * 看整页的认法（PageFinder）也按这个先后排，只在 findOnPage 里跑。
  */
 class CompositeRule(
     override val id: String,
     override val kind: SensitiveKind,
     override val enabledByDefault: Boolean,
     private vararg val finders: Finder,
+    override val yieldsTo: Set<SensitiveKind> = emptySet(),
 ) : Rule {
     override fun findIn(text: String): List<RuleMatch> {
         val out = ArrayList<RuleMatch>()
         finders.forEach { f ->
             f.findIn(text).forEach { m -> if (out.none { it.range.overlaps(m.range) }) out += m }
+        }
+        return out
+    }
+
+    override fun findOnPage(page: Page): List<PageMatch> {
+        val out = ArrayList<PageMatch>()
+        finders.forEach { f ->
+            // 一种认法出错，当它什么也没认出，不拖累同一条规则里的其余几种
+            val found = if (f is PageFinder) runCatching { f.findOnPage(page) }.getOrElse { emptyList() }
+            else page.texts.indices.flatMap { i ->
+                runCatching { f.findIn(page.texts[i]) }.getOrElse { emptyList() }.map { PageMatch(i, it) }
+            }
+            found.forEach { m ->
+                if (out.none { it.line == m.line && it.match.range.overlaps(m.match.range) }) out += m
+            }
         }
         return out
     }

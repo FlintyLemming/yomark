@@ -5,7 +5,7 @@ import moe.flinty.yomark.rules.validator.Checksums
 import moe.flinty.yomark.rules.validator.KnownTlds
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。16 条：11 条默认打码、5 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。17 条：12 条默认打码、5 条仅圈出。
  * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
@@ -23,6 +23,8 @@ object DefaultRuleSet {
         pattern = Regex("""(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])"""),
         confidence = 0.95f,
         validate = { _, m -> Checksums.luhn(m.value.filter { it.isDigit() }) },
+        // 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn
+        yieldsTo = setOf(SensitiveKind.PASSPORT),
     )
 
     private val IBAN = RegexRule(
@@ -62,16 +64,41 @@ object DefaultRuleSet {
         validate = { _, m -> KnownTlds.isKnown(m.groupValues[1]) },
     )
 
-    private val PASSPORT = RegexRule(
+    /**
+     * 护照号的形状：「E00007730」「123456789」「EA1234567」「C01X00T47」——至多三个字母开头，后面字母数字，6 到 12 位。
+     * 只跟在字段名后面认，单独一串字母数字什么都可能是。
+     */
+    private const val DOCUMENT_NUMBER = """[A-Z]{0,3}\d[A-Z0-9]{4,11}"""
+    private val DOCUMENT_NUMBER_ALONE = Regex("""(?<![A-Za-z0-9])$DOCUMENT_NUMBER(?![A-Za-z0-9])""")
+
+    /**
+     * 护照 = 机读码 + 资料页上的护照号。
+     *
+     * 机读码见 Mrz：去掉 OCR 补的空格、放宽填充符的个数，靠填充符或校验位认。护照号三种认法：
+     * 同一行的「Passport No.: E12345678」；字段名在上、号码在下的资料页（StackedField）；
+     * 机读码里读出的证件号在页上别处又出现（MrzEcho），字段名是哪国文字都不要紧。
+     */
+    private val PASSPORT = CompositeRule(
         id = "passport",
         kind = SensitiveKind.PASSPORT,
         enabledByDefault = true,
-        // TD3：两行各 44 字符，字符集是大写字母、数字与填充符
-        pattern = Regex("""(?<![A-Z0-9<])[A-Z0-9<]{44}(?![A-Z0-9<])"""),
-        confidence = 0.95f,
-        validate = { _, m ->
-            Checksums.mrzTd3Line1(m.value) || Checksums.mrzTd3Line2Valid(m.value)
-        },
+        MrzLines(confidence = 0.95f),
+        LabeledField(
+            labels = listOf(
+                "Passport No.", "Passport No", "Passport Number", "Passport #", "Document No.", "Document No",
+                "Document Number", "护照号码", "护照号",
+            ),
+            value = Regex("""$DOCUMENT_NUMBER(?![A-Za-z0-9])"""),
+            confidence = 0.8f,
+            ignoreCase = true,
+        ),
+        StackedField(
+            StackedField.document(StackedField.DOCUMENT_NUMBER_LABELS),
+            value = { cell -> DOCUMENT_NUMBER_ALONE.find(cell)?.range },
+            confidence = 0.8f,
+            sameLine = true,
+        ),
+        MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, confidence = 0.9f),
     )
 
     private val API_KEY = RegexRule(
@@ -152,9 +179,25 @@ object DefaultRuleSet {
         LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
         EnglishNameCues(confidence = 0.8f, weakConfidence = 0.7f),
+        StackedField(StackedField.document(StackedField.NAME_LABELS), ::documentNameIn, confidence = 0.8f),
+        StackedField(StackedField.header(StackedField.NAME_HEADER), ::formNameIn, confidence = 0.7f),
+        MrzEcho(MrzEcho.What.NAME, confidence = 0.8f),
         NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
         NeedsAnchor(EnglishNameGuess(confidence = 0.6f)),
     )
+
+    /**
+     * 证件上「Surname」「Given names」下面的名字：没有数字，六个词以内，第一个词大写开头（护照上全大写），
+     * 可夹着汉字（「张三 ZHANG SAN」）。字段名已经说明了这是名字，不再对名单。
+     */
+    private val DOCUMENT_NAME = Regex("""\p{L}[\p{L}'’.\-]*(?:[ ,/]+\p{L}[\p{L}'’.\-]*){0,5}""")
+
+    private fun documentNameIn(cell: String): IntRange? =
+        cell.indices.takeIf { DOCUMENT_NAME.matches(cell) && !cell.first().isLowerCase() }
+
+    /** 表单上单独一行的「Name」「Customer」下面那个：与「Name: …」同一套值的形状，「Order Details」、品牌名不算。 */
+    private fun formNameIn(cell: String): IntRange? =
+        cell.indices.takeIf { EnglishNameCues.VALUE.matches(cell) && EnglishNameCues.looksLikeNameValue(cell) }
 
     /**
      * 地址。**不能用姓名那套「遇数字即停」**——门牌号、楼层、邮编本来就是地址的一部分。
@@ -185,8 +228,34 @@ object DefaultRuleSet {
             value = ADDRESS_VALUE,
             confidence = 0.8f,
         ),
+        StackedField(StackedField.document(StackedField.BIRTH_PLACE_LABELS), ::placeIn, confidence = 0.8f),
+        StackedField(StackedField.header(StackedField.ADDRESS_HEADER), ::addressLineIn, confidence = 0.7f, maxLines = 4),
         AddressShape(confidence = 0.7f),
         EnglishAddressShape(confidence = 0.7f),
+    )
+
+    /** 出生地：护照上是「WASHINGTON, D.C., U.S.A.」「广东 GUANGDONG」。有字母、没有邮箱，八个词以内，整段遮。 */
+    private fun placeIn(cell: String): IntRange? =
+        cell.indices.takeIf { cell.count(Char::isLetter) >= 2 && '@' !in cell && cell.split(' ').size <= 8 }
+
+    /**
+     * 表单上「Shipping Address」下面的一行：整行遮，到邮箱、电话那一行为止（那两样有自己的规则），
+     * 也到地址块下面那些界面上的字为止（[NOT_AN_ADDRESS_LINE]）。
+     */
+    private fun addressLineIn(cell: String): IntRange? {
+        if ('@' in cell || cell.length > 60 || NOT_AN_ADDRESS_LINE.containsMatchIn(cell)) return null
+        val digits = cell.count(Char::isDigit)
+        if (digits >= 7 && digits * 2 >= cell.count { !it.isWhitespace() }) return null
+        return cell.indices.takeIf { cell.any(Char::isLetterOrDigit) }
+    }
+
+    /**
+     * 地址块下面常跟着的、不是地址的行（英文名址基准上量出来的）：勾选项「Same as billing address」、
+     * 链接「Get directions」、送餐备注「Meet at door」、联系人卡片上地址的类型「Home」。
+     */
+    private val NOT_AN_ADDRESS_LINE = Regex(
+        """(?i)^(?:(?:same as|get directions|directions|view (?:on )?map|open in|meet at|leave at|hand it|""" +
+            """(?:add )?(?:delivery )?instructions|edit|change|copy)\b|(?:home|work|personal|office|other|main|primary|default)$)"""
     )
 
     /**
@@ -205,6 +274,35 @@ object DefaultRuleSet {
             value = Regex("""[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""),
             confidence = 0.8f,
         ),
+    )
+
+    /**
+     * 出生日期：字段名指明了的那个日期，误报少，默认打码；没有字段名的日期仍归日期时间，只圈出。
+     *
+     * 三种认法：同一行的「出生日期：1990-01-01」「DOB 01/07/1973」「出生 1990年1月1日」（身份证）；
+     * 字段名在上、日期在下的护照资料页（「Date of birth」下面的「05 FEB 1965」）；机读码里的生日在页上别处出现
+     * （幽灵像旁边那行「05 02 65」）。前面写着字段名，日期可以写得随意些：两位年、空格分隔都认（Dates.LENIENT）。
+     */
+    private val BIRTH_DATE = CompositeRule(
+        id = "birthdate",
+        kind = SensitiveKind.BIRTH_DATE,
+        enabledByDefault = true,
+        LabeledField(
+            labels = listOf(
+                "出生日期", "出生年月日", "出生年月", "出生", "生日",
+                "Date of birth", "Birth date", "Birthdate", "Birthday", "DOB", "D.O.B.", "Born",
+            ),
+            value = Regex(Dates.LENIENT),
+            confidence = 0.8f,
+            ignoreCase = true,
+        ),
+        StackedField(
+            StackedField.document(StackedField.BIRTH_DATE_LABELS),
+            value = Dates::findLenient,
+            confidence = 0.8f,
+            sameLine = true,
+        ),
+        MrzEcho(MrzEcho.What.BIRTH_DATE, confidence = 0.9f),
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
@@ -258,6 +356,7 @@ object DefaultRuleSet {
         override val id = "tracking"
         override val kind = SensitiveKind.TRACKING_NO
         override val enabledByDefault = false
+        override val yieldsTo = setOf(SensitiveKind.PASSPORT)
 
         private val ups = Regex("""(?<![A-Za-z0-9])1Z[0-9A-Za-z]{16}(?![A-Za-z0-9])""")
         // FedEx 12/15 位、USPS 20/22 位：无校验位，置信度调低
@@ -296,6 +395,7 @@ object DefaultRuleSet {
         override val id = "longnum"
         override val kind = SensitiveKind.LONG_NUMBER
         override val enabledByDefault = false
+        override val yieldsTo = setOf(SensitiveKind.PASSPORT)
 
         private val run = Regex("""(?<![A-Za-z0-9])\d{16,}(?![A-Za-z0-9])""")
         private val trackingLengths = setOf(20, 22)
@@ -315,7 +415,7 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE,
+        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 

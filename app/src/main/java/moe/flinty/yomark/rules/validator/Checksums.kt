@@ -69,20 +69,9 @@ object Checksums {
         return "10X98765432"[sum % 11] == raw[17].uppercaseChar()
     }
 
-    // ---------- 护照 MRZ（TD3，两行各 44 字符） ----------
-    fun mrzTd3Line1(line: String): Boolean =
-        line.length == 44 && MRZ_L1.matches(line)
-
-    fun mrzTd3Line2Valid(line: String): Boolean {
-        if (line.length != 44) return false
-        if (!line.all { it in 'A'..'Z' || it.isDigit() || it == '<' }) return false
-        // 护照号 0..8 校验位 9；生日 13..18 校验位 19；有效期 21..26 校验位 27
-        return mrzCheck(line.substring(0, 9)) == line[9] &&
-            mrzCheck(line.substring(13, 19)) == line[19] &&
-            mrzCheck(line.substring(21, 27)) == line[27]
-    }
-
-    private fun mrzCheck(field: String): Char {
+    // ---------- 机读码（MRZ）：怎么认见 rules/Mrz.kt ----------
+    /** 机读码一个字段的校验位（权重 7、3、1 循环，字母 A=10……Z=35，填充符 < 算 0）。字段里有别的字符时给「?」。 */
+    fun mrzCheck(field: String): Char {
         val weights = intArrayOf(7, 3, 1)
         var sum = 0
         field.forEachIndexed { i, c ->
@@ -137,7 +126,6 @@ object Checksums {
 
     private val ID_WEIGHTS = intArrayOf(7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2)
     private val SSN_SHAPE = Regex("""^(\d{3})-(\d{2})-(\d{4})$""")
-    private val MRZ_L1 = Regex("""^P[A-Z<][A-Z<]{3}[A-Z<]{39}$""")
 
     /** 常见国家的 IBAN 长度。缺的国家会被判为无效——宁可漏检 IBAN，也不要误报一串数字。 */
     private val IBAN_LENGTHS = mapOf(

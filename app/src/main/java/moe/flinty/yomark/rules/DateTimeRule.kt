@@ -14,12 +14,17 @@ import moe.flinty.yomark.core.model.SensitiveKind
  *
  * 日期与紧随其后的时间**合成一个匹配**（含不带年份的「09-29 12:30」）。拆成两条会在同一处叠出两个候选，
  * 而合并只在同 kind 之间做，用户就得点两次才能放过一个时间戳。
+ *
+ * 英文的写法（2026-10，护照样张上的「05 FEB 1965」一个都没认出来）：「Feb 5, 1965」「5 February 1965」、
+ * 四位年的「02/05/1965」，时间带「10:30 AM」。写法表在 [Dates]。
+ * 出生日期另有一类（「Date of birth」下面那个），同一处它让给出生日期；取件码「3-2-2025」也让。
  */
 class DateTimeRule : Rule {
 
     override val id = "datetime"
     override val kind = SensitiveKind.DATETIME
     override val enabledByDefault = false
+    override val yieldsTo = setOf(SensitiveKind.BIRTH_DATE, SensitiveKind.PICKUP_CODE)
 
     override fun findIn(text: String): List<RuleMatch> =
         PATTERN.findAll(text)
@@ -32,36 +37,35 @@ class DateTimeRule : Rule {
      * `88:12` 会被时间分支的字符类挡掉，但月/日没有同样的字符类可用。
      */
     private fun inRange(value: String): Boolean {
-        val monthDay = MONTH_DAY_FIRST.find(value)
-        val (month, day) = when {
-            YEAR_FIRST.containsMatchIn(value) -> NUMBER.findAll(value).map { it.value.toInt() }.toList()
-                .takeIf { it.size >= 3 }?.let { it[1] to it[2] } ?: return true
-            // 不能用 NUMBER 切：「09-2912:30」里日与时粘在一起，会切出 2912
-            monthDay != null -> monthDay.groupValues[1].toInt() to monthDay.groupValues[2].toInt()
-            else -> return true
-        }
-        return month in 1..12 && day in 1..31
+        DATE_FIRST.find(value)?.let { return Dates.readings(it.value).isNotEmpty() }
+        // 不能用数字切：「09-2912:30」里日与时粘在一起，会切出 2912
+        MONTH_DAY_FIRST.find(value)?.let { return it.groupValues[1].toInt() in 1..12 && it.groupValues[2].toInt() in 1..31 }
+        MONTH_NAME_DAY_FIRST.find(value)?.let { return it.groupValues[1].toInt() in 1..31 }
+        return true
     }
 
     private companion object {
         const val CONFIDENCE = 0.6f
 
-        /** 2026-09-03 / 2026/9/3 / 2026.9.3 / 2026年9月3日 */
-        const val DATE = """(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)"""
-
-        /** 时:分(:秒)，小时与分钟用字符类卡死范围，所以 88:12 根本不成形 */
-        const val TIME = """(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?"""
+        /** 时:分(:秒)，小时与分钟用字符类卡死范围，所以 88:12 根本不成形。英文界面上常带「AM」「p.m.」 */
+        const val TIME = """(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?: ?[AaPp]\.?[Mm]\.?(?![A-Za-z]))?"""
 
         /**
          * 不带年份的「09-29 12:30」：物流轨迹、聊天记录里最常见的写法。
          * 月日单独出现太容易撞上别的（比分、编号），所以只认后面跟着时间的。
          * 时间前的空格可有可无——PP-OCR 按像素补空格，窄间隙会被当成没有，读成「09-2912:30」。
+         * 英文的「Oct 28」同理，后面跟着时间才算。
          */
         const val MONTH_DAY = """\d{1,2}[-/]\d{1,2}"""
 
-        val PATTERN = Regex("""(?<![\d:.])(?:$DATE(?:[ T]$TIME)?|$MONTH_DAY ?$TIME|$TIME)(?![\d:])""")
-        val NUMBER = Regex("""\d+""")
-        val YEAR_FIRST = Regex("""^\d{4}""")
+        /** 日期与时间之间：空格、T，英文还写「Sep 28, 2026, 10:30 AM」「Oct 28 at 9:41」。 */
+        const val JOIN = """(?:[ T]|,? (?:at )?)"""
+
+        val PATTERN = Regex(
+            """(?<![\d:.])(?:${Dates.STRICT}(?:$JOIN$TIME)?|$MONTH_DAY ?$TIME|${Dates.MONTH_DAY}$JOIN$TIME|$TIME)(?![\d:])"""
+        )
+        val DATE_FIRST = Regex("""^${Dates.STRICT}""")
         val MONTH_DAY_FIRST = Regex("""^(\d{1,2})[-/](\d{1,2})(?= ?$TIME)""")
+        val MONTH_NAME_DAY_FIRST = Regex("""^${Dates.MONTH} ?(\d{1,2})""")
     }
 }

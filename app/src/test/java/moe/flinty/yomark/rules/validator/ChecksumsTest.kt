@@ -59,23 +59,14 @@ class ChecksumsTest {
     }
 
     // ---------- MRZ ----------
-    @Test fun `mrz line one is recognized by its format`() {
-        val l1 = "P<USADOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-        assertThat(l1.length).isEqualTo(44)
-        assertThat(Checksums.mrzTd3Line1(l1)).isTrue()
-        assertThat(Checksums.mrzTd3Line1("NOT AN MRZ LINE")).isFalse()
-    }
-
-    @Test fun `mrz line two validates its own check digits`() {
-        // 护照号 L898902C3 校验位 6；生日 740812 校验位 2；有效期 120415 校验位 9
-        val l2 = "L898902C36UTO7408122F1204159ZE184226B<<<<<10"
-        assertThat(l2.length).isEqualTo(44)
-        assertThat(Checksums.mrzTd3Line2Valid(l2)).isTrue()
-    }
-
-    @Test fun `mrz line two with a broken check digit is rejected`() {
-        val broken = "L898902C31UTO7408122F1204159ZE184226B<<<<<10"
-        assertThat(Checksums.mrzTd3Line2Valid(broken)).isFalse()
+    /** ICAO 9303 的样例：护照号 L898902C3 校验位 6；生日 740812 校验位 2；有效期 120415 校验位 9。 */
+    @Test fun `mrz check digits follow the icao example`() {
+        assertThat(Checksums.mrzCheck("L898902C3")).isEqualTo('6')
+        assertThat(Checksums.mrzCheck("740812")).isEqualTo('2')
+        assertThat(Checksums.mrzCheck("120415")).isEqualTo('9')
+        // 填充符算 0，别的字符算不出来
+        assertThat(Checksums.mrzCheck("D23145890<")).isEqualTo(Checksums.mrzCheck("D23145890"))
+        assertThat(Checksums.mrzCheck("74-812")).isEqualTo('?')
     }
 
     // ---------- 熵 ----------

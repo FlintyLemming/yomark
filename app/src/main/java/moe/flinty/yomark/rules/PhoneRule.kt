@@ -29,6 +29,9 @@ class PhoneRule(
     override val kind = SensitiveKind.PHONE
     override val enabledByDefault = true
 
+    /** 机读码第二行全是数字，libphonenumber 会从里面挑出「电话」来；那一行整行已经按护照遮了。 */
+    override val yieldsTo = setOf(SensitiveKind.PASSPORT)
+
     private val util: PhoneNumberUtil by lazy { PhoneNumberUtil.getInstance() }
 
     override fun findIn(text: String): List<RuleMatch> {

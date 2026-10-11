@@ -14,7 +14,8 @@ import kotlin.math.min
  * 判定层的规则实现（spec §4.3）。
  * 规则永远在 classifiers 列表的第一位且永不缺席——它是全部识别能力的地基。
  *
- * 规则逐行认；只有「要旁证的猜测」（[NeedsAnchor]，目前是从字面猜出的人名）在这里看整页：
+ * 规则大多逐行认；整页交给它们（[Page]），看整页的认法（PageFinder：字段名在上、值在下，机读码对照）自己去看。
+ * 「要旁证的猜测」（[NeedsAnchor]，目前是从字面猜出的人名）在这里看整页：
  * 有旁证（[anchors]：紧挨着的称呼，或者同一行、同一排、上下相邻一行的电话、证件号……）的照规则的设置出；
  * 没有的，按 [keepUnanchored] 丢掉或只圈出。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
  */
@@ -51,33 +52,45 @@ class RuleClassifier(
      * 加了 HanLP 的人名识别之后，第一次分词要等词典读完，留在主线程会卡住界面。
      */
     override suspend fun classify(lines: List<TextLine>): List<Candidate> = withContext(Dispatchers.Default) {
-        val out = ArrayList<Candidate>()
+        val kept = lines.indices.filter { lines[it].confidence >= minLineConfidence }
+        val page = Page(kept.map { lines[it].text }) { i, range -> lines[kept[i]].quadForRange(range).bounds().toBounds() }
+        // 单条规则出错不能拖垮整次判定
+        val found = rules.map { rule -> runCatching { rule.findOnPage(page) }.getOrElse { emptyList() } }
+
+        val out = ArrayList<Pair<Int, Candidate>>()
         // 旁证只在有猜测要核对时才找：大多数页面上一个猜出来的人名都没有
         val anchorsOnPage by lazy { findAnchors(lines) }
-        lines.forEachIndexed { lineIndex, line ->
-            if (line.confidence < minLineConfidence) return@forEachIndexed
-            rules.forEach { rule ->
-                // 单条规则出错不能拖垮整次判定
-                val matches = runCatching { rule.findIn(line.text) }.getOrElse { emptyList() }
-                matches.forEachIndexed { i, m ->
-                    val quad = line.quadForRange(m.range)
-                    val anchored = !m.needsAnchor ||
-                        anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, quad.bounds()) }
-                    if (!anchored && !keepUnanchored) return@forEachIndexed
-                    out += Candidate(
-                        id = "rule-${rule.id}-$lineIndex-${m.range.first}-$i",
-                        quad = quad,
-                        kind = rule.kind,
-                        source = DetectorSource.RULE,
-                        confidence = m.confidence,
-                        // 有旁证的猜测照规则的设置打码；没有旁证、又被设置留下来的只圈出
-                        enabledByDefault = rule.enabledByDefault && anchored,
-                    )
-                }
+        rules.forEachIndexed { r, rule ->
+            found[r].forEachIndexed { n, (pageLine, m) ->
+                if (yields(rule, pageLine, m.range, found)) return@forEachIndexed
+                val lineIndex = kept[pageLine]
+                val line = lines[lineIndex]
+                val quad = line.quadForRange(m.range)
+                val anchored = !m.needsAnchor ||
+                    anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, quad.bounds()) }
+                if (!anchored && !keepUnanchored) return@forEachIndexed
+                out += lineIndex to Candidate(
+                    id = "rule-${rule.id}-$lineIndex-${m.range.first}-$n",
+                    quad = quad,
+                    kind = rule.kind,
+                    source = DetectorSource.RULE,
+                    confidence = m.confidence,
+                    // 有旁证的猜测照规则的设置打码；没有旁证、又被设置留下来的只圈出
+                    enabledByDefault = rule.enabledByDefault && anchored,
+                )
             }
         }
-        out
+        // 按行排回去，同一行里按规则表的先后：与逐行跑规则时的出法一样
+        out.sortedBy { it.first }.map { it.second }
     }
+
+    /** [rule] 在第 [line] 行 [range] 上的命中，要不要让给同一处的另一类（Rule.yieldsTo）。 */
+    private fun yields(rule: Rule, line: Int, range: IntRange, found: List<List<PageMatch>>): Boolean =
+        rule.yieldsTo.isNotEmpty() && rules.indices.any { o ->
+            rules[o].kind in rule.yieldsTo && found[o].any { it.line == line && it.match.range.overlaps(range) }
+        }
+
+    private fun RectF.toBounds() = Bounds(left, top, right, bottom)
 
     private fun findAnchors(lines: List<TextLine>): List<FoundAnchor> = lines.flatMapIndexed { lineIndex, line ->
         if (line.confidence < minLineConfidence) return@flatMapIndexed emptyList()

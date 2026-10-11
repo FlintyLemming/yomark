@@ -21,6 +21,7 @@ object SensitiveKindLabels {
         SensitiveKind.API_KEY -> "密钥"
         SensitiveKind.LONG_NUMBER -> "长数字串"
         SensitiveKind.DATETIME -> "日期时间"
+        SensitiveKind.BIRTH_DATE -> "出生日期"
         SensitiveKind.PICKUP_CODE -> "取件码"
         SensitiveKind.POSTAL_ADDRESS -> "地址"
         SensitiveKind.PERSON_NAME -> "人名"

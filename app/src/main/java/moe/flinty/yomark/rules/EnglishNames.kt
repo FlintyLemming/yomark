@@ -55,10 +55,11 @@ class EnglishNameCues(private val confidence: Float, private val weakConfidence:
         return out
     }
 
-    private companion object {
+    internal companion object {
         /** 英文的人名字段名。不分大小写：表单常写「FULL NAME」「Ship To」。 */
         val LABEL = Regex(
             """(?i)\b(?:full name|first name|last name|legal name|preferred name|guest name|lead guest|primary guest|""" +
+                """surname|family name|given names?|forenames?|""" +
                 """account name|account holder|card ?holder|name on card|contact name|emergency contact|member name|""" +
                 """driver name|policy ?holder|insured|recipient|passenger|traveler|traveller|customer|sender|attn|""" +
                 """attention|payee|beneficiary|patient|tenant|applicant|employee|student|guest|name|""" +

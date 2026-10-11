@@ -52,6 +52,38 @@ class DateTimeRuleTest {
         assertThat(rule.findIn("付款时间 2026-09-03 12:08:07")).hasSize(1)
     }
 
+    // ---------- 英文 ----------
+
+    /** 护照上的写法：日、大写的月份缩写、四位年。样张上一个都没认出来。 */
+    @Test fun `day month year as printed on a passport`() {
+        assertThat(matches("15 OCT 2020")).containsExactly("15 OCT 2020")
+        assertThat(matches("born 5 February 1965 in")).containsExactly("5 February 1965")
+        assertThat(matches("05-Feb-1965")).containsExactly("05-Feb-1965")
+    }
+
+    @Test fun `month first as written in us english`() {
+        assertThat(matches("Order placed September 28, 2026")).containsExactly("September 28, 2026")
+        assertThat(matches("Sep 28, 2026, 10:30 AM")).containsExactly("Sep 28, 2026, 10:30 AM")
+        assertThat(matches("Tue, Oct 28 at 9:41 PM")).containsExactly("Oct 28 at 9:41 PM")
+    }
+
+    /** 四位年的数字日期，日月还是月日看不出来，有一种读得通就算。 */
+    @Test fun `numeric dates with a four digit year`() {
+        assertThat(matches("Delivered 10/11/2026")).containsExactly("10/11/2026")
+        assertThat(matches("Datum 31.12.2025")).containsExactly("31.12.2025")
+        assertThat(matches("due 13/25/2026")).isEmpty()
+    }
+
+    @Test fun `twelve hour clock`() {
+        assertThat(matches("Pickup 3:45 pm today")).containsExactly("3:45 pm")
+    }
+
+    /** 不是月份的词：「Mark」「Decade」里有「Mar」「Dec」。 */
+    @Test fun `words that start like a month are not months`() {
+        assertThat(matches("Mark 12, 2026")).isEmpty()
+        assertThat(matches("Decade 5 2026")).isEmpty()
+    }
+
     // ---------- 反例 ----------
 
     @Test fun `price is not a date`() {

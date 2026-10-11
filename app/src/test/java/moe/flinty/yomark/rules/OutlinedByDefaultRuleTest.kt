@@ -76,21 +76,22 @@ class OutlinedByDefaultRuleTest {
     //     「v2 需要 NER，首版不产出」，真机上表现为姓名地址完全漏检
     //   + 菜鸟快递详情页实测漏检补的 pickup（取件码）
     // 滴滴出票页实测漏检补的「从字面认人名」不单独成条，并在 name 里（见 PersonNameRecognizer）
-    @Test fun `the rule set has the eleven spec rules plus the five field-added ones`() {
+    //   + 护照样张实测漏检补的 birthdate（出生日期）
+    @Test fun `the rule set has the eleven spec rules plus the six field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
             "card", "iban", "ssn", "mac", "email", "phone", "passport", "apikey", "name", "address",
-            "pickup", "url", "ip", "tracking", "longnum", "datetime",
+            "pickup", "birthdate", "url", "ip", "tracking", "longnum", "datetime",
         )
     }
 
     /**
-     * name / address / pickup 加在默认打码一侧：标签锚定的误报率低——「收货地址」四个字后面那一段
-     * 几乎必然是地址，符合 §6「按误报率划线」。name 里从字面认出的那部分例外，要旁证才算，
-     * 见 PersonNameRecognizerTest、NameAnchorPageTest。
+     * name / address / pickup / birthdate 加在默认打码一侧：标签锚定的误报率低——「收货地址」四个字后面那一段
+     * 几乎必然是地址，「Date of birth」下面那个日期就是生日，符合 §6「按误报率划线」。
+     * name 里从字面认出的那部分例外，要旁证才算，见 PersonNameRecognizerTest、NameAnchorPageTest。
      */
-    @Test fun `exactly eleven rules are masked by default and five are outlined`() {
+    @Test fun `exactly twelve rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
-        assertThat(masked).hasSize(11)
+        assertThat(masked).hasSize(12)
         assertThat(outlined.map { it.id })
             .containsExactly("url", "ip", "tracking", "longnum", "datetime")
     }

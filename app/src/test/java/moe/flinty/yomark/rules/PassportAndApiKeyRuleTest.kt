@@ -20,9 +20,16 @@ class PassportAndApiKeyRuleTest {
         assertThat(matched("passport", mrzL2)).containsExactly(mrzL2)
     }
 
-    @Test fun `passport rejects a line two with a broken check digit`() {
-        val broken = "L898902C31UTO7408122F1204159ZE184226B<<<<<10"
-        assertThat(matched("passport", broken)).isEmpty()
+    /** 有成串的填充符就是机读码，OCR 读错一位校验位不要紧。 */
+    @Test fun `a line two with fillers is kept when one check digit is misread`() {
+        val misread = "L898902C31UTO7408122F1204159ZE184226B<<<<<10"
+        assertThat(matched("passport", misread)).containsExactly(misread)
+    }
+
+    /** 没有填充符的第二行（美国护照只有一个「<」）全靠校验位：三个错两个就不算。 */
+    @Test fun `a line two without fillers needs its check digits`() {
+        assertThat(matched("passport", "E000077303USA6502056F3010149500101920<091824")).hasSize(1)
+        assertThat(matched("passport", "E000077301USA6502051F3010149500101920<091824")).isEmpty()
     }
 
     @Test fun `passport ignores ordinary text of the same length`() {

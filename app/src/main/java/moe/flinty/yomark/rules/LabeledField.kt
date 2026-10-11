@@ -17,11 +17,13 @@ package moe.flinty.yomark.rules
  *
  * @param value 值的形状。姓名与地址差别很大（地址必须含数字，姓名遇数字就该停），
  *   所以不在这里写死，由调用方给。
+ * @param ignoreCase 字段名不分大小写：英文证件上是「DATE OF BIRTH」，表单上是「Date Of Birth」。值的形状照旧分。
  */
 class LabeledField(
     labels: List<String>,
     private val value: Regex,
     private val confidence: Float,
+    ignoreCase: Boolean = false,
 ) : Finder {
 
     /**
@@ -36,7 +38,7 @@ class LabeledField(
      * **少认一处好过错涂一处**。
      */
     private val label = Regex(
-        "(?<![\\u4e00-\\u9fa5A-Za-z0-9])(?:" +
+        "(?<![\\u4e00-\\u9fa5A-Za-z0-9])(?" + (if (ignoreCase) "i" else "") + ":" +
             labels.sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) } +
             ")[：:＝=]?[ 　]*"
     )
