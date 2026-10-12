@@ -1,7 +1,9 @@
 package moe.flinty.yomark.engine
 
+import android.graphics.PointF
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.geometry.ReadingFrame
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.SensitiveKind
@@ -153,5 +155,25 @@ class CandidateMergerTest {
     @Test
     fun `empty input yields empty output`() {
         assertThat(merger.merge(emptyList())).isEmpty()
+    }
+
+    // ---------- 竖着拍的页：行和行高按阅读方向算 ----------
+
+    /** 阅读方向朝下的页（竖着拍的身份证）。 */
+    private val downwards = ReadingFrame.of(listOf(Quad(PointF(20f, 0f), PointF(20f, 100f), PointF(0f, 100f), PointF(0f, 0f))))
+
+    /** 图上左右挨着的两个竖条是上下两行地址：按图上的横竖算会拼成一大块，连中间的空白一起遮。 */
+    @Test
+    fun `stacked lines on a page turned on its side stay apart`() {
+        val lines = listOf(c("a", 100f, 0f, 120f, 200f), c("b", 70f, 0f, 90f, 200f))
+        assertThat(merger.merge(lines, downwards)).hasSize(2)
+        assertThat(merger.merge(lines)).hasSize(1)
+    }
+
+    /** 同一行里的两段（图上上下挨着）照样拼起来，拼出来的框还在图上原处。 */
+    @Test
+    fun `pieces of one line on a page turned on its side are merged`() {
+        val out = merger.merge(listOf(c("a", 100f, 0f, 120f, 50f), c("b", 100f, 58f, 120f, 100f)), downwards)
+        assertThat(out.single().quad.bounds()).isEqualTo(RectF(100f, 0f, 120f, 100f))
     }
 }

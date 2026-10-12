@@ -2,6 +2,7 @@ package moe.flinty.yomark.engine
 
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.geometry.ReadingFrame
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import kotlin.math.abs
@@ -14,16 +15,19 @@ import kotlin.math.min
  * 1. IoU > 0.6 的候选按 source 优先级去重（RULE > ENTITY_MODEL > LLM）；
  * 2. 同一 kind 且水平间距小于行高 0.5 倍的相邻候选合并；
  * 3. 按面积降序输出，让 UI 先渲染大块。
+ *
+ * 「水平」「行高」按页面的阅读方向算（[ReadingFrame]）：竖着拍的页上一行字在图上是竖的，
+ * 按图上的横竖算，上下两行地址会被当成同一行拼成一大块。
  */
 class CandidateMerger(
     private val iouThreshold: Float = 0.6f,
     private val gapRatio: Float = 0.5f,
 ) {
 
-    fun merge(candidates: List<Candidate>): List<Candidate> {
+    fun merge(candidates: List<Candidate>, frame: ReadingFrame = ReadingFrame.UPRIGHT): List<Candidate> {
         if (candidates.isEmpty()) return emptyList()
         val deduped = dedupe(candidates)
-        val joined = joinAdjacent(deduped)
+        val joined = joinAdjacent(deduped, frame)
         return joined.sortedByDescending { it.quad.area() }
     }
 
@@ -62,7 +66,7 @@ class CandidateMerger(
      */
     private fun comparable(a: Candidate, b: Candidate): Boolean = a.kind == b.kind
 
-    private fun joinAdjacent(input: List<Candidate>): List<Candidate> {
+    private fun joinAdjacent(input: List<Candidate>, frame: ReadingFrame): List<Candidate> {
         val remaining = input.toMutableList()
         val out = ArrayList<Candidate>()
         while (remaining.isNotEmpty()) {
@@ -73,8 +77,8 @@ class CandidateMerger(
                 val it = remaining.iterator()
                 while (it.hasNext()) {
                     val other = it.next()
-                    if (canJoin(current, other)) {
-                        current = join(current, other)
+                    if (canJoin(current, other, frame)) {
+                        current = join(current, other, frame)
                         it.remove()
                         merged = true
                     }
@@ -85,11 +89,11 @@ class CandidateMerger(
         return out
     }
 
-    private fun canJoin(a: Candidate, b: Candidate): Boolean {
+    private fun canJoin(a: Candidate, b: Candidate, frame: ReadingFrame): Boolean {
         if (a.kind != b.kind) return false
         if (a.source in REGION_SOURCES || b.source in REGION_SOURCES) return false  // 人脸/条码不参与合并
-        val ra = a.quad.bounds()
-        val rb = b.quad.bounds()
+        val ra = frame.bounds(a.quad)
+        val rb = frame.bounds(b.quad)
         val lineHeight = max(ra.height(), rb.height())
         // 同一行：垂直中心相差不超过行高的一半
         if (abs(ra.centerY() - rb.centerY()) > lineHeight * 0.5f) return false
@@ -97,11 +101,12 @@ class CandidateMerger(
         return gap < lineHeight * gapRatio
     }
 
-    private fun join(a: Candidate, b: Candidate): Candidate {
-        val r = RectF(a.quad.bounds()).apply { union(b.quad.bounds()) }
+    /** 两个框在阅读方向上的外接框；正着的页就是图上的外接矩形。 */
+    private fun join(a: Candidate, b: Candidate, frame: ReadingFrame): Candidate {
+        val r = RectF(frame.bounds(a.quad)).apply { union(frame.bounds(b.quad)) }
         return a.copy(
             id = "${a.id}+${b.id}",
-            quad = Quad.fromRect(r),
+            quad = if (frame.isUpright) Quad.fromRect(r) else frame.toImage(r),
             confidence = max(a.confidence, b.confidence),
             // 取「或」：合并绝不把默认打码的降级成仅圈出
             enabledByDefault = a.enabledByDefault || b.enabledByDefault,

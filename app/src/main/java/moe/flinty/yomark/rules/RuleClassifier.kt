@@ -1,6 +1,7 @@
 package moe.flinty.yomark.rules
 
 import android.graphics.RectF
+import moe.flinty.yomark.core.geometry.ReadingFrame
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.TextLine
@@ -53,13 +54,15 @@ class RuleClassifier(
      */
     override suspend fun classify(lines: List<TextLine>): List<Candidate> = withContext(Dispatchers.Default) {
         val kept = lines.indices.filter { lines[it].confidence >= minLineConfidence }
-        val page = Page(kept.map { lines[it].text }) { i, range -> lines[kept[i]].quadForRange(range).bounds().toBounds() }
+        // 规则按「下面 = +y」认版面：竖着、倒着拍的页先转到阅读方向上再取框（正着的页原样）。候选的 quad 仍是图上的
+        val frame = ReadingFrame.of(kept.map { lines[it].quad })
+        val page = Page(kept.map { lines[it].text }) { i, range -> frame.bounds(lines[kept[i]].quadForRange(range)).toBounds() }
         // 单条规则出错不能拖垮整次判定
         val found = rules.map { rule -> runCatching { rule.findOnPage(page) }.getOrElse { emptyList() } }
 
         val out = ArrayList<Pair<Int, Candidate>>()
         // 旁证只在有猜测要核对时才找：大多数页面上一个猜出来的人名都没有
-        val anchorsOnPage by lazy { findAnchors(lines) }
+        val anchorsOnPage by lazy { findAnchors(lines, frame) }
         rules.forEachIndexed { r, rule ->
             found[r].forEachIndexed { n, (pageLine, m) ->
                 if (yields(rule, pageLine, m.range, found)) return@forEachIndexed
@@ -67,7 +70,7 @@ class RuleClassifier(
                 val line = lines[lineIndex]
                 val quad = line.quadForRange(m.range)
                 val anchored = !m.needsAnchor ||
-                    anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, quad.bounds()) }
+                    anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, frame.bounds(quad)) }
                 if (!anchored && !keepUnanchored) return@forEachIndexed
                 out += lineIndex to Candidate(
                     id = "rule-${rule.id}-$lineIndex-${m.range.first}-$n",
@@ -92,16 +95,16 @@ class RuleClassifier(
 
     private fun RectF.toBounds() = Bounds(left, top, right, bottom)
 
-    private fun findAnchors(lines: List<TextLine>): List<FoundAnchor> = lines.flatMapIndexed { lineIndex, line ->
+    private fun findAnchors(lines: List<TextLine>, frame: ReadingFrame): List<FoundAnchor> = lines.flatMapIndexed { lineIndex, line ->
         if (line.confidence < minLineConfidence) return@flatMapIndexed emptyList()
         anchors.flatMap { anchor ->
             // 单条旁证出错，当它没找到
             runCatching { anchor.finder.findIn(line.text) }.getOrElse { emptyList() }
-                .map { FoundAnchor(anchor.reach, lineIndex, it.range, line.quadForRange(it.range).bounds()) }
+                .map { FoundAnchor(anchor.reach, lineIndex, it.range, frame.bounds(line.quadForRange(it.range))) }
         }
     }
 
-    /** 页面上找到的一处旁证：第 [lineIndex] 行的 [range]，框为 [box]。 */
+    /** 页面上找到的一处旁证：第 [lineIndex] 行的 [range]，框为 [box]（阅读方向上的）。 */
     private class FoundAnchor(
         val reach: NameAnchor.Reach,
         val lineIndex: Int,
