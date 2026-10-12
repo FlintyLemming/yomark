@@ -28,7 +28,7 @@ const linear = (id, [x1, y1, x2, y2], s) =>
 const radial = (id, [cx, cy, r], s) =>
   `    <radialGradient id="${id}" cx="${cx}" cy="${cy}" r="${r}" gradientUnits="userSpaceOnUse">\n${stops(s)}\n    </radialGradient>`;
 // 两层投影：贴得近的一层收边，散得开的一层给体积。
-// 不用 feDropShadow，拆成模糊、位移、上色三步，Inkscape、Figma 这些渲染器也认
+// 不用 SVG 2 才有的 feDropShadow，拆成 SVG 1.1 的模糊、位移、上色三步，旧一点的渲染器也认
 const shadowLayer = ([dy, blur, color, opacity], name) =>
   `      <feGaussianBlur in="SourceAlpha" stdDeviation="${blur}"/>\n` +
   `      <feOffset dy="${dy}" result="${name}Offset"/>\n` +
