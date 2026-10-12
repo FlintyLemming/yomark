@@ -23,6 +23,18 @@ interface RegionDetector {
     val id: String
     val kind: SensitiveKind
     suspend fun detect(image: SourceImage): List<Candidate>
+
+    /**
+     * 页面在图上转了直角时，要不要把图转正了再看一遍。人脸检测认不出横躺着的脸：
+     * 竖着拍的身份证，人像在图上是横着的。条码不分方向，不用。
+     */
+    val needsUpright: Boolean get() = false
+
+    /**
+     * 把图转正了再看：页面在图上顺时针转了 [quarterTurns] 个直角（1..3，见 ReadingFrame.quarterTurns），
+     * 逆着转回来再检测，框映射回原图的坐标。引擎只对 [needsUpright] 的检测器调它。
+     */
+    suspend fun detect(image: SourceImage, quarterTurns: Int): List<Candidate> = emptyList()
 }
 
 /**

@@ -1,6 +1,7 @@
 package moe.flinty.yomark.engine
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
@@ -154,6 +155,80 @@ class RedactionEngineTest {
         val line = TextLine(quad(), "hello", 0.8f, emptyList())
         val result = engine(recognizer = FakeRecognizer(lines = listOf(line))).analyze(image())
         assertThat(result.lines).containsExactly(line)
+    }
+
+    // ---------- 转了直角的页：要转正的检测器再看一遍 ----------
+
+    /** 一行字，沿 p0→p1 读：(dx, dy) 是阅读方向。 */
+    private fun lineReading(dx: Float, dy: Float) = TextLine(
+        Quad(PointF(50f, 50f), PointF(50f + dx, 50f + dy), PointF(50f + dx - dy / 8, 50f + dy + dx / 8), PointF(50f - dy / 8, 50f + dx / 8)),
+        "姓名", 0.9f, emptyList(),
+    )
+
+    private class TurningDetector(
+        override val kind: SensitiveKind,
+        override val needsUpright: Boolean,
+        val boom: Boolean = false,
+    ) : RegionDetector {
+        override val id = "turning-$kind"
+        val turns = ArrayList<Int>()
+        override suspend fun detect(image: SourceImage): List<Candidate> =
+            listOf(Candidate("$kind-flat", Quad.fromRect(RectF(0f, 0f, 10f, 10f)), kind, DetectorSource.FACE, 0.9f))
+
+        override suspend fun detect(image: SourceImage, quarterTurns: Int): List<Candidate> {
+            turns += quarterTurns
+            if (boom) error("upright pass exploded")
+            return listOf(Candidate("$kind-turned", Quad.fromRect(RectF(50f, 50f, 80f, 80f)), kind, DetectorSource.FACE, 0.9f))
+        }
+    }
+
+    /** 竖着拍的（阅读方向朝下）：人脸在转正的图上再看一遍，条码不分方向、不用。两遍的结果都留下。 */
+    @Test
+    fun `a page on its side gets an upright look from detectors that need one`() = runTest {
+        val faces = TurningDetector(SensitiveKind.FACE, needsUpright = true)
+        val codes = TurningDetector(SensitiveKind.BARCODE, needsUpright = false)
+        val result = engine(recognizer = FakeRecognizer(lines = listOf(lineReading(0f, 80f))), detectors = listOf(faces, codes))
+            .analyze(image())
+        assertThat(faces.turns).containsExactly(1)
+        assertThat(codes.turns).isEmpty()
+        assertThat(result.candidates.map { it.id }).containsExactly("FACE-flat", "FACE-turned", "BARCODE-flat")
+    }
+
+    @Test
+    fun `the number of quarter turns follows the reading direction`() = runTest {
+        for ((line, turns) in listOf(lineReading(-80f, 0f) to 2, lineReading(0f, -80f) to 3)) {
+            val faces = TurningDetector(SensitiveKind.FACE, needsUpright = true)
+            engine(recognizer = FakeRecognizer(lines = listOf(line)), detectors = listOf(faces)).analyze(image())
+            assertThat(faces.turns).containsExactly(turns)
+        }
+    }
+
+    /** 正着的页、没有字的页：不多看一遍。 */
+    @Test
+    fun `an upright page gets no second look`() = runTest {
+        for (lines in listOf(listOf(lineReading(80f, 0f)), emptyList())) {
+            val faces = TurningDetector(SensitiveKind.FACE, needsUpright = true)
+            val result = engine(recognizer = FakeRecognizer(lines = lines), detectors = listOf(faces)).analyze(image())
+            assertThat(faces.turns).isEmpty()
+            assertThat(result.candidates.map { it.id }).containsExactly("FACE-flat")
+        }
+    }
+
+    @Test
+    fun `an exploding upright look degrades to nothing`() = runTest {
+        val faces = TurningDetector(SensitiveKind.FACE, needsUpright = true, boom = true)
+        val result = engine(recognizer = FakeRecognizer(lines = listOf(lineReading(0f, 80f))), detectors = listOf(faces))
+            .analyze(image())
+        assertThat(faces.turns).containsExactly(1)
+        assertThat(result.candidates.map { it.id }).containsExactly("FACE-flat")
+    }
+
+    /** 检测器默认不转正：没覆盖的那个入口什么也不出。 */
+    @Test
+    fun `a detector that does not turn finds nothing on the upright entry`() = runTest {
+        val plain = FakeDetector(SensitiveKind.FACE, listOf(candidate("f", SensitiveKind.FACE)))
+        assertThat(plain.needsUpright).isFalse()
+        assertThat(plain.detect(image(), 1)).isEmpty()
     }
 
     // ---------- 第二遍（端侧大模型） ----------

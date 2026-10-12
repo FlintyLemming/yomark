@@ -1,6 +1,7 @@
 package moe.flinty.yomark.engine
 
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.geometry.ReadingFrame
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.AnalysisResult
 import moe.flinty.yomark.core.model.Candidate
@@ -47,13 +48,20 @@ class RedactionEngine(
         }
 
         val lines = linesJob.await()
+        // 竖着、倒着拍的页：人像在图上是横着的，人脸检测认不出。文字读出来才知道页面转了几个直角，
+        // 这时让要转正的检测器在转正的图上再看一遍，和上面那一遍的结果一起合并（同一张脸重叠的去重）
+        val frame = ReadingFrame.of(lines.map { it.quad })
+        val turns = frame.quarterTurns
+        val uprightJobs = if (turns == 0) emptyList() else regionDetectors.filter { it.needsUpright }.map { d ->
+            async { runCatching { d.detect(image, turns) }.getOrElse { emptyList() } }
+        }
         val fromText = classifiers
             .filter { it.isAvailable() }                    // 不可用的直接跳过
             .flatMap { c -> runCatching { c.classify(lines) }.getOrElse { emptyList() } }
 
         AnalysisResult(
             lines = lines,
-            candidates = merger.merge(fromText + regionJobs.awaitAll().flatten()),
+            candidates = merger.merge(fromText + regionJobs.awaitAll().flatten() + uprightJobs.awaitAll().flatten(), frame),
         )
     }
 
@@ -72,7 +80,7 @@ class RedactionEngine(
             .filter { runCatching { it.isAvailable() }.getOrDefault(false) }
             .mapNotNull { r -> runCatching { r.classify(lines) }.getOrNull() }
         if (runs.isEmpty()) return null
-        return merger.merge(runs.flatten()).filter { c -> covered.none { covers(it, c.quad) } }
+        return merger.merge(runs.flatten(), ReadingFrame.of(lines.map { it.quad })).filter { c -> covered.none { covers(it, c.quad) } }
     }
 
     /** a 盖住了 b 的大半：交集超过两者中较小那个的一半。 */
