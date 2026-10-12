@@ -54,31 +54,25 @@ object RuleCatalog {
     fun description(rule: Rule): String = DESCRIPTIONS.getValue(rule.id)
 
     private val DESCRIPTIONS = mapOf(
-        "card" to "13 到 19 位的卡号，要通过卡号的校验位（Luhn）。",
+        "card" to "13 到 19 位、通过 Luhn 校验的卡号。",
         "iban" to "国际银行账号，按国家核对长度和校验位。",
         "ssn" to "美国社会安全号，形如 123-45-6789，不会发放的号段不算。",
         "mac" to "网卡地址，形如 AA:BB:CC:DD:EE:FF。",
         "email" to "带常见域名后缀的邮箱地址。",
         "phone" to "按各地号码规则解析的电话号码，打了星的手机号也认。紧挨着「订单」「单号」的数字不算。",
-        "passport" to "护照、身份证底部的机读码（OCR 补的空格、数错的填充符都不要紧），" +
-            "以及资料页上「Passport No.」这类字段名旁边或下面的号码、和机读码里一样的号码。",
+        "passport" to "护照、身份证底部的机读码，以及「Passport No.」这类字段旁边或下面的号码。",
         "apikey" to "以 sk-、ghp_、AKIA、eyJ 等开头、足够随机的长串。",
-        "name" to "「收货人」「姓名」「Ship to」这类字段后面的名字，电话前面的名字，" +
-            "以及英文的「Hi David,」「Mr. Patel」这类写法；证件上「Surname」「Given names」下面的名字，" +
-            "和护照机读码里的姓名在页上别处出现的地方。" +
-            "没有字段名时从字面猜，猜出来的要有旁证才算，见下面。",
-        "address" to "「收货地址」「送至」这类字段后面的内容，以及带路名门牌、楼栋、房号的地址；" +
-            "英文的门牌街道、城市州邮编，以及英国、加拿大、澳大利亚、爱尔兰、新加坡的邮编；" +
-            "单独一行的「Shipping Address」下面几行，证件上「Place of birth」下面的出生地。",
+        "name" to "「收货人」「姓名」「Ship to」这类字段后面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，" +
+            "证件上「Surname」「Given names」下面的名字。没有字段名时从字面猜，要有旁证才算。",
+        "address" to "「收货地址」「送至」这类字段后面的内容，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，" +
+            "证件上「Place of birth」下面的出生地。",
         "pickup" to "「取件码」「取货码」这类字段后面的码。",
         "url" to "只遮路径和参数，域名保留。",
         "ip" to "IPv4 和 IPv6 地址。前面写着 v 或 version 的版本号不算。",
         "tracking" to "UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈。",
         "longnum" to "16 位以上、不属于其他任何一类的数字，比如交易号、订单号。没有校验位，可能误圈。",
-        "datetime" to "日期、时间，以及连在一起的日期加时间，英文的「Feb 5, 1965」「05 FEB 1965」也认。" +
-            "截图里到处都是，比如状态栏的时钟、每条聊天记录。出生日期另算一类。",
-        "birthdate" to "「出生日期」「Date of birth」「DOB」这类字段后面或下面的日期，" +
-            "以及护照机读码里的生日在页上出现的地方（幽灵像旁边那行小字）。",
+        "datetime" to "日期、时间，英文的「Feb 5, 1965」「05 FEB 1965」也认。出生日期另算一类。",
+        "birthdate" to "「出生日期」「Date of birth」「DOB」这类字段后面或下面的日期，以及护照机读码里的生日。",
     )
 
     /**
@@ -91,7 +85,7 @@ object RuleCatalog {
             attached.takeIf { it.isNotEmpty() }?.joinToString("、", prefix = "紧挨着名字的") { it.label },
             nearby.takeIf { it.isNotEmpty() }?.joinToString("、", prefix = "同一行、上下相邻一行的") { it.label },
         )
-        return "旁证是" + parts.joinToString("，或者") + "。有旁证的按上面的设置处理；没有的大多是商品名、店名，默认不圈。"
+        return "旁证是" + parts.joinToString("，或者") + "。"
     }
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =

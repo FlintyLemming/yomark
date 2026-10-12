@@ -110,14 +110,6 @@ internal fun ColorPicker(
         CustomColorSwatch(color = Color(color), selected = custom, onClick = { customOpen = !customOpen })
         EyedropperButton(active = picking, onClick = onEyedropper)
     }
-    AnimatedVisibility(visible = nearOn) {
-        Text(
-            "每一块取它四周的颜色填上，纯色背景上几乎看不出打过码",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 8.dp),
-        )
-    }
     AnimatedVisibility(visible = customOpen) {
         HsvSliders(
             color = color,

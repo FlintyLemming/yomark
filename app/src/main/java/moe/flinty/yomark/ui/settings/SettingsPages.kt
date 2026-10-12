@@ -42,6 +42,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.core.model.SensitiveKind
@@ -109,7 +111,7 @@ fun TextSettingsScreen(
                 )
                 SwitchRow(
                     title = "AI 增强识别",
-                    summary = "编辑页多一个按钮，点了由端侧 Gemini Nano 补查人名和地址，结果只圈出",
+                    summary = "编辑页多一个按钮，用 Gemini Nano 补查人名和地址，只圈出不打码",
                     icon = Icons.Outlined.AutoAwesome,
                     checked = config.semantic != SemanticOption.OFF,
                     onCheckedChange = { on ->
@@ -117,7 +119,7 @@ fun TextSettingsScreen(
                     },
                 )
             }
-            FooterText("AI 增强识别离线运行，仅支持部分机型（如 Pixel 9 及以后）。")
+            FooterText(supportedDevicesSentence("AI 增强识别离线运行，"))
             SectionHeader("敏感信息")
         }
         val rules = RuleCatalog.inSettingsOrder
@@ -161,7 +163,6 @@ fun TextEngineSettingsScreen(
                     )
                 }
             }
-            FooterText("只管怎么把截图里的字读出来。读出来的字算不算敏感信息，由「文字」页下面的各类决定。")
         }
     }
 }
@@ -238,7 +239,6 @@ fun FaceSettingsScreen(
                     )
                 }
             }
-            FooterText("仅定位人脸，不识别身份。")
         }
     }
 }
@@ -272,7 +272,7 @@ fun BarcodeSettingsScreen(
                     )
                 }
             }
-            FooterText("包括二维码和条形码。只用到条码的位置，不读取其中的内容。")
+            FooterText("包括二维码和条形码。")
         }
     }
 }
@@ -301,8 +301,10 @@ fun AiSettingsScreen(
                 )
             }
             FooterText(
-                "Google 的端侧大模型，由系统的 AICore 服务在本机离线运行。编辑页的「AI 增强识别」用的就是它。" +
-                    nanoNote(nano)?.let { "\n\n$it" }.orEmpty(),
+                buildAnnotatedString {
+                    append("Google 的端侧大模型。")
+                    nanoNote(nano)?.let { append("\n\n"); append(it) }
+                },
             )
         }
         item {
@@ -314,7 +316,7 @@ fun AiSettingsScreen(
                     leading = { RowIcon(Icons.Outlined.DocumentScanner) },
                 )
             }
-            FooterText("百度飞桨的开源文字识别模型，检测、识别各一个，由 ONNX Runtime 在本机离线运行。识别引擎选「PP-OCR」时用的就是它。")
+            FooterText("百度飞桨的开源文字识别模型。")
         }
         item {
             SectionHeader("ML Kit 模型")
@@ -330,10 +332,7 @@ fun AiSettingsScreen(
                     leading = { RowIcon(Icons.Outlined.Memory) },
                 )
             }
-            FooterText(
-                "Google 的端侧机器学习工具包，里面是几个各管一件事的小模型：文字识别（英文、中文各一个）、人脸、条码，" +
-                    "都随安装包内置、离线运行。版本号是 ML Kit 库的版本，Google 不单独公布模型的版本。",
-            )
+            FooterText("Google 的端侧机器学习工具包。")
         }
     }
 }
@@ -366,7 +365,6 @@ fun ExportSettingsScreen(
                     onCheckedChange = onExportReminderChange,
                 )
             }
-            FooterText("关掉后，圈出但没打码的内容会照原样导出。")
         }
         item {
             SectionHeader("水印样式")
@@ -374,16 +372,11 @@ fun ExportSettingsScreen(
                 BrandWatermarkStyle.entries.forEach { style ->
                     RadioRow(
                         title = "图标 + ${style.text}",
-                        summary = when (style) {
-                            BrandWatermarkStyle.ICON_ZH_EN -> "中文名和英文名都带"
-                            BrandWatermarkStyle.ICON_EN -> "只带英文名，不带中文"
-                        },
                         selected = watermarkStyle == style,
                         onClick = { onWatermarkStyleChange(style) },
                     )
                 }
             }
-            FooterText("免费版导出的图片角落带这个水印，去除水印后就没有了。没选过时跟随系统语言，系统语言不是中文就用不带中文的样式。")
         }
     }
 }
@@ -414,8 +407,7 @@ fun AppearanceSettingsScreen(
             SettingsGroup {
                 RadioRow(
                     title = themeColorLabel(ThemeColor.SYSTEM),
-                    summary = if (systemDynamicColorAvailable) "随壁纸取色，换壁纸后跟着变"
-                    else "需要 Android 12 及以上，本机上是紫色",
+                    summary = if (systemDynamicColorAvailable) "随壁纸取色" else "需要 Android 12 及以上",
                     selected = themeColor == ThemeColor.SYSTEM,
                     onClick = { onThemeColorChange(ThemeColor.SYSTEM) },
                 )
@@ -446,16 +438,11 @@ fun AppearanceSettingsScreen(
                 ScanStyle.entries.forEach { style ->
                     RadioRow(
                         title = scanStyleLabel(style),
-                        summary = when (style) {
-                            ScanStyle.SWEEP -> "一束光自上而下扫过，打码块跟在光后落下"
-                            ScanStyle.FROST -> "整页模糊、闪着光点，识别完从中心散开"
-                        },
                         selected = scanStyle == style,
                         onClick = { onScanStyleChange(style) },
                     )
                 }
             }
-            FooterText("识别时画面上的效果，不影响识别结果。")
         }
     }
 }
@@ -550,21 +537,34 @@ internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
     }
 }
 
+/** 哪些机型有 Gemini Nano：Google 的文档。页尾「支持设备列表参考官方文档」那一句指向它。 */
+internal const val GENAI_DOCS_URL = "https://developers.google.cn/ml-kit/genai"
+
+/** 「[prefix]支持设备列表参考官方文档。」，「官方文档」是个链接。 */
+@Composable
+private fun supportedDevicesSentence(prefix: String = ""): AnnotatedString = buildAnnotatedString {
+    append(prefix)
+    append("支持设备列表参考")
+    append(footerLink("官方文档", GENAI_DOCS_URL))
+    append("。")
+}
+
 /**
- * 卡片下面那句：这个状态对 AI 增强识别意味着什么。还没问完时不写。
+ * 卡片下面那句：本机没有就指去看哪些机型有，模型还没下载就说怎么让系统去下。
+ * 已就绪、下载中的小字已经说清了，不再重复；还没问完时不写。
  *
  * 未下载时不在这里摆下载按钮：开着 AI 增强识别打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
  */
-internal fun nanoNote(nano: NanoStatus?): String? = when (nano) {
+@Composable
+internal fun nanoNote(nano: NanoStatus?): AnnotatedString? = when (nano) {
     null -> null
-    is NanoStatus.Unavailable ->
-        "只有部分机型有 Gemini Nano（如 Pixel 9 及以后）。本机用不了 AI 增强识别，其余识别照常。" +
-            nano.errorCode?.let { "AICore 返回错误码 $it。" }.orEmpty()
+    is NanoStatus.Unavailable -> buildAnnotatedString {
+        append(supportedDevicesSentence())
+        nano.errorCode?.let { append("AICore 返回错误码 $it。") }
+    }
     is NanoStatus.Present -> when (nano.model) {
-        NanoStatus.Model.READY -> "模型已在本机，AI 增强识别可以用。"
-        NanoStatus.Model.DOWNLOADING -> "系统正在下载模型，下载完就能用 AI 增强识别。"
-        NanoStatus.Model.NOT_DOWNLOADED ->
-            "模型还没下载到本机。开着 AI 增强识别时打开一张图，会请系统下载；下载完，编辑页才出现「AI 增强识别」按钮。"
+        NanoStatus.Model.NOT_DOWNLOADED -> AnnotatedString("开着 AI 增强识别打开一张图，会请系统下载。")
+        NanoStatus.Model.READY, NanoStatus.Model.DOWNLOADING -> null
     }
 }
 

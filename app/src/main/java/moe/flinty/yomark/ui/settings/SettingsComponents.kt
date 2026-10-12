@@ -55,7 +55,14 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 
 /*
@@ -172,12 +179,25 @@ internal fun PageTopSpacer() {
 /** 卡片下方的说明文字。 */
 @Composable
 internal fun FooterText(text: String, modifier: Modifier = Modifier) {
+    FooterText(AnnotatedString(text), modifier)
+}
+
+/** 卡片下方的说明文字，里面可以有链接（用 [footerLink] 拼）。 */
+@Composable
+internal fun FooterText(text: AnnotatedString, modifier: Modifier = Modifier) {
     Text(
         text,
         modifier.fillMaxWidth().padding(start = TextInset, end = TextInset, top = 12.dp, bottom = 4.dp),
         style = MaterialTheme.typography.bodyMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
+}
+
+/** 说明文字里的一个链接：主题色、带下划线，点了交给系统浏览器打开。 */
+@Composable
+internal fun footerLink(text: String, url: String): AnnotatedString {
+    val styles = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))
+    return buildAnnotatedString { withLink(LinkAnnotation.Url(url, styles)) { append(text) } }
 }
 
 /** 组与组之间（没有分组标题时）的间距。 */

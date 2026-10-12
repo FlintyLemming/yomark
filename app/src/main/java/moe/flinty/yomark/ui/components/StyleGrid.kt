@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -43,7 +42,7 @@ import kotlin.math.roundToInt
  * 横着拿时铺满右边那一栏的宽、高取宽的四分之三。方块大了，里面的小样子和名字跟着放大。
  *
  * 一行一行地放：色块、马赛克，模糊、马克笔——越往后越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
- * 点一种换样式，再点当前那一种才弹出或收起调节面板；安全性说明贴在方块下面。
+ * 点一种换样式，再点当前那一种才弹出或收起调节面板。
  *
  * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
  * @param holdHeight 调节面板开着、下面那一块跟着面板长高时，方块停在面板打开前的高度，不跟着变高
@@ -57,7 +56,6 @@ fun StyleGrid(
     holdHeight: Boolean = false,
 ) {
     val look = model.look
-    val note = MaskStyleInfo.note(look.style)
     val held = remember { HeldHeight() }
     Layout(
         content = {
@@ -71,41 +69,28 @@ fun StyleGrid(
                     onClick = { actions.onStyleClick(style) },
                 )
             }
-            if (note != null) {
-                Text(
-                    note,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
         },
         modifier = modifier.selectableGroup(),
     ) { measurables, constraints ->
         val gap = GAP.roundToPx()
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else (TILE_MIN * COLUMNS).roundToPx() + gap * (COLUMNS - 1)
         val tileW = ((width - gap * (COLUMNS - 1)) / COLUMNS).coerceAtLeast(0)
-        val note = measurables.getOrNull(STYLES)?.measure(Constraints(maxWidth = width))
-        val noteH = note?.height ?: 0
         val byWidth = (tileW * SIDE_ASPECT).roundToInt().coerceIn(TILE_MIN.roundToPx(), TILE_MAX.roundToPx())
         val tileH = when {
             !fillHeight || !constraints.hasBoundedHeight -> byWidth
             // 面板开着：停在打开前的高度；一次也没量过（开着面板转过来的）就按宽定
-            holdHeight -> (if (held.px > 0) held.px else byWidth).coerceAtMost(
-                ((constraints.maxHeight - noteH - gap) / ROWS).coerceAtLeast(0),
-            )
-            else -> min((constraints.maxHeight - noteH - gap) / ROWS, (tileW * MAX_ASPECT).roundToInt())
+            holdHeight -> (if (held.px > 0) held.px else byWidth).coerceAtMost(((constraints.maxHeight - gap) / ROWS).coerceAtLeast(0))
+            else -> min((constraints.maxHeight - gap) / ROWS, (tileW * MAX_ASPECT).roundToInt())
                 .coerceAtLeast(0)
                 .also { held.px = it }
         }
         val gridH = tileH * ROWS + gap * (ROWS - 1)
-        val tiles = measurables.take(STYLES).map { it.measure(Constraints.fixed(tileW, tileH)) }
-        val height = (gridH + noteH).coerceIn(constraints.minHeight, constraints.maxHeight)
+        val tiles = measurables.map { it.measure(Constraints.fixed(tileW, tileH)) }
+        val height = gridH.coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, height) {
             tiles.forEachIndexed { i, tile ->
                 tile.place((i % COLUMNS) * (tileW + gap), (i / COLUMNS) * (tileH + gap))
             }
-            note?.place(0, gridH)
         }
     }
 }
@@ -172,7 +157,6 @@ private fun StyleTile(
     }
 }
 
-private val STYLES = MaskStyleInfo.ORDER.size
 private const val ROWS = 2
 private const val COLUMNS = 2
 

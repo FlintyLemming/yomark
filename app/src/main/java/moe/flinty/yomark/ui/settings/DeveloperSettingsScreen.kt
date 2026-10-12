@@ -30,7 +30,7 @@ fun DeveloperSettingsScreen(
             SettingsGroup {
                 SwitchRow(
                     title = "调试信息",
-                    summary = "编辑页顶栏多一个按钮，查看每次识别的文字识别结果、规则命中，以及 AI 增强识别的提示词和模型的原始回答",
+                    summary = "编辑页顶栏多一个按钮，查看每次识别的文字识别结果、规则命中和 AI 的回答",
                     icon = Icons.Outlined.BugReport,
                     checked = debugTrace,
                     onCheckedChange = onDebugTraceChange,
@@ -38,14 +38,14 @@ fun DeveloperSettingsScreen(
                 if (debugTrace) {
                     LinkRow(
                         title = "调试记录",
-                        summary = "最近 $traceCapacity 次识别，换了图、重开应用都还在",
+                        summary = "最近 $traceCapacity 次识别",
                         icon = Icons.Outlined.History,
                         onClick = onOpenTraceHistory,
                     )
                 }
             }
             if (!debugTrace) {
-                FooterText("调试信息已关闭，记下的都已删除。要再打开，在「关于」里连点版本号七下。")
+                FooterText("记录已删除。要再打开，在「关于」里连点版本号七下。")
             }
         }
         if (debugTrace) {
@@ -60,10 +60,7 @@ fun DeveloperSettingsScreen(
                         )
                     }
                 }
-                FooterText(
-                    "记录存在应用自己的目录里，不写入系统日志、不进备份；里面有截图上识别出的原文。" +
-                        "超出的旧记录自动删掉，关掉调试信息时全部删掉。",
-                )
+                FooterText("记录里有截图上识别出的原文，关掉调试信息时全部删掉。")
             }
         }
     }

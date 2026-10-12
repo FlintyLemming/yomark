@@ -35,8 +35,8 @@ fun FreeEditionDialog(
         title = { Text("全功能免费版") },
         text = {
             Column {
-                Text("当前是开源的全功能免费版本，导出的图片不带水印，所有功能都可以直接使用。")
-                Text("如果有码帮到了你，欢迎打赏支持后续开发。")
+                Text("这是开源的全功能免费版，导出不带水印。")
+                Text("如果有码帮到了你，欢迎打赏。")
                 if (noBrowser) {
                     Spacer(Modifier.height(16.dp))
                     Text(

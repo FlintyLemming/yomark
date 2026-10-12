@@ -110,9 +110,6 @@ interface StyleBarActions {
  *
  * 样式栏是「画笔」：换了样式、调了颜色，从下一次打码起生效——新画的框、点了打码的虚线框都用它，
  * 已经打好的码不变；选中了手动框时，改动也落在那个框上。面板上的「应用到全部」把这张图上打好的码全换成这样。
- *
- * 安全性说明贴在样式下面，面板收起时也在——用户切到模糊的那一刻就该知道模糊不是安全手段，
- * 而不是导出之后才发现。
  */
 @Composable
 fun StyleBar(
@@ -122,21 +119,9 @@ fun StyleBar(
 ) {
     Column(modifier.fillMaxWidth()) {
         StylePalette(model.look, model.nearColors, panelOpen = model.panelOpen, onClick = actions::onStyleClick)
-        val note = styleNote(model)
-        if (note != null) {
-            Text(
-                note,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            )
-        }
     }
     StyleSheet(model, actions)
 }
-
-/** 贴在样式下面的说明：模糊、马赛克、马克笔的安全性说明。 */
-private fun styleNote(model: StyleBarModel): String? = MaskStyleInfo.note(model.look.style)
 
 // ---------- 样式那一排 ----------
 
@@ -327,8 +312,6 @@ private fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
                 .padding(start = 16.dp, end = 4.dp, bottom = 8.dp),
         ) {
             PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
-            // 样式栏下面的说明被面板盖住了，这里再说一遍
-            PanelNote(model)
             StylePanelBody(model, actions)
         }
     }
@@ -377,25 +360,12 @@ internal fun StylePanel(
         ) {
             if (standalone) {
                 PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
-                PanelNote(model)
             } else {
                 PanelHeader(model, actions)
             }
             StylePanelBody(model, actions)
         }
     }
-}
-
-/** 样式下面的那句说明被面板盖住或顶掉时，面板上再说一遍。 */
-@Composable
-private fun PanelNote(model: StyleBarModel) {
-    val note = styleNote(model) ?: return
-    Text(
-        note,
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.error,
-        modifier = Modifier.padding(end = 12.dp, bottom = 4.dp),
-    )
 }
 
 /** 面板顶上：一行小字说清楚改的是什么，右边是收起。弹出的面板上还有个标题，是当前样式的名字。 */
@@ -473,12 +443,6 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
                 onChange = { emit(options.copy(pixelBlockDivisor = finest - it.roundToInt()), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
-            )
-            // 粗到一格比框还高时就画不出马赛克了（PixelateRenderer.willFallBack），先说一声，免得以为是出了错
-            Text(
-                "框太小、放不下一格时，那一块改用色块",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
 

@@ -351,7 +351,7 @@ class SettingsScreenTest {
     @Test fun theAiPageSaysWhenThisPhoneHasNoNano() {
         ai(NanoStatus.Unavailable())
         compose.onNodeWithText("本机没有").assertIsDisplayed()
-        compose.onNodeWithText("Pixel 9", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("官方文档", substring = true).assertIsDisplayed()
     }
 
     /** AICore 报了错就把错误码写出来，真机上排查时用得上。 */
@@ -530,7 +530,7 @@ class SettingsScreenTest {
     @Test fun theDeveloperPagePicksHowManyRunsToKeep() {
         val picked = mutableListOf<Int>()
         developer(traceCapacity = 20, onTraceCapacityChange = { picked += it })
-        compose.onNodeWithText("最近 20 次识别，换了图、重开应用都还在").assertExists()
+        compose.onNodeWithText("最近 20 次识别").assertExists()
         compose.onNode(hasScrollToKeyAction()).performScrollToNode(hasText("50 次"))
         compose.onNodeWithText("50 次").performClick()
         assertThat(picked).containsExactly(50)

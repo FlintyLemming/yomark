@@ -24,7 +24,7 @@ fun UnopenedExportDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("还有 $unopened 张没看过") },
-        text = { Text("没打开过的图片还没有识别，也没有检查过，导出时会跳过它们。") },
+        text = { Text("没打开过的图片还没识别，导出时会跳过。") },
         confirmButton = { TextButton(onClick = onReview) { Text("去看看") } },
         dismissButton = if (opened > 0) {
             { TextButton(onClick = onExportOpened) { Text("只导出看过的 $opened 张") } }

@@ -52,7 +52,7 @@ fun PaywallDialog(
                 Text("一次付费，永久有效，不是订阅。")
                 Text("付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。")
                 Spacer(Modifier.height(16.dp))
-                Text("以前买过？换了手机或重装后，点「恢复购买」即可，不会再次扣费。")
+                Text("以前买过？点「恢复购买」，不会再次扣费。")
                 TextButton(
                     onClick = {
                         restoring = true

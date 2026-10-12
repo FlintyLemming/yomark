@@ -7,7 +7,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -17,7 +16,6 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -91,16 +89,6 @@ class StyleBarTest {
         show(StyleBarModel(MaskLook()), actions)
         compose.onNodeWithText("马赛克").performClick()
         assertThat(actions.clicked).containsExactly(MaskStyle.PIXELATE)
-    }
-
-    @Test fun blurShowsTheNotSecureWarning() {
-        show(StyleBarModel(MaskLook(MaskStyle.BLUR)))
-        compose.onNodeWithText("模糊能被还原，不适合遮挡敏感信息").assertIsDisplayed()
-    }
-
-    @Test fun markerShowsTheAnnotationOnlyWarning() {
-        show(StyleBarModel(MaskLook(MaskStyle.MARKER)))
-        compose.onNodeWithText("马克笔只做标记，盖不住下面的内容").assertIsDisplayed()
     }
 
     @Test fun thePanelStaysOutOfTheWayUntilOpened() {
@@ -202,19 +190,17 @@ class StyleBarTest {
         assertThat(inProgress).isFalse()
     }
 
-    /** 开着近似色时选中的是它，色板上哪一格都不算选中（连「自定义」也不算），下面说一句它是怎么取色的。 */
+    /** 开着近似色时选中的是它，色板上哪一格都不算选中（连「自定义」也不算）。 */
     @Test fun nearColorIsTheOnlySelectedSwatchWhileOn() {
         show(open(MaskStyle.SOLID, MaskOptions(solidNear = true)).copy(nearColors = listOf(0xFFFFFFFF.toInt())))
         compose.onNodeWithText("近似色").assertIsSelected()
         compose.onNodeWithContentDescription("天蓝").assertIsNotSelected()
         compose.onNodeWithContentDescription("自定义颜色").assertIsNotSelected()
-        compose.onNodeWithText("每一块取它四周的颜色填上，纯色背景上几乎看不出打过码").assertIsDisplayed()
     }
 
-    @Test fun theNearColorHintStaysHiddenWhileOff() {
+    @Test fun nearColorIsNotSelectedWhileOff() {
         show(open(MaskStyle.SOLID))
         compose.onNodeWithText("近似色").assertIsNotSelected()
-        compose.onNodeWithText("每一块取它四周的颜色填上，纯色背景上几乎看不出打过码").assertDoesNotExist()
     }
 
     /** 开着近似色时点色板上的颜色：换回固定的颜色。 */
@@ -298,13 +284,5 @@ class StyleBarTest {
         compose.waitForIdle()
         assertThat(actions.collapsed).isEqualTo(1)
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
-    }
-
-    /** 样式栏下面的安全性说明被面板盖住了，面板上再说一遍。 */
-    @Test fun theSheetRepeatsTheSafetyNoteItCovers() {
-        show(open(MaskStyle.PIXELATE))
-        val note = "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
-        compose.onAllNodesWithText(note).assertCountEquals(2)
-        compose.onNode(hasText(note) and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 }

@@ -5,8 +5,9 @@ import moe.flinty.yomark.core.model.MaskStyle
 /**
  * 安全性分档（spec §8 的「安全性」列）。
  *
- * 用户以为自己打了码而实际没有，是这个 app 能犯的最严重的错误。
- * COSMETIC 与 ANNOTATION_ONLY 必须在 UI 上带着说明一起出现。
+ * 用户以为自己打了码而实际没有，是这个 app 能犯的最严重的错误。样式栏按它排序：盖得住的排前面。
+ * 原先 COSMETIC 与 ANNOTATION_ONLY 在样式下面各带一句提醒，2026-10-12 去掉了：
+ * 模糊、马赛克能还原，马克笔盖不住，用户都知道，提醒只是占地方。
  */
 enum class MaskSafety { IRREVERSIBLE, COSMETIC, ANNOTATION_ONLY }
 
@@ -35,13 +36,5 @@ object MaskStyleInfo {
         MaskStyle.SOLID -> MaskSafety.IRREVERSIBLE
         MaskStyle.BLUR, MaskStyle.PIXELATE -> MaskSafety.COSMETIC
         MaskStyle.MARKER -> MaskSafety.ANNOTATION_ONLY
-    }
-
-    /** 逐样式给文案，不按档位共用一句——两种 COSMETIC 的失效方式不一样，说法也该不一样。 */
-    fun note(style: MaskStyle): String? = when (style) {
-        MaskStyle.BLUR -> "模糊能被还原，不适合遮挡敏感信息"
-        MaskStyle.PIXELATE -> "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
-        MaskStyle.MARKER -> "马克笔只做标记，盖不住下面的内容"
-        MaskStyle.SOLID -> null
     }
 }

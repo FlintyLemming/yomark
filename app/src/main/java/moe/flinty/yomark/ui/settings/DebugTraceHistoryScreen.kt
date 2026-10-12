@@ -83,7 +83,7 @@ fun DebugTraceHistoryScreen(
         val direction = LocalLayoutDirection.current
         TraceRunList(
             runs = runs,
-            emptyText = "还没有记录。打开一张图识别一次，这里就有了。",
+            emptyText = "还没有记录。",
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction),
                 top = padding.calculateTopPadding() + 8.dp,
@@ -96,7 +96,7 @@ fun DebugTraceHistoryScreen(
         AlertDialog(
             onDismissRequest = { confirmClear = false },
             title = { Text("清空调试记录？") },
-            text = { Text("这 ${runs.size} 次识别的记录会从手机上删掉。调试信息仍然开着，之后识别的照常记下。") },
+            text = { Text("删掉这 ${runs.size} 次识别的记录，调试信息仍然开着。") },
             confirmButton = {
                 TextButton(onClick = { confirmClear = false; onClear() }) { Text("清空") }
             },

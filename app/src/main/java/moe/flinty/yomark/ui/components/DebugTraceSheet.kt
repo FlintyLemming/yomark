@@ -119,15 +119,9 @@ internal fun DebugTraceContent(
                 Icon(Icons.Outlined.Share, "分享")
             }
         }
-        Text(
-            "存在应用自己的目录里，不写系统日志、不进备份；在设置 → 开发者里关掉调试信息时一并删掉。",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 24.dp),
-        )
         TraceRunList(
             runs = runs,
-            emptyText = "还没有记录。打开调试信息之后识别的图才有记录；点「重新识别」，把当前这张图再跑一遍。",
+            emptyText = "还没有记录。点「重新识别」再跑一遍当前这张图。",
             contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
         )
     }
