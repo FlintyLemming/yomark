@@ -46,8 +46,9 @@ class HomeActivity : ComponentActivity() {
         BillingRepository(applicationContext, PurchaseStore(applicationContext), lifecycleScope)
     }
 
-    private val picker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) startActivity(EditorActivity.intent(this, uri))
+    // 多选：选一张就是单张编辑，选多张进批量会话，逐张过、走完统一导出（spec §7.6）
+    private val picker = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+        if (uris.isNotEmpty()) startActivity(EditorActivity.intent(this, uris))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

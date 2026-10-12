@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui
 
 import android.app.TaskStackBuilder
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -35,7 +36,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
- * 编辑器：从首页选图进来（intent.data），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
+ * 编辑器：从首页选图进来（intent.data / clipData，可多选），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
  *
  * 返回就是 finish：回到首页，或回到分享它的那个应用。系统返回不拦（不常驻 BackHandler），
  * 预见式返回的跨 Activity 动画才放得出来。例外是用途水印面板、样式面板开着，或吸管正等着取色的时候：
@@ -139,22 +140,29 @@ class EditorActivity : ComponentActivity() {
     }
 
     /**
-     * 批量按 spec §7.6 只从 ACTION_SEND_MULTIPLE 进——用户已经在相册里选好了，不该再选一次。
-     * 首页的 Picker 一律是单选，选中的图放在 intent.data 里。
+     * 批量（spec §7.6）有两个入口：相册分享来的 ACTION_SEND_MULTIPLE，和首页 Picker 多选。
+     * 首页选的图全放在 clipData 里（第一张同时放 intent.data）。
      */
     private fun incomingUris(intent: Intent): List<Uri> = when (intent.action) {
         Intent.ACTION_SEND ->
             listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
         Intent.ACTION_SEND_MULTIPLE ->
             IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
-        else -> listOfNotNull(intent.data)
+        else -> intent.clipData
+            ?.let { clip -> (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri } }
+            ?.takeIf { it.isNotEmpty() }
+            ?: listOfNotNull(intent.data)
     }
 
     companion object {
-        /** 首页选好一张图后打开编辑器。 */
-        fun intent(context: Context, image: Uri): Intent =
+        /** 首页选好图后打开编辑器。多张时读权限要随 clipData 一起授予，光放 data 只覆盖第一张。 */
+        fun intent(context: Context, images: List<Uri>): Intent =
             Intent(context, EditorActivity::class.java)
-                .setData(image)
+                .setData(images.first())
+                .apply {
+                    clipData = ClipData.newRawUri(null, images.first())
+                        .also { clip -> images.drop(1).forEach { clip.addItem(ClipData.Item(it)) } }
+                }
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 }
