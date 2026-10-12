@@ -146,6 +146,32 @@ class EditorViewModelWatermarkTest {
     }
 
     @Test
+    fun `an unlocked user who picked a style in settings keeps the watermark`() = runTest(dispatcher) {
+        val settings = isolatedSettingsStore(context)
+        settings.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_EN, unlocked = true)
+        val vm = vm(settings)
+        vm.observePro(MutableStateFlow(true)); advanceUntilIdle()
+
+        vm.onImageChosen(whiteUri("kept.png")); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
+        vm.requestExport(); advanceUntilIdle()
+        assertThat(cornerMarked()).isTrue()
+    }
+
+    @Test
+    fun `no watermark picked earlier does not count while locked`() = runTest(dispatcher) {
+        val settings = isolatedSettingsStore(context)
+        settings.setBrandWatermarkOff()
+        val vm = vm(settings)
+        vm.observePro(MutableStateFlow(false)); advanceUntilIdle()
+
+        vm.onImageChosen(whiteUri("locked.png")); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
+        vm.requestExport(); advanceUntilIdle()
+        assertThat(cornerMarked()).isTrue()
+    }
+
+    @Test
     fun `pro state flowing in flips the ui state`() = runTest(dispatcher) {
         val vm = vm()
         val pro = MutableStateFlow(false)

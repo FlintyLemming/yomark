@@ -20,3 +20,9 @@ enum class BrandWatermarkStyle(val text: String) {
             if (locale.language == Locale.CHINESE.language) ICON_ZH_EN else ICON_EN
     }
 }
+
+/**
+ * 导出加不加品牌水印。没解锁（没买、开源版没点过「去除水印」）一律加；
+ * 解锁了看设置里的「无水印」，没选过（[off] 为 null）按不加算，选了某个字样才加。
+ */
+fun brandWatermarkApplies(unlocked: Boolean, off: Boolean?): Boolean = !unlocked || off == false

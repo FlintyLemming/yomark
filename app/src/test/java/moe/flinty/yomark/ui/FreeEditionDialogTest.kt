@@ -1,6 +1,9 @@
 package moe.flinty.yomark.ui
 
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
@@ -14,24 +17,44 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** 开源版里去水印按钮打开的对话框：说明全功能免费，给一个打赏入口。 */
+/** 开源版里去水印按钮打开的对话框：没解锁时给「去除水印」，两种状态都给打赏入口。 */
 @RunWith(RobolectricTestRunner::class)
 @Config(qualifiers = "w412dp-h915dp-xxhdpi")
 class FreeEditionDialogTest {
 
     @get:Rule val compose = createComposeRule()
 
-    @Test fun `it says this is the full free edition`() {
-        compose.setContent { MaterialTheme { FreeEditionDialog(onDismiss = {}, openUrl = {}) } }
+    @Test fun `locked, it offers to remove the watermark and stays open`() {
+        var unlocked = false
+        var dismissed = false
+        compose.setContent {
+            MaterialTheme {
+                FreeEditionDialog(unlocked = false, onUnlock = { unlocked = true }, onDismiss = { dismissed = true }, openUrl = {})
+            }
+        }
         compose.onNodeWithText("全功能免费版").assertIsDisplayed()
-        compose.onNodeWithText("不带水印", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("去除水印").performClick()
+        assertThat(unlocked).isTrue()
+        assertThat(dismissed).isFalse()
+    }
+
+    @Test fun `unlocking switches the dialog to the done state`() {
+        var unlocked by mutableStateOf(false)
+        compose.setContent {
+            MaterialTheme { FreeEditionDialog(unlocked = unlocked, onUnlock = { unlocked = true }, onDismiss = {}, openUrl = {}) }
+        }
+        compose.onNodeWithText("去除水印").performClick()
+        compose.onNodeWithText("水印已去除", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("去除水印").assertDoesNotExist()
     }
 
     @Test fun `donating opens the donation page and closes the dialog`() {
         var opened: String? = null
         var dismissed = false
         compose.setContent {
-            MaterialTheme { FreeEditionDialog(onDismiss = { dismissed = true }, openUrl = { opened = it }) }
+            MaterialTheme {
+                FreeEditionDialog(unlocked = false, onUnlock = {}, onDismiss = { dismissed = true }, openUrl = { opened = it })
+            }
         }
         compose.onNodeWithText("打赏").performClick()
         assertThat(opened).isEqualTo("https://pay.mitsea.com")
@@ -43,7 +66,7 @@ class FreeEditionDialogTest {
         var dismissed = false
         compose.setContent {
             MaterialTheme {
-                FreeEditionDialog(onDismiss = { dismissed = true }, openUrl = { error("no browser") })
+                FreeEditionDialog(unlocked = true, onUnlock = {}, onDismiss = { dismissed = true }, openUrl = { error("no browser") })
             }
         }
         compose.onNodeWithText("打赏").performClick()
@@ -51,9 +74,11 @@ class FreeEditionDialogTest {
         assertThat(dismissed).isFalse()
     }
 
-    @Test fun `close just closes`() {
+    @Test fun `once unlocked, close just closes`() {
         var dismissed = false
-        compose.setContent { MaterialTheme { FreeEditionDialog(onDismiss = { dismissed = true }, openUrl = {}) } }
+        compose.setContent {
+            MaterialTheme { FreeEditionDialog(unlocked = true, onUnlock = {}, onDismiss = { dismissed = true }, openUrl = {}) }
+        }
         compose.onNodeWithText("关闭").performClick()
         assertThat(dismissed).isTrue()
     }

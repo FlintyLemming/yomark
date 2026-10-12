@@ -27,6 +27,7 @@ import moe.flinty.yomark.debug.TraceRecorder
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RedactionEngine
 import moe.flinty.yomark.export.BrandWatermarkStyle
+import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
@@ -173,6 +174,9 @@ class EditorViewModel(
     /** 品牌水印的字样。设置还没读到时按系统语言算，和设置页没选过时的默认一致。 */
     private var watermarkStyle = BrandWatermarkStyle.defaultFor(Locale.getDefault())
 
+    /** 设置里的「无水印」，没选过是 null（见 SettingsStore.brandWatermarkOff）。 */
+    private var watermarkOff: Boolean? = null
+
     init {
         restore()
         brushRestored = restoreBrush()
@@ -180,6 +184,7 @@ class EditorViewModel(
         observeRecognitionConfig()
         viewModelScope.launch { settings.pendingExportReminder.collect { exportReminder = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
+        viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
     }
 
     /**
@@ -1036,10 +1041,10 @@ class EditorViewModel(
     }
 
     /**
-     * 水印只由购买态决定，调用点一律不传（spec §10）。
+     * 水印只由购买态和设置里的「无水印」决定，调用点一律不传（spec §10）。
      * 留一个 applyWatermark 参数就等于留了一条「某个入口忘了接购买态」的路。
      */
-    private fun applyWatermark(): Boolean = !_state.value.isPro
+    private fun applyWatermark(): Boolean = brandWatermarkApplies(_state.value.isPro, watermarkOff)
 
     private fun runExport(plan: MaskPlan) {
         val image = _state.value.image ?: return

@@ -50,14 +50,16 @@ class BillingRepository(
     context: Context,
     private val store: PurchaseStore,
     private val scope: CoroutineScope,
-    /** 开源版（[Edition.isFree]）：恒为已购，不连 Play。 */
+    /** 开源版（[Edition.isFree]）：不连 Play，点过「去除水印」就算已购（见 [unlockFree]）。 */
     private val freeEdition: Boolean = Edition.isFree,
 ) {
 
-    /** Play 购买态，跟着缓存走（见 [start]）。查询结果可以把它改回 false（退款/撤单）。 */
+    /**
+     * 能不能去掉品牌水印，跟着缓存走（见 [start]）。
+     * 内购版是 Play 购买态，查询结果可以把它改回 false（退款/撤单）；开源版是点没点过「去除水印」。
+     */
     private val _purchased = MutableStateFlow(false)
-    val isPro: StateFlow<Boolean> =
-        if (freeEdition) MutableStateFlow(true).asStateFlow() else _purchased.asStateFlow()
+    val isPro: StateFlow<Boolean> = _purchased.asStateFlow()
 
     /**
      * 刚买成、还没放过感谢页。放的是前台那一页（见 ui.thanks.showThanksWhenPurchased），放了就 [dismissThanks]。
@@ -83,11 +85,11 @@ class BillingRepository(
 
     /** 启动时调用：先用缓存点亮 UI，再尝试联网校验。 */
     fun start() {
-        // 开源版没有东西可买，也就不去碰 Play 服务
-        if (freeEdition) return
         // 一直跟着缓存，不是只读一次：首页和编辑器各有一个 BillingRepository，
         // 在编辑器里买成、写进缓存，回到首页时这边也得是已购，购买入口不能还挂着
-        scope.launch { store.isPro.collect { _purchased.value = it } }
+        scope.launch { store.unlocked(freeEdition).collect { _purchased.value = it } }
+        // 开源版没有东西可买，也就不去碰 Play 服务
+        if (freeEdition) return
         client.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
                 if (result.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -162,6 +164,11 @@ class BillingRepository(
         if (ours.isEmpty()) return
         purchases.forEach { acknowledgeIfNeeded(it) }
         store.grant(fresh = ours.any { !it.isAcknowledged })
+    }
+
+    /** 开源版对话框里的「去除水印」。内购版不认它，只能买。 */
+    fun unlockFree() {
+        if (freeEdition) scope.launch { store.unlockFree() }
     }
 
     /** 感谢页放过了：清掉待谢，另一页回到前台时就不会再放一次。 */

@@ -85,12 +85,12 @@ class HomeActivity : ComponentActivity() {
                         else -> HomeScreen(
                             onPickImage = ::pickImage,
                             onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
-                            // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
+                            // 已购用户不该再看见购买入口；开源版留着它，点开是去除水印与打赏
                             onRemoveWatermark = if (isPro && !Edition.isFree) null else ({ paywall = true }),
                         )
                     }
                     if (paywall && Edition.isFree) {
-                        FreeEditionDialog(onDismiss = { paywall = false })
+                        FreeEditionDialog(unlocked = isPro, onUnlock = billing::unlockFree, onDismiss = { paywall = false })
                     } else if (paywall) {
                         PaywallDialog(
                             onBuy = { lifecycleScope.launch { billing.launchPurchase(this@HomeActivity) } },

@@ -10,16 +10,22 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import moe.flinty.yomark.billing.Edition
+import moe.flinty.yomark.billing.PurchaseStore
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.engine.genai.NanoClient
 import moe.flinty.yomark.engine.genai.NanoStatus
+import moe.flinty.yomark.export.BrandWatermarkStyle
+import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.theme.YomarkTheme
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
@@ -104,15 +110,27 @@ class SettingsPageActivity : ComponentActivity() {
             }
             SettingsPage.EXPORT -> {
                 val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
-                val watermark by store.brandWatermarkStyle.collectAsStateWithLifecycle(initialValue = null)
+                // 三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
+                val watermark by remember {
+                    combine(
+                        store.brandWatermarkStyle,
+                        store.brandWatermarkOff,
+                        PurchaseStore(applicationContext).unlocked(Edition.isFree),
+                    ) { style, off, unlocked -> BrandWatermarkSetting(style, unlocked, !brandWatermarkApplies(unlocked, off)) }
+                }.collectAsStateWithLifecycle(initialValue = null)
                 val on = reminder
-                val style = watermark
-                if (on != null && style != null) {
+                val mark = watermark
+                if (on != null && mark != null) {
                     ExportSettingsScreen(
                         exportReminder = on,
                         onExportReminderChange = { next -> lifecycleScope.launch { store.setPendingExportReminder(next) } },
-                        watermarkStyle = style,
-                        onWatermarkStyleChange = { next -> lifecycleScope.launch { store.setBrandWatermarkStyle(next) } },
+                        watermarkStyle = mark.style,
+                        onWatermarkStyleChange = { next ->
+                            lifecycleScope.launch { store.setBrandWatermarkStyle(next, mark.unlocked) }
+                        },
+                        watermarkUnlocked = mark.unlocked,
+                        watermarkOff = mark.off,
+                        onWatermarkOff = { lifecycleScope.launch { store.setBrandWatermarkOff() } },
                         onNavigateUp = ::finish,
                     )
                 }
@@ -205,3 +223,6 @@ private fun ComponentActivity.setSettingsContent(store: SettingsStore, screen: @
         }
     }
 }
+
+/** 导出页的品牌水印：选的字样、能不能去水印、现在是不是无水印。 */
+private data class BrandWatermarkSetting(val style: BrandWatermarkStyle, val unlocked: Boolean, val off: Boolean)

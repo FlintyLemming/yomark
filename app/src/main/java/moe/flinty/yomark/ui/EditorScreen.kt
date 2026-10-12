@@ -103,6 +103,7 @@ fun EditorScreen(
     onNavigateUp: () -> Unit,
     onBuyClicked: () -> Unit = {},
     onRestoreClicked: suspend () -> RestoreResult = { RestoreResult.Unavailable },
+    onUnlockFree: () -> Unit = {},
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -162,7 +163,7 @@ fun EditorScreen(
     }
 
     if (state.paywallVisible && Edition.isFree) {
-        FreeEditionDialog(onDismiss = vm::dismissPaywall)
+        FreeEditionDialog(unlocked = state.isPro, onUnlock = onUnlockFree, onDismiss = vm::dismissPaywall)
     } else if (state.paywallVisible) {
         PaywallDialog(onBuy = onBuyClicked, onRestore = onRestoreClicked, onDismiss = vm::dismissPaywall)
     }

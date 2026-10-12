@@ -5,6 +5,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
@@ -551,6 +552,7 @@ class SettingsScreenTest {
             ExportSettingsScreen(
                 exportReminder = true, onExportReminderChange = { latest = it },
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
+                watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
                 onNavigateUp = {},
             )
         }
@@ -564,12 +566,58 @@ class SettingsScreenTest {
             ExportSettingsScreen(
                 exportReminder = true, onExportReminderChange = {},
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
+                watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
                 onNavigateUp = {},
             )
         }
         compose.onNodeWithText("图标 + 有码 Yomark").assertIsSelected()
         compose.onNodeWithText("图标 + Yomark").performClick()
         assertThat(latest).isEqualTo(BrandWatermarkStyle.ICON_EN)
+    }
+
+    @Test fun noWatermarkIsOfferedOnlyOnceUnlocked() {
+        show {
+            ExportSettingsScreen(
+                exportReminder = true, onExportReminderChange = {},
+                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
+                watermarkUnlocked = false, watermarkOff = true, onWatermarkOff = {},
+                onNavigateUp = {},
+            )
+        }
+        compose.onNodeWithText("无水印").assertDoesNotExist()
+        // 没解锁时「无水印」不算数，照样选中一个字样
+        compose.onNodeWithText("图标 + 有码 Yomark").assertIsSelected()
+    }
+
+    @Test fun unlockedAndOffSelectsNoWatermarkAndPickingAStyleEmitsIt() {
+        var latest: BrandWatermarkStyle? = null
+        show {
+            ExportSettingsScreen(
+                exportReminder = true, onExportReminderChange = {},
+                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
+                watermarkUnlocked = true, watermarkOff = true, onWatermarkOff = {},
+                onNavigateUp = {},
+            )
+        }
+        compose.onNodeWithText("无水印").assertIsSelected()
+        compose.onNodeWithText("图标 + 有码 Yomark").assertIsNotSelected()
+        compose.onNodeWithText("图标 + 有码 Yomark").performClick()
+        assertThat(latest).isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)
+    }
+
+    @Test fun pickingNoWatermarkEmitsIt() {
+        var off = false
+        show {
+            ExportSettingsScreen(
+                exportReminder = true, onExportReminderChange = {},
+                watermarkStyle = BrandWatermarkStyle.ICON_EN, onWatermarkStyleChange = {},
+                watermarkUnlocked = true, watermarkOff = false, onWatermarkOff = { off = true },
+                onNavigateUp = {},
+            )
+        }
+        compose.onNodeWithText("图标 + Yomark").assertIsSelected()
+        compose.onNodeWithText("无水印").performClick()
+        assertThat(off).isTrue()
     }
 
     @Test fun pickingTheFrostedScanEffectEmitsIt() {

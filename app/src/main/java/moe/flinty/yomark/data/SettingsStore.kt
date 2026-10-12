@@ -148,8 +148,25 @@ class SettingsStore internal constructor(
         it[KEY_BRAND_WATERMARK].toEnum(BrandWatermarkStyle.defaultFor(locale()))
     }
 
-    suspend fun setBrandWatermarkStyle(style: BrandWatermarkStyle) {
-        store.edit { it[KEY_BRAND_WATERMARK] = style.name }
+    /**
+     * 选字样。[unlocked]（能去水印）时选字样就是要水印，一并把 [brandWatermarkOff] 记成 false；
+     * 没解锁时不碰它——否则以后解锁了，水印还在。
+     */
+    suspend fun setBrandWatermarkStyle(style: BrandWatermarkStyle, unlocked: Boolean = false) {
+        store.edit {
+            it[KEY_BRAND_WATERMARK] = style.name
+            if (unlocked) it[KEY_BRAND_WATERMARK_OFF] = false
+        }
+    }
+
+    /**
+     * 设置里选了「无水印」。只在解锁后才能选，没选过是 null，怎么算见 export.brandWatermarkApplies：
+     * 解锁了、没选过就按不加算，所以买成或点了「去除水印」的那一下，不用回头改这里水印就没了。
+     */
+    val brandWatermarkOff: Flow<Boolean?> = store.data.map { it[KEY_BRAND_WATERMARK_OFF] }
+
+    suspend fun setBrandWatermarkOff() {
+        store.edit { it[KEY_BRAND_WATERMARK_OFF] = true }
     }
 
     /**
@@ -236,6 +253,7 @@ class SettingsStore internal constructor(
 
     /**
      * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的两项（导出前提醒、水印样式）回到出厂值。
+     * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。
      *
@@ -254,6 +272,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_RULES)
             it.remove(KEY_EXPORT_REMINDER)
             it.remove(KEY_BRAND_WATERMARK)
+            it.remove(KEY_BRAND_WATERMARK_OFF)
         }
     }
 
@@ -310,6 +329,7 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
+        val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
         val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
         val KEY_DEBUG_TRACE = booleanPreferencesKey("debug_trace")

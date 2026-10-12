@@ -226,6 +226,33 @@ class SettingsStoreTest {
     }
 
     @Test
+    fun `no watermark is unset until picked, and picking a style while locked leaves it unset`() = runTest {
+        val store = store()
+        assertThat(store.brandWatermarkOff.first()).isNull()
+        // 没解锁时选字样不能写下「要水印」，否则解锁那一下水印去不掉
+        store.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_EN, unlocked = false)
+        assertThat(store.brandWatermarkOff.first()).isNull()
+    }
+
+    @Test
+    fun `picking a style once unlocked means keeping the watermark`() = runTest {
+        val store = store()
+        store.setBrandWatermarkOff()
+        assertThat(store.brandWatermarkOff.first()).isTrue()
+        store.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_EN, unlocked = true)
+        assertThat(store.brandWatermarkOff.first()).isFalse()
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_EN)
+    }
+
+    @Test
+    fun `reset forgets the no watermark choice`() = runTest {
+        val store = store()
+        store.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_EN, unlocked = true)
+        store.resetSettings()
+        assertThat(store.brandWatermarkOff.first()).isNull()
+    }
+
+    @Test
     fun `theme color follows the system by default and remembers the choice`() = runTest {
         val store = store()
         assertThat(store.themeColor.first()).isEqualTo(ThemeColor.SYSTEM)

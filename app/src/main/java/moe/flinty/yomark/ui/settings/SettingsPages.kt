@@ -335,7 +335,8 @@ fun AiSettingsScreen(
  * 导出：导出前提醒和品牌水印的样式。
  *
  * 导出前提醒兜的正是「圈出」这一态——关掉它，圈出的内容导出时就没人再问了。
- * 水印样式是免费版导出时角落那个水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
+ * 水印样式是导出时角落那个品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
+ * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
  * 两项都不在识别方案里：改它们编辑器不重跑识别。
  */
 @Composable
@@ -344,9 +345,15 @@ fun ExportSettingsScreen(
     onExportReminderChange: (Boolean) -> Unit,
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
+    /** 能不能去水印。false 时没有「无水印」这一项。 */
+    watermarkUnlocked: Boolean,
+    /** 导出不加品牌水印。只在 [watermarkUnlocked] 时有意义。 */
+    watermarkOff: Boolean,
+    onWatermarkOff: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val none = watermarkUnlocked && watermarkOff
     SettingsScaffold(title = "导出", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
@@ -366,9 +373,12 @@ fun ExportSettingsScreen(
                 BrandWatermarkStyle.entries.forEach { style ->
                     RadioRow(
                         title = "图标 + ${style.text}",
-                        selected = watermarkStyle == style,
+                        selected = !none && watermarkStyle == style,
                         onClick = { onWatermarkStyleChange(style) },
                     )
+                }
+                if (watermarkUnlocked) {
+                    RadioRow(title = "无水印", selected = none, onClick = onWatermarkOff)
                 }
             }
         }

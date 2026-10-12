@@ -91,6 +91,7 @@ class EditorActivity : ComponentActivity() {
                             lifecycleScope.launch { billing.launchPurchase(this@EditorActivity) }
                         },
                         onRestoreClicked = { restorePurchase(billing) },
+                        onUnlockFree = billing::unlockFree,
                         onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNavigateUp = ::navigateUpToHome,
                     )

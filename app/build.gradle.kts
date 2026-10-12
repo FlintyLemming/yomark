@@ -68,7 +68,7 @@ android {
         versionCode = 21
         versionName = "0.13.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // 开源版：全功能免费，导出不带品牌水印，去水印按钮改成打赏入口（见 billing/Edition.kt）。
+        // 开源版：全功能免费，去水印按钮点开就能免费去水印，另有打赏入口（见 billing/Edition.kt）。
         // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
         val freeEdition = providers.gradleProperty("yomark.freeEdition").orNull?.toBooleanStrict() ?: true
         buildConfigField("boolean", "FREE_EDITION", "$freeEdition")
