@@ -1,6 +1,7 @@
 package moe.flinty.yomark.rules
 
 import android.graphics.RectF
+import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.TextLine
@@ -15,6 +16,7 @@ import kotlin.math.min
  * 规则永远在 classifiers 列表的第一位且永不缺席——它是全部识别能力的地基。
  *
  * 规则大多逐行认；整页交给它们（[Page]），看整页的认法（PageFinder：字段名在上、值在下，机读码对照）自己去看。
+ * 只圈不打码的命中（RuleMatch.outlineOnly，照片上孤零零一行的德国车牌这类）照这一类的开关出，出来一律只圈出。
  * 「要旁证的猜测」（[NeedsAnchor]，目前是从字面猜出的人名）在这里看整页：
  * 有旁证（[anchors]：紧挨着的称呼，或者同一行、同一排、上下相邻一行的电话、证件号……）的照规则的设置出；
  * 没有的，按 [keepUnanchored] 丢掉或只圈出。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
@@ -61,9 +63,10 @@ class RuleClassifier(
         // 旁证只在有猜测要核对时才找：大多数页面上一个猜出来的人名都没有
         val anchorsOnPage by lazy { findAnchors(lines) }
         rules.forEachIndexed { r, rule ->
-            found[r].forEachIndexed { n, (pageLine, m) ->
-                if (yields(rule, pageLine, m.range, found)) return@forEachIndexed
-                val lineIndex = kept[pageLine]
+            found[r].forEachIndexed { n, pm ->
+                val m = pm.match
+                if (yields(rule, pm, found)) return@forEachIndexed
+                val lineIndex = kept[pm.line]
                 val line = lines[lineIndex]
                 val quad = line.quadForRange(m.range)
                 val anchored = !m.needsAnchor ||
@@ -71,12 +74,14 @@ class RuleClassifier(
                 if (!anchored && !keepUnanchored) return@forEachIndexed
                 out += lineIndex to Candidate(
                     id = "rule-${rule.id}-$lineIndex-${m.range.first}-$n",
-                    quad = quad,
+                    // 落在几行上的（上下两行的车牌）合成一个框
+                    quad = if (pm.also.isEmpty()) quad
+                    else Quad.boundingQuad(listOf(quad) + pm.also.map { lines[kept[it.line]].quadForRange(it.range) }),
                     kind = rule.kind,
                     source = DetectorSource.RULE,
                     confidence = m.confidence,
                     // 有旁证的猜测照规则的设置打码；没有旁证、又被设置留下来的只圈出
-                    enabledByDefault = rule.enabledByDefault && anchored,
+                    enabledByDefault = rule.enabledByDefault && anchored && !m.outlineOnly,
                 )
             }
         }
@@ -84,10 +89,15 @@ class RuleClassifier(
         out.sortedBy { it.first }.map { it.second }
     }
 
-    /** [rule] 在第 [line] 行 [range] 上的命中，要不要让给同一处的另一类（Rule.yieldsTo）。 */
-    private fun yields(rule: Rule, line: Int, range: IntRange, found: List<List<PageMatch>>): Boolean =
-        rule.yieldsTo.isNotEmpty() && rules.indices.any { o ->
-            rules[o].kind in rule.yieldsTo && found[o].any { it.line == line && it.match.range.overlaps(range) }
+    /**
+     * [rule] 的命中 [m] 要不要让给同一处的另一类：那一类在 Rule.yieldsTo 里；或者 [m] 只是只圈不打码的一档，
+     * 同一处别的类型认出了东西。只让给那边有把握的命中（不是只圈出的、不是要旁证的猜测）：
+     * 地址让给车牌，让给一个只圈出的车牌就是把打了码的降成只圈出。
+     */
+    private fun yields(rule: Rule, m: PageMatch, found: List<List<PageMatch>>): Boolean =
+        (rule.yieldsTo.isNotEmpty() || m.match.outlineOnly) && rules.indices.any { o ->
+            rules[o] !== rule && (rules[o].kind in rule.yieldsTo || m.match.outlineOnly) &&
+                found[o].any { !it.match.outlineOnly && !it.match.needsAnchor && it.overlaps(m) }
         }
 
     private fun RectF.toBounds() = Bounds(left, top, right, bottom)

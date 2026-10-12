@@ -19,6 +19,9 @@ enum class SensitiveKind {
     /** 驿站、快递柜的取件码。凭它就能把包裹取走，默认打码。 */
     PICKUP_CODE,
 
+    /** 车牌。凭它能查到车、找到人，写法独特的和字段名后面的默认打码。 */
+    LICENSE_PLATE,
+
     // PERSON_NAME / POSTAL_ADDRESS 不是 NER 产出的：标签锚定认字段名后面的值，
     // 另外人名认电话前面的那几个字、地址认门牌的形状（NameBeforePhone / AddressShape）。
     // 自由行文里的人名地址仍然认不出，完整覆盖要等 NER（spec §14 的接口已留）。

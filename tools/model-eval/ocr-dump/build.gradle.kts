@@ -25,6 +25,7 @@ sourceSets {
                 "moe/flinty/yomark/rules/EnglishAddressShape.kt", "moe/flinty/yomark/rules/EnglishNames.kt",
                 "moe/flinty/yomark/rules/EnglishLists.kt", "moe/flinty/yomark/rules/Page.kt",
                 "moe/flinty/yomark/rules/StackedField.kt", "moe/flinty/yomark/rules/Mrz.kt", "moe/flinty/yomark/rules/Dates.kt",
+                "moe/flinty/yomark/rules/LicensePlate.kt",
                 "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )
         }
