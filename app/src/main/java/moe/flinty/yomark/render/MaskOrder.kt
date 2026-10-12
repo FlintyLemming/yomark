@@ -1,30 +1,44 @@
 package moe.flinty.yomark.render
 
+import android.graphics.Bitmap
+import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
+import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 
 /**
  * 码的绘制顺序。预览（ImageCanvas）与导出（Exporter）共用，所见即所得靠它。
  *
- * 每块码有自己的样式之后（spec §7.5 修订），顺序就不只是谁盖住谁了：马赛克、模糊、开了近似色的色块要读图上的像素，
- * 而导出是在同一张位图上一块接一块地画，先画上去的色块会被后面读像素的样式读进去。
- * 比如近似色的采样环碰到隔壁的天蓝色块，导出时就取成了偏蓝的颜色；预览读的却是原图——两边就对不上了。
+ * 后来的盖在先来的上面：识别出的在底下（同一批里大的先画、小的盖在上面），手动框按画的先后叠上去。
+ * 在色块上再拉一个模糊框，模糊就该在色块上面——早先读像素的样式一律先画，模糊反倒被压在色块底下。
  *
- * 所以先画读像素的，再画直接上色的（固定颜色的色块、马克笔）；同一组里大的先画、小的盖在上面，
- * 与 GestureRules.hitTest 的「取最小」互为对应。
+ * 读像素的样式（马赛克、模糊）读的是画到它这一层时底下的样子：导出本来就在同一张位图上一块接一块地画，
+ * 模糊盖在色块上，糊的是色块，色块挡住的字仍然看不见；预览照样合成一遍再读（见 ImageCanvas 的 MaskComposite）。
+ *
+ * 近似色是例外：它要的是背景的颜色，隔壁先画上去的天蓝色块不该掺进来。所以两边都先在原图上把近似色取好
+ * （[pinNearColor]），再开始一块块地画。
  */
 object MaskOrder {
 
-    /** 这一块要读底下的像素：画在直接上色的之前。色块开了近似色也要读，它取的是四周的颜色。 */
+    /** 这一块要读底下的像素。近似色不算：它在开画之前就从原图上取好了（见 [pinNearColor]）。 */
     fun readsPixels(look: MaskLook): Boolean = when (look.style) {
         MaskStyle.PIXELATE, MaskStyle.BLUR -> true
-        MaskStyle.SOLID -> look.options.solidNear
-        MaskStyle.MARKER -> false
+        MaskStyle.SOLID, MaskStyle.MARKER -> false
     }
 
-    fun forDrawing(items: List<MaskItem>): List<MaskItem> =
-        items.sortedWith(
-            compareBy<MaskItem> { !readsPixels(it.look) }.thenByDescending { it.quad.area() }
-        )
+    fun forDrawing(items: List<MaskItem>): List<MaskItem> {
+        val (detected, manual) = items.partition { it.source != DetectorSource.MANUAL }
+        return detected.sortedByDescending { it.quad.area() } + manual
+    }
+
+    /**
+     * 开了近似色的，在 [original]（还没画任何码的图）上把颜色取好、写成固定颜色。
+     * 这样后面一块块地画时，近似色的采样环碰到隔壁已经画上去的码也不受影响。
+     */
+    fun pinNearColor(options: MaskOptions, original: Bitmap, quad: Quad): MaskOptions =
+        if (options.solidNear) {
+            options.copy(solidNear = false, solidColor = NearColor.around(original, quad, options.renderScale))
+        } else options
 }

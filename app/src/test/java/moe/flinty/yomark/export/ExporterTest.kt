@@ -120,8 +120,8 @@ class ExporterTest {
     }
 
     /**
-     * 读像素的（近似色）画在直接上色的之前，与预览同一个顺序（MaskOrder）：
-     * 近似色的采样环要是先读到隔壁已经画上去的色块，导出就取成了偏蓝的颜色，而预览读的是原图。
+     * 近似色在开画之前就从原图上取好（MaskOrder.pinNearColor），与预览一样：
+     * 近似色的采样环要是读到隔壁已经画上去的色块，导出就取成了偏蓝的颜色，而预览读的是原图。
      */
     @Test
     fun `near colour next to a solid block samples the original background, as the preview does`() = runTest {
@@ -136,6 +136,21 @@ class ExporterTest {
         // 近似色取到的是白底，没有掺进天蓝
         assertThat(sink.bitmap!!.getPixel(200, 265)).isEqualTo(Color.WHITE)
         assertThat(sink.bitmap!!.getPixel(200, 300)).isEqualTo(MaskOptions.SKY_BLUE)
+    }
+
+    /** 色块上后拉的模糊框盖在色块上面（MaskOrder）：糊的是色块，不是一条清清楚楚的天蓝压在模糊上。 */
+    @Test
+    fun `a blur drawn over a solid block lies on top of it`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("blur-over.png", 400, 400, png = true)   // 右下是白底
+        val bar = maskedItem(220f, 290f, 380f, 300f).copy(candidateId = "bar")
+        val blur = maskedItem(210f, 210f, 390f, 390f).copy(candidateId = "blur", look = MaskLook(MaskStyle.BLUR))
+        exporter(sink).export(ExportRequest(src, "image/png", planWith(bar, blur), 1f, false))
+        val c = sink.bitmap!!.getPixel(300, 295)
+        assertThat(c).isNotEqualTo(MaskOptions.SKY_BLUE)
+        // 糊开的是色块：偏蓝，比原来的天蓝淡
+        assertThat(Color.blue(c)).isGreaterThan(Color.red(c))
+        assertThat(Color.red(c)).isGreaterThan(Color.red(MaskOptions.SKY_BLUE))
     }
 
     @Test

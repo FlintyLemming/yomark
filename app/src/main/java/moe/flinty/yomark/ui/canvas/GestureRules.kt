@@ -4,6 +4,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.render.MaskOrder
 import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
@@ -32,9 +33,9 @@ object GestureRules {
     )
 
     /**
-     * 命中测试：取面积最小的命中项。
-     * 渲染时大块先画、小块盖在上面，用户点到的应该是他看到的那个。
+     * 命中测试：取最上面的命中项，即按 MaskOrder 最后画的那块。用户点到的应该是他看到的那个：
+     * 识别出的大块先画、小块盖在上面，手动框后画的盖在先画的上面。
      */
     fun hitTest(items: List<MaskItem>, imagePoint: PointF): MaskItem? =
-        items.filter { it.quad.contains(imagePoint) }.minByOrNull { it.quad.area() }
+        MaskOrder.forDrawing(items).lastOrNull { it.quad.contains(imagePoint) }
 }

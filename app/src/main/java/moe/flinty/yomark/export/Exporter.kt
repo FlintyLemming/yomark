@@ -67,13 +67,17 @@ class Exporter(
             // 渲染器里的绝对像素常数是原图口径；导出图可能因 32MP 上限降过一次，按它折算。
             val renderScale = 1f / decoded.downsampleFactor
 
-            // 每块码按它自己的样式画（spec §7.5 修订），顺序与预览一致（见 MaskOrder）
+            // 每块码按它自己的样式画（spec §7.5 修订），顺序与预览一致（见 MaskOrder）。
+            // 近似色先在还没画码的原图上全部取好，再一块块地画：后画的模糊、马赛克读的是底下已经画上去的码。
             val maskedBounds = ArrayList<RectF>()
             MaskOrder.forDrawing(request.plan.items.filter { it.state == MaskState.MASKED })
-                .forEach { item ->
+                .map { item ->
                     val quad = item.quad.scaled(factor)
                     val options = item.look.options.copy(renderScale = renderScale)
-                    registry[item.look.style].render(canvas, bitmap, quad, options)
+                    Triple(item.look.style, quad, MaskOrder.pinNearColor(options, bitmap, quad))
+                }
+                .forEach { (style, quad, options) ->
+                    registry[style].render(canvas, bitmap, quad, options)
                     maskedBounds += quad.bounds()
                 }
 

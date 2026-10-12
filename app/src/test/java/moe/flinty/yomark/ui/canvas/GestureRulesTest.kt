@@ -54,11 +54,23 @@ class GestureRulesTest {
     }
 
     @Test
-    fun `hitTest prefers the smallest item when boxes overlap`() {
+    fun `hitTest picks the box drawn last when manual boxes overlap`() {
         val big = item("big", 0f, 0f, 100f, 100f)
         val small = item("small", 40f, 40f, 60f, 60f)
-        val hit = GestureRules.hitTest(listOf(big, small), PointF(50f, 50f))
-        assertThat(hit?.candidateId).isEqualTo("small")
+        assertThat(GestureRules.hitTest(listOf(big, small), PointF(50f, 50f))?.candidateId).isEqualTo("small")
+        // 后拉的大框盖住了先前的小框：点到的是看得见的那个大框
+        assertThat(GestureRules.hitTest(listOf(small, big), PointF(50f, 50f))?.candidateId).isEqualTo("big")
+    }
+
+    @Test
+    fun `hitTest prefers the smallest detected box, and a manual box over detected ones`() {
+        fun detected(id: String, l: Float, t: Float, r: Float, b: Float) =
+            item(id, l, t, r, b).copy(kind = SensitiveKind.PHONE, source = DetectorSource.RULE)
+        val small = detected("small", 40f, 40f, 60f, 60f)
+        val big = detected("big", 0f, 0f, 100f, 100f)
+        assertThat(GestureRules.hitTest(listOf(small, big), PointF(50f, 50f))?.candidateId).isEqualTo("small")
+        val manual = item("manual", 30f, 30f, 90f, 90f)
+        assertThat(GestureRules.hitTest(listOf(manual, small, big), PointF(50f, 50f))?.candidateId).isEqualTo("manual")
     }
 
     @Test

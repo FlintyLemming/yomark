@@ -130,6 +130,7 @@ fun ImageCanvas(
         }
     }
     val scanPaints = remember { ScanPaints() }
+    val maskComposite = remember(image) { MaskComposite() }
 
     // 磨砂要用的模糊图与光点：选的是磨砂、动效又在走（识别中或收尾那一遍）时在后台准备一次（几毫秒）。
     // 准备好之前的那几帧只压暗，淡入刚开始，看不出差别。识别快到结果先到，也接着准备完，散开那一遍用得上。
@@ -332,7 +333,7 @@ fun ImageCanvas(
                     ScanStyle.SWEEP -> ScanLook.Sweep
                     ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
                 }
-                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look)
+                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite)
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
                 state.purposeText?.let {
@@ -555,6 +556,7 @@ private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, rect:
  *
  * @param time 动效时间轴上的这一帧（见 ScanEffect、FrostEffect）；null 表示静止，照常画全部遮罩
  * @param look 按哪种样式画这一帧
+ * @param composite 读像素的码压在别的码上时，从这里取合成好的样子；跨帧复用才有缓存
  */
 internal fun drawScene(
     canvas: android.graphics.Canvas,
@@ -566,15 +568,18 @@ internal fun drawScene(
     time: ScanTime?,
     paints: ScanPaints,
     look: ScanLook = ScanLook.Sweep,
+    composite: MaskComposite = MaskComposite(),
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
-    // 读像素的样式先画、直接上色的后画，同一组里大的先画、小的盖在上面——与导出同一个顺序（见 MaskOrder）
+    // 识别出的在底下，手动框后画的盖在先画的上面——与导出同一个顺序（见 MaskOrder）
     val sorted = MaskOrder.forDrawing(plan.items)
     // 标签按整张 plan 一起摆：识别中/落码时打码块分两批画，标签之间也得互相避让
     val labels = layoutKindLabels(sorted, image, scale)
+    val composed = composite.of(image, sorted.filter { it.state == MaskState.MASKED }, registry)
+    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, scale, labels, composed) }
     if (time == null) {
-        drawItems(canvas, sorted, image, registry, scale, labels)
+        drawItems(sorted)
         return
     }
 
@@ -583,8 +588,8 @@ internal fun drawScene(
         val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
         drawFrostScene(
             canvas, image.width.toFloat(), image.height.toFloat(), dp, time, look, paints.frost,
-            drawDetected = { drawItems(canvas, detected, image, registry, scale, labels) },
-            drawManual = { drawItems(canvas, manual, image, registry, scale, labels) },
+            drawDetected = { drawItems(detected) },
+            drawManual = { drawItems(manual) },
         )
         return
     }
@@ -605,7 +610,7 @@ internal fun drawScene(
     // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
     if (front != null) {
         val layer = canvas.saveLayer(null, null)
-        drawItems(canvas, detected, image, registry, scale, labels)
+        drawItems(detected)
         keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
         canvas.restoreToCount(layer)
         drawLight(canvas, light, front, strength = 1f, paints)
@@ -619,12 +624,13 @@ internal fun drawScene(
         )
     }
     // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
-    drawItems(canvas, manual, image, registry, scale, labels)
+    drawItems(manual)
 }
 
 /**
  * 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。
  * 每块码按它自己的样式画；[items] 已经按 MaskOrder 排好了。
+ * 有 [composite]（见 MaskComposite）时，码所在的地方直接从合成好的图上取。
  */
 private fun drawItems(
     canvas: android.graphics.Canvas,
@@ -633,12 +639,25 @@ private fun drawItems(
     registry: RendererRegistry,
     scale: Float,
     labels: Map<String, RectF>,
+    composite: android.graphics.Bitmap?,
 ) {
-    items.filter { it.state == MaskState.MASKED }.forEach {
-        // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
-        // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
-        val options = it.look.options.copy(renderScale = image.scale)
-        registry[it.look.style].render(canvas, image.bitmap, it.quad, options)
+    val masked = items.filter { it.state == MaskState.MASKED }
+    if (composite != null) {
+        if (masked.isNotEmpty()) {
+            val area = android.graphics.Path()
+            masked.forEach { area.op(it.quad.toPath(), android.graphics.Path.Op.UNION) }
+            val save = canvas.save()
+            canvas.clipPath(area)
+            canvas.drawBitmap(composite, 0f, 0f, null)
+            canvas.restoreToCount(save)
+        }
+    } else {
+        masked.forEach {
+            // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
+            // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
+            val options = it.look.options.copy(renderScale = image.scale)
+            registry[it.look.style].render(canvas, image.bitmap, it.quad, options)
+        }
     }
     items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
         canvas.drawPath(item.quad.toPath(), outlinePaint(scale))
