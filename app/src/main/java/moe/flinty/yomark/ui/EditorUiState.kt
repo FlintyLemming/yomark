@@ -61,13 +61,18 @@ data class EditorUiState(
     /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
     val colorPick: ColorTarget? = null,
     val pendingDialogVisible: Boolean = false,
+    /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
+    val unopenedDialogVisible: Boolean = false,
     /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
     val purposeText: String? = null,
     /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
     val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
     /** 用途水印调节面板开着：它顶替底栏，画布留在上面实时预览。 */
     val purposeSheetVisible: Boolean = false,
-    /** ACTION_SEND_MULTIPLE 进来的批量会话；单张时为 null，底栏也就没有「下一张」。 */
+    /**
+     * 批量会话：相册一次分享多张（ACTION_SEND_MULTIPLE），或首页 Picker 里选了多张。单张时为 null，底栏也就没有胶片条。
+     * 画布上这张图（[image] 不为 null 时）就是 batch.current，它的编辑在 [plan] 里，切走时才写回 batch。
+     */
     val batch: BatchSession? = null,
     /**
      * 已买断去水印（spec §10）。免费版一项隐私能力都不缺，付费买到的纯粹是外观。
@@ -90,4 +95,10 @@ data class EditorUiState(
      * 只是选中、什么也没改，画笔不动——取消选中后样式栏回到画笔。
      */
     val barLook: MaskLook get() = selectedItem?.look ?: brush
+
+    /**
+     * 连同画布上这张的编辑在内的批量会话。切图的那一下画布是空的（[image] 为 null，下一张还在载入），
+     * 这时 [plan] 只是个占位，不能写回去，否则会把那一张已经存下的编辑冲掉。
+     */
+    val liveBatch: BatchSession? get() = batch?.let { if (image != null) it.withPlan(plan) else it }
 }

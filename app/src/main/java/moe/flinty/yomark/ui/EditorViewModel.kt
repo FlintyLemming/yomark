@@ -11,6 +11,7 @@ import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.IntakeResult
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.image.SourceImageLoader
+import moe.flinty.yomark.core.model.AnalysisResult
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
@@ -34,6 +35,7 @@ import moe.flinty.yomark.ui.batch.BatchItem
 import moe.flinty.yomark.ui.batch.BatchSession
 import moe.flinty.yomark.ui.canvas.GestureRules
 import moe.flinty.yomark.ui.canvas.ScanStyle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -46,6 +48,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -99,7 +102,35 @@ class EditorViewModel(
             savedState[KEY_PLAN] = value.plan
         }
 
-    private val undoStack = UndoStack()
+    /** 画布上这张图的撤销栈。批量里每一张各有一个，切图时换（见 [batchUndo]）。 */
+    private var undoStack = UndoStack()
+
+    /** 批量里不在画布上的那几张的撤销栈。来回切着看，回到一张图上还能接着撤销它自己的改动。 */
+    private val batchUndo = HashMap<Int, UndoStack>()
+
+    /** 批量里每一张的识别记录，按下标存，只在内存里。 */
+    private val batchScans = HashMap<Int, BatchScan>()
+
+    /** 识别的流水号，只增不减。结果回来时对得上号才算数：同一张后来又重跑了、或者整批换了，旧结果自然作废。 */
+    private var scanSerial = 0
+
+    /** 批量里正在载入的那一张。又切到别的图时作废它。 */
+    private var batchLoad: Job? = null
+
+    private class BatchScan {
+        /** 最近一次识别。切到别的图上它也接着跑完，结果落回这一张自己的 plan。 */
+        var job: Job? = null
+        var serial = 0
+        /** 跑出眼下这份结果的方案。null = 还没跑完过。 */
+        var ranWith: RecognitionConfig? = null
+        /** 识别出的整页文字，「AI 增强识别」要用。 */
+        var lines: List<TextLine>? = null
+        /** 切走时增强识别到了哪一步，切回来照原样显示。跑到一半切走的算没跑过。 */
+        var aiReview: AiReview = AiReview.Hidden
+    }
+
+    /** 一次识别属于批量里的哪一张、是第几次。 */
+    private class BatchTarget(val index: Int, val serial: Int)
 
     private var config = RecognitionConfig()
     private var engine: RedactionEngine = engineProvider(config)
@@ -184,7 +215,9 @@ class EditorViewModel(
     private fun reanalyze(image: SourceImage) {
         undoStack.push(_state.value.plan)
         uiState = _state.value.copy(analyzing = true, aiReview = AiReview.Hidden).withHistoryFlags()
-        viewModelScope.launch { analyze(image, keepOnlyManual = true) }
+        val index = _state.value.batch?.index
+        if (index != null) scanBatchItem(index, image, keepOnlyManual = true)
+        else viewModelScope.launch { analyze(image, keepOnlyManual = true) }
     }
 
     /**
@@ -255,6 +288,7 @@ class EditorViewModel(
     }
 
     fun onImageChosen(uri: Uri) {
+        endBatch()
         aiReviewJob?.cancel()                             // 上一张图的增强识别作废，按钮随之收起
         uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden)
         viewModelScope.launch {
@@ -292,8 +326,12 @@ class EditorViewModel(
     }
 
     /**
-     * 批量入口（spec §7.6）。单张时不开批量会话，行为与 onImageChosen 完全一致——
-     * 「下一张」按钮只在真的有下一张时出现。
+     * 批量入口（spec §7.6）：相册一次分享多张，或首页 Picker 里选了多张。
+     * 单张时不开批量会话，行为与 onImageChosen 完全一致——底栏的胶片条只在真的有多张时出现。
+     *
+     * 批量会话不进 SavedStateHandle：进程被杀之后回来只恢复画布上那一张
+     * （restore() 那条路），批量退化成单张。这是有意的降级——把整个会话
+     * 序列化回来，用户会面对一个「哪几张看过、哪几张识别完了」完全说不清的状态。
      */
     fun onImagesChosen(uris: List<Uri>) {
         if (uris.isEmpty()) return
@@ -301,83 +339,195 @@ class EditorViewModel(
             onImageChosen(uris.first())
             return
         }
-        // 私有副本只在会话开始时清一次。批量导出要在走完最后一张之后读回**每一张**的副本，
-        // 像 onImageChosen 那样逐张 clear() 会把前面几张就地删掉，导出只剩最后一张。
+        endBatch()
+        aiReviewJob?.cancel()
+        // 私有副本只在会话开始时清一次。批量导出要在最后读回**每一张**的副本，
+        // 像 onImageChosen 那样逐张 clear() 会把前面几张就地删掉，导出只剩最后看的那一张。
         intake.clear()
         intakeResult = null
-        undoStack.clear()
+        undoStack = UndoStack()
         lookEditOrigin = null
+        dragOrigin = null
         uiState = EditorUiState(
             plan = MaskPlan.empty(),
+            loading = true,
             isPro = _state.value.isPro,
             purposeStyle = _state.value.purposeStyle,
             brush = _state.value.brush,
             stylePanelOpen = _state.value.stylePanelOpen,
-            batch = BatchSession(
-                items = uris.map { BatchItem(it, null, "image/jpeg", null, 1f) },
-                index = 0,
-            ),
+            batch = BatchSession(items = uris.map { BatchItem(it) }, index = 0),
         )
-        loadBatchCurrent()
-    }
-
-    /** 保存当前这张的编辑，推进到下一张。 */
-    fun nextImage() {
-        val batch = _state.value.batch ?: return
-        val saved = batch.withPlan(_state.value.plan)
-        if (saved.isLast) return
-        uiState = _state.value.copy(batch = saved.advance())
-        loadBatchCurrent()
+        loadBatchItem(0)
     }
 
     /**
-     * 批量里的每一张都走和单张一样的载入 + 识别路径。
+     * 胶片条停在了第 [index] 张（滑过去，或点了它）。
      *
-     * 批量会话不进 SavedStateHandle：进程被杀之后回来只恢复当前这一张
-     * （restore() 那条路），批量退化成单张。这是有意的降级——把整个会话
-     * 序列化回来，用户会面对一个「我刚才编到第几张了」完全说不清的状态。
+     * 画布上这张的编辑、撤销栈、增强识别走到哪一步，都存回会话里；画布先空着（底下垫着那一张的缩略图），
+     * 那一张载入后接着它自己的编辑和撤销栈来。一张图第一次被打开时才识别。
+     * 切走时还没识别完的那一张接着在后台跑，结果落回它自己的 plan。
      */
-    private fun loadBatchCurrent() {
-        val batch = _state.value.batch ?: return
+    fun selectImage(index: Int) {
+        val before = _state.value.batch ?: return
+        if (index !in before.items.indices) return
+        // 就是眼前这张：开着、或者正在载入，就没什么要做的；上次没打开成，就再试一次
+        if (index == before.index && (_state.value.image != null || _state.value.loading)) return
+        // 还没收尾的拖框、滑条先收尾，算进要离开的这张自己的撤销栈
+        commitDrag()
+        finishLookEdit()
         aiReviewJob?.cancel()
-        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden)
-        viewModelScope.launch {
-            val loaded = runCatching {
-                val taken = intake.copyToPrivate(batch.current.uri, ioDispatcher)
+        val s = _state.value
+        val batch = s.batch ?: return
+        val live = s.liveBatch ?: return
+        if (s.image != null) {
+            batchUndo[batch.index] = undoStack
+            // 增强识别跑到一半切走，就算没跑：任务已经取消了，回来时按钮还能点
+            batchScans.getOrPut(batch.index) { BatchScan() }.aiReview =
+                if (s.aiReview == AiReview.Running) AiReview.Ready else s.aiReview
+        }
+        undoStack = UndoStack()
+        // 载入期间进程被杀的话，宁可什么都不恢复，也不要把上一张的图配上这里的占位 plan
+        intakeResult = null
+        uiState = s.copy(
+            image = null,
+            plan = MaskPlan.empty(),
+            loading = true,
+            analyzing = false,
+            aiReview = AiReview.Hidden,
+            selectedManualId = null,
+            colorPick = null,
+            canUndo = false,
+            canRedo = false,
+            batch = live.select(index),
+        )
+        loadBatchItem(index)
+    }
+
+    /**
+     * 载入批量里的第 [index] 张：第一次打开时复制私有副本，之后每次从副本解码。
+     * 第一次打开的这一下开始识别；切走时还在识别的，回来接着等它。
+     */
+    private fun loadBatchItem(index: Int) {
+        batchLoad?.cancel()
+        batchLoad = viewModelScope.launch {
+            val item = _state.value.batch?.items?.getOrNull(index) ?: return@launch
+            val loaded = try {
+                val taken = item.file?.let { IntakeResult(it, item.mimeType) }
+                    ?: intake.copyToPrivate(item.uri, ioDispatcher).also { copied ->
+                        ensureActive()
+                        _state.value.batch?.let { b ->
+                            uiState = _state.value.copy(batch = b.withFile(index, copied.file, copied.mimeType))
+                        }
+                    }
                 taken to SourceImageLoader.loadForAnalysis(taken.file, taken.mimeType, ioDispatcher)
-            }.getOrNull()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            }
+            ensureActive()                                  // 载入期间又切走了，或者整批换了
+            val s = _state.value
+            val batch = s.batch?.takeIf { it.index == index } ?: return@launch
             if (loaded == null) {
-                uiState = _state.value.copy(
+                uiState = s.copy(
                     loading = false,
+                    batch = batch.withFailed(index),
                     message = EditorMessage.Error("打不开这张图片"),
                 )
                 return@launch
             }
             val (taken, image) = loaded
+            val stored = batch.items[index]
+            val record = batchScans[index]
+            val scanning = record?.job?.isActive == true
+            // 打开过、也不在识别，却从没跑完过一遍识别：照第一次打开处理
+            val needsScan = !scanning && record?.ranWith == null
             intakeResult = taken
-            undoStack.clear()
+            undoStack = batchUndo.remove(index) ?: UndoStack()
             lookEditOrigin = null
-            uiState = _state.value.copy(
+            dragOrigin = null
+            analyzedWith = record?.ranWith
+            reviewLines = record?.lines
+            uiState = s.copy(
                 image = image,
-                plan = MaskPlan.empty(),
+                plan = stored.plan ?: MaskPlan.empty(),
                 loading = false,
-                analyzing = true,
-                aiReview = AiReview.Hidden,
-                canUndo = false,
-                canRedo = false,
-                selectedManualId = null,
-                colorPick = null,
-                batch = _state.value.batch?.withLoaded(taken.file, taken.mimeType, image.scale),
-            )
-            analyze(image)
+                analyzing = needsScan || scanning,
+                aiReview = if (needsScan || scanning) AiReview.Hidden else record?.aiReview ?: AiReview.Hidden,
+                batch = batch.withLoaded(index, taken.file, taken.mimeType, image.scale),
+            ).withHistoryFlags()
+            val ranWith = record?.ranWith
+            when {
+                needsScan -> scanBatchItem(index, image)
+                scanning -> Unit                            // 结果出来时直接落到画布上这份 plan 里
+                // 这一张识别完之后改过设置：和单张一样，按新方案重跑一遍
+                ranWith != null && ranWith != config -> reanalyze(image)
+                // 识别早就跑完了：和刚识别完一样，看要不要摆出「AI 增强识别」
+                ranWith != null && reviewLines != null && engine.canRefine &&
+                    _state.value.aiReview == AiReview.Hidden -> offerAiReview(image, ranWith, engine, trace = null)
+            }
         }
+    }
+
+    /** 识别批量里的第 [index] 张。[image] 必须是画布上那一张（就是 batch.current）。 */
+    private fun scanBatchItem(index: Int, image: SourceImage, keepOnlyManual: Boolean = false) {
+        val record = batchScans.getOrPut(index) { BatchScan() }
+        val target = BatchTarget(index, ++scanSerial)
+        record.serial = target.serial
+        record.job = viewModelScope.launch { analyze(image, keepOnlyManual, target) }
+    }
+
+    /**
+     * 批量里一张图的识别结果回来了。这张图还在画布上，就和单张一样并进画布上的 plan、看要不要摆出「AI 增强识别」；
+     * 已经切走了（或者切回来了、但还在载入），就并进会话里它自己的那份 plan，下次打开时直接是识别完的样子。
+     */
+    private fun deliverBatchScan(
+        target: BatchTarget,
+        result: AnalysisResult?,
+        ranWith: RecognitionConfig,
+        ranOn: RedactionEngine,
+        keepOnlyManual: Boolean,
+        trace: TraceRecorder?,
+    ) {
+        val record = batchScans[target.index]
+        if (record == null || record.serial != target.serial) return    // 这一张后来又重跑了，以新的那一遍为准
+        record.ranWith = ranWith
+        record.lines = result?.lines
+        record.aiReview = AiReview.Hidden
+        val current = _state.value
+        val batch = current.batch ?: return
+        val shown = current.image?.takeIf { batch.index == target.index }
+        val base = if (shown != null) current.plan else batch.items[target.index].plan ?: MaskPlan.empty()
+        // 直接打码的用结果到达这一刻的画笔，和单张一样；用户在识别期间画的手动框排在后面，不被覆盖
+        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.brush)
+        val kept = if (keepOnlyManual) base.items.filter { it.kind == SensitiveKind.MANUAL } else base.items
+        val merged = base.copy(items = detected + kept)
+        if (shown == null) {
+            uiState = current.copy(batch = batch.withPlanAt(target.index, merged))
+            return
+        }
+        analyzedWith = ranWith
+        reviewLines = result?.lines
+        uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged)
+        if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
+    }
+
+    /** 批量会话结束（换成单张，或者换了一批）：还在跑的载入、识别都作废，各张的撤销栈一并丢掉。 */
+    private fun endBatch() {
+        batchLoad?.cancel()
+        batchLoad = null
+        batchScans.values.forEach { it.job?.cancel() }
+        batchScans.clear()
+        batchUndo.clear()
     }
 
     /**
      * 识别（spec §7.1）：选中即进编辑器，候选已按规则表的默认状态打好码，
      * 不是「等你逐个确认」。分析期间画布可交互，结果到达时并入现有 plan。
+     *
+     * @param target 批量里的哪一张。为 null 时是单张：结果到达前换了图，这批结果就丢掉。
      */
-    private suspend fun analyze(image: SourceImage, keepOnlyManual: Boolean = false) {
+    private suspend fun analyze(image: SourceImage, keepOnlyManual: Boolean = false, target: BatchTarget? = null) {
         val ranWith = config
         val ranOn = engine
         aiReviewJob?.cancel()
@@ -391,6 +541,10 @@ class EditorViewModel(
         }
         val result = outcome.getOrNull()
         brushRestored.join()
+        if (target != null) {
+            deliverBatchScan(target, result, ranWith, ranOn, keepOnlyManual, trace)
+            return
+        }
         // 分析结果不进撤销栈——它是初始状态，不是用户动作。
         // 用户在分析期间画的手动框排在后面，不被覆盖。
         val current = _state.value
@@ -723,13 +877,34 @@ class EditorViewModel(
     }
 
     /**
-     * 批量导出：走完最后一张后一次性导出全部（spec §7.6）。
+     * 批量导出：看过的一次性全部导出（spec §7.6）。
+     *
+     * 先等还没跑完的识别：切走的那几张可能还在后台识别，这时导出，本该直接打码的东西就原样出去了——
+     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」。
+     *
+     * 还有没打开过的图时先问一句（[reviewUnopened] / [exportOpenedOnly]）：没打开过的图没识别、也没人看过，不能替用户导出。
      * 拦截按**全部图片**的待打码数之和判定，不是只看当前这张——
-     * 只看当前这张的话，前面几张里被放过的 OUTLINED 就永远没有第二次机会了。
+     * 只看当前这张的话，别的几张里被放过的 OUTLINED 就永远没有第二次机会了。
      */
     fun exportBatch() {
-        val batch = _state.value.batch?.withPlan(_state.value.plan) ?: return
-        uiState = _state.value.copy(batch = batch)
+        if (_state.value.batch == null || _state.value.exporting) return
+        finishLookEdit()
+        uiState = _state.value.copy(exporting = true)
+        viewModelScope.launch {
+            awaitBatchScans()
+            val batch = _state.value.liveBatch
+            if (batch == null) {
+                uiState = _state.value.copy(exporting = false)
+                return@launch
+            }
+            uiState = _state.value.copy(batch = batch, exporting = false)
+            if (batch.unopened > 0) uiState = _state.value.copy(unopenedDialogVisible = true)
+            else exportOpened(batch)
+        }
+    }
+
+    /** 没打开过的问过了（或者本来就没有）：照常走待打码拦截，再导出看过的那些。 */
+    private fun exportOpened(batch: BatchSession) {
         if (exportReminder && batch.totalPending > 0) {
             uiState = _state.value.copy(pendingDialogVisible = true)
             return
@@ -737,17 +912,41 @@ class EditorViewModel(
         runBatchExport(batch)
     }
 
+    /** 等批量里还在跑的载入和识别都跑完。等的时候又切出去打开了新的一张，就接着等它。 */
+    private suspend fun awaitBatchScans() {
+        while (true) {
+            batchLoad?.join()
+            val running = batchScans.values.mapNotNull { scan -> scan.job?.takeIf { it.isActive } }
+            if (running.isEmpty()) return
+            running.joinAll()
+        }
+    }
+
+    /** 「还有几张没看过」里的「去看看」：跳到第一张没打开过的，它这时开始识别。 */
+    fun reviewUnopened() {
+        uiState = _state.value.copy(unopenedDialogVisible = false)
+        val first = _state.value.batch?.firstUnopened ?: return
+        selectImage(first)
+    }
+
+    /** 「还有几张没看过」里的「只导出看过的」：没打开过的不导出，看过的照常走待打码拦截。 */
+    fun exportOpenedOnly() {
+        uiState = _state.value.copy(unopenedDialogVisible = false)
+        exportOpened(_state.value.liveBatch ?: return)
+    }
+
     /** @param stopReminding 对话框里勾了「不再提示」。 */
     fun confirmMaskAllAndExport(stopReminding: Boolean = false) {
         if (stopReminding) stopExportReminder()
         uiState = _state.value.copy(pendingDialogVisible = false)
-        val batch = _state.value.batch
+        val batch = _state.value.liveBatch
         val brush = _state.value.brush
         if (batch != null) {
-            val cleared = batch.withPlan(_state.value.plan).maskAllEverywhere(brush)
-            uiState = _state.value.copy(
+            val cleared = batch.maskAllEverywhere(brush)
+            val s = _state.value
+            uiState = s.copy(
                 batch = cleared,
-                plan = cleared.current.plan ?: _state.value.plan.maskAll(brush),
+                plan = if (s.image != null) cleared.current.plan ?: s.plan.maskAll(brush) else s.plan,
             )
             runBatchExport(cleared)
         } else {
@@ -759,8 +958,8 @@ class EditorViewModel(
     fun confirmExportAnyway(stopReminding: Boolean = false) {
         if (stopReminding) stopExportReminder()
         uiState = _state.value.copy(pendingDialogVisible = false)
-        val batch = _state.value.batch
-        if (batch != null) runBatchExport(batch.withPlan(_state.value.plan))
+        val batch = _state.value.liveBatch
+        if (batch != null) runBatchExport(batch)
         else runExport(_state.value.plan)
     }
 
@@ -829,7 +1028,7 @@ class EditorViewModel(
     fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
-        uiState = _state.value.copy(pendingDialogVisible = false)
+        uiState = _state.value.copy(pendingDialogVisible = false, unopenedDialogVisible = false)
     }
 
     fun consumeMessage() {

@@ -279,7 +279,7 @@ class PlayScreenshots {
         shoot("purpose")
     }
 
-    /** 从相册一次分享三张进来：底栏是「1 / 3」和「下一张」。 */
+    /** 从相册一次分享三张进来：底栏导出的左边是胶片条，停在第一张上。 */
     @Test fun batch() {
         open(
             sample("/play/chat-page.png"),

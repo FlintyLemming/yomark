@@ -1,6 +1,8 @@
 package moe.flinty.yomark.ui.components
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -90,12 +92,10 @@ fun EditorBottomBar(
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
-    /** 批量进度，如「2 / 5」。单张时为 null。 */
-    batchLabel: String? = null,
-    /** 非 null 时说明后面还有图：主按钮是「下一张」而不是「导出」（spec §7.6）。 */
-    onNext: (() -> Unit)? = null,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
+    /** 批量时的胶片条（见 [EditorActionRow]）。单张时为 null。 */
+    filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
     // 样式的调节面板是弹出来盖在画布上的（见 StyleBar），底栏的高度不随它变
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -103,41 +103,41 @@ fun EditorBottomBar(
         EditorActionRow(
             onExport = onExport,
             exporting = exporting,
-            batchLabel = batchLabel,
-            onNext = onNext,
             aiReview = aiReview,
             onAiReview = onAiReview,
+            filmstrip = filmstrip,
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
         )
     }
 }
 
 /**
- * 底栏的最后一行：左边「AI 增强识别」，右边批量进度和主按钮（「导出」，批量里后面还有图时是「下一张」）。
- * 手机的底栏和宽屏的样式列表那一块（WideEditorPanel）共用。
+ * 底栏的最后一行，手机的底栏和宽屏的样式列表那一块（WideEditorPanel）共用。
+ *
+ * 单张时左边「AI 增强识别」，右边「导出」。批量时左边是胶片条，占掉导出左边剩下的地方，
+ * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。
+ *
+ * @param filmstrip 批量时的胶片条，传进来的 Modifier 定好了它的宽。单张时为 null
  */
 @Composable
 fun EditorActionRow(
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
-    batchLabel: String? = null,
-    onNext: (() -> Unit)? = null,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
+    filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        AiReviewButton(aiReview, onAiReview)
-        Spacer(Modifier.weight(1f))
-        if (batchLabel != null) {
-            Text(batchLabel, style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.width(12.dp))
-        }
-        if (onNext != null) {
-            Button(onClick = onNext) { Text("下一张") }
+        if (filmstrip != null) {
+            filmstrip(Modifier.weight(1f))
+            Box(Modifier.animateContentSize()) { AiReviewButton(aiReview, onAiReview) }
+            Spacer(Modifier.width(8.dp))
         } else {
-            Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
+            AiReviewButton(aiReview, onAiReview)
+            Spacer(Modifier.weight(1f))
         }
+        Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
     }
 }
 

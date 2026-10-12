@@ -15,14 +15,14 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 class BatchSessionTest {
 
     private fun uri(n: Int) = Uri.parse("content://test/$n")
 
-    private fun session(count: Int) =
-        BatchSession(items = (1..count).map { BatchItem(uri(it), null, "image/jpeg", null, 1f) }, index = 0)
+    private fun session(count: Int) = BatchSession(items = (1..count).map { BatchItem(uri(it)) }, index = 0)
 
     private fun planWithPending(n: Int) = MaskPlan(
         items = (1..n).map {
@@ -31,38 +31,75 @@ class BatchSessionTest {
         },
     )
 
+    private fun BatchSession.open(i: Int) = withLoaded(i, File("src-$i.jpg"), "image/jpeg", 1f)
+
     @Test fun `total is the number of items`() {
         assertThat(session(3).total).isEqualTo(3)
     }
 
-    @Test fun `current points at the indexed item`() {
-        val s = session(3).advance()
+    @Test fun `any image can be selected, in any order`() {
+        val s = session(4).select(3).select(1)
+        assertThat(s.index).isEqualTo(1)
         assertThat(s.current.uri).isEqualTo(uri(2))
     }
 
-    @Test fun `isLast is true only on the final item`() {
-        var s = session(2)
-        assertThat(s.isLast).isFalse()
-        s = s.advance()
-        assertThat(s.isLast).isTrue()
+    @Test fun `selecting outside the batch stays inside it`() {
+        assertThat(session(3).select(7).index).isEqualTo(2)
+        assertThat(session(3).select(-1).index).isEqualTo(0)
     }
 
-    @Test fun `advancing past the end is a no-op`() {
-        val s = session(1).advance().advance()
-        assertThat(s.index).isEqualTo(0)
+    @Test fun `an image counts as opened once it has loaded`() {
+        val s = session(3).open(0).open(2)
+        assertThat(s.items.map { it.opened }).containsExactly(true, false, true).inOrder()
+        assertThat(s.opened).isEqualTo(2)
+        assertThat(s.unopened).isEqualTo(1)
+        assertThat(s.firstUnopened).isEqualTo(1)
+    }
+
+    @Test fun `loading keeps the edits an image already has`() {
+        val s = session(2).withPlanAt(1, planWithPending(2)).open(1)
+        assertThat(s.items[1].plan!!.pendingCount).isEqualTo(2)
+    }
+
+    @Test fun `a copied but never decoded image is not opened yet`() {
+        val s = session(2).withFile(1, File("src-1.jpg"), "image/png")
+        assertThat(s.items[1].opened).isFalse()
+        assertThat(s.items[1].mimeType).isEqualTo("image/png")
+    }
+
+    @Test fun `an image that failed to open is not asked about again`() {
+        val s = session(3).open(0).withFailed(1)
+        assertThat(s.unopened).isEqualTo(1)
+        assertThat(s.firstUnopened).isEqualTo(2)
+    }
+
+    @Test fun `opening again after a failure clears it`() {
+        val s = session(2).open(0).withFailed(1).open(1)
+        assertThat(s.items[1].failed).isFalse()
+        assertThat(s.unopened).isEqualTo(0)
+    }
+
+    @Test fun `firstUnopened is null once every image has been opened`() {
+        assertThat(session(2).open(0).open(1).firstUnopened).isNull()
     }
 
     @Test fun `withPlan stores the plan on the current item only`() {
-        val s = session(2).withPlan(planWithPending(1))
-        assertThat(s.items[0].plan).isNotNull()
-        assertThat(s.items[1].plan).isNull()
+        val s = session(2).select(1).withPlan(planWithPending(1))
+        assertThat(s.items[0].plan).isNull()
+        assertThat(s.items[1].plan).isNotNull()
+    }
+
+    @Test fun `withPlanAt can store a plan on an image that is not on screen`() {
+        val s = session(3).withPlanAt(2, planWithPending(1))
+        assertThat(s.index).isEqualTo(0)
+        assertThat(s.items[2].plan!!.pendingCount).isEqualTo(1)
     }
 
     @Test fun `totalPending sums pending across every image`() {
         val s = session(3)
-            .withPlan(planWithPending(2)).advance()
-            .withPlan(planWithPending(1)).advance()
-            .withPlan(planWithPending(0))
+            .withPlanAt(0, planWithPending(2))
+            .withPlanAt(1, planWithPending(1))
+            .withPlanAt(2, planWithPending(0))
         assertThat(s.totalPending).isEqualTo(3)
     }
 
@@ -71,14 +108,19 @@ class BatchSessionTest {
     }
 
     @Test fun `maskAllEverywhere clears pending on every stored plan`() {
-        val s = session(2).withPlan(planWithPending(2)).advance().withPlan(planWithPending(3))
+        val s = session(2).withPlanAt(0, planWithPending(2)).withPlanAt(1, planWithPending(3))
         assertThat(s.maskAllEverywhere(MaskLook()).totalPending).isEqualTo(0)
     }
 
     @Test fun `maskAllEverywhere masks with the given look on every image`() {
         val look = MaskLook(MaskStyle.MARKER, MaskOptions(markerColor = 0x66FF4081))
-        val s = session(2).withPlan(planWithPending(1)).advance().withPlan(planWithPending(2))
+        val s = session(2).withPlanAt(0, planWithPending(1)).withPlanAt(1, planWithPending(2))
         val looks = s.maskAllEverywhere(look).items.flatMap { it.plan!!.items }.map { it.look }
         assertThat(looks).containsExactly(look, look, look)
+    }
+
+    @Test fun `maskAllEverywhere leaves unopened images unopened`() {
+        val s = session(2).withPlanAt(0, planWithPending(1)).maskAllEverywhere(MaskLook())
+        assertThat(s.items[1].plan).isNull()
     }
 }

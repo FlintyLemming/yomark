@@ -9,6 +9,8 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import android.net.Uri
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -45,6 +47,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -56,9 +59,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -69,8 +75,10 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.RendererRegistry
+import moe.flinty.yomark.ui.batch.BatchThumbnails
 import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
+import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
@@ -82,6 +90,7 @@ import moe.flinty.yomark.ui.components.PendingExportDialog
 import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
+import moe.flinty.yomark.ui.components.UnopenedExportDialog
 import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.nearColorsOf
 import moe.flinty.yomark.ui.components.purposePanelMaxHeight
@@ -102,6 +111,10 @@ fun EditorScreen(
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
     val styleActions = remember(vm) { ViewModelStyleActions(vm) }
+    // 批量里各张的缩略图：胶片条上画它，切图时画布载入的那一下也先垫上它
+    val context = LocalContext.current
+    val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
+    val thumbnails = remember(context, thumbnailPx) { BatchThumbnails(context.contentResolver, thumbnailPx) }
     // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
@@ -118,9 +131,21 @@ fun EditorScreen(
         }
     }
 
+    if (state.unopenedDialogVisible) {
+        state.batch?.let { batch ->
+            UnopenedExportDialog(
+                unopened = batch.unopened,
+                opened = batch.opened,
+                onReview = vm::reviewUnopened,
+                onExportOpened = vm::exportOpenedOnly,
+                onDismiss = vm::dismissDialog,
+            )
+        }
+    }
+
     if (state.pendingDialogVisible) {
         // 批量下拦截看的是全部图片的汇总，不是当前这一张（spec §7.6）。
-        val batchWithCurrent = state.batch?.withPlan(state.plan)
+        val batchWithCurrent = state.liveBatch
         val pending = batchWithCurrent?.totalPending ?: state.plan.pendingCount
         val byKind = batchWithCurrent?.items?.mapNotNull { it.plan }
             ?.flatMap { it.pendingByKind().entries }
@@ -197,6 +222,10 @@ fun EditorScreen(
                     .then(if (atSide && state.purposeSheetVisible) Modifier.imePadding() else Modifier),
                 canvas = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        // 批量里切图的那一下，画布上先垫着这一张的缩略图，载入完换成原图
+                        if (batch != null && state.image == null) {
+                            BatchPlaceholder(batch.current.uri, thumbnails, Modifier.fillMaxSize())
+                        }
                         if (state.loading) CircularProgressIndicator()
                         ImageCanvas(
                             state = state,
@@ -222,8 +251,18 @@ fun EditorScreen(
                 },
                 panel = {
                     val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
-                    val batchLabel = batch?.let { "${it.index + 1} / ${it.total}" }
-                    val onNext = if (batch != null && !batch.isLast) vm::nextImage else null
+                    val uris = remember(batch?.items) { batch?.items?.map { it.uri } }
+                    val filmstrip: (@Composable (Modifier) -> Unit)? = if (batch != null && uris != null) {
+                        { modifier ->
+                            BatchFilmstrip(
+                                uris = uris,
+                                selected = batch.index,
+                                onSelect = vm::selectImage,
+                                thumbnails = thumbnails,
+                                modifier = modifier,
+                            )
+                        }
+                    } else null
                     when {
                         state.purposeSheetVisible -> PurposeWatermarkPanel(
                             text = state.purposeText,
@@ -242,10 +281,9 @@ fun EditorScreen(
                             styleActions = styleActions,
                             onExport = onExport,
                             exporting = state.exporting,
-                            batchLabel = batchLabel,
-                            onNext = onNext,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
+                            filmstrip = filmstrip,
                         )
                         else -> WideEditorPanel(
                             atSide = atSide,
@@ -267,10 +305,9 @@ fun EditorScreen(
                                 EditorActionRow(
                                     onExport = onExport,
                                     exporting = state.exporting,
-                                    batchLabel = batchLabel,
-                                    onNext = onNext,
                                     aiReview = state.aiReview,
                                     onAiReview = vm::runAiReview,
+                                    filmstrip = filmstrip,
                                     modifier = modifier,
                                 )
                             },
@@ -387,6 +424,21 @@ private fun ColorPickHint(visible: Boolean, onCancel: () -> Unit) {
         }
     }
 }
+
+/**
+ * 批量里切图时垫在画布上的缩略图，和画布一样按比例放在正中，载入完的原图正好盖在它上面。
+ * 缩略图小，放大了是糊的，正好像是原图在一点点清楚起来。
+ */
+@Composable
+private fun BatchPlaceholder(uri: Uri, thumbnails: BatchThumbnails, modifier: Modifier = Modifier) {
+    val bitmap by produceState(thumbnails.cached(uri), uri) {
+        if (value == null) value = thumbnails.load(uri)
+    }
+    bitmap?.let { Image(it, contentDescription = null, modifier = modifier, contentScale = ContentScale.Fit) }
+}
+
+/** 缩略图长边的上限：胶片条上的格子 40 dp 高，切图时画布上垫底也用它。 */
+private val THUMBNAIL_EDGE = 128.dp
 
 /** 按住「对比」时浮在画布顶上的标签：现在看的是原图。和识别中的提示条一样用 Box 画底色，不吃触摸。 */
 @Composable

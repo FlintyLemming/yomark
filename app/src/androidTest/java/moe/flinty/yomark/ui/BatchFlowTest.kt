@@ -5,7 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ActivityScenario
@@ -41,7 +43,7 @@ class BatchFlowTest {
     }
 
     @Test
-    fun walks_the_shared_images_one_by_one_and_only_offers_export_on_the_last() {
+    fun jumps_between_the_shared_images_on_the_filmstrip_and_asks_before_leaving_any_out() {
         val uris = sourceUris(3)
         val intent = Intent(context, EditorActivity::class.java).apply {
             action = Intent.ACTION_SEND_MULTIPLE
@@ -50,15 +52,18 @@ class BatchFlowTest {
         }
         try {
             ActivityScenario.launch<EditorActivity>(intent).use {
-                compose.onNodeWithText("1 / 3").assertIsDisplayed()
-                compose.onNodeWithText("下一张").performClick()
-
-                compose.onNodeWithText("2 / 3").assertIsDisplayed()
-                compose.onNodeWithText("下一张").performClick()
-
-                // 最后一张上主按钮换回「导出」——批量不做无人值守，导出是一次性的收尾动作
-                compose.onNodeWithText("3 / 3").assertIsDisplayed()
+                compose.onNodeWithContentDescription("第 1 张，共 3 张").assertIsSelected()
                 compose.onNodeWithText("导出").assertIsDisplayed()
+
+                // 不必按顺序：直接跳到最后一张
+                compose.onNodeWithContentDescription("第 3 张，共 3 张").performClick()
+                compose.onNodeWithContentDescription("第 3 张，共 3 张").assertIsSelected()
+
+                // 中间那张一眼都没看过，导出前先问——批量不做无人值守
+                compose.onNodeWithText("导出").performClick()
+                compose.onNodeWithText("还有 1 张没看过").assertIsDisplayed()
+                compose.onNodeWithText("去看看").performClick()
+                compose.onNodeWithContentDescription("第 2 张，共 3 张").assertIsSelected()
             }
         } finally {
             uris.forEach { context.contentResolver.delete(it, null, null) }
