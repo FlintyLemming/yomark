@@ -5,11 +5,13 @@ package moe.flinty.yomark.rules
  *
  * @param x 第一个字的左沿。
  * @param y 上沿。
+ * @param glued 几段直接连在一起、中间不补空格：OCR 把字段名和值读成一串（「名宋语桐」「出生201 2 年」），
+ *   每个字的框却还在原处。
  */
-internal class Row(val y: Float, val h: Float, vararg val segments: Segment) {
+internal class Row(val y: Float, val h: Float, vararg val segments: Segment, val glued: Boolean = false) {
     constructor(text: String, x: Float, y: Float, h: Float = 20f) : this(y, h, Segment(text, x, x + text.length * h * 0.6f))
 
-    val text: String get() = segments.joinToString(" ") { it.text }
+    val text: String get() = segments.joinToString(if (glued) "" else " ") { it.text }
 }
 
 /** 一段字，[left, right) 之间均匀排开。 */
@@ -22,7 +24,7 @@ internal fun page(vararg rows: Row): Page {
             val chars = seg.text.indices.map { i ->
                 if (seg.text[i] == ' ') null else Bounds(seg.left + i * w, row.y, seg.left + (i + 1) * w, row.y + row.h)
             }
-            if (n == 0) chars else listOf(null) + chars
+            if (n == 0 || row.glued) chars else listOf(null) + chars
         }
     }
     return Page(rows.map { it.text }) { line, range ->

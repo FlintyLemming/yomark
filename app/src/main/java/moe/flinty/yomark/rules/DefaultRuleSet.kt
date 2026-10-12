@@ -122,20 +122,28 @@ object DefaultRuleSet {
     /** 物流轨迹里「签收人：」后面常见的非人名：「本人」「菜鸟驿站」「门卫」。 */
     private const val NOT_A_NAME_VALUE = "本人|他人|家人|同事|邻居|门卫|保安|前台|物业|收发室|快递柜|驿站|代收"
 
+    /** 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。 */
+    private const val NEXT_FIELD = "电话|手机|性别|性別|民族|出生|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名"
+
+    /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
+    private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""
+
     /**
      * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
      *
-     * 三个分支对应三种排版：连写的汉字名、字距拉开后被空格隔开的名、拉丁名。
-     * 连写分支放在最前，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
-     * 逐字切分的行拼回来成了「张三手机」时，不把「手机」也吞进去。
+     * 五个分支对应五种排版：带间隔点的少数民族名（「阿依古丽·买买提」，点常被读成「•」「.」）、连写的汉字名、
+     * 字距拉开后被空格隔开的名（隔得不匀的「周 以宁」也算）、证件上「姓, 名」的拼音（「ZHANG, SAN」「SMITH,JOHN」，姓全大写）、拉丁名。
+     * 连写分支在拆字分支前面，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
+     * 逐字切分的行拼回来成了「张三手机」「张三户主或与户主关系」时，不把后面的也吞进去。
      *
      * 值里含 NOT_A_NAME_VALUE 的词、或者紧跟着它们，整个值作废，而不是停在它们前面——
      * 否则「菜鸟驿站」会剩下「菜鸟」两个字被当成名字。
      */
     private val NAME_VALUE = Regex(
-        """(?:(?!电话|手机|性别|民族|出生|地址|住址|身份|证件|联系|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5]){2,6}""" +
-            """(?!$NOT_A_NAME_VALUE)""" +
-            """|[\u4e00-\u9fa5](?:[ ][\u4e00-\u9fa5]){1,5}""" +
+        """[\u4e00-\u9fa5]{1,8}(?:[·•・.．‧](?:(?!$NEXT_FIELD)[\u4e00-\u9fa5]){1,8}){1,3}""" +
+            """|$NAME_CHAR{2,6}(?!$NOT_A_NAME_VALUE)""" +
+            """|$NAME_CHAR{1,2}(?: $NAME_CHAR{1,2}){1,4}""" +
+            """|[A-Z][A-Z'\-]* ?, ?[A-Z][A-Za-z.'\-]*(?:[ ][A-Z][A-Za-z.'\-]*){0,2}""" +
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
@@ -144,7 +152,18 @@ object DefaultRuleSet {
         "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
         "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
         "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
+        // 户口簿、出生医学证明、结婚证，日本的在留卡、驾照
+        "户主姓名", "新生儿姓名", "母亲姓名", "父亲姓名", "配偶姓名", "氏名",
     )
+
+    /**
+     * 也是常用词的人名字段名：行驶证的「所有人 Owner」，营业执照的「法定代表人」「经营者」「投资人」「执行事务合伙人」，
+     * 结婚证的「持证人」，户口簿的「曾用名」，「监护人」。群聊里的「@所有人」「所有人都到了」「曾用名也要写吗」、
+     * 条文里的「经营者应当」「法定代表人签字」也是它们，所以后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），
+     * 也不当旁证。
+     */
+    private val COMMON_WORD_NAME_LABELS =
+        listOf("所有人", "持证人", "法定代表人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名")
 
     /**
      * 跟在名字后面的称呼。认名字时拿它补全「赵」+「师傅」、放过「张三老师」「张老师好」（见 PersonNameRecognizer）；
@@ -172,17 +191,24 @@ object DefaultRuleSet {
      * 英文的两种（2026-10）：[EnglishNameCues] 是英文界面上自己说明「这是人」的写法（「Ship to:」「Hi David,」
      * 「Sarah Johnson <…@…>」），与字段名同一档；[EnglishNameGuess] 按名单从字面猜「Emily Carter」，
      * 与 HanLP 同一档，要旁证。调研与评测见 docs/english-recognition-research.md。
+     *
+     * 证件上的（2026-10，用户反馈身份证遮不全）：身份证人像面上字段名读坏了的那一行（[IdCardFront]），
+     * 毕业证、学位证正文里的「张三，男，……生」（[DiplomaName]）。
      */
     private val NAME = CompositeRule(
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
-        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
+        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f, spaced = COMMON_WORD_NAME_LABELS),
         NameBeforePhone(PHONE, confidence = 0.7f),
         EnglishNameCues(confidence = 0.8f, weakConfidence = 0.7f),
         StackedField(StackedField.document(StackedField.NAME_LABELS), ::documentNameIn, confidence = 0.8f),
+        // 中国护照的「姓名/Name」下面两行：汉字名、拼音
+        StackedField(StackedField.document(StackedField.CHINESE_NAME_LABELS), ::documentNameIn, confidence = 0.8f, maxLines = 2),
         StackedField(StackedField.header(StackedField.NAME_HEADER), ::formNameIn, confidence = 0.7f),
         MrzEcho(MrzEcho.What.NAME, confidence = 0.8f),
+        IdCardFront(IdCardFront.What.NAME, confidence = 0.8f),
+        DiplomaName(confidence = 0.8f),
         NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
         NeedsAnchor(EnglishNameGuess(confidence = 0.6f)),
     )
@@ -207,28 +233,61 @@ object DefaultRuleSet {
      * 因此「收货地址 …… 电话 138……」会把电话一起遮掉。这是过遮，方向是安全的
      * （spec §13：多遮一块只是麻烦，漏遮一块是事故），何况电话本来也该遮。
      */
-    private val ADDRESS_VALUE = Regex("""\S.{2,58}\S""")
+    private val ADDRESS_VALUE = Regex("""[^\s/／|｜].{2,58}\S""")
+
+    private val ADDRESS_LABELS = listOf(
+        "收货地址", "收件地址", "寄件地址", "发货地址", "退货地址", "取件地址", "寄送地址",
+        "送货地址", "配送地址", "送达地址", "详细地址", "联系地址", "通讯地址", "家庭地址",
+        "居住地址", "户籍地址", "家庭住址", "现住址", "所在地区", "住址", "地址",
+        "配送至", "送货至", "送至", "寄至", "Address", "Ship to", "Deliver to",
+        // 营业执照（「住　　所」两端对齐）、户口簿、居住证，日本的在留卡、驾照
+        "住所", "经营场所", "主要经营场所", "营业场所", "户籍所在地", "现居住地址", "现居住地", "居住地", "住居地",
+        "本市（县）其他住址", "本市(县)其他住址", "何时由何地迁来本市（县）", "何时由何地迁来本市(县)", "何时由何地迁来本址",
+    )
+
+    /** 地址字段名后面那一段。证件上折到下一行的那几行由 [FollowingLines] 从它往下接。 */
+    private val ADDRESS_FIELD =
+        LabeledField(labels = ADDRESS_LABELS, value = ADDRESS_VALUE, confidence = 0.8f, nextField = ::startsWithField)
+
+    /**
+     * 证件、表格上姓名、地址、出生日期以外的字段名。户口簿一行有好几个字段（「出生地 江苏省南京市 民族 汉」），
+     * 出生地遮到它们前面为止；住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
+     */
+    private val OTHER_FIELDS = listOf(
+        "公民身份号码", "身份证", "证件号", "证号", "号码", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期",
+        "档案编号", "准驾车型", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆", "发动机", "号牌",
+        "户号", "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
+        "经营范围", "成立日期", "注册资本", "类型", "名称", "营业期限", "电话", "手机", "邮编", "邮政编码", "备注",
+    )
+
+    /**
+     * 出生地：户口簿、出生医学证明、护照上常常只写一个省（「江苏」），比住址短。
+     * 出生医学证明上省市县之间隔着空格（「山东省 青岛市 黄岛区」），一段一段接，到下一个字段名为止。
+     */
+    private val BIRTH_PLACE_FIELD = LabeledField(
+        labels = listOf("出生地点", "出生地"),
+        value = Regex("""[^\s/／|｜]\S{1,29}(?: (?!${OTHER_FIELDS.joinToString("|")})\S{1,29}){0,3}"""),
+        confidence = 0.8f,
+        nextField = ::startsWithField,
+    )
 
     /**
      * 地址 = 字段名后面的值 + 长得像门牌的串。
      *
      * 后一种是真机漏检补的：菜鸟快递详情页只写「送至」，淘宝收货卡片什么都不写，
      * 驿站地址夹在一句通知中间。见 AddressShape；英文的门牌、城市州邮编、各国邮编见 EnglishAddressShape。
+     *
+     * 证件上的住址一行写不下，折到下面不带字段名的几行，见 FollowingLines；
+     * 身份证上「住址」读坏了的，按人像面的排版认，见 IdCardFront。
      */
     private val ADDRESS = CompositeRule(
         id = "address",
         kind = SensitiveKind.POSTAL_ADDRESS,
         enabledByDefault = true,
-        LabeledField(
-            labels = listOf(
-                "收货地址", "收件地址", "寄件地址", "发货地址", "退货地址", "取件地址", "寄送地址",
-                "送货地址", "配送地址", "送达地址", "详细地址", "联系地址", "通讯地址", "家庭地址",
-                "居住地址", "户籍地址", "家庭住址", "现住址", "所在地区", "住址", "地址",
-                "配送至", "送货至", "送至", "寄至", "Address", "Ship to", "Deliver to",
-            ),
-            value = ADDRESS_VALUE,
-            confidence = 0.8f,
-        ),
+        ADDRESS_FIELD,
+        FollowingLines(ADDRESS_FIELD, ::startsWithField, confidence = 0.8f),
+        BIRTH_PLACE_FIELD,
+        IdCardFront(IdCardFront.What.ADDRESS, confidence = 0.8f),
         StackedField(StackedField.document(StackedField.BIRTH_PLACE_LABELS), ::placeIn, confidence = 0.8f),
         StackedField(StackedField.header(StackedField.ADDRESS_HEADER), ::addressLineIn, confidence = 0.7f, maxLines = 4),
         AddressShape(confidence = 0.7f),
@@ -277,26 +336,25 @@ object DefaultRuleSet {
         ),
     )
 
+    private val BIRTH_DATE_LABELS = listOf(
+        "出生日期", "出生年月日", "出生年月", "出生时间", "出生", "生年月日", "生日",
+        "Date of birth", "Birth date", "Birthdate", "Birthday", "DOB", "D.O.B.", "Born",
+    )
+
     /**
      * 出生日期：字段名指明了的那个日期，误报少，默认打码；没有字段名的日期仍归日期时间，只圈出。
      *
-     * 三种认法：同一行的「出生日期：1990-01-01」「DOB 01/07/1973」「出生 1990年1月1日」（身份证）；
+     * 五种认法：同一行的「出生日期：1990-01-01」「DOB 01/07/1973」「出生 1990年1月1日」（身份证）；
      * 字段名在上、日期在下的护照资料页（「Date of birth」下面的「05 FEB 1965」）；机读码里的生日在页上别处出现
-     * （幽灵像旁边那行「05 02 65」）。前面写着字段名，日期可以写得随意些：两位年、空格分隔都认（Dates.LENIENT）。
+     * （幽灵像旁边那行「05 02 65」）；身份证号里的生日在页上别处出现（IdBirthEcho：「出生」读坏了的那一行也遮得上）；
+     * 毕业证、日本证件上没有字段名、后面跟着「生」的「一九九八年三月五日生」（BornOn）。
+     * 前面写着字段名，日期可以写得随意些：两位年、空格分隔、数字里夹空格、民国和年号纪年都认（Dates.LENIENT）。
      */
     private val BIRTH_DATE = CompositeRule(
         id = "birthdate",
         kind = SensitiveKind.BIRTH_DATE,
         enabledByDefault = true,
-        LabeledField(
-            labels = listOf(
-                "出生日期", "出生年月日", "出生年月", "出生", "生日",
-                "Date of birth", "Birth date", "Birthdate", "Birthday", "DOB", "D.O.B.", "Born",
-            ),
-            value = Regex(Dates.LENIENT),
-            confidence = 0.8f,
-            ignoreCase = true,
-        ),
+        LabeledField(labels = BIRTH_DATE_LABELS, value = Regex(Dates.LENIENT), confidence = 0.8f, ignoreCase = true),
         StackedField(
             StackedField.document(StackedField.BIRTH_DATE_LABELS),
             value = Dates::findLenient,
@@ -304,7 +362,21 @@ object DefaultRuleSet {
             sameLine = true,
         ),
         MrzEcho(MrzEcho.What.BIRTH_DATE, confidence = 0.9f),
+        IdBirthEcho(confidence = 0.9f),
+        BornOn(confidence = 0.8f),
     )
+
+    /**
+     * 住址折行时，以字段名（OTHER_FIELDS，姓名、地址、出生日期的字段名，英文译名）打头的一行是下一个字段，
+     * 不是住址的下半截（见 FollowingLines）。
+     */
+    private val FIELD_START = Regex(
+        "(?i)^(?:" + (OTHER_FIELDS + NAME_LABELS + COMMON_WORD_NAME_LABELS + ADDRESS_LABELS + BIRTH_DATE_LABELS +
+            LabeledField.TRANSLATIONS).map { it.replace(" ", "") }.distinct().sortedByDescending { it.length }
+            .joinToString("|") { Regex.escape(it) } + ")"
+    )
+
+    private fun startsWithField(line: String): Boolean = FIELD_START.containsMatchIn(line.filterNot { it.isWhitespace() })
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
 
