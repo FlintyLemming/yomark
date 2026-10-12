@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.billing.Edition
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 开源版里去水印按钮打开的是它，不是 [PaywallDialog]（见 [Edition]）。
@@ -32,15 +34,15 @@ fun FreeEditionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("全功能免费版") },
+        title = { Text(stringResource(R.string.free_edition)) },
         text = {
             Column {
-                Text("这是开源的全功能免费版，导出不带水印。")
-                Text("如果有码帮到了你，欢迎打赏。")
+                Text(stringResource(R.string.free_edition_text))
+                Text(stringResource(R.string.free_edition_donate))
                 if (noBrowser) {
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "没有找到可以打开网页的应用，请在浏览器里访问 ${Edition.DONATE_URL}",
+                        stringResource(R.string.no_browser, Edition.DONATE_URL),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -51,8 +53,8 @@ fun FreeEditionDialog(
                 runCatching { openUrl(Edition.DONATE_URL) }
                     .onSuccess { onDismiss() }
                     .onFailure { noBrowser = true }
-            }) { Text("打赏") }
+            }) { Text(stringResource(R.string.donate)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("关闭") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) } },
     )
 }

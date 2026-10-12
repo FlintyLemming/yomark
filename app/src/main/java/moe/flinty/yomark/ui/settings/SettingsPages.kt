@@ -1,5 +1,7 @@
 package moe.flinty.yomark.ui.settings
 
+import android.content.res.Resources
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -42,10 +44,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.BuildConfig
+import moe.flinty.yomark.R
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
@@ -92,25 +96,25 @@ fun TextSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
-        title = "文字",
+        title = stringResource(R.string.settings_text),
         onNavigateUp = onNavigateUp,
         modifier = modifier,
         actions = {
             val reset = config.withTextDefaults()
-            TextButton(onClick = { onChange(reset) }, enabled = config != reset) { Text("恢复默认") }
+            TextButton(onClick = { onChange(reset) }, enabled = config != reset) { Text(stringResource(R.string.reset_defaults)) }
         },
     ) {
         item {
-            SectionHeader("文字识别", first = true)
+            SectionHeader(stringResource(R.string.text_recognition), first = true)
             SettingsGroup {
                 LinkRow(
-                    title = "识别引擎",
-                    summary = textEngineLabel(config.textEngine),
+                    title = stringResource(R.string.engine),
+                    summary = stringResource(textEngineLabel(config.textEngine)),
                     icon = Icons.Outlined.DocumentScanner,
                     onClick = onOpenEngine,
                 )
                 SwitchRow(
-                    title = "AI 增强识别",
+                    title = stringResource(R.string.ai_review),
                     icon = Icons.Outlined.AutoAwesome,
                     checked = config.semantic != SemanticOption.OFF,
                     onCheckedChange = { on ->
@@ -118,12 +122,12 @@ fun TextSettingsScreen(
                     },
                 )
             }
-            SectionHeader("敏感信息")
+            SectionHeader(stringResource(R.string.sensitive_info))
         }
         val rules = RuleCatalog.inSettingsOrder
         itemsIndexed(rules, key = { _, rule -> rule.id }) { i, rule ->
             LinkRow(
-                title = RuleCatalog.label(rule),
+                title = stringResource(RuleCatalog.label(rule)),
                 summary = ruleSummary(config, rule.id),
                 icon = rule.kind.settingsIcon(),
                 onClick = { onOpenRule(rule.id) },
@@ -143,19 +147,21 @@ fun TextEngineSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "识别引擎", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.engine), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
             SettingsGroup(Modifier.selectableGroup()) {
                 TextEngineOption.entries.forEach { option ->
                     RadioRow(
-                        title = textEngineLabel(option),
-                        summary = when (option) {
-                            TextEngineOption.PADDLE -> "中文最准，速度稍慢"
-                            TextEngineOption.LATIN -> "不支持中文"
-                            TextEngineOption.CHINESE -> "中英文都能认"
-                            TextEngineOption.BOTH -> "两个模型一起跑，最慢"
-                        },
+                        title = stringResource(textEngineLabel(option)),
+                        summary = stringResource(
+                            when (option) {
+                                TextEngineOption.PADDLE -> R.string.engine_paddle_summary
+                                TextEngineOption.LATIN -> R.string.engine_latin_summary
+                                TextEngineOption.CHINESE -> R.string.engine_chinese_summary
+                                TextEngineOption.BOTH -> R.string.engine_both_summary
+                            },
+                        ),
                         selected = config.textEngine == option,
                         onClick = { onChange(config.copy(textEngine = option)) },
                     )
@@ -178,23 +184,23 @@ fun TextRuleSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val rule = RuleCatalog.all.first { it.id == ruleId }
-    val label = RuleCatalog.label(rule)
+    val label = stringResource(RuleCatalog.label(rule))
     val state = RuleCatalog.stateOf(config, rule.id)
     SettingsScaffold(title = label, onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader("识别到${label}时", first = true)
+            SectionHeader(stringResource(R.string.when_found, label), first = true)
             HandlingGroup(state) {
                 onChange(config.withRule(rule.id, it, RuleCatalog.factoryState(rule.id)))
             }
-            FooterText(RuleCatalog.description(rule))
+            FooterText(stringResource(RuleCatalog.description(rule)))
         }
         if (rule.id == NAME_RULE) {
             item {
-                SectionHeader("从字面猜出的人名")
+                SectionHeader(stringResource(R.string.guessed_names))
                 SettingsGroup {
                     SwitchRow(
-                        title = "没有旁证的也圈出",
-                        summary = "会多圈到药名、品牌名",
+                        title = stringResource(R.string.outline_unanchored),
+                        summary = stringResource(R.string.outline_unanchored_summary),
                         icon = Icons.Outlined.PersonSearch,
                         checked = config.outlineUnanchoredNames,
                         enabled = state != RuleState.OFF,
@@ -202,7 +208,7 @@ fun TextRuleSettingsScreen(
                         modifier = Modifier.testTag("unanchored-names"),
                     )
                 }
-                FooterText(RuleCatalog.nameAnchorNote())
+                FooterText(RuleCatalog.nameAnchorNote(LocalContext.current.resources))
             }
         }
     }
@@ -216,17 +222,17 @@ fun FaceSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "人脸", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_face), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader("识别到人脸时", first = true)
+            SectionHeader(stringResource(R.string.when_found, stringResource(R.string.kind_face)), first = true)
             HandlingGroup(config.faceState) { onChange(config.copy(faceState = it)) }
         }
         item {
-            SectionHeader("识别模式")
+            SectionHeader(stringResource(R.string.detect_mode))
             SettingsGroup(Modifier.selectableGroup()) {
                 FaceOption.entries.forEach { option ->
                     RadioRow(
-                        title = faceModeLabel(option),
+                        title = stringResource(faceModeLabel(option)),
                         selected = config.face == option,
                         enabled = config.faceState != RuleState.OFF,
                         onClick = { onChange(config.copy(face = option)) },
@@ -245,28 +251,30 @@ fun BarcodeSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "条码", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_barcode), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader("识别到条码时", first = true)
+            SectionHeader(stringResource(R.string.when_found, stringResource(R.string.kind_barcode)), first = true)
             HandlingGroup(config.barcodeState) { onChange(config.copy(barcodeState = it)) }
         }
         item {
-            SectionHeader("识别模式")
+            SectionHeader(stringResource(R.string.detect_mode))
             SettingsGroup(Modifier.selectableGroup()) {
                 BarcodeOption.entries.forEach { option ->
                     RadioRow(
-                        title = barcodeModeLabel(option),
-                        summary = when (option) {
-                            BarcodeOption.STRICT -> "只认能解码的条码"
-                            BarcodeOption.LOOSE -> "解不出的疑似条码也圈出，可能误圈"
-                        },
+                        title = stringResource(barcodeModeLabel(option)),
+                        summary = stringResource(
+                            when (option) {
+                                BarcodeOption.STRICT -> R.string.barcode_strict_summary
+                                BarcodeOption.LOOSE -> R.string.barcode_loose_summary
+                            },
+                        ),
                         selected = config.barcode == option,
                         enabled = config.barcodeState != RuleState.OFF,
                         onClick = { onChange(config.copy(barcode = option)) },
                     )
                 }
             }
-            FooterText("包括二维码和条形码。")
+            FooterText(stringResource(R.string.barcode_footer))
         }
     }
 }
@@ -284,9 +292,9 @@ fun AiSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "AI", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_ai), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader("大模型", first = true)
+            SectionHeader(stringResource(R.string.ai_model), first = true)
             SettingsGroup {
                 SettingsRow(
                     title = "Gemini Nano",
@@ -296,28 +304,29 @@ fun AiSettingsScreen(
             }
             FooterText(
                 buildAnnotatedString {
-                    append("Google 的端侧大模型。")
+                    append(stringResource(R.string.nano_footer))
                     nanoNote(nano)?.let { append("\n\n"); append(it) }
                 },
             )
         }
         item {
-            SectionHeader("文字识别模型")
+            SectionHeader(stringResource(R.string.ocr_models))
             SettingsGroup {
                 SettingsRow(
                     title = "PP-OCR",
-                    summary = "${PpOcrModels.VERSION} · 随安装包内置",
+                    summary = "${PpOcrModels.VERSION} · ${stringResource(R.string.bundled)}",
                     leading = { RowIcon(Icons.Outlined.DocumentScanner) },
                 )
             }
-            FooterText("百度飞桨的开源文字识别模型。")
+            FooterText(stringResource(R.string.ppocr_footer))
         }
         item {
-            SectionHeader("ML Kit 模型")
+            SectionHeader(stringResource(R.string.mlkit_models))
             SettingsGroup {
                 SettingsRow(
                     title = "ML Kit",
                     summary = mlKitSummary(
+                        res = LocalContext.current.resources,
                         text = BuildConfig.MLKIT_TEXT_VERSION,
                         textChinese = BuildConfig.MLKIT_TEXT_CHINESE_VERSION,
                         face = BuildConfig.MLKIT_FACE_VERSION,
@@ -326,7 +335,7 @@ fun AiSettingsScreen(
                     leading = { RowIcon(Icons.Outlined.Memory) },
                 )
             }
-            FooterText("Google 的端侧机器学习工具包。")
+            FooterText(stringResource(R.string.mlkit_footer))
         }
     }
 }
@@ -347,13 +356,13 @@ fun ExportSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "导出", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_export), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
             SettingsGroup {
                 SwitchRow(
-                    title = "导出前提醒",
-                    summary = "有圈出但未打码的内容时",
+                    title = stringResource(R.string.export_reminder),
+                    summary = stringResource(R.string.export_reminder_summary),
                     icon = Icons.AutoMirrored.Outlined.FactCheck,
                     checked = exportReminder,
                     onCheckedChange = onExportReminderChange,
@@ -361,11 +370,11 @@ fun ExportSettingsScreen(
             }
         }
         item {
-            SectionHeader("水印样式")
+            SectionHeader(stringResource(R.string.watermark_style))
             SettingsGroup(Modifier.selectableGroup()) {
                 BrandWatermarkStyle.entries.forEach { style ->
                     RadioRow(
-                        title = "图标 + ${style.text}",
+                        title = stringResource(R.string.watermark_style_option, style.text),
                         selected = watermarkStyle == style,
                         onClick = { onWatermarkStyleChange(style) },
                     )
@@ -395,18 +404,18 @@ fun AppearanceSettingsScreen(
     val presets = remember(context) {
         ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context).primary }
     }
-    SettingsScaffold(title = "外观", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_appearance), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader("主题色", first = true)
+            SectionHeader(stringResource(R.string.theme_color), first = true)
             SettingsGroup {
                 RadioRow(
-                    title = themeColorLabel(ThemeColor.SYSTEM),
-                    summary = if (systemDynamicColorAvailable) "随壁纸取色" else "需要 Android 12 及以上",
+                    title = stringResource(themeColorLabel(ThemeColor.SYSTEM)),
+                    summary = stringResource(if (systemDynamicColorAvailable) R.string.dynamic_color else R.string.needs_android_12),
                     selected = themeColor == ThemeColor.SYSTEM,
                     onClick = { onThemeColorChange(ThemeColor.SYSTEM) },
                 )
                 SettingsRow(
-                    title = "预设颜色",
+                    title = stringResource(R.string.preset_colors),
                     below = {
                         FlowRow(
                             Modifier.fillMaxWidth().padding(top = 12.dp),
@@ -416,7 +425,7 @@ fun AppearanceSettingsScreen(
                             presets.forEach { (color, primary) ->
                                 ColorSwatch(
                                     color = primary,
-                                    name = themeColorLabel(color),
+                                    name = stringResource(themeColorLabel(color)),
                                     selected = color == themeColor,
                                     onClick = { onThemeColorChange(color) },
                                 )
@@ -427,11 +436,11 @@ fun AppearanceSettingsScreen(
             }
         }
         item {
-            SectionHeader("识别动效")
+            SectionHeader(stringResource(R.string.scan_effect))
             SettingsGroup(Modifier.selectableGroup()) {
                 ScanStyle.entries.forEach { style ->
                     RadioRow(
-                        title = scanStyleLabel(style),
+                        title = stringResource(scanStyleLabel(style)),
                         selected = scanStyle == style,
                         onClick = { onScanStyleChange(style) },
                     )
@@ -448,7 +457,7 @@ private fun HandlingGroup(selected: RuleState, onSelect: (RuleState) -> Unit) {
         listOf(RuleState.MASKED, RuleState.OUTLINED, RuleState.OFF).forEach { state ->
             RadioRow(
                 title = handlingLabel(state),
-                summary = if (state == RuleState.OUTLINED) "只画虚线框，点一下才打码" else null,
+                summary = if (state == RuleState.OUTLINED) stringResource(R.string.handling_outlined_summary) else null,
                 selected = selected == state,
                 onClick = { onSelect(state) },
             )
@@ -488,11 +497,12 @@ private const val NAME_RULE = "name"
  * 「文字」页上一类的小字：怎么处理。人名再写上没有旁证的那些怎么办——
  * 不写的话，聊天里的人名不圈了，用户只看得到「打码」两个字。
  */
+@Composable
 internal fun ruleSummary(config: RecognitionConfig, ruleId: String): String {
     val state = RuleCatalog.stateOf(config, ruleId)
     val handling = handlingLabel(state)
     if (ruleId != NAME_RULE || state == RuleState.OFF) return handling
-    return handling + if (config.outlineUnanchoredNames) " · 没有旁证的只圈出" else " · 没有旁证的不圈"
+    return handling + stringResource(if (config.outlineUnanchoredNames) R.string.name_summary_outline else R.string.name_summary_skip)
 }
 
 /**
@@ -510,21 +520,27 @@ internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
 }
 
 /** 打码 / 仅圈出 / 关闭。人脸、条码、文字的各类共用。 */
-internal fun handlingLabel(state: RuleState) = when (state) {
-    RuleState.MASKED -> "打码"
-    RuleState.OUTLINED -> "仅圈出"
-    RuleState.OFF -> "关闭"
-}
+@Composable
+internal fun handlingLabel(state: RuleState): String = stringResource(
+    when (state) {
+        RuleState.MASKED -> R.string.handling_masked
+        RuleState.OUTLINED -> R.string.handling_outlined
+        RuleState.OFF -> R.string.handling_off
+    },
+)
 
 /** 「nano-v3 · 已就绪」：先回答是哪一版，再说模型在不在本机。本机没有就只写「本机没有」。 */
+@Composable
 internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
-    null -> "正在检测…"
-    is NanoStatus.Unavailable -> "本机没有"
-    is NanoStatus.Present -> "${nano.version ?: "版本未知"} · " + when (nano.model) {
-        NanoStatus.Model.READY -> "已就绪"
-        NanoStatus.Model.DOWNLOADING -> "下载中"
-        NanoStatus.Model.NOT_DOWNLOADED -> "未下载"
-    }
+    null -> stringResource(R.string.nano_checking)
+    is NanoStatus.Unavailable -> stringResource(R.string.nano_absent)
+    is NanoStatus.Present -> "${nano.version ?: stringResource(R.string.nano_version_unknown)} · " + stringResource(
+        when (nano.model) {
+            NanoStatus.Model.READY -> R.string.nano_ready
+            NanoStatus.Model.DOWNLOADING -> R.string.nano_downloading
+            NanoStatus.Model.NOT_DOWNLOADED -> R.string.nano_not_downloaded
+        },
+    )
 }
 
 /** 哪些机型有 Gemini Nano：Google 的文档。页尾「支持设备列表参考官方文档」那一句指向它。 */
@@ -533,9 +549,9 @@ internal const val GENAI_DOCS_URL = "https://developers.google.cn/ml-kit/genai"
 /** 「支持设备列表参考官方文档。」，「官方文档」是个链接。 */
 @Composable
 private fun supportedDevicesSentence(): AnnotatedString = buildAnnotatedString {
-    append("支持设备列表参考")
-    append(footerLink("官方文档", GENAI_DOCS_URL))
-    append("。")
+    append(stringResource(R.string.supported_devices_prefix))
+    append(footerLink(stringResource(R.string.official_docs), GENAI_DOCS_URL))
+    append(stringResource(R.string.sentence_end))
 }
 
 /**
@@ -549,10 +565,10 @@ internal fun nanoNote(nano: NanoStatus?): AnnotatedString? = when (nano) {
     null -> null
     is NanoStatus.Unavailable -> buildAnnotatedString {
         append(supportedDevicesSentence())
-        nano.errorCode?.let { append("AICore 返回错误码 $it。") }
+        nano.errorCode?.let { append(stringResource(R.string.aicore_error, it)) }
     }
     is NanoStatus.Present -> when (nano.model) {
-        NanoStatus.Model.NOT_DOWNLOADED -> AnnotatedString("开着 AI 增强识别打开一张图，会请系统下载。")
+        NanoStatus.Model.NOT_DOWNLOADED -> AnnotatedString(stringResource(R.string.nano_download_hint))
         NanoStatus.Model.READY, NanoStatus.Model.DOWNLOADING -> null
     }
 }
@@ -561,40 +577,45 @@ internal fun nanoNote(nano: NanoStatus?): AnnotatedString? = when (nano) {
  * ML Kit 的几个模型写成一行：「文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0」。
  * 英文、中文两个文字模型多半同版，同版只写一次，不同才分开写。
  */
-internal fun mlKitSummary(text: String, textChinese: String, face: String, barcode: String): String {
-    val textVersions = if (text == textChinese) text else "$text（英文）/ $textChinese（中文）"
-    return "文字 $textVersions · 人脸 $face · 条码 $barcode"
+internal fun mlKitSummary(res: Resources, text: String, textChinese: String, face: String, barcode: String): String {
+    val textVersions = if (text == textChinese) text else res.getString(R.string.mlkit_text_versions, text, textChinese)
+    return res.getString(R.string.mlkit_summary, textVersions, face, barcode)
 }
 
-internal fun textEngineLabel(option: TextEngineOption) = when (option) {
-    TextEngineOption.PADDLE -> "PP-OCR"
-    TextEngineOption.LATIN -> "ML Kit 英文"
-    TextEngineOption.CHINESE -> "ML Kit 中文"
-    TextEngineOption.BOTH -> "ML Kit 中英"
+@StringRes
+internal fun textEngineLabel(option: TextEngineOption): Int = when (option) {
+    TextEngineOption.PADDLE -> R.string.engine_paddle
+    TextEngineOption.LATIN -> R.string.engine_latin
+    TextEngineOption.CHINESE -> R.string.engine_chinese
+    TextEngineOption.BOTH -> R.string.engine_both
 }
 
-internal fun faceModeLabel(option: FaceOption) = when (option) {
-    FaceOption.FAST -> "快速"
-    FaceOption.ACCURATE -> "精确"
+@StringRes
+internal fun faceModeLabel(option: FaceOption): Int = when (option) {
+    FaceOption.FAST -> R.string.face_fast
+    FaceOption.ACCURATE -> R.string.face_accurate
 }
 
-internal fun barcodeModeLabel(option: BarcodeOption) = when (option) {
-    BarcodeOption.STRICT -> "严格"
-    BarcodeOption.LOOSE -> "宽松"
+@StringRes
+internal fun barcodeModeLabel(option: BarcodeOption): Int = when (option) {
+    BarcodeOption.STRICT -> R.string.barcode_strict
+    BarcodeOption.LOOSE -> R.string.barcode_loose
 }
 
-internal fun scanStyleLabel(style: ScanStyle) = when (style) {
-    ScanStyle.SWEEP -> "扫光"
-    ScanStyle.FROST -> "磨砂"
+@StringRes
+internal fun scanStyleLabel(style: ScanStyle): Int = when (style) {
+    ScanStyle.SWEEP -> R.string.scan_sweep
+    ScanStyle.FROST -> R.string.scan_frost
 }
 
-internal fun themeColorLabel(color: ThemeColor) = when (color) {
-    ThemeColor.SYSTEM -> "跟随系统"
-    ThemeColor.PURPLE -> "紫色"
-    ThemeColor.BLUE -> "蓝色"
-    ThemeColor.TEAL -> "青色"
-    ThemeColor.GREEN -> "绿色"
-    ThemeColor.ORANGE -> "橙色"
-    ThemeColor.RED -> "红色"
-    ThemeColor.PINK -> "粉色"
+@StringRes
+internal fun themeColorLabel(color: ThemeColor): Int = when (color) {
+    ThemeColor.SYSTEM -> R.string.follow_system
+    ThemeColor.PURPLE -> R.string.theme_purple
+    ThemeColor.BLUE -> R.string.theme_blue
+    ThemeColor.TEAL -> R.string.theme_teal
+    ThemeColor.GREEN -> R.string.theme_green
+    ThemeColor.ORANGE -> R.string.theme_orange
+    ThemeColor.RED -> R.string.theme_red
+    ThemeColor.PINK -> R.string.theme_pink
 }

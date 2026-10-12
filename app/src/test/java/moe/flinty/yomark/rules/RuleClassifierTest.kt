@@ -74,12 +74,12 @@ class RuleClassifierTest {
         NeedsAnchor(Finder { t -> Regex("""[a-z]{3}""").findAll(t).map { RuleMatch(it.range, 0.6f) }.toList() }),
     )
     private val digitAnchors = listOf(
-        NameAnchor("数字", NameAnchor.Reach.NEARBY, Finder { t -> Regex("""\d{4}""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
+        NameAnchor(0, NameAnchor.Reach.NEARBY, Finder { t -> Regex("""\d{4}""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
     )
 
     /** 紧挨着才算的旁证：XYZ（大写，猜测是小写，不会互相认错）。 */
     private val attachedAnchors = listOf(
-        NameAnchor("称呼", NameAnchor.Reach.ATTACHED, Finder { t -> Regex("""XYZ""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
+        NameAnchor(0, NameAnchor.Reach.ATTACHED, Finder { t -> Regex("""XYZ""").findAll(t).map { RuleMatch(it.range, 1f) }.toList() }),
     )
 
     private suspend fun attached(vararg lines: TextLine) =
@@ -127,7 +127,7 @@ class RuleClassifierTest {
     /** 猜测落在旁证里面：旁证撑不住它自己里面的那一截。 */
     @Test
     fun `an anchor does not vouch for a guess inside it`() = runTest {
-        val overlapping = listOf(NameAnchor("整行", NameAnchor.Reach.NEARBY, Finder { t -> listOf(RuleMatch(t.indices, 1f)) }))
+        val overlapping = listOf(NameAnchor(0, NameAnchor.Reach.NEARBY, Finder { t -> listOf(RuleMatch(t.indices, 1f)) }))
         val out = RuleClassifier(listOf(guess), anchors = overlapping).classify(listOf(line("abc")))
         assertThat(out).isEmpty()
     }

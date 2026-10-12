@@ -62,6 +62,8 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 选颜色：一排色板，后面是「自定义」和吸管，排不下就折到第二行——不横着滑，吸管不会藏在屏幕外面。
@@ -102,7 +104,7 @@ internal fun ColorPicker(
         palette.forEach { c ->
             ColorSwatch(
                 color = Color(c.argb),
-                name = c.name,
+                name = stringResource(c.name),
                 selected = !nearOn && c.argb == color,
                 onClick = { onColor(c.argb, false) },
             )
@@ -127,11 +129,12 @@ internal fun ColorPicker(
 private fun CustomColorSwatch(color: Color, selected: Boolean, onClick: () -> Unit) {
     val primary = MaterialTheme.colorScheme.primary
     val surface = MaterialTheme.colorScheme.surface
+    val label = stringResource(R.string.custom_color)
     Box(
         Modifier
             .size(SWATCH)
             .semantics {
-                contentDescription = "自定义颜色"
+                contentDescription = label
                 this.selected = selected
             }
             .clickable(role = Role.Button, onClick = onClick)
@@ -177,7 +180,7 @@ private fun NearColorSwatch(colors: List<Int>, selected: Boolean, onClick: () ->
                 .border(1.dp, scheme.outlineVariant, CircleShape),
         )
         Spacer(Modifier.width(6.dp))
-        Text("近似色", style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
+        Text(stringResource(R.string.near_color), style = MaterialTheme.typography.labelLarge, color = scheme.onSurface)
     }
 }
 
@@ -219,14 +222,16 @@ private fun SwatchDivider() {
 @Composable
 private fun EyedropperButton(active: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
+    val label = stringResource(R.string.eyedropper)
+    val pickingLabel = stringResource(R.string.picking)
     Box(
         Modifier
             .size(SWATCH)
             .border(if (active) 3.dp else 1.dp, if (active) colors.primary else colors.outlineVariant, CircleShape)
             .background(if (active) colors.primaryContainer else Color.Transparent, CircleShape)
             .semantics {
-                contentDescription = "从图上取色"
-                stateDescription = if (active) "正在取色" else ""
+                contentDescription = label
+                stateDescription = if (active) pickingLabel else ""
             }
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -268,7 +273,7 @@ internal fun HsvSliders(
     }
     Column(modifier) {
         GradientSlider(
-            label = "色相",
+            label = stringResource(R.string.hue),
             value = hsv.h / 360f,
             track = RAINBOW,
             thumb = Color(hsv.copy(s = 1f, v = 1f).toArgb()),
@@ -276,7 +281,7 @@ internal fun HsvSliders(
             onFinished = finish,
         )
         GradientSlider(
-            label = "饱和度",
+            label = stringResource(R.string.saturation),
             value = hsv.s,
             track = listOf(Color(hsv.copy(s = 0f).toArgb()), Color(hsv.copy(s = 1f).toArgb())),
             thumb = Color(hsv.toArgb()),
@@ -284,7 +289,7 @@ internal fun HsvSliders(
             onFinished = finish,
         )
         GradientSlider(
-            label = "亮度",
+            label = stringResource(R.string.brightness),
             value = hsv.v,
             track = listOf(Color.Black, Color(hsv.copy(v = 1f).toArgb())),
             thumb = Color(hsv.toArgb()),

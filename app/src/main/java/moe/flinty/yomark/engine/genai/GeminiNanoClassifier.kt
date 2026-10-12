@@ -124,7 +124,7 @@ class GeminiNanoClassifier(
                 lines = findings.map { f ->
                     val quote = lines[f.lineIndex].text.substring(f.range.first, f.range.last + 1)
                     "第 ${f.lineIndex + 1} 行（提示词里第 ${chunk.lineIndices.indexOf(f.lineIndex) + 1} 行）" +
-                        "  ${SensitiveKindLabels.display(f.kind)}  「$quote」"
+                        "  ${SensitiveKindLabels.debugName(f.kind)}  「$quote」"
                 },
                 blocks = listOfNotNull(
                     TraceBlock("提示词", chunk.prompt),

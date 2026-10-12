@@ -95,6 +95,8 @@ import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.nearColorsOf
 import moe.flinty.yomark.ui.components.purposePanelMaxHeight
 import moe.flinty.yomark.ui.components.wideSidePanelWidth
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 @Composable
 fun EditorScreen(
@@ -121,12 +123,14 @@ fun EditorScreen(
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
-            is EditorMessage.Exported -> {
-                val extra = if (m.downscaled) "（图片太大，已缩小到 ${m.width}×${m.height}）" else ""
-                snackbar.showMessage("已保存到相册$extra", vm)
-            }
-            is EditorMessage.BatchExported -> snackbar.showMessage("已保存 ${m.count} 张到相册", vm)
-            is EditorMessage.Error -> snackbar.showMessage(m.text, vm)
+            is EditorMessage.Exported -> snackbar.showMessage(
+                if (m.downscaled) context.getString(R.string.saved_downscaled, m.width, m.height)
+                else context.getString(R.string.saved_to_gallery),
+                vm,
+            )
+            is EditorMessage.BatchExported -> snackbar.showMessage(context.getString(R.string.saved_batch, m.count), vm)
+            is EditorMessage.BatchPartial -> snackbar.showMessage(context.getString(R.string.error_batch_partial, m.ok, m.failed), vm)
+            is EditorMessage.Error -> snackbar.showMessage(context.getString(m.text), vm)
             null -> Unit
         }
     }
@@ -414,11 +418,11 @@ private fun ColorPickHint(visible: Boolean, onCancel: () -> Unit) {
             Row(Modifier.padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Colorize, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("点一下图片，取那里的颜色", style = MaterialTheme.typography.labelLarge)
+                Text(stringResource(R.string.eyedropper_hint), style = MaterialTheme.typography.labelLarge)
                 TextButton(
                     onClick = onCancel,
                     colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.inversePrimary),
-                ) { Text("取消") }
+                ) { Text(stringResource(R.string.cancel)) }
             }
         }
     }
@@ -448,7 +452,7 @@ private fun OriginalPill(visible: Boolean) {
                 .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f), RoundedCornerShape(50))
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
-            Text("原图", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
+            Text(stringResource(R.string.original), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
         }
     }
 }
@@ -477,7 +481,7 @@ private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             Text(
-                "识别中…",
+                stringResource(R.string.analyzing),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.inverseOnSurface,
                 modifier = Modifier

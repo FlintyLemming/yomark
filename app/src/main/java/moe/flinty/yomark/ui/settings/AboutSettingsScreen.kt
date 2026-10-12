@@ -20,7 +20,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.BuildConfig
+import moe.flinty.yomark.R
 
 /**
  * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
@@ -54,19 +56,20 @@ fun AboutSettingsScreen(
     openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
     notify: (String) -> Unit = rememberToast(),
 ) {
+    val context = LocalContext.current
     var taps by remember { mutableIntStateOf(0) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
 
-    SettingsScaffold(title = "关于", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_about), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
             SettingsGroup {
                 SettingsRow(
-                    title = "版本",
+                    title = stringResource(R.string.version),
                     summary = version,
                     interaction = Modifier.clickable {
                         if (debugTrace) {
-                            notify("调试信息已经打开，在设置的「开发者」里")
+                            notify(context.getString(R.string.debug_already_on))
                             return@clickable
                         }
                         taps++
@@ -75,15 +78,15 @@ fun AboutSettingsScreen(
                             left <= 0 -> {
                                 taps = 0
                                 onDebugTraceChange(true)
-                                notify("已打开调试信息，设置里多了「开发者」一项")
+                                notify(context.getString(R.string.debug_turned_on))
                             }
-                            left <= TAPS_TO_DEBUG - 3 -> notify("再点 $left 次即可打开调试信息")
+                            left <= TAPS_TO_DEBUG - 3 -> notify(context.getString(R.string.debug_taps_left, left))
                         }
                     },
                     leading = { RowIcon(Icons.Outlined.Info) },
                 )
                 LinkRow(
-                    title = "隐私权政策",
+                    title = stringResource(R.string.privacy_policy),
                     summary = PRIVACY_POLICY_URL.removePrefix("https://"),
                     icon = Icons.Outlined.Policy,
                     onClick = { runCatching { openUrl(PRIVACY_POLICY_URL) } },
@@ -94,8 +97,8 @@ fun AboutSettingsScreen(
             GroupSpacer()
             SettingsGroup {
                 LinkRow(
-                    title = "恢复默认设置",
-                    summary = "除外观外，全部恢复出厂值",
+                    title = stringResource(R.string.reset_settings),
+                    summary = stringResource(R.string.reset_settings_summary),
                     icon = Icons.Outlined.SettingsBackupRestore,
                     onClick = { confirmReset = true },
                 )
@@ -107,15 +110,15 @@ fun AboutSettingsScreen(
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             icon = { Icon(Icons.Outlined.SettingsBackupRestore, contentDescription = null) },
-            title = { Text("恢复默认设置？") },
-            text = { Text("除外观外，全部恢复出厂值。") },
+            title = { Text(stringResource(R.string.reset_confirm_title)) },
+            text = { Text(stringResource(R.string.reset_confirm_text)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false
                     onReset()
-                }) { Text("恢复") }
+                }) { Text(stringResource(R.string.reset)) }
             },
-            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmReset = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

@@ -56,6 +56,9 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 宽屏的框列表：画面上框出来的每一块——识别出来的和手动画的——按从上到下、从左到右排成一列，
@@ -129,9 +132,9 @@ private fun ListSummary(items: List<MaskItem>, analyzing: Boolean) {
     ) {
         Text(
             when {
-                analyzing -> "识别中…"
-                items.isEmpty() -> "框出的内容"
-                else -> "框出 ${items.size} 处"
+                analyzing -> stringResource(R.string.analyzing)
+                items.isEmpty() -> stringResource(R.string.list_title)
+                else -> stringResource(R.string.list_count, items.size)
             },
             style = MaterialTheme.typography.titleSmall,
         )
@@ -140,13 +143,13 @@ private fun ListSummary(items: List<MaskItem>, analyzing: Boolean) {
             Box(Modifier.size(8.dp).background(OutlineAmber, CircleShape))
             Spacer(Modifier.width(6.dp))
             Text(
-                "$pending 处未打码",
+                stringResource(R.string.list_pending, pending),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         } else if (!analyzing && items.isNotEmpty()) {
             Text(
-                "都已打码",
+                stringResource(R.string.list_all_masked),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -158,11 +161,11 @@ private fun ListSummary(items: List<MaskItem>, analyzing: Boolean) {
 private fun EmptyHint() {
     Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
         Text(
-            "没有识别到敏感信息",
+            stringResource(R.string.list_empty),
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
-            "有漏掉的地方，在图上用一根手指拖出一个框",
+            stringResource(R.string.list_empty_hint),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(top = 4.dp),
@@ -216,7 +219,7 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
         Spacer(Modifier.width(12.dp))
         Column(Modifier.widthIn(min = 56.dp, max = 112.dp)) {
             Text(
-                SensitiveKindLabels.display(item),
+                SensitiveKindLabels.display(LocalContext.current.resources, item),
                 style = MaterialTheme.typography.labelLarge,
                 color = if (masked && !selected) colors.onSurfaceVariant else colors.onSurface,
                 maxLines = 1,
@@ -229,10 +232,10 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
                 }
                 Text(
                     when {
-                        manual && selected -> "已选中"
-                        manual -> "手动画的框"
-                        masked -> "已打码"
-                        else -> "未打码"
+                        manual && selected -> stringResource(R.string.item_selected)
+                        manual -> stringResource(R.string.item_manual)
+                        masked -> stringResource(R.string.item_masked)
+                        else -> stringResource(R.string.item_unmasked)
                     },
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onSurfaceVariant,

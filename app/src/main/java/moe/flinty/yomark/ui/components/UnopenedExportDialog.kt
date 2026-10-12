@@ -4,6 +4,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 批量导出时还有没打开过的图（spec §7.6）。
@@ -23,11 +25,11 @@ fun UnopenedExportDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("还有 $unopened 张没看过") },
-        text = { Text("没打开过的图片还没识别，导出时会跳过。") },
-        confirmButton = { TextButton(onClick = onReview) { Text("去看看") } },
+        title = { Text(stringResource(R.string.unopened_title, unopened)) },
+        text = { Text(stringResource(R.string.unopened_text)) },
+        confirmButton = { TextButton(onClick = onReview) { Text(stringResource(R.string.review)) } },
         dismissButton = if (opened > 0) {
-            { TextButton(onClick = onExportOpened) { Text("只导出看过的 $opened 张") } }
+            { TextButton(onClick = onExportOpened) { Text(stringResource(R.string.export_opened, opened)) } }
         } else null,
     )
 }

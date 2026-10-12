@@ -62,6 +62,8 @@ import moe.flinty.yomark.debug.TraceSection
 import moe.flinty.yomark.debug.heading
 import moe.flinty.yomark.debug.subheading
 import moe.flinty.yomark.debug.toText
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 调试信息（设置 → 关于，连点版本号打开之后才有）：最近几次识别在各环节看到了什么。
@@ -110,18 +112,18 @@ internal fun DebugTraceContent(
             Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("调试信息", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            TextButton(onClick = { onRerun?.invoke() }, enabled = onRerun != null) { Text("重新识别") }
+            Text(stringResource(R.string.debug_info), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+            TextButton(onClick = { onRerun?.invoke() }, enabled = onRerun != null) { Text(stringResource(R.string.rerun)) }
             IconButton(onClick = { onCopy(runs.toText()) }, enabled = runs.isNotEmpty()) {
-                Icon(Icons.Outlined.ContentCopy, "复制全部")
+                Icon(Icons.Outlined.ContentCopy, stringResource(R.string.copy_all))
             }
             IconButton(onClick = { onShare(runs.toText()) }, enabled = runs.isNotEmpty()) {
-                Icon(Icons.Outlined.Share, "分享")
+                Icon(Icons.Outlined.Share, stringResource(R.string.share))
             }
         }
         TraceRunList(
             runs = runs,
-            emptyText = "还没有记录。点「重新识别」再跑一遍当前这张图。",
+            emptyText = stringResource(R.string.debug_empty),
             contentPadding = PaddingValues(top = 12.dp, bottom = 16.dp),
         )
     }
@@ -183,7 +185,7 @@ private fun RunCard(run: TraceRun, initiallyExpanded: Boolean) {
             }
             Icon(
                 if (expanded) Icons.Outlined.ExpandLess else Icons.Outlined.ExpandMore,
-                contentDescription = if (expanded) "收起" else "展开",
+                contentDescription = stringResource(if (expanded) R.string.collapse else R.string.expand),
             )
         }
         if (expanded) {
@@ -240,7 +242,7 @@ private fun BlockView(block: TraceBlock) {
                 modifier = Modifier.size(18.dp),
             )
             Spacer(Modifier.width(4.dp))
-            Text("${block.label}（${block.text.length} 字）", style = MaterialTheme.typography.labelMedium)
+            Text(stringResource(R.string.block_chars, block.label, block.text.length), style = MaterialTheme.typography.labelMedium)
         }
         if (open) {
             SelectionContainer {
@@ -269,18 +271,18 @@ internal fun List<TraceRun>.toText(): String = joinToString("\n\n") { it.toText(
  * Android 13 起系统自己会提示已复制，之前的版本自己弹一句。
  */
 internal fun copyToClipboard(context: Context, text: String) {
-    val clip = ClipData.newPlainText("调试信息", text).apply {
+    val clip = ClipData.newPlainText(context.getString(R.string.debug_info), text).apply {
         description.extras = PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
     }
     val copied = runCatching { context.getSystemService(ClipboardManager::class.java).setPrimaryClip(clip) }.isSuccess
     if (!copied) {
-        Toast.makeText(context, "复制失败，内容可能太长", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.copy_failed, Toast.LENGTH_SHORT).show()
     } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show()
     }
 }
 
 internal fun share(context: Context, text: String) {
     val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
-    runCatching { context.startActivity(Intent.createChooser(send, "分享调试信息")) }
+    runCatching { context.startActivity(Intent.createChooser(send, context.getString(R.string.share_debug))) }
 }

@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
 class MaskStyleInfoTest {
 
     @Test fun `every style has a label`() {
-        MaskStyle.entries.forEach { assertThat(MaskStyleInfo.label(it)).isNotEmpty() }
+        MaskStyle.entries.forEach { assertThat(MaskStyleInfo.label(it)).isNotEqualTo(0) }
     }
 
     @Test fun `solid is irreversible`() {

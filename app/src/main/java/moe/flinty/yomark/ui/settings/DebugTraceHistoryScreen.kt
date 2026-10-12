@@ -36,6 +36,8 @@ import moe.flinty.yomark.ui.components.TraceRunList
 import moe.flinty.yomark.ui.components.copyToClipboard
 import moe.flinty.yomark.ui.components.share
 import moe.flinty.yomark.ui.components.toText
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 设置 → 开发者 → 调试记录：不用先打开一张图，也看得到之前几次识别的记录。内容和编辑页顶栏的面板是同一份。
@@ -59,19 +61,19 @@ fun DebugTraceHistoryScreen(
         containerColor = background,
         topBar = {
             TopAppBar(
-                title = { Text("调试记录") },
+                title = { Text(stringResource(R.string.debug_log)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+                    IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
                 },
                 actions = {
                     IconButton(onClick = { copyToClipboard(context, runs.toText()) }, enabled = runs.isNotEmpty()) {
-                        Icon(Icons.Outlined.ContentCopy, "复制全部")
+                        Icon(Icons.Outlined.ContentCopy, stringResource(R.string.copy_all))
                     }
                     IconButton(onClick = { share(context, runs.toText()) }, enabled = runs.isNotEmpty()) {
-                        Icon(Icons.Outlined.Share, "分享")
+                        Icon(Icons.Outlined.Share, stringResource(R.string.share))
                     }
                     IconButton(onClick = { confirmClear = true }, enabled = runs.isNotEmpty()) {
-                        Icon(Icons.Outlined.DeleteSweep, "清空")
+                        Icon(Icons.Outlined.DeleteSweep, stringResource(R.string.clear))
                     }
                 },
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -83,7 +85,7 @@ fun DebugTraceHistoryScreen(
         val direction = LocalLayoutDirection.current
         TraceRunList(
             runs = runs,
-            emptyText = "还没有记录。",
+            emptyText = stringResource(R.string.history_empty),
             contentPadding = PaddingValues(
                 start = padding.calculateStartPadding(direction),
                 top = padding.calculateTopPadding() + 8.dp,
@@ -95,12 +97,12 @@ fun DebugTraceHistoryScreen(
     if (confirmClear) {
         AlertDialog(
             onDismissRequest = { confirmClear = false },
-            title = { Text("清空调试记录？") },
-            text = { Text("删掉这 ${runs.size} 次识别的记录，调试信息仍然开着。") },
+            title = { Text(stringResource(R.string.clear_confirm_title)) },
+            text = { Text(stringResource(R.string.clear_confirm_text, runs.size)) },
             confirmButton = {
-                TextButton(onClick = { confirmClear = false; onClear() }) { Text("清空") }
+                TextButton(onClick = { confirmClear = false; onClear() }) { Text(stringResource(R.string.clear)) }
             },
-            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("取消") } },
+            dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(stringResource(R.string.cancel)) } },
         )
     }
 }

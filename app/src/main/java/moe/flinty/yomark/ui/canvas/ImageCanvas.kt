@@ -67,6 +67,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.hypot
 import kotlin.math.roundToInt
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 画布：图像 + 遮罩 + 叠层 + 手势。
@@ -92,6 +95,8 @@ fun ImageCanvas(
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
+    val resources = LocalContext.current.resources
+    val labelOf = remember(resources) { { item: MaskItem -> SensitiveKindLabels.display(resources, item) } }
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
 
@@ -333,7 +338,7 @@ fun ImageCanvas(
                     ScanStyle.SWEEP -> ScanLook.Sweep
                     ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
                 }
-                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite)
+                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite, labelOf)
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
                 state.purposeText?.let {
@@ -388,7 +393,7 @@ private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: ()
                 TextButton(onClick = onDelete) {
                     Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("删除")
+                    Text(stringResource(R.string.delete))
                 }
             }
         },
@@ -499,9 +504,6 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
     })
 }
 
-/** 类型小标签的文字，与宽屏的框列表同一套。 */
-private fun kindLabelText(item: MaskItem) = SensitiveKindLabels.display(item)
-
 /** 琥珀色小标签的画笔与尺寸。字号按缩放反算，视觉大小恒定。 */
 private class LabelPaints(val scale: Float) {
     val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -523,7 +525,7 @@ private class LabelPaints(val scale: Float) {
  *
  * 缩放比 < 0.5 时不画标签，返回空：避免密集截图上标签糊成一片。
  */
-internal fun layoutKindLabels(items: List<MaskItem>, image: SourceImage, scale: Float): Map<String, RectF> {
+internal fun layoutKindLabels(items: List<MaskItem>, image: SourceImage, scale: Float, labelOf: (MaskItem) -> String): Map<String, RectF> {
     if (scale < GestureRules.LABEL_MIN_SCALE) return emptyMap()
     val outlined = items.withIndex()
         .filter { it.value.state == MaskState.OUTLINED }
@@ -532,18 +534,18 @@ internal fun layoutKindLabels(items: List<MaskItem>, image: SourceImage, scale: 
     val paints = LabelPaints(scale)
     val rects = LabelLayout.place(
         boxes = items.map { it.quad.bounds() },
-        requests = outlined.map { LabelLayout.Request(it.index, paints.width(kindLabelText(it.value)), paints.height) },
+        requests = outlined.map { LabelLayout.Request(it.index, paints.width(labelOf(it.value)), paints.height) },
         area = RectF(0f, 0f, image.width.toFloat(), image.height.toFloat()),
         gap = 2f / scale,
     )
     return outlined.zip(rects) { item, rect -> item.value.candidateId to rect }.toMap()
 }
 
-private fun drawKindLabel(canvas: android.graphics.Canvas, item: MaskItem, rect: RectF, paints: LabelPaints) {
+private fun drawKindLabel(canvas: android.graphics.Canvas, label: String, rect: RectF, paints: LabelPaints) {
     val scale = paints.scale
     canvas.drawRoundRect(rect, 4f / scale, 4f / scale, paints.bg)
     canvas.drawText(
-        kindLabelText(item), rect.left + paints.padding,
+        label, rect.left + paints.padding,
         rect.bottom - paints.padding - paints.text.descent() * 0.5f, paints.text,
     )
 }
@@ -569,15 +571,17 @@ internal fun drawScene(
     paints: ScanPaints,
     look: ScanLook = ScanLook.Sweep,
     composite: MaskComposite = MaskComposite(),
+    /** 类型小标签的文字（见 SensitiveKindLabels），与宽屏的框列表同一套。单测里不传，画类型名。 */
+    labelOf: (MaskItem) -> String = { it.kind.name },
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
     // 识别出的在底下，手动框后画的盖在先画的上面——与导出同一个顺序（见 MaskOrder）
     val sorted = MaskOrder.forDrawing(plan.items)
     // 标签按整张 plan 一起摆：识别中/落码时打码块分两批画，标签之间也得互相避让
-    val labels = layoutKindLabels(sorted, image, scale)
+    val labels = layoutKindLabels(sorted, image, scale, labelOf)
     val composed = composite.of(image, sorted.filter { it.state == MaskState.MASKED }, registry)
-    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, scale, labels, composed) }
+    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, scale, labels, composed, labelOf) }
     if (time == null) {
         drawItems(sorted)
         return
@@ -640,6 +644,7 @@ private fun drawItems(
     scale: Float,
     labels: Map<String, RectF>,
     composite: android.graphics.Bitmap?,
+    labelOf: (MaskItem) -> String,
 ) {
     val masked = items.filter { it.state == MaskState.MASKED }
     if (composite != null) {
@@ -665,7 +670,7 @@ private fun drawItems(
     // 标签在全部描边之后画：贴在别的框外侧的标签不会被后画的描边划过
     val labelPaints = LabelPaints(scale)
     items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
-        labels[item.candidateId]?.let { drawKindLabel(canvas, item, it, labelPaints) }
+        labels[item.candidateId]?.let { drawKindLabel(canvas, labelOf(item), it, labelPaints) }
     }
 }
 

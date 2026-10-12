@@ -17,7 +17,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class AiReviewButtonTest {
 
     @get:Rule val compose = createComposeRule()

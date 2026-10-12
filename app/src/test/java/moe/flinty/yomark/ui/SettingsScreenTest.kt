@@ -47,16 +47,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * 设置的一级页只是目录，选项都在二级页里；人脸、条码和文字规则一样能设成打码、仅圈出或关闭。
  * 各页改动即时发出新值（写 DataStore 由 Activity 管，这里只看发出了什么）。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class SettingsScreenTest {
 
     @get:Rule val compose = createComposeRule()
+
+    /** 和 @Config 里的语言一致：Robolectric 按它选 values-zh。 */
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     private fun show(screen: @Composable () -> Unit) {
         compose.setContent { MaterialTheme { Surface { screen() } } }
@@ -116,7 +121,7 @@ class SettingsScreenTest {
             ),
             exportReminder = false,
         )
-        compose.onNodeWithText("仅圈出 · 精确识别").assertIsDisplayed()
+        compose.onNodeWithText("仅圈出 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
         compose.onNodeWithText("导出前提醒已关闭").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED }
@@ -293,7 +298,7 @@ class SettingsScreenTest {
         rulePage("url")
         compose.onNodeWithText("识别到网址时").assertIsDisplayed()
         compose.onNodeWithText("仅圈出").assertIsSelected()
-        compose.onNodeWithText(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" })).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" }))).assertIsDisplayed()
     }
 
     @Test fun pickingAHandlingOnAKindPageEmitsIt() {
@@ -388,8 +393,9 @@ class SettingsScreenTest {
     }
 
     @Test fun mlKitTextVersionsAreWrittenOnceWhenTheyMatch() {
-        assertThat(mlKitSummary("16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
-        assertThat(mlKitSummary("16.0.1", "16.0.2", "16.1.7", "17.3.0"))
+        val res = context.resources
+        assertThat(mlKitSummary(res, "16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
+        assertThat(mlKitSummary(res, "16.0.1", "16.0.2", "16.1.7", "17.3.0"))
             .isEqualTo("文字 16.0.1（英文）/ 16.0.2（中文） · 人脸 16.1.7 · 条码 17.3.0")
     }
 

@@ -91,7 +91,7 @@ class LabelLayoutTest {
             item("surgery", RectF(70f, 124f, 380f, 146f), MaskState.OUTLINED),
             item("record", RectF(70f, 150f, 180f, 172f), MaskState.OUTLINED),
         )
-        val labels = layoutKindLabels(items, image, scale = 1f)
+        val labels = layoutKindLabels(items, image, scale = 1f) { "日期时间" }
         assertThat(labels.keys).containsExactly("surgery", "record")
         labels.values.forEach { label -> items.forEach { assertThat(label.overlaps(it.quad.bounds())).isFalse() } }
         assertThat(labels["surgery"]!!.overlaps(labels["record"]!!)).isFalse()
@@ -101,6 +101,6 @@ class LabelLayoutTest {
     fun `no labels when zoomed out below the label threshold`() {
         val image = SourceImage(Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888), 1f, 100, 100, "image/png")
         val item = MaskItem("a", Quad.fromRect(RectF(10f, 40f, 90f, 60f)), SensitiveKind.PHONE, DetectorSource.RULE, MaskState.OUTLINED)
-        assertThat(layoutKindLabels(listOf(item), image, scale = 0.4f)).isEmpty()
+        assertThat(layoutKindLabels(listOf(item), image, scale = 0.4f) { "电话" }).isEmpty()
     }
 }

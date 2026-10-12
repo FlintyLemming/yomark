@@ -292,7 +292,7 @@ fun describeLine(index: Int, line: TextLine): String =
  * 最后是它的 id——从 id 看得出是哪条规则、哪个检测器出的。
  */
 fun describeCandidate(candidate: Candidate, lines: List<TextLine> = emptyList()): String = buildString {
-    append(SensitiveKindLabels.display(candidate.kind))
+    append(SensitiveKindLabels.debugName(candidate.kind))
     append("  ").append(if (candidate.enabledByDefault) "打码" else "圈出")
     append("  ").append(String.format(Locale.ROOT, "%.2f", candidate.confidence))
     append("  ").append(candidate.quad.describe())

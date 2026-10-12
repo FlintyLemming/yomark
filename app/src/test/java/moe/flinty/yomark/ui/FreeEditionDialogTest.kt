@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 
 /** 开源版里去水印按钮打开的对话框：说明全功能免费，给一个打赏入口。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class FreeEditionDialogTest {
 
     @get:Rule val compose = createComposeRule()

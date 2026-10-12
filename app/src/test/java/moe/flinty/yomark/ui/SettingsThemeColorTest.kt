@@ -19,9 +19,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** 设置「外观」页的主题色：跟随系统是一个单选项，下面是预设色块。 */
 @RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "zh-rCN")
 class SettingsThemeColorTest {
 
     @get:Rule val compose = createComposeRule()

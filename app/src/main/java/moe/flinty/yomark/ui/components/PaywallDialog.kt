@@ -22,6 +22,9 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import moe.flinty.yomark.billing.BillingRepository
 import moe.flinty.yomark.billing.RestoreResult
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 去水印的购买入口（spec §10）。
@@ -46,13 +49,13 @@ fun PaywallDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("去除水印") },
+        title = { Text(stringResource(R.string.remove_watermark)) },
         text = {
             Column {
-                Text("一次付费，永久有效，不是订阅。")
-                Text("付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。")
+                Text(stringResource(R.string.paywall_one_time))
+                Text(stringResource(R.string.paywall_what))
                 Spacer(Modifier.height(16.dp))
-                Text("以前买过？点「恢复购买」，不会再次扣费。")
+                Text(stringResource(R.string.paywall_restore_hint))
                 TextButton(
                     onClick = {
                         restoring = true
@@ -63,9 +66,9 @@ fun PaywallDialog(
                         }
                     },
                     enabled = !restoring,
-                ) { Text(if (restoring) "正在查询…" else "恢复购买") }
+                ) { Text(stringResource(if (restoring) R.string.restoring else R.string.restore_purchase)) }
                 restoreMessage(restoreResult)?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(it), color = MaterialTheme.colorScheme.error)
                 }
             }
         },
@@ -73,15 +76,16 @@ fun PaywallDialog(
             TextButton(onClick = {
                 onBuy()
                 onDismiss()
-            }) { Text("购买") }
+            }) { Text(stringResource(R.string.buy)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
-private fun restoreMessage(result: RestoreResult?): String? = when (result) {
-    RestoreResult.NotFound -> "没有找到购买记录。请确认 Play 商店登录的是购买时用的 Google 账号。"
-    RestoreResult.Unavailable -> "暂时连不上 Google Play，请联网后再试。"
+@StringRes
+private fun restoreMessage(result: RestoreResult?): Int? = when (result) {
+    RestoreResult.NotFound -> R.string.restore_not_found
+    RestoreResult.Unavailable -> R.string.restore_unavailable
     RestoreResult.Restored, null -> null
 }
 
@@ -96,7 +100,7 @@ suspend fun ComponentActivity.restorePurchase(billing: BillingRepository): Resto
     lifecycleScope.async {
         billing.restore().also {
             if (it == RestoreResult.Restored) {
-                Toast.makeText(this@restorePurchase, "已恢复购买，导出不再带水印", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this@restorePurchase, getString(R.string.restored_toast), Toast.LENGTH_SHORT).show()
             }
         }
     }.await()

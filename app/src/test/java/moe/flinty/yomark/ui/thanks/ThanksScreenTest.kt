@@ -18,7 +18,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class ThanksScreenTest {
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -54,7 +54,7 @@ class ThanksScreenTest {
 
     /** 横着拿的手机竖向放不下：滚得到按钮，不会被裁掉。 */
     @Test
-    @Config(qualifiers = "w915dp-h412dp-xxhdpi")
+    @Config(qualifiers = "zh-rCN-w915dp-h412dp-xxhdpi")
     fun `the button is still reachable on a landscape phone`() {
         var done = 0
         show(onDone = { done++ })
