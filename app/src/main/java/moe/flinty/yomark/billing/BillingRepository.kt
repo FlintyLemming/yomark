@@ -26,6 +26,16 @@ import kotlin.coroutines.resume
 
 const val PRODUCT_REMOVE_WATERMARK = "yomark_remove_watermark"
 
+/** [BillingRepository.restore] 的结果，购买框照着它告诉用户发生了什么。 */
+enum class RestoreResult {
+    /** 这个 Google 账号买过，已经点亮。 */
+    Restored,
+    /** Play 明确回答没买过：多半是 Play 商店登录的不是购买时那个账号。 */
+    NotFound,
+    /** 没问到：无网络、Play 服务没连上。 */
+    Unavailable,
+}
+
 /**
  * Play Billing 接入（spec §10）：一次性买断，非订阅，无服务端，无账号。
  * 付费解锁的**唯一**内容是去除品牌水印——免费版一项隐私能力都不缺。
@@ -93,7 +103,7 @@ class BillingRepository(
 
     fun stop() = client.endConnection()
 
-    private suspend fun sync() {
+    private suspend fun sync(): QueryOutcome {
         val cached = store.isPro.first()
         val outcome = queryOwned()
         val resolved = PurchaseResolver.resolve(cached, outcome)
@@ -103,6 +113,21 @@ class BillingRepository(
             store.grant(fresh = true)
         } else if (resolved != cached) {
             store.setPro(resolved)
+        }
+        return outcome
+    }
+
+    /**
+     * 购买框里的「恢复购买」：用户点了才查，和启动时那次是同一个查询，只是把 Play 的回答交回去给用户看。
+     *
+     * 购买按钮遇到已购也会自己点亮（ITEM_ALREADY_OWNED），但换机、重装过的人不该被逼着去点「购买」
+     * 来试探会不会再扣一次钱。查不到（[RestoreResult.Unavailable]）不动缓存，同 [sync]。
+     */
+    suspend fun restore(): RestoreResult {
+        if (freeEdition) return RestoreResult.Restored
+        return when (val outcome = sync()) {
+            is QueryOutcome.Ok -> if (outcome.owned) RestoreResult.Restored else RestoreResult.NotFound
+            QueryOutcome.Unavailable -> RestoreResult.Unavailable
         }
     }
 

@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.flinty.yomark.billing.Edition
+import moe.flinty.yomark.billing.RestoreResult
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
@@ -92,6 +93,7 @@ fun EditorScreen(
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     onBuyClicked: () -> Unit = {},
+    onRestoreClicked: suspend () -> RestoreResult = { RestoreResult.Unavailable },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -137,7 +139,7 @@ fun EditorScreen(
     if (state.paywallVisible && Edition.isFree) {
         FreeEditionDialog(onDismiss = vm::dismissPaywall)
     } else if (state.paywallVisible) {
-        PaywallDialog(onBuy = onBuyClicked, onDismiss = vm::dismissPaywall)
+        PaywallDialog(onBuy = onBuyClicked, onRestore = onRestoreClicked, onDismiss = vm::dismissPaywall)
     }
 
     // 调试信息（设置 → 关于，连点版本号打开）：顶栏的按钮弹出来，盖在画布上

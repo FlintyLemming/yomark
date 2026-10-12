@@ -25,6 +25,7 @@ import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.MediaStoreSink
 import moe.flinty.yomark.export.WatermarkDrawer
 import moe.flinty.yomark.render.RendererRegistry
+import moe.flinty.yomark.ui.components.restorePurchase
 import moe.flinty.yomark.ui.home.HomeActivity
 import moe.flinty.yomark.ui.settings.SettingsActivity
 import moe.flinty.yomark.ui.thanks.showThanksWhenPurchased
@@ -88,6 +89,7 @@ class EditorActivity : ComponentActivity() {
                         onBuyClicked = {
                             lifecycleScope.launch { billing.launchPurchase(this@EditorActivity) }
                         },
+                        onRestoreClicked = { restorePurchase(billing) },
                         onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNavigateUp = ::navigateUpToHome,
                     )

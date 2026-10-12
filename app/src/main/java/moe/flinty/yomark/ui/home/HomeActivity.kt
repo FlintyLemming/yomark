@@ -22,6 +22,7 @@ import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.ui.EditorActivity
 import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.PaywallDialog
+import moe.flinty.yomark.ui.components.restorePurchase
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.onboarding.OnboardingScreen
 import moe.flinty.yomark.ui.settings.SettingsActivity
@@ -92,6 +93,7 @@ class HomeActivity : ComponentActivity() {
                     } else if (paywall) {
                         PaywallDialog(
                             onBuy = { lifecycleScope.launch { billing.launchPurchase(this@HomeActivity) } },
+                            onRestore = { restorePurchase(billing) },
                             onDismiss = { paywall = false },
                         )
                     }

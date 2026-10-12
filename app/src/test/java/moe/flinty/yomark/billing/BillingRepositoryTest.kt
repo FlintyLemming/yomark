@@ -49,4 +49,19 @@ class BillingRepositoryTest {
         val billing = BillingRepository(context, store, backgroundScope, freeEdition = true)
         assertThat(billing.thanksPending.first()).isFalse()
     }
+
+    /** 恢复购买时问不到 Play：照实说问不到，也不能因此把缓存里的已购抹掉。 */
+    @Test fun `restoring without Play keeps the cache and says Play is unreachable`() = runTest {
+        val store = isolatedPurchaseStore(context)
+        store.grant(fresh = false)
+        val billing = BillingRepository(context, store, backgroundScope, freeEdition = false)
+
+        assertThat(billing.restore()).isEqualTo(RestoreResult.Unavailable)
+        assertThat(store.isPro.first()).isTrue()
+    }
+
+    @Test fun `the free edition has nothing to restore`() = runTest {
+        val billing = BillingRepository(context, isolatedPurchaseStore(context), backgroundScope, freeEdition = true)
+        assertThat(billing.restore()).isEqualTo(RestoreResult.Restored)
+    }
 }
