@@ -89,7 +89,7 @@ class SettingsStoreTest {
         assertThat(store.maskOptions.first().solidNear).isFalse()
     }
 
-    /** 手改过的、以后改了范围的旧值读回来收进范围：色块不会半透明，马克笔不会不透明，马赛克不比出厂细。 */
+    /** 手改过的、以后改了范围的旧值读回来收进范围：色块不会半透明，马克笔不会不透明，马赛克不比最细一档细。 */
     @Test
     fun `out of range stored mask options are pulled back into range`() = runTest {
         val store = store()

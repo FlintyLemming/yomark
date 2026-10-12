@@ -27,16 +27,16 @@ class MaskOptionsTest {
         assertThat(clear.markerAlpha).isWithin(0.01f).of(MaskOptions.MARKER_ALPHA_RANGE.start)
     }
 
-    @Test fun `mosaic never gets finer than the factory setting`() {
+    @Test fun `mosaic never gets finer than the finest step`() {
         assertThat(MaskOptions(pixelBlockDivisor = 40).normalized().pixelBlockDivisor)
             .isEqualTo(MaskOptions.FINEST_PIXEL_DIVISOR)
         assertThat(MaskOptions(pixelBlockDivisor = 1).normalized().pixelBlockDivisor)
             .isEqualTo(MaskOptions.PIXEL_DIVISOR_RANGE.first)
     }
 
-    @Test fun `blur never gets weaker than the factory setting`() {
+    @Test fun `blur never gets weaker than the weakest step`() {
         assertThat(MaskOptions(blurRadiusRatio = 0.01f).normalized().blurRadiusRatio)
-            .isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
+            .isEqualTo(MaskOptions.WEAKEST_BLUR_RATIO)
         assertThat(MaskOptions(blurRadiusRatio = Float.NaN).normalized().blurRadiusRatio)
             .isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
     }
@@ -45,14 +45,24 @@ class MaskOptionsTest {
         val tuned = MaskOptions(
             solidColor = 0xFF000000.toInt(),
             pixelBlockDivisor = 4,
-            blurRadiusRatio = 0.2f,
+            blurRadiusRatio = 0.3f,
         )
         val reset = tuned.resetFor(MaskStyle.BLUR)
         assertThat(reset.blurRadiusRatio).isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
         assertThat(reset.solidColor).isEqualTo(0xFF000000.toInt())    // 别的样式调好的不动
         assertThat(reset.pixelBlockDivisor).isEqualTo(4)
         assertThat(tuned.resetFor(MaskStyle.SOLID).solidColor).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(tuned.resetFor(MaskStyle.SOLID).blurRadiusRatio).isEqualTo(0.2f)
+        assertThat(tuned.resetFor(MaskStyle.SOLID).blurRadiusRatio).isEqualTo(0.3f)
+    }
+
+    /** 出厂两种都是中间那档，不是最轻的。 */
+    @Test fun `mosaic and blur default to the middle step`() {
+        val factory = MaskOptions()
+        assertThat(factory.pixelBlockDivisor).isLessThan(MaskOptions.FINEST_PIXEL_DIVISOR)
+        assertThat(factory.pixelBlockDivisor).isGreaterThan(MaskOptions.PIXEL_DIVISOR_RANGE.first)
+        assertThat(factory.blurRadiusRatio).isGreaterThan(MaskOptions.BLUR_RATIO_RANGE.start)
+        assertThat(factory.blurRadiusRatio).isLessThan(MaskOptions.BLUR_RATIO_RANGE.endInclusive)
+        assertThat(factory.normalized()).isEqualTo(factory)
     }
 
     /** 近似色是色块的一项：色块的「恢复默认」把它关掉，固定的颜色也回到天蓝。 */

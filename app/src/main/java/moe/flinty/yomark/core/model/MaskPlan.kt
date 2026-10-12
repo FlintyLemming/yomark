@@ -39,9 +39,9 @@ data class MaskOptions(
     val solidNear: Boolean = false,
     /**
      * 马赛克的粗细：块边长 = 图片决定的基准块 × (8 / divisor)，与选框大小无关（spec §8）。
-     * 名字是历史遗留，存档的键也沿用它。出厂的 8 就是最细的一档，只能往粗调（见 [PIXEL_DIVISOR_RANGE]、PixelateRenderer.blockSizeFor）。
+     * 名字是历史遗留，存档的键也沿用它。8 是最细的一档，只能往粗调（见 [PIXEL_DIVISOR_RANGE]、PixelateRenderer.blockSizeFor）。
      */
-    val pixelBlockDivisor: Int = FINEST_PIXEL_DIVISOR,
+    val pixelBlockDivisor: Int = DEFAULT_PIXEL_DIVISOR,
     /** 模糊的强度：缩小倍数 = 区域短边 × 它，越大越糊。 */
     val blurRadiusRatio: Float = DEFAULT_BLUR_RATIO,
     /** 马克笔的颜色，ARGB。透明度就在 alpha 里，范围见 [MARKER_ALPHA_RANGE]。 */
@@ -92,16 +92,22 @@ data class MaskOptions(
         /** 荧光黄，60% 不透明。 */
         const val DEFAULT_MARKER_COLOR: Int = 0x99FFEB3B.toInt()
 
-        /** 出厂的马赛克粗细，也是允许的最细一档：再细，截图上的字就更容易被逐字还原（spec §15.6）。 */
+        /** 允许的最细一档：再细，截图上的字就更容易被逐字还原（spec §15.6）。 */
         const val FINEST_PIXEL_DIVISOR = 8
+
+        /** 出厂是中间的「适中」：最细一档透得太多。 */
+        const val DEFAULT_PIXEL_DIVISOR = 6
 
         /** 3 最粗：一条文字行上只剩一两排块。 */
         val PIXEL_DIVISOR_RANGE = 3..FINEST_PIXEL_DIVISOR
 
-        const val DEFAULT_BLUR_RATIO = 0.08f
+        /** 最弱的一档：更弱的模糊连「看上去遮住了」都做不到。 */
+        const val WEAKEST_BLUR_RATIO = 0.08f
 
-        /** 出厂值就是最弱的一档：更弱的模糊连「看上去遮住了」都做不到。 */
-        val BLUR_RATIO_RANGE = DEFAULT_BLUR_RATIO..0.32f
+        /** 出厂是中间的「适中」：最弱一档透得太多。 */
+        const val DEFAULT_BLUR_RATIO = 0.20f
+
+        val BLUR_RATIO_RANGE = WEAKEST_BLUR_RATIO..0.32f
 
         /**
          * 马克笔只做标记（spec §8），上限刻意不到 100%：调到不透明它就成了一块不受控的色块，
