@@ -38,6 +38,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -119,13 +120,16 @@ fun ThanksScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /**
- * 会动的 🎉：转着弹出来，喷一把彩纸，然后一直轻轻地晃。开头连喷三把，之后点它还会再喷。
+ * 会动的 🎉：转着弹出来，喷一把彩纸，然后一直轻轻地晃。只自己喷这一把，想再看就点它。
+ * 转屏重建时不再弹、不再喷：已经放过了。
  *
  * 系统关了动画（开发者选项里动画时长缩放为 0）时，这些动画都直接跳到终点：🎉 停在原位，彩纸不出现。
  */
 @Composable
 private fun PartyPopper(confetti: Confetti, modifier: Modifier = Modifier) {
-    val pop = remember { Animatable(0f) }
+    // 放过一次就记下，转屏重建后 🎉 直接停在原位
+    var played by rememberSaveable { mutableStateOf(false) }
+    val pop = remember { Animatable(if (played) 1f else 0f) }
     // 每喷一把，🎉 往上一顶、往后一仰，再弹回来
     val kick = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
@@ -137,11 +141,11 @@ private fun PartyPopper(confetti: Confetti, modifier: Modifier = Modifier) {
         }
     }
     LaunchedEffect(Unit) {
+        if (played) return@LaunchedEffect
+        played = true
         launch { pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = Spring.StiffnessLow)) }
-        repeat(Popper.AUTO_BURSTS) {
-            delay(if (it == 0) Popper.FIRST_BURST_MS else Popper.BURST_GAP_MS)
-            fire()
-        }
+        delay(Popper.FIRST_BURST_MS)
+        fire()
     }
     val wobble = rememberInfiniteTransition(label = "wobble").animateFloat(
         initialValue = -Popper.WOBBLE_DEG,
@@ -186,9 +190,7 @@ private fun PartyPopper(confetti: Confetti, modifier: Modifier = Modifier) {
 }
 
 private object Popper {
-    const val AUTO_BURSTS = 3
     const val FIRST_BURST_MS = 200L
-    const val BURST_GAP_MS = 1400L
     const val WOBBLE_DEG = 7f
     const val WOBBLE_MS = 1200
 
