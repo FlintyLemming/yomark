@@ -25,6 +25,7 @@ import moe.flinty.yomark.debug.TraceLog
 import moe.flinty.yomark.debug.TraceRecorder
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RedactionEngine
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
@@ -47,6 +48,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.EmptyCoroutineContext
 
@@ -137,12 +139,16 @@ class EditorViewModel(
     /** 导出前提醒的开关。设置还没读到时按开着算——宁可多问一次。 */
     private var exportReminder = true
 
+    /** 品牌水印的字样。设置还没读到时按系统语言算，和设置页没选过时的默认一致。 */
+    private var watermarkStyle = BrandWatermarkStyle.defaultFor(Locale.getDefault())
+
     init {
         restore()
         brushRestored = restoreBrush()
         restorePurposeStyle()
         observeRecognitionConfig()
         viewModelScope.launch { settings.pendingExportReminder.collect { exportReminder = it } }
+        viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
     }
 
     /**
@@ -848,6 +854,7 @@ class EditorViewModel(
                     plan = plan,
                     analysisScale = image.scale,
                     applyWatermark = applyWatermark(),
+                    watermarkStyle = watermarkStyle,
                     purposeText = _state.value.purposeText,
                     purposeStyle = _state.value.purposeStyle,
                 ),
@@ -881,6 +888,7 @@ class EditorViewModel(
                         plan = plan,
                         analysisScale = item.analysisScale,
                         applyWatermark = applyWatermark(),
+                        watermarkStyle = watermarkStyle,
                         purposeText = _state.value.purposeText,
                         purposeStyle = _state.value.purposeStyle,
                     ),

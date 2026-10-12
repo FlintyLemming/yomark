@@ -104,10 +104,15 @@ class SettingsPageActivity : ComponentActivity() {
             }
             SettingsPage.EXPORT -> {
                 val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
-                reminder?.let { on ->
+                val watermark by store.brandWatermarkStyle.collectAsStateWithLifecycle(initialValue = null)
+                val on = reminder
+                val style = watermark
+                if (on != null && style != null) {
                     ExportSettingsScreen(
                         exportReminder = on,
                         onExportReminderChange = { next -> lifecycleScope.launch { store.setPendingExportReminder(next) } },
+                        watermarkStyle = style,
+                        onWatermarkStyleChange = { next -> lifecycleScope.launch { store.setBrandWatermarkStyle(next) } },
                         onNavigateUp = ::finish,
                     )
                 }

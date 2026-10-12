@@ -18,11 +18,13 @@ import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.theme.ThemeColor
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 
 private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
@@ -33,7 +35,11 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
  * 编辑器的画笔（下一次打码用的样式）存样式的枚举名加各样式的参数；每块码自己的样式只活在 MaskPlan 里。
  */
-class SettingsStore internal constructor(private val store: DataStore<Preferences>) {
+class SettingsStore internal constructor(
+    private val store: DataStore<Preferences>,
+    /** 系统语言，品牌水印字样没选过时按它定。测试换成固定值。 */
+    private val locale: () -> Locale = Locale::getDefault,
+) {
 
     constructor(context: Context) : this(context.applicationContext.settingsDataStore)
 
@@ -140,6 +146,19 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     }
 
     /**
+     * 品牌水印的字样（见 BrandWatermarkStyle）。没选过就按**读的时候**的系统语言定，不在第一次读时写下：
+     * 用户换了系统语言，没选过的人跟着换；选过一次之后就一直是那一版。
+     * 认不出的值同没选过，理由与 lastStyle 一致。
+     */
+    val brandWatermarkStyle: Flow<BrandWatermarkStyle> = store.data.map {
+        it[KEY_BRAND_WATERMARK].toEnum(BrandWatermarkStyle.defaultFor(locale()))
+    }
+
+    suspend fun setBrandWatermarkStyle(style: BrandWatermarkStyle) {
+        store.edit { it[KEY_BRAND_WATERMARK] = style.name }
+    }
+
+    /**
      * 识别动效：扫光或磨砂（见 ScanStyle）。出厂是扫光。
      *
      * 同样不放进 RecognitionConfig：它只是识别时画面上的过渡，放进去的话一换样式编辑器就会重跑识别。
@@ -222,7 +241,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出前提醒回到出厂值。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的两项（导出前提醒、水印样式）回到出厂值。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。
      *
@@ -240,6 +259,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_EXPORT_REMINDER)
+            it.remove(KEY_BRAND_WATERMARK)
         }
     }
 
@@ -268,6 +288,11 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
     }
 
     @VisibleForTesting
+    internal suspend fun writeRawBrandWatermarkForTest(raw: String) {
+        store.edit { it[KEY_BRAND_WATERMARK] = raw }
+    }
+
+    @VisibleForTesting
     internal suspend fun writeRawScanStyleForTest(raw: String) {
         store.edit { it[KEY_SCAN_STYLE] = raw }
     }
@@ -293,6 +318,7 @@ class SettingsStore internal constructor(private val store: DataStore<Preference
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
+        val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
         val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
         val KEY_DEBUG_TRACE = booleanPreferencesKey("debug_trace")

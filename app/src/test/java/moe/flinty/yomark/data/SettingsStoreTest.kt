@@ -3,6 +3,7 @@ package moe.flinty.yomark.data
 import androidx.test.core.app.ApplicationProvider
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.theme.ThemeColor
@@ -12,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.util.Locale
 
 @RunWith(RobolectricTestRunner::class)
 class SettingsStoreTest {
@@ -171,6 +173,50 @@ class SettingsStoreTest {
         assertThat(store.pendingExportReminder.first()).isTrue()
         store.setPendingExportReminder(false)
         assertThat(store.pendingExportReminder.first()).isFalse()
+    }
+
+    @Test
+    fun `brand watermark defaults to the chinese style on a chinese system`() = runTest {
+        assertThat(isolatedSettingsStore(context) { Locale.SIMPLIFIED_CHINESE }.brandWatermarkStyle.first())
+            .isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)
+        assertThat(isolatedSettingsStore(context) { Locale.TRADITIONAL_CHINESE }.brandWatermarkStyle.first())
+            .isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)
+    }
+
+    @Test
+    fun `brand watermark defaults to the style without chinese on any other system`() = runTest {
+        assertThat(isolatedSettingsStore(context) { Locale.US }.brandWatermarkStyle.first())
+            .isEqualTo(BrandWatermarkStyle.ICON_EN)
+        assertThat(isolatedSettingsStore(context) { Locale.JAPANESE }.brandWatermarkStyle.first())
+            .isEqualTo(BrandWatermarkStyle.ICON_EN)
+    }
+
+    /** 没选过的人换了系统语言就跟着换；选过一次就不再跟。 */
+    @Test
+    fun `brand watermark follows the system language until picked`() = runTest {
+        var locale = Locale.SIMPLIFIED_CHINESE
+        val store = isolatedSettingsStore(context) { locale }
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)
+        locale = Locale.US
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_EN)
+
+        store.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_ZH_EN)
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)
+    }
+
+    @Test
+    fun `an unknown stored brand watermark falls back to the system language default`() = runTest {
+        val store = isolatedSettingsStore(context) { Locale.US }
+        store.writeRawBrandWatermarkForTest("NOT_A_STYLE")
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_EN)
+    }
+
+    @Test
+    fun `reset puts the brand watermark back on the system language default`() = runTest {
+        val store = isolatedSettingsStore(context) { Locale.US }
+        store.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_ZH_EN)
+        store.resetSettings()
+        assertThat(store.brandWatermarkStyle.first()).isEqualTo(BrandWatermarkStyle.ICON_EN)
     }
 
     @Test

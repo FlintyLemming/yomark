@@ -25,22 +25,29 @@ data class WatermarkPlacement(
  * 会让人以为那个遮罩本身也是半透明的、底下的东西还在——这直接损害核心承诺。
  *
  * 水印是营销手段，不是安全边界。用户裁掉它是预期内的，不做任何对抗。
+ *
+ * 字样有两版（[BrandWatermarkStyle]），由调用方按设置传进来；宽度跟着字样算，避让四角的逻辑不变。
  */
-class WatermarkDrawer(private val text: String = "有码 Yomark") {
+class WatermarkDrawer {
 
-    fun placement(canvasW: Int, canvasH: Int, maskedBounds: List<RectF>): WatermarkPlacement =
-        placement(canvasW, canvasH, maskedBounds, darkInk = true)
+    fun placement(
+        canvasW: Int,
+        canvasH: Int,
+        maskedBounds: List<RectF>,
+        brand: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
+    ): WatermarkPlacement = placement(canvasW, canvasH, maskedBounds, brand.text, darkInk = true)
 
     private fun placement(
         canvasW: Int,
         canvasH: Int,
         maskedBounds: List<RectF>,
+        text: String,
         darkInk: Boolean,
     ): WatermarkPlacement {
         val shortEdge = min(canvasW, canvasH).toFloat()
         val h = max(shortEdge * HEIGHT_RATIO, MIN_HEIGHT_PX)
         val margin = shortEdge * MARGIN_RATIO
-        val w = measureWidth(h)
+        val w = measureWidth(h, text)
 
         for (corner in ORDER) {
             val r = rectFor(corner, canvasW.toFloat(), canvasH.toFloat(), w, h, margin)
@@ -54,8 +61,14 @@ class WatermarkDrawer(private val text: String = "有码 Yomark") {
     }
 
     /** 绘制时机：所有遮罩绘制完成之后，编码之前。 */
-    fun draw(canvas: Canvas, source: Bitmap, maskedBounds: List<RectF>): WatermarkPlacement {
-        val probe = placement(source.width, source.height, maskedBounds, darkInk = true)
+    fun draw(
+        canvas: Canvas,
+        source: Bitmap,
+        maskedBounds: List<RectF>,
+        brand: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
+    ): WatermarkPlacement {
+        val text = brand.text
+        val probe = placement(source.width, source.height, maskedBounds, text, darkInk = true)
         val dark = isBright(source, probe.rect)
         val p = probe.copy(darkInk = dark)
 
@@ -101,7 +114,7 @@ class WatermarkDrawer(private val text: String = "有码 Yomark") {
         return p
     }
 
-    private fun measureWidth(h: Float): Float {
+    private fun measureWidth(h: Float, text: String): Float {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = h * 0.72f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)

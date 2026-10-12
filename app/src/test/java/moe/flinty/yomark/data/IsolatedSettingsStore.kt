@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import java.io.File
+import java.util.Locale
 import java.util.UUID
 
 /**
@@ -16,8 +17,12 @@ import java.util.UUID
  * 写进去的数据活下来，「默认值是 SOLID」这类断言会随执行顺序时好时坏。
  * 测试因此一律走内部构造器，各自拿一个独立文件。
  */
-internal fun isolatedSettingsStore(context: Context): SettingsStore = SettingsStore(
+internal fun isolatedSettingsStore(
+    context: Context,
+    locale: () -> Locale = Locale::getDefault,
+): SettingsStore = SettingsStore(
     PreferenceDataStoreFactory.create(
         scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
-    ) { File(context.filesDir, "settings-test-${UUID.randomUUID()}.preferences_pb") }
+    ) { File(context.filesDir, "settings-test-${UUID.randomUUID()}.preferences_pb") },
+    locale,
 )

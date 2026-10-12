@@ -24,6 +24,7 @@ import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.engine.genai.NanoStatus
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.settings.AboutSettingsScreen
@@ -546,9 +547,29 @@ class SettingsScreenTest {
 
     @Test fun theExportReminderSwitchTurnsItOff() {
         var latest: Boolean? = null
-        show { ExportSettingsScreen(exportReminder = true, onExportReminderChange = { latest = it }, onNavigateUp = {}) }
+        show {
+            ExportSettingsScreen(
+                exportReminder = true, onExportReminderChange = { latest = it },
+                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
+                onNavigateUp = {},
+            )
+        }
         compose.onNodeWithText("导出前提醒").performClick()
         assertThat(latest).isFalse()
+    }
+
+    @Test fun pickingTheWatermarkWithoutChineseEmitsIt() {
+        var latest: BrandWatermarkStyle? = null
+        show {
+            ExportSettingsScreen(
+                exportReminder = true, onExportReminderChange = {},
+                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
+                onNavigateUp = {},
+            )
+        }
+        compose.onNodeWithText("图标 + 有码 Yomark").assertIsSelected()
+        compose.onNodeWithText("图标 + Yomark").performClick()
+        assertThat(latest).isEqualTo(BrandWatermarkStyle.ICON_EN)
     }
 
     @Test fun pickingTheFrostedScanEffectEmitsIt() {

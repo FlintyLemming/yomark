@@ -52,6 +52,7 @@ import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.engine.genai.NanoStatus
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.engine.ppocr.PpOcrModels
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
@@ -338,13 +339,18 @@ fun AiSettingsScreen(
 }
 
 /**
- * 导出：导出前提醒。它兜的正是「圈出」这一态——关掉它，圈出的内容导出时就没人再问了。
- * 不在识别方案里：拨这个开关编辑器不重跑识别。
+ * 导出：导出前提醒和品牌水印的样式。
+ *
+ * 导出前提醒兜的正是「圈出」这一态——关掉它，圈出的内容导出时就没人再问了。
+ * 水印样式是免费版导出时角落那个水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
+ * 两项都不在识别方案里：改它们编辑器不重跑识别。
  */
 @Composable
 fun ExportSettingsScreen(
     exportReminder: Boolean,
     onExportReminderChange: (Boolean) -> Unit,
+    watermarkStyle: BrandWatermarkStyle,
+    onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -361,6 +367,23 @@ fun ExportSettingsScreen(
                 )
             }
             FooterText("关掉后，圈出但没打码的内容会照原样导出。")
+        }
+        item {
+            SectionHeader("水印样式")
+            SettingsGroup(Modifier.selectableGroup()) {
+                BrandWatermarkStyle.entries.forEach { style ->
+                    RadioRow(
+                        title = "图标 + ${style.text}",
+                        summary = when (style) {
+                            BrandWatermarkStyle.ICON_ZH_EN -> "中文名和英文名都带"
+                            BrandWatermarkStyle.ICON_EN -> "只带英文名，不带中文"
+                        },
+                        selected = watermarkStyle == style,
+                        onClick = { onWatermarkStyleChange(style) },
+                    )
+                }
+            }
+            FooterText("免费版导出的图片角落带这个水印，去除水印后就没有了。没选过时跟随系统语言，系统语言不是中文就用不带中文的样式。")
         }
     }
 }

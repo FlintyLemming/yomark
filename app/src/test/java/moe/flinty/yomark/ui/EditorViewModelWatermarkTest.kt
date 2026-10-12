@@ -19,6 +19,7 @@ import moe.flinty.yomark.engine.CandidateMerger
 import moe.flinty.yomark.engine.RedactionEngine
 import moe.flinty.yomark.engine.SensitivityClassifier
 import moe.flinty.yomark.engine.TextRecognizer
+import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.ImageSink
 import moe.flinty.yomark.export.PurposeWatermarkStyle
@@ -123,6 +124,25 @@ class EditorViewModelWatermarkTest {
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
         vm.requestExport(); advanceUntilIdle()
         assertThat(cornerMarked()).isFalse()
+    }
+
+    /** 两版字样宽度不同，水印左缘落在哪就说明画的是哪一版。 */
+    @Test
+    fun `the export draws the watermark style picked in settings`() = runTest(dispatcher) {
+        val settings = isolatedSettingsStore(context)
+        settings.setBrandWatermarkStyle(BrandWatermarkStyle.ICON_EN)
+        val vm = vm(settings)
+        vm.onImageChosen(whiteUri("en.png")); advanceUntilIdle()
+        vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
+        vm.requestExport(); advanceUntilIdle()
+
+        val en = WatermarkDrawer().placement(600, 600, emptyList(), BrandWatermarkStyle.ICON_EN).rect
+        val zh = WatermarkDrawer().placement(600, 600, emptyList(), BrandWatermarkStyle.ICON_ZH_EN).rect
+        val bmp = sink.last!!
+        val y = en.centerY().toInt()
+        val left = (0 until 600).first { bmp.getPixel(it, y) != Color.WHITE }
+        assertThat(left.toFloat()).isWithin(2f).of(en.left)
+        assertThat(left.toFloat()).isGreaterThan(zh.left + 2f)
     }
 
     @Test

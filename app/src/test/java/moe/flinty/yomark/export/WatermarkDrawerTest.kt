@@ -74,6 +74,15 @@ class WatermarkDrawerTest {
     }
 
     @Test
+    fun `the style without chinese is narrower but just as tall`() {
+        val zh = drawer.placement(1000, 2000, emptyList(), BrandWatermarkStyle.ICON_ZH_EN).rect
+        val en = drawer.placement(1000, 2000, emptyList(), BrandWatermarkStyle.ICON_EN).rect
+        assertThat(en.width()).isLessThan(zh.width())
+        assertThat(en.height()).isWithin(0.5f).of(zh.height())
+        assertThat(en.right).isWithin(0.5f).of(zh.right)            // 同样贴右下角
+    }
+
+    @Test
     fun `ink turns dark on a bright background`() {
         val bmp = bitmap(400, 400, Color.WHITE)
         assertThat(drawer.draw(Canvas(bmp), bmp, emptyList()).darkInk).isTrue()

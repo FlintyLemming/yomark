@@ -24,6 +24,8 @@ data class ExportRequest(
     /** SourceImage.scale：分析图边长 / 原图边长。遮罩按 1/scale 反算。 */
     val analysisScale: Float,
     val applyWatermark: Boolean,
+    /** 品牌水印用哪一版字样；[applyWatermark] 为 false 时不看它。 */
+    val watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
     /** 用途水印文案（「仅供办理 XX 使用」）。与品牌水印无关，不受购买态影响。 */
     val purposeText: String? = null,
     /** 用途水印的颜色、角度、透明度、密度。 */
@@ -79,7 +81,7 @@ class Exporter(
             request.purposeText?.let {
                 purposeWatermark.draw(canvas, bitmap.width, bitmap.height, it, request.purposeStyle)
             }
-            if (request.applyWatermark) watermark.draw(canvas, bitmap, maskedBounds)
+            if (request.applyWatermark) watermark.draw(canvas, bitmap, maskedBounds, request.watermarkStyle)
 
             val png = request.mimeType.equals("image/png", ignoreCase = true)
             val format = if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
