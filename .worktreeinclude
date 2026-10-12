@@ -1,0 +1,2 @@
+# 新建 worktree 时从主目录复制过去的被忽略文件（.gitignore 语法）
+local.properties

@@ -15,3 +15,6 @@ docs/readme/shots/
 
 # 商店截图的中间产物，由 PlayScreenshots 生成
 docs/play/shots/
+
+# Claude Code 的 worktree 目录
+.claude/worktrees/
