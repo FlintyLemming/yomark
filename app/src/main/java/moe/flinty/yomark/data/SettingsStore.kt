@@ -47,7 +47,7 @@ class SettingsStore internal constructor(
         val raw = prefs[KEY_STYLE] ?: return@map MaskStyle.SOLID
         // 枚举名是持久化格式的一部分：删掉或改名一个样式后，旧安装里的值会读不回来。
         // 读不回来就退回 SOLID，而不是崩在启动路径上。抹除并进色块（近似色）后，旧安装里的抹除也走这一条，
-        // 近似色由 maskOptions 接上
+        // 近似色由 maskOptions 接上；去掉的表情也走这一条
         runCatching { MaskStyle.valueOf(raw) }.getOrDefault(MaskStyle.SOLID)
     }
 
@@ -56,7 +56,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡、表情与它的底色和排法。
+     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡。
      * 与 lastStyle 一样是编辑器里记住的偏好，不是设置页上的项，「恢复默认设置」不动它。
      *
      * 读回来一律 normalized()：手改过的或以后改了范围的旧值收回范围内，色块不会变成半透明的，
@@ -73,9 +73,6 @@ class SettingsStore internal constructor(
             pixelBlockDivisor = prefs[KEY_PIXEL_DIVISOR] ?: fallback.pixelBlockDivisor,
             blurRadiusRatio = prefs[KEY_BLUR_RATIO] ?: fallback.blurRadiusRatio,
             markerColor = prefs[KEY_MARKER_COLOR] ?: fallback.markerColor,
-            emoji = prefs[KEY_EMOJI] ?: fallback.emoji,
-            emojiBackground = prefs[KEY_EMOJI_BACKGROUND] ?: fallback.emojiBackground,
-            emojiTiled = prefs[KEY_EMOJI_TILED] ?: fallback.emojiTiled,
         ).normalized()
     }
 
@@ -87,9 +84,6 @@ class SettingsStore internal constructor(
             it[KEY_PIXEL_DIVISOR] = o.pixelBlockDivisor
             it[KEY_BLUR_RATIO] = o.blurRadiusRatio
             it[KEY_MARKER_COLOR] = o.markerColor
-            it[KEY_EMOJI] = o.emoji
-            it[KEY_EMOJI_BACKGROUND] = o.emojiBackground
-            it[KEY_EMOJI_TILED] = o.emojiTiled
         }
     }
 
@@ -309,9 +303,6 @@ class SettingsStore internal constructor(
         val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor")
         val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio")
         val KEY_MARKER_COLOR = intPreferencesKey("mask_marker_color")
-        val KEY_EMOJI = stringPreferencesKey("mask_emoji")
-        val KEY_EMOJI_BACKGROUND = intPreferencesKey("mask_emoji_background")
-        val KEY_EMOJI_TILED = booleanPreferencesKey("mask_emoji_tiled")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
         val KEY_PURPOSE_COLOR = intPreferencesKey("purpose_watermark_color")
         val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")

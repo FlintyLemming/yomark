@@ -155,8 +155,8 @@ class EditorScreenLayoutTest {
         val vm = open()
         val bar = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
         compose.runOnUiThread {
-            vm.onStyleChipClick(MaskStyle.EMOJI)   // 换成表情
-            vm.onStyleChipClick(MaskStyle.EMOJI)   // 再点一下才弹出面板
+            // 色块本来就选着，再点一下就弹出面板。别换成带安全性说明的样式：说明会把样式栏往上顶
+            vm.onStyleChipClick(MaskStyle.SOLID)
         }
         frames(SETTLE_FRAMES)
         compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
@@ -258,9 +258,9 @@ class EditorScreenLayoutTest {
         assertThat(list.left).isGreaterThan(screen.right * 0.6f)
         // 样式方块铺满这一栏的宽，在列表上面
         val solid = compose.onNodeWithText("色块").getUnclippedBoundsInRoot()
-        val blur = compose.onNodeWithText("模糊").getUnclippedBoundsInRoot()
+        val pixelate = compose.onNodeWithText("马赛克").getUnclippedBoundsInRoot()
         assertThat(solid.bottom).isLessThan(list.top)
-        assertThat(blur.right - solid.left).isGreaterThan(screen.width * 0.25f)
+        assertThat(pixelate.right - solid.left).isGreaterThan(screen.width * 0.25f)
     }
 
     @Config(qualifiers = "sw528dp-w528dp-h848dp-port-xhdpi")
@@ -284,8 +284,8 @@ class EditorScreenLayoutTest {
     @Test fun `the style panel takes the list's place while it is open`() {
         val vm = open()
         compose.runOnUiThread {
-            vm.onStyleChipClick(MaskStyle.EMOJI)   // 换成表情
-            vm.onStyleChipClick(MaskStyle.EMOJI)   // 再点一下才弹出面板
+            vm.onStyleChipClick(MaskStyle.PIXELATE)   // 换成马赛克
+            vm.onStyleChipClick(MaskStyle.PIXELATE)   // 再点一下才弹出面板
         }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("恢复默认").assertExists()

@@ -11,26 +11,21 @@ enum class ColorTarget {
     /** 色块的颜色；马赛克降级成色块时也用它。挑了一种颜色就不再是近似色。 */
     SOLID,
 
-    /** 表情底下的底色。 */
-    EMOJI_BACKGROUND,
-
     /** 马克笔的颜色。只换颜色，浓淡（透明度）另外调，不跟着变。 */
     MARKER;
 
     /** 这一项现在的颜色，不透明的 RGB。 */
     fun colorOf(options: MaskOptions): Int = when (this) {
         SOLID -> options.solidColor
-        EMOJI_BACKGROUND -> options.emojiBackground
         MARKER -> options.markerColor
     } or OPAQUE
 
     /**
-     * 把这一项换成 [rgb]。传进来的透明度一律不认：色块、底色强制不透明，马克笔保留原来的浓淡。
+     * 把这一项换成 [rgb]。传进来的透明度一律不认：色块强制不透明，马克笔保留原来的浓淡。
      * 色块挑了颜色（色板、自定义、吸管）就是要这个颜色，近似色随之关掉。
      */
     fun withColor(options: MaskOptions, rgb: Int): MaskOptions = when (this) {
         SOLID -> options.copy(solidColor = rgb or OPAQUE, solidNear = false)
-        EMOJI_BACKGROUND -> options.copy(emojiBackground = rgb or OPAQUE)
         MARKER -> options.copy(markerColor = MaskOptions.withAlpha(rgb, options.markerAlpha))
     }
 

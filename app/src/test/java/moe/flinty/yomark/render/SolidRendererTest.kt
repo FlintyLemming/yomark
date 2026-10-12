@@ -67,6 +67,6 @@ class SolidRendererTest {
     @Test
     fun `registry falls back to solid for styles not yet implemented`() {
         // M1 只有实色块；后续里程碑补齐后这条会自然变成「返回对应渲染器」
-        assertThat(RendererRegistry.default()[MaskStyle.EMOJI]).isNotNull()
+        assertThat(RendererRegistry.default()[MaskStyle.MARKER]).isNotNull()
     }
 }

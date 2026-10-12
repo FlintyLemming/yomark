@@ -35,7 +35,7 @@ class MaskPlanParcelTest {
                 MaskLook(MaskStyle.PIXELATE, MaskOptions(solidColor = 0x11223344, pixelBlockDivisor = 6))),
             MaskItem("manual-abc", Quad.fromRect(RectF(5f, 6f, 7f, 8f)),
                 SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.OUTLINED,
-                MaskLook(MaskStyle.EMOJI, MaskOptions(emoji = "🙈", emojiBackground = 0xFFFFE082.toInt(), emojiTiled = true))),
+                MaskLook(MaskStyle.MARKER, MaskOptions(markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f)))),
         ),
     )
 
@@ -67,8 +67,7 @@ class MaskPlanParcelTest {
         val (card, manual) = restored.items
         assertThat(card.look.style).isEqualTo(MaskStyle.PIXELATE)
         assertThat(card.look.options.pixelBlockDivisor).isEqualTo(6)
-        assertThat(manual.look.style).isEqualTo(MaskStyle.EMOJI)
-        assertThat(manual.look.options.emoji).isEqualTo("🙈")
-        assertThat(manual.look.options.emojiTiled).isTrue()
+        assertThat(manual.look.style).isEqualTo(MaskStyle.MARKER)
+        assertThat(manual.look.options.markerColor).isEqualTo(MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f))
     }
 }

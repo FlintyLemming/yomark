@@ -55,9 +55,6 @@ class SettingsStoreTest {
             pixelBlockDivisor = 4,
             blurRadiusRatio = 0.2f,
             markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f),
-            emoji = "🐱",
-            emojiBackground = 0xFFFFE082.toInt(),
-            emojiTiled = true,
         )
         store.setMaskOptions(tuned)
         assertThat(store.maskOptions.first()).isEqualTo(tuned)
@@ -72,6 +69,15 @@ class SettingsStoreTest {
         assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.SOLID)
         assertThat(store.maskOptions.first().solidNear).isTrue()
         assertThat(store.maskOptions.first().solidColor).isEqualTo(0xFF000000.toInt())
+    }
+
+    /** 表情去掉了：旧安装里上次用的是表情，读回来是色块。 */
+    @Test
+    fun `a brush left on the removed emoji style comes back as solid`() = runTest {
+        val store = store()
+        store.writeRawStyleForTest("EMOJI")
+        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.SOLID)
+        assertThat(store.maskOptions.first().solidNear).isFalse()
     }
 
     /** 画笔动过一次之后近似色就记下了：关掉的不会因为旧的样式名又被打开。 */
@@ -97,11 +103,11 @@ class SettingsStoreTest {
     @Test
     fun `resetting settings leaves the editor's brush alone`() = runTest {
         val store = store()
-        store.setLastStyle(MaskStyle.EMOJI)
-        store.setMaskOptions(MaskOptions(emoji = "🐱"))
+        store.setLastStyle(MaskStyle.MARKER)
+        store.setMaskOptions(MaskOptions(pixelBlockDivisor = 4))
         store.resetSettings()
-        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.EMOJI)
-        assertThat(store.maskOptions.first().emoji).isEqualTo("🐱")
+        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.MARKER)
+        assertThat(store.maskOptions.first().pixelBlockDivisor).isEqualTo(4)
     }
 
     @Test

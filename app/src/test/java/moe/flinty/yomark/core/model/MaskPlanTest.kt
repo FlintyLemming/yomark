@@ -19,7 +19,7 @@ class MaskPlanTest {
 
     private fun plan(vararg items: MaskItem) = MaskPlan(items.toList())
 
-    private val emoji = MaskLook(MaskStyle.EMOJI, MaskOptions(emoji = "🐱"))
+    private val marker = MaskLook(MaskStyle.MARKER, MaskOptions(markerColor = 0x66FF4081))
 
     @Test
     fun `pendingCount counts only outlined items`() {
@@ -42,17 +42,17 @@ class MaskPlanTest {
     /** 换了样式再点虚线框，打上的是新样式，不是它上一次打码时的样子（spec §7.5 修订）。 */
     @Test
     fun `masking an outlined item by toggle takes the given look`() {
-        val p = plan(item("a", MaskState.MASKED)).toggle("a", emoji)
+        val p = plan(item("a", MaskState.MASKED)).toggle("a", marker)
         assertThat(p.items.single().look).isEqualTo(MaskLook())     // 退回圈出时不动
-        val again = p.toggle("a", emoji)
+        val again = p.toggle("a", marker)
         assertThat(again.items.single().state).isEqualTo(MaskState.MASKED)
-        assertThat(again.items.single().look).isEqualTo(emoji)
+        assertThat(again.items.single().look).isEqualTo(marker)
     }
 
     @Test
     fun `toggle of an unknown id changes nothing`() {
         val p = plan(item("a", MaskState.MASKED))
-        assertThat(p.toggle("zzz", emoji)).isEqualTo(p)
+        assertThat(p.toggle("zzz", marker)).isEqualTo(p)
     }
 
     @Test
@@ -89,16 +89,16 @@ class MaskPlanTest {
     @Test
     fun `maskAll gives the given look only to the items it masks`() {
         val p = plan(item("a", MaskState.OUTLINED), item("b", MaskState.MASKED))
-        val all = p.maskAll(emoji)
-        assertThat(all.find("a")!!.look).isEqualTo(emoji)
+        val all = p.maskAll(marker)
+        assertThat(all.find("a")!!.look).isEqualTo(marker)
         assertThat(all.find("b")!!.look).isEqualTo(MaskLook())       // 已经打好的码保持原样
     }
 
     @Test
     fun `restyle changes one item and restyleMasked every masked one`() {
         val p = plan(item("a", MaskState.MASKED), item("b", MaskState.MASKED), item("c", MaskState.OUTLINED))
-        assertThat(p.restyle("a", emoji).items.map { it.look }).containsExactly(emoji, MaskLook(), MaskLook()).inOrder()
-        assertThat(p.restyleMasked(emoji).items.map { it.look }).containsExactly(emoji, emoji, MaskLook()).inOrder()
+        assertThat(p.restyle("a", marker).items.map { it.look }).containsExactly(marker, MaskLook(), MaskLook()).inOrder()
+        assertThat(p.restyleMasked(marker).items.map { it.look }).containsExactly(marker, marker, MaskLook()).inOrder()
     }
 
     @Test

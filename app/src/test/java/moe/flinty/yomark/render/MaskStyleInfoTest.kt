@@ -15,10 +15,8 @@ class MaskStyleInfoTest {
         MaskStyle.entries.forEach { assertThat(MaskStyleInfo.label(it)).isNotEmpty() }
     }
 
-    @Test fun `solid and emoji are irreversible`() {
-        listOf(MaskStyle.SOLID, MaskStyle.EMOJI).forEach {
-            assertThat(MaskStyleInfo.safety(it)).isEqualTo(MaskSafety.IRREVERSIBLE)
-        }
+    @Test fun `solid is irreversible`() {
+        assertThat(MaskStyleInfo.safety(MaskStyle.SOLID)).isEqualTo(MaskSafety.IRREVERSIBLE)
     }
 
     @Test fun `blur is cosmetic and says so`() {
@@ -50,10 +48,9 @@ class MaskStyleInfoTest {
         assertThat(MaskStyleInfo.note(MaskStyle.SOLID)).isNull()
     }
 
-    @Test fun `the style bar offers every style once, irreversible ones first`() {
+    @Test fun `the style bar offers every style once, the irreversible one first`() {
         assertThat(MaskStyleInfo.ORDER).containsExactlyElementsIn(MaskStyle.entries)
-        assertThat(MaskStyleInfo.ORDER.take(2).map { MaskStyleInfo.safety(it) })
-            .containsExactly(MaskSafety.IRREVERSIBLE, MaskSafety.IRREVERSIBLE)
+        assertThat(MaskStyleInfo.safety(MaskStyleInfo.ORDER.first())).isEqualTo(MaskSafety.IRREVERSIBLE)
     }
 
     @Test fun `the registry implements every style`() {

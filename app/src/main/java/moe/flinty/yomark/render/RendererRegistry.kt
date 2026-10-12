@@ -17,14 +17,13 @@ class RendererRegistry(renderers: List<MaskRenderer>) {
     fun implemented(): Set<MaskStyle> = byStyle.keys
 
     companion object {
-        /** 全部五种样式。近似色是色块的一种取色方式，不是单独的样式。 */
+        /** 全部四种样式。近似色是色块的一种取色方式，不是单独的样式。 */
         fun default() = RendererRegistry(
             listOf(
                 SolidRenderer(),
                 PixelateRenderer(),
                 BlurRenderer(),
                 MarkerRenderer(),
-                EmojiRenderer(),
             )
         )
     }

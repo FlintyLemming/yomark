@@ -11,7 +11,7 @@ import moe.flinty.yomark.core.model.MaskStyle
  * 同一个实现既画预览也画导出——这是「所见即所得」的唯一保证。
  *
  * @param source 被打码的位图。像素化/模糊、开了近似色的色块需要读它的原始像素；
- *               固定颜色的色块与 Emoji 不需要，但签名统一。
+ *               固定颜色的色块不需要，但签名统一。
  * @param quad   与 canvas 同一坐标系下的目标区域。
  */
 interface MaskRenderer {

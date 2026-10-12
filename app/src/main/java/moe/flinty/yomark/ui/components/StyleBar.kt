@@ -19,9 +19,6 @@ import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
@@ -35,7 +32,6 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,11 +59,8 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import moe.flinty.yomark.core.image.SourceImage
@@ -113,7 +106,7 @@ interface StyleBarActions {
 }
 
 /**
- * 样式栏（spec §7.5 修订）：一排五种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
+ * 样式栏（spec §7.5 修订）：一排四种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
  *
  * 样式栏是「画笔」：换了样式、调了颜色，从下一次打码起生效——新画的框、点了打码的虚线框都用它，
  * 已经打好的码不变；选中了手动框时，改动也落在那个框上。面板上的「应用到全部」把这张图上打好的码全换成这样。
@@ -148,8 +141,8 @@ private fun styleNote(model: StyleBarModel): String? = MaskStyleInfo.note(model.
 // ---------- 样式那一排 ----------
 
 /**
- * 五种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
- * 小样子跟着参数走：色块是当前的颜色（近似色是图上取到的颜色），表情是当前的表情——不点开面板也看得出下一笔是什么样。
+ * 四种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
+ * 小样子跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
  * 选中的那一项名字后面有个小箭头：再点它一下，面板就弹出来。面板从下面往上弹，所以收着时箭头朝上、弹出来后朝下。
  */
 @Composable
@@ -237,7 +230,6 @@ internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, nearColors: List
                 .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
                 .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
         )
-        MaskStyle.EMOJI -> Text(options.emoji, fontSize = 18.sp * scale)
         MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
         MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
         MaskStyle.MARKER -> Box(
@@ -468,26 +460,6 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         // 近似色排在色板最前面：原先的「抹除」，并进色块之后就是色块的一种取色方式
         MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, "颜色", NearChoice(options.solidNear, nearColors))
 
-        MaskStyle.EMOJI -> {
-            PanelLabel("表情")
-            EmojiPicker(options.emoji) { emit(options.copy(emoji = it)) }
-            Colors(ColorTarget.EMOJI_BACKGROUND, EMOJI_BACKGROUND_PALETTE, "底色")
-            LabeledRow("排列") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(
-                        selected = !options.emojiTiled,
-                        onClick = { emit(options.copy(emojiTiled = false)) },
-                        label = { Text("单个") },
-                    )
-                    FilterChip(
-                        selected = options.emojiTiled,
-                        onClick = { emit(options.copy(emojiTiled = true)) },
-                        label = { Text("排满") },
-                    )
-                }
-            }
-        }
-
         MaskStyle.PIXELATE -> {
             // 滑条往右是更粗：divisor 越小块越大
             val finest = MaskOptions.PIXEL_DIVISOR_RANGE.last
@@ -549,34 +521,6 @@ private fun PanelLabel(text: String) {
     )
 }
 
-/** 一排表情，横着滑。选中的垫一块底色；面板打开时先滑到它附近，不让它藏在屏幕外面。 */
-@Composable
-private fun EmojiPicker(selected: String, onPick: (String) -> Unit) {
-    val list = rememberLazyListState(initialFirstVisibleItemIndex = (EMOJIS.indexOf(selected) - 2).coerceAtLeast(0))
-    LazyRow(
-        Modifier
-            .fillMaxWidth()
-            .selectableGroup(),
-        state = list,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        items(EMOJIS) { emoji ->
-            val isSelected = emoji == selected
-            Box(
-                Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(if (isSelected) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
-                    .semantics { contentDescription = emoji }
-                    .selectable(selected = isSelected, role = Role.RadioButton, onClick = { onPick(emoji) }),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(emoji, fontSize = 24.sp)
-            }
-        }
-    }
-}
-
 /**
  * 「近似色」那一颗和色块的小样子上画的颜色：这张图上真取到的近似色，最多三种，块数多的排前面。
  *
@@ -593,7 +537,7 @@ internal fun nearColorsOf(image: SourceImage?, plan: MaskPlan, selected: MaskIte
 
 private const val MAX_NEAR_COLORS = 3
 
-// ---------- 色板与表情 ----------
+// ---------- 色板 ----------
 
 /** 色板上的一个颜色：不透明的 RGB 和读屏念的名字。 */
 @Immutable
@@ -613,18 +557,6 @@ internal val SOLID_PALETTE = listOf(
     NamedColor(0xFF8E24AA.toInt(), "紫色"),
 )
 
-/** 表情的底色：出厂的深灰、黑白，再是几种浅色——浅底上的表情更俏皮。 */
-internal val EMOJI_BACKGROUND_PALETTE = listOf(
-    NamedColor(MaskOptions.EMOJI_BACKGROUND, "深灰"),
-    NamedColor(0xFF000000.toInt(), "黑色"),
-    NamedColor(0xFFFFFFFF.toInt(), "白色"),
-    NamedColor(MaskOptions.SKY_BLUE, "天蓝"),
-    NamedColor(0xFFFFE082.toInt(), "浅黄"),
-    NamedColor(0xFFF8BBD0.toInt(), "浅粉"),
-    NamedColor(0xFFC5E1A5.toInt(), "浅绿"),
-    NamedColor(0xFFB3E5FC.toInt(), "浅蓝"),
-)
-
 /** 马克笔：荧光笔的几种颜色。浓淡另外调。 */
 internal val MARKER_PALETTE = listOf(
     NamedColor(MaskOptions.DEFAULT_MARKER_COLOR or 0xFF000000.toInt(), "黄色"),
@@ -635,12 +567,6 @@ internal val MARKER_PALETTE = listOf(
     NamedColor(0xFF448AFF.toInt(), "蓝色"),
     NamedColor(0xFF18FFFF.toInt(), "青色"),
     NamedColor(0xFF76FF03.toInt(), "绿色"),
-)
-
-/** 都是 Unicode 9 以前就有的，Android 10 自带的字体全画得出来。 */
-internal val EMOJIS = listOf(
-    "🙂", "😀", "😊", "😎", "🤐", "🙈", "😶", "🐱", "🐶", "🐼",
-    "🐰", "🦊", "🐷", "🐸", "⭐", "❤️", "🌸", "🔒", "🚫", "✋",
 )
 
 /** 马赛克颗粒的六档，按 8 - divisor 排：0 最细（出厂），5 最粗。 */

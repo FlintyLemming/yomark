@@ -120,11 +120,6 @@ class IrreversibilityTest {
     }
 
     @Test
-    fun emoji_output_is_unreadable() = runTest {
-        assertThat(ocrText(exportWith(MaskStyle.EMOJI))).doesNotContain("4111")
-    }
-
-    @Test
     fun near_color_output_is_unreadable() = runTest {
         assertThat(ocrText(exportWith(MaskStyle.SOLID, MaskOptions(solidNear = true)))).doesNotContain("4111")
     }

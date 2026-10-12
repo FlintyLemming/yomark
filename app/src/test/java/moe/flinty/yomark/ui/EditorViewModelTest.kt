@@ -317,12 +317,12 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED)))
-        vm.setStyle(MaskStyle.EMOJI)
+        vm.setStyle(MaskStyle.PIXELATE)
 
         vm.onTap(PointF(50f, 50f))
         val item = vm.state.value.plan.items.single()
         assertThat(item.state).isEqualTo(MaskState.MASKED)
-        assertThat(item.look.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(item.look.style).isEqualTo(MaskStyle.PIXELATE)
     }
 
     @Test
@@ -361,14 +361,14 @@ class EditorViewModelTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(box(10f, 10f, 90f, 90f))
         vm.clearSelection()
-        vm.setStyle(MaskStyle.EMOJI)
+        vm.setStyle(MaskStyle.PIXELATE)
 
         vm.onTap(PointF(50f, 50f))                                         // 点选那个色块
         assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.SOLID)
-        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PIXELATE)
 
         vm.onTap(PointF(300f, 300f))                                       // 点空白，样式栏回到画笔
-        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.PIXELATE)
     }
 
     @Test
@@ -415,25 +415,25 @@ class EditorViewModelTest {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         val bar = vm.state.value.barLook
-        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.BLACK, emoji = "🐱")))
+        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.BLACK, pixelBlockDivisor = 4)))
         vm.resetLookOptions()
         assertThat(vm.state.value.brush.options.solidColor).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(vm.state.value.brush.options.emoji).isEqualTo("🐱")
+        assertThat(vm.state.value.brush.options.pixelBlockDivisor).isEqualTo(4)
     }
 
     @Test
     fun `tapping a style only switches to it, tapping it again opens and closes its panel`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.onStyleChipClick(MaskStyle.EMOJI)
+        vm.onStyleChipClick(MaskStyle.PIXELATE)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
-        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PIXELATE)
 
-        vm.onStyleChipClick(MaskStyle.EMOJI)
+        vm.onStyleChipClick(MaskStyle.PIXELATE)
         assertThat(vm.state.value.stylePanelOpen).isTrue()
-        vm.onStyleChipClick(MaskStyle.EMOJI)
+        vm.onStyleChipClick(MaskStyle.PIXELATE)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
-        vm.onStyleChipClick(MaskStyle.EMOJI)
+        vm.onStyleChipClick(MaskStyle.PIXELATE)
         assertThat(vm.state.value.stylePanelOpen).isTrue()
         vm.dismissStylePanel()
         assertThat(vm.state.value.stylePanelOpen).isFalse()
@@ -455,14 +455,14 @@ class EditorViewModelTest {
     fun `the brush is remembered across image changes and sessions`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri("brush-1.jpg")); advanceUntilIdle()
-        vm.setStyle(MaskStyle.EMOJI)
+        vm.setStyle(MaskStyle.PIXELATE)
         val bar = vm.state.value.barLook
-        vm.editLook(bar.copy(options = bar.options.copy(emoji = "🐱", emojiTiled = true)))
+        vm.editLook(bar.copy(options = bar.options.copy(pixelBlockDivisor = 4, blurRadiusRatio = 0.2f)))
         advanceUntilIdle()                                                 // 落盘有去抖
 
         vm.onImageChosen(sampleUri("brush-2.jpg")); advanceUntilIdle()
-        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
-        assertThat(vm.state.value.brush.options.emoji).isEqualTo("🐱")
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(vm.state.value.brush.options.pixelBlockDivisor).isEqualTo(4)
 
         val next = EditorViewModel(
             intake = ImageIntake(context),
@@ -473,8 +473,8 @@ class EditorViewModelTest {
             ioDispatcher = dispatcher,
         )
         advanceUntilIdle()
-        assertThat(next.state.value.brush.style).isEqualTo(MaskStyle.EMOJI)
-        assertThat(next.state.value.brush.options.emojiTiled).isTrue()
+        assertThat(next.state.value.brush.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(next.state.value.brush.options.blurRadiusRatio).isEqualTo(0.2f)
     }
 
     private fun twoToneUri(name: String): Uri {

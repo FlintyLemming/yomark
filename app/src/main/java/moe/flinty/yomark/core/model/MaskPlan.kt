@@ -10,16 +10,17 @@ enum class MaskState { MASKED, OUTLINED }
 
 /**
  * 枚举名是持久化格式的一部分（SettingsStore 记着画笔的样式名）。
- * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）。
+ * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）；
+ * 还有一种「表情」，2026-10-12 去掉了。记着这两个名字的旧设置读回来认不出，落回色块。
  */
-enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, EMOJI }
+enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER }
 
 /**
- * 各样式的参数。一份里装着全部五种样式的参数，每块码只读它自己那种样式的几项；
+ * 各样式的参数。一份里装着全部四种样式的参数，每块码只读它自己那种样式的几项；
  * 编辑器里调好的参数记在 SettingsStore，下次打开沿用。
  *
  * 能调的项都有范围（见 [normalized]），范围的边界是安全底线，不是审美：
- * 色块、表情底色永远不透明，马克笔永远透得过去，马赛克的块不会比出厂时更细。
+ * 色块永远不透明，马克笔永远透得过去，马赛克的块不会比出厂时更细。
  */
 @Parcelize
 data class MaskOptions(
@@ -45,11 +46,6 @@ data class MaskOptions(
     val blurRadiusRatio: Float = DEFAULT_BLUR_RATIO,
     /** 马克笔的颜色，ARGB。透明度就在 alpha 里，范围见 [MARKER_ALPHA_RANGE]。 */
     val markerColor: Int = DEFAULT_MARKER_COLOR,
-    val emoji: String = DEFAULT_EMOJI,
-    /** 表情底下铺的底色。不透明：表情是圆的，光靠字形盖不满矩形，四角靠它盖住。 */
-    val emojiBackground: Int = EMOJI_BACKGROUND,
-    /** 表情沿长边排满一排，而不是只在中间放一个。长条形的文字行上更像样。 */
-    val emojiTiled: Boolean = false,
     /**
      * 当前渲染坐标系相对**原图**的比例。预览画在降采样的分析图上（< 1），导出画在原图上（= 1）。
      *
@@ -74,8 +70,6 @@ data class MaskOptions(
         pixelBlockDivisor = pixelBlockDivisor.coerceIn(PIXEL_DIVISOR_RANGE),
         blurRadiusRatio = blurRadiusRatio.orIfNaN(DEFAULT_BLUR_RATIO).coerceIn(BLUR_RATIO_RANGE),
         markerColor = withAlpha(markerColor, markerAlpha.coerceIn(MARKER_ALPHA_RANGE)),
-        emoji = emoji.ifBlank { DEFAULT_EMOJI },
-        emojiBackground = emojiBackground or OPAQUE,
     )
 
     /** 只把 [style] 用到的几项放回出厂值，别的样式调好的不动。面板上的「恢复默认」。 */
@@ -86,11 +80,6 @@ data class MaskOptions(
             MaskStyle.PIXELATE -> copy(pixelBlockDivisor = factory.pixelBlockDivisor)
             MaskStyle.BLUR -> copy(blurRadiusRatio = factory.blurRadiusRatio)
             MaskStyle.MARKER -> copy(markerColor = factory.markerColor)
-            MaskStyle.EMOJI -> copy(
-                emoji = factory.emoji,
-                emojiBackground = factory.emojiBackground,
-                emojiTiled = factory.emojiTiled,
-            )
         }
     }
 
@@ -99,11 +88,6 @@ data class MaskOptions(
     companion object {
         /** 天蓝色 #87CEEB（CSS / X11 的 SkyBlue）。 */
         const val SKY_BLUE: Int = 0xFF87CEEB.toInt()
-
-        /** 表情的出厂底色：近黑的深灰，什么颜色的表情放上去都看得清。 */
-        const val EMOJI_BACKGROUND: Int = 0xFF333338.toInt()
-
-        const val DEFAULT_EMOJI = "🙂"
 
         /** 荧光黄，60% 不透明。 */
         const val DEFAULT_MARKER_COLOR: Int = 0x99FFEB3B.toInt()

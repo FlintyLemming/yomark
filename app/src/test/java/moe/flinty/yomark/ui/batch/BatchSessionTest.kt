@@ -76,7 +76,7 @@ class BatchSessionTest {
     }
 
     @Test fun `maskAllEverywhere masks with the given look on every image`() {
-        val look = MaskLook(MaskStyle.EMOJI, MaskOptions(emoji = "🐱"))
+        val look = MaskLook(MaskStyle.MARKER, MaskOptions(markerColor = 0x66FF4081))
         val s = session(2).withPlan(planWithPending(1)).advance().withPlan(planWithPending(2))
         val looks = s.maskAllEverywhere(look).items.flatMap { it.plan!!.items }.map { it.look }
         assertThat(looks).containsExactly(look, look, look)

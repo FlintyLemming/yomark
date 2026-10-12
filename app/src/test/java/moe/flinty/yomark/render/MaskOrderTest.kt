@@ -32,11 +32,11 @@ class MaskOrderTest {
             item("near", MaskStyle.SOLID, 20f, near = true),
             item("solid-big", MaskStyle.SOLID, 50f),
             item("blur-big", MaskStyle.BLUR, 40f),
-            item("emoji", MaskStyle.EMOJI, 30f),
+            item("marker", MaskStyle.MARKER, 30f),
             item("pixelate-small", MaskStyle.PIXELATE, 5f),
         )
         assertThat(MaskOrder.forDrawing(items).map { it.candidateId }).containsExactly(
-            "blur-big", "near", "pixelate-small", "solid-big", "emoji", "solid-small",
+            "blur-big", "near", "pixelate-small", "solid-big", "marker", "solid-small",
         ).inOrder()
     }
 

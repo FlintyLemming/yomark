@@ -14,17 +14,16 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 模式下 getPixel 恒为 0
 class ColorTargetTest {
 
-    @Test fun `solid and emoji background stay opaque whatever comes in`() {
+    @Test fun `solid stays opaque whatever comes in`() {
         val o = MaskOptions()
         assertThat(ColorTarget.SOLID.withColor(o, 0x40FF0000).solidColor).isEqualTo(Color.RED)
-        assertThat(ColorTarget.EMOJI_BACKGROUND.withColor(o, 0x0000FF00).emojiBackground).isEqualTo(Color.GREEN)
     }
 
     /** 色块挑了一种颜色（色板、自定义、吸管）就是要这个颜色：近似色跟着关掉，别的样式的不动。 */
     @Test fun `picking a solid color turns near colour off`() {
         val near = MaskOptions(solidNear = true)
         assertThat(ColorTarget.SOLID.withColor(near, Color.RED).solidNear).isFalse()
-        assertThat(ColorTarget.EMOJI_BACKGROUND.withColor(near, Color.RED).solidNear).isTrue()
+        assertThat(ColorTarget.MARKER.withColor(near, Color.RED).solidNear).isTrue()
     }
 
     @Test fun `the marker keeps its opacity when its color changes`() {
@@ -53,7 +52,7 @@ class ColorTargetTest {
     @Test fun `hsv round trips the palette colors exactly`() {
         listOf(
             Color.BLACK, Color.WHITE, Color.RED, Color.GREEN, Color.BLUE,
-            MaskOptions.SKY_BLUE, MaskOptions.EMOJI_BACKGROUND, 0xFF123456.toInt(), 0xFFFB8C00.toInt(),
+            MaskOptions.SKY_BLUE, 0xFF333338.toInt(), 0xFF123456.toInt(), 0xFFFB8C00.toInt(),
         ).forEach { assertThat(Hsv.of(it).toArgb()).isEqualTo(it) }
     }
 

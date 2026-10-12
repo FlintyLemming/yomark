@@ -37,13 +37,12 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
- * 宽屏的样式按钮：五种样式排成两行三列的圆角方块（宽屏增补设计）。
+ * 宽屏的样式按钮：四种样式排成两行两列的圆角方块（宽屏增补设计）。
  *
  * 方块跟着给它的地方变大变小，不在旁边空出一块：竖着拿时铺满下面那一块的左半边（[fillHeight]），
  * 横着拿时铺满右边那一栏的宽、高取宽的四分之三。方块大了，里面的小样子和名字跟着放大。
  *
- * 照草图一列一列地放：色块是出厂的那一种，抹除并进来成了它的近似色之后，独占第一列、两格高；
- * 往右依次是表情、马赛克，模糊、马克笔——左边盖得严，越往右越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
+ * 一行一行地放：色块、马赛克，模糊、马克笔——越往后越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
  * 点一种换样式，再点当前那一种才弹出或收起调节面板；安全性说明贴在方块下面。
  *
  * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
@@ -84,8 +83,8 @@ fun StyleGrid(
         modifier = modifier.selectableGroup(),
     ) { measurables, constraints ->
         val gap = GAP.roundToPx()
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else (TILE_MIN * 3).roundToPx() + gap * 2
-        val tileW = ((width - gap * 2) / COLUMNS).coerceAtLeast(0)
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else (TILE_MIN * COLUMNS).roundToPx() + gap * (COLUMNS - 1)
+        val tileW = ((width - gap * (COLUMNS - 1)) / COLUMNS).coerceAtLeast(0)
         val note = measurables.getOrNull(STYLES)?.measure(Constraints(maxWidth = width))
         val noteH = note?.height ?: 0
         val byWidth = (tileW * SIDE_ASPECT).roundToInt().coerceIn(TILE_MIN.roundToPx(), TILE_MAX.roundToPx())
@@ -100,20 +99,11 @@ fun StyleGrid(
                 .also { held.px = it }
         }
         val gridH = tileH * ROWS + gap * (ROWS - 1)
-        // 第一个（色块）占满第一列的两格，其余的一列一列地排
-        val tiles = measurables.take(STYLES).mapIndexed { i, m ->
-            m.measure(Constraints.fixed(tileW, if (i == 0) gridH else tileH))
-        }
+        val tiles = measurables.take(STYLES).map { it.measure(Constraints.fixed(tileW, tileH)) }
         val height = (gridH + noteH).coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, height) {
             tiles.forEachIndexed { i, tile ->
-                if (i == 0) {
-                    tile.place(0, 0)
-                } else {
-                    // 一列一列地放：先排满第二列的两个，再到下一列
-                    val cell = i - 1
-                    tile.place((1 + cell / ROWS) * (tileW + gap), (cell % ROWS) * (tileH + gap))
-                }
+                tile.place((i % COLUMNS) * (tileW + gap), (i / COLUMNS) * (tileH + gap))
             }
             note?.place(0, gridH)
         }
@@ -184,7 +174,7 @@ private fun StyleTile(
 
 private val STYLES = MaskStyleInfo.ORDER.size
 private const val ROWS = 2
-private const val COLUMNS = 3
+private const val COLUMNS = 2
 
 private val GAP = 12.dp
 

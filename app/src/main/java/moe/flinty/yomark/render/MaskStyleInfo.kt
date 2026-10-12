@@ -12,10 +12,9 @@ enum class MaskSafety { IRREVERSIBLE, COSMETIC, ANNOTATION_ONLY }
 
 object MaskStyleInfo {
 
-    /** 样式栏上的顺序：不可还原的两种排前面，外观优先的与只做标记的排后面（与 README 的样式表一致）。 */
+    /** 样式栏上的顺序：不可还原的色块排最前面，外观优先的与只做标记的排后面（与 README 的样式表一致）。 */
     val ORDER: List<MaskStyle> = listOf(
-        MaskStyle.SOLID, MaskStyle.EMOJI,
-        MaskStyle.PIXELATE, MaskStyle.BLUR, MaskStyle.MARKER,
+        MaskStyle.SOLID, MaskStyle.PIXELATE, MaskStyle.BLUR, MaskStyle.MARKER,
     )
 
     fun label(style: MaskStyle): String = when (style) {
@@ -23,7 +22,6 @@ object MaskStyleInfo {
         MaskStyle.PIXELATE -> "马赛克"
         MaskStyle.BLUR -> "模糊"
         MaskStyle.MARKER -> "马克笔"
-        MaskStyle.EMOJI -> "表情"
     }
 
     /**
@@ -34,7 +32,7 @@ object MaskStyleInfo {
      * 所以如实降级为 COSMETIC，而不是留一个假的安全承诺。
      */
     fun safety(style: MaskStyle): MaskSafety = when (style) {
-        MaskStyle.SOLID, MaskStyle.EMOJI -> MaskSafety.IRREVERSIBLE
+        MaskStyle.SOLID -> MaskSafety.IRREVERSIBLE
         MaskStyle.BLUR, MaskStyle.PIXELATE -> MaskSafety.COSMETIC
         MaskStyle.MARKER -> MaskSafety.ANNOTATION_ONLY
     }
@@ -44,6 +42,6 @@ object MaskStyleInfo {
         MaskStyle.BLUR -> "模糊能被还原，不适合遮挡敏感信息"
         MaskStyle.PIXELATE -> "截图上的马赛克能被逐字还原，不适合遮挡敏感信息"
         MaskStyle.MARKER -> "马克笔只做标记，盖不住下面的内容"
-        MaskStyle.SOLID, MaskStyle.EMOJI -> null
+        MaskStyle.SOLID -> null
     }
 }

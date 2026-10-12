@@ -76,12 +76,13 @@ class StyleBarTest {
 
     // ---------- 样式那一排 ----------
 
-    @Test fun allFiveStylesAreOffered() {
+    @Test fun allFourStylesAreOffered() {
         show(StyleBarModel(MaskLook()))
-        listOf("色块", "表情", "马赛克", "模糊", "马克笔").forEach {
+        listOf("色块", "马赛克", "模糊", "马克笔").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
         compose.onNodeWithText("抹除").assertDoesNotExist()      // 并进了色块，是色块的近似色
+        compose.onNodeWithText("表情").assertDoesNotExist()      // 去掉了
         compose.onNodeWithText("色块").assertIsSelected()
     }
 
@@ -186,18 +187,6 @@ class StyleBarTest {
         assertThat(actions.picks).containsExactly(ColorTarget.SOLID, null).inOrder()
     }
 
-    @Test fun emojiPanelPicksAnEmojiAndTheLayout() {
-        val actions = Recorder()
-        show(open(MaskStyle.EMOJI), actions)
-        compose.onNodeWithContentDescription("🐱").performClick()
-        compose.onNodeWithText("排满").performClick()
-        compose.onNodeWithContentDescription("浅黄").performClick()
-        val looks = actions.looks.map { it.first.options }
-        assertThat(looks[0].emoji).isEqualTo("🐱")
-        assertThat(looks[1].emojiTiled).isTrue()
-        assertThat(looks[2].emojiBackground).isEqualTo(0xFFFFE082.toInt())
-    }
-
     // ---------- 近似色 ----------
 
     /** 近似色排在色块的色板最前面；点了还是色块，只是打开近似色，固定的颜色记着不动。 */
@@ -238,9 +227,9 @@ class StyleBarTest {
         assertThat(options.solidColor).isEqualTo(0xFF000000.toInt())
     }
 
-    /** 近似色只有色块有：表情的底色、马克笔的颜色都是一种固定的颜色。 */
+    /** 近似色只有色块有：马克笔的颜色是一种固定的颜色。 */
     @Test fun onlyTheSolidStyleOffersNearColor() {
-        show(open(MaskStyle.EMOJI))
+        show(open(MaskStyle.MARKER))
         compose.onNodeWithText("近似色").assertDoesNotExist()
     }
 

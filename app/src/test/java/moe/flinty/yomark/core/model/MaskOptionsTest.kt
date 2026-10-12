@@ -4,7 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 样式参数的范围是安全底线（MaskOptions.normalized）：色块与表情底色永远不透明，
+ * 样式参数的范围是安全底线（MaskOptions.normalized）：色块永远不透明，
  * 马克笔永远透得过去，马赛克不比出厂更细，模糊不比出厂更弱。
  */
 class MaskOptionsTest {
@@ -14,9 +14,8 @@ class MaskOptionsTest {
     }
 
     @Test fun `a translucent solid color is made opaque`() {
-        val o = MaskOptions(solidColor = 0x3387CEEB, emojiBackground = 0x00112233).normalized()
+        val o = MaskOptions(solidColor = 0x3387CEEB).normalized()
         assertThat(o.solidColor).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(o.emojiBackground).isEqualTo(0xFF112233.toInt())
     }
 
     @Test fun `the marker can neither turn opaque nor vanish`() {
@@ -42,25 +41,18 @@ class MaskOptionsTest {
             .isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
     }
 
-    @Test fun `a blank emoji falls back to the default one`() {
-        assertThat(MaskOptions(emoji = " ").normalized().emoji).isEqualTo(MaskOptions.DEFAULT_EMOJI)
-    }
-
     @Test fun `reset puts back only the params of that style`() {
         val tuned = MaskOptions(
             solidColor = 0xFF000000.toInt(),
             pixelBlockDivisor = 4,
             blurRadiusRatio = 0.2f,
-            emoji = "🐱",
-            emojiTiled = true,
         )
-        val reset = tuned.resetFor(MaskStyle.EMOJI)
-        assertThat(reset.emoji).isEqualTo(MaskOptions.DEFAULT_EMOJI)
-        assertThat(reset.emojiTiled).isFalse()
+        val reset = tuned.resetFor(MaskStyle.BLUR)
+        assertThat(reset.blurRadiusRatio).isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
         assertThat(reset.solidColor).isEqualTo(0xFF000000.toInt())    // 别的样式调好的不动
         assertThat(reset.pixelBlockDivisor).isEqualTo(4)
         assertThat(tuned.resetFor(MaskStyle.SOLID).solidColor).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(tuned.resetFor(MaskStyle.SOLID).emoji).isEqualTo("🐱")
+        assertThat(tuned.resetFor(MaskStyle.SOLID).blurRadiusRatio).isEqualTo(0.2f)
     }
 
     /** 近似色是色块的一项：色块的「恢复默认」把它关掉，固定的颜色也回到天蓝。 */
@@ -69,7 +61,7 @@ class MaskOptionsTest {
         assertThat(near.isDefaultFor(MaskStyle.SOLID)).isFalse()
         assertThat(near.isDefaultFor(MaskStyle.BLUR)).isTrue()
         assertThat(near.resetFor(MaskStyle.SOLID)).isEqualTo(MaskOptions())
-        assertThat(near.resetFor(MaskStyle.EMOJI).solidNear).isTrue()
+        assertThat(near.resetFor(MaskStyle.MARKER).solidNear).isTrue()
     }
 
     @Test fun `withAlpha keeps the color and replaces only the alpha`() {
