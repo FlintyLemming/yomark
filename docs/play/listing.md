@@ -67,14 +67,14 @@
 
 | 素材 | 文件 | 规格 |
 |---|---|---|
-| 应用图标 | [`icon.png`](icon.png) | 512×512，32 位 PNG（带 alpha），2 KB |
+| 应用图标 | [`icon.png`](icon.png) | 512×512，32 位 PNG（带 alpha），17 KB |
 | 置顶大图 | [`feature-graphic.png`](feature-graphic.png) | 1024×500，24 位 PNG |
 | 手机截图 | [`screenshots/`](screenshots/) | 8 张，1080×1920（9:16），24 位 PNG，每张不到 600 KB |
 
 8 张截图都是每边 ≥ 1080 px 的 9:16 竖图，满足推荐位「至少 4 张、每边不低于 1080 像素」的要求。视频是选填项，这里没有做。
 
-图标照启动器图标（`res/drawable/ic_launcher_foreground.xml`）换算：自适应图标 108 dp 的画布只露出中间 72 dp，
-48×24 dp 的白条在可见区域里占 2/3 宽。官网和 README 上的品牌标白条细一些（约 44%），Play 要求商店图标是启动器图标的高清版，所以这里跟启动器走。
+图标直接由母版 [`docs/icon/icon.svg`](../icon/icon.svg) 渲染：母版是满版方形，1024 对应自适应图标露出来的 72 dp，
+和启动器图标出自同一份几何（`docs/icon/src/icons.mjs`），Play 要求商店图标是启动器图标的高清版，正好对得上。
 
 ### 替代文字
 
