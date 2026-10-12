@@ -13,7 +13,8 @@ sourceSets {
                 "OcrDump.kt", "RuleProto.kt", "OcrBench.kt", "EnRules.kt", "EnProto.kt", "PpOcrEngineX.kt",
                 "moe/flinty/yomark/engine/ppocr/CtcDecoder.kt", "moe/flinty/yomark/engine/ppocr/DbPostProcess.kt",
                 "moe/flinty/yomark/engine/ppocr/OcrTypes.kt", "moe/flinty/yomark/engine/ppocr/PpOcrEngine.kt",
-                "moe/flinty/yomark/engine/ppocr/WordGaps.kt",
+                "moe/flinty/yomark/engine/ppocr/WordGaps.kt", "moe/flinty/yomark/engine/ppocr/Pixels.kt",
+                "moe/flinty/yomark/engine/ppocr/TextAxis.kt",
                 "moe/flinty/yomark/engine/genai/SemanticPrompt.kt",
                 "moe/flinty/yomark/core/model/Sensitivity.kt",
                 // 规则原型要对照出厂规则表

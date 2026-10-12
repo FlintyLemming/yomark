@@ -4,8 +4,8 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import java.nio.FloatBuffer
+import kotlin.math.abs
 import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -21,6 +21,8 @@ import kotlin.math.roundToInt
  * - 词界空格：见 WordGaps。
  * 最后把同一行上被检测拆开的几段拼回一条（RowGrouper），「取件码」和「1-58908」
  * 被拆成两个框时，标签锚定照样接得上。
+ *
+ * 版面不正的（竖着拍的证件、倒着的页、歪着的照片）先转正再读，见 [recognize]。
  *
  * 线程安全：ONNX Runtime 的 session 允许并发 run，但这里的调用方一次只跑一张图。
  */
@@ -39,17 +41,80 @@ class PpOcrEngine(
     private val det = env.createSession(detModel, options)
     private val rec = env.createSession(recModel, options)
 
+    /**
+     * 先在原图上检测，看文字行的走向（[TextAxis]）：
+     * - 横平的（大多数截图）：照常逐框读。读得磕磕绊绊（平均置信度不到 [UPRIGHT_SCORE]）的，拿最长的几行倒过来再读一遍，
+     *   明显更好就是整页倒着，转半圈重读；
+     * - 竖着的、歪着的：转到行是横平的那个方向上重读。差半圈的两个方向里挑哪个，问识别器自己——
+     *   各读一遍最长的几行，取读得更有把握的；
+     * - 看不出走向的（横竖都有）：照常读。
+     *
+     * 转正了读，检测、排序、拼行（RowGrouper）都在转正的画布上做，跟正着的页一模一样；最后把每行、每个字的框逐点映射回原图。
+     * 四个角仍按「阅读方向的左上、右上、右下、左下」排，TextLine.quad 的 p0→p1 就是原图上的阅读方向，规则层靠它转回来（ReadingFrame）。
+     * 行的先后是转正后的阅读顺序。
+     */
     fun recognize(pixels: IntArray, width: Int, height: Int): List<OcrLine> {
-        val image = Rgb(pixels, width, height)
-        val lines = detect(image)
-            .sortedWith(compareBy<Box> { (it.minY / ROW_BUCKET).toInt() }.thenBy { it.minX })
-            .mapNotNull { recognizeBox(image, it) }
-        return RowGrouper.group(lines)
+        val image = Argb(pixels, width, height)
+        val boxes = inReadingOrder(detect(image))
+        val axis = TextAxis.of(boxes)
+        if (axis == null || axis == 0f) {
+            val reads = boxes.map { read(image, it) }
+            val lines = RowGrouper.group(reads.mapNotNull { it?.line })
+            if (axis == null || score(reads) >= UPRIGHT_SCORE) return lines
+            val sample = TextAxis.sample(boxes, 0f)
+            val readOf = boxes.zip(reads).toMap()
+            return if (beats(score(sample.map { readOf[it] })) { score(image, sample, 180f) }) readTurned(image, 180f) else lines
+        }
+        // 转多少度行才横平；竖着的默认往下读（逆时针转 90°），同以前逐框转的方向
+        val turn = -axis
+        val other = if (turn > 0) turn - 180 else turn + 180
+        val (preferred, alternative) = if (abs(axis) > 45 && turn > 0) other to turn else turn to other
+        val sample = TextAxis.sample(boxes, axis)
+        val alternativeWins = beats(score(image, sample, preferred)) { score(image, sample, alternative) }
+        return readTurned(image, if (alternativeWins) alternative else preferred)
     }
+
+    /**
+     * 另一个方向是不是明显更好：置信度高出 [MARGIN]。默认的方向已经读到 1 − [MARGIN] 以上时，另一个不可能再高出这么多，不用试。
+     */
+    private inline fun beats(default: Float, other: () -> Float): Boolean =
+        default + MARGIN < 1f && other() > default + MARGIN
+
+    /** 把 [image] 顺时针转 [degrees] 度读一遍，行和字的框映射回原图。 */
+    private fun readTurned(image: Pixels, degrees: Float): List<OcrLine> {
+        val view = Turned(image, degrees)
+        val lines = inReadingOrder(detect(view)).mapNotNull { read(view, it)?.line }
+        return RowGrouper.group(lines).map { line ->
+            line.copy(box = line.box.map(view::toSource), charBoxes = line.charBoxes.map { it?.map(view::toSource) })
+        }
+    }
+
+    /** 拿 [sample] 这几行试一个方向：转 [degrees] 度之后读出来的置信度。 */
+    private fun score(image: Pixels, sample: List<Box>, degrees: Float): Float {
+        val view = Turned(image, degrees)
+        return score(sample.map { b -> read(view, DbPostProcess.order(b.corners().map(view::fromSource))) })
+    }
+
+    /** 按框长加权的平均置信度，丢掉的行（不到 [DROP_SCORE]）也算：要比的就是读得有多磕绊。 */
+    private fun score(reads: List<Read?>): Float {
+        var sum = 0.0
+        var weight = 0.0
+        reads.forEach { r ->
+            if (r == null) return@forEach
+            sum += r.confidence * r.length
+            weight += r.length
+        }
+        return if (weight > 0) (sum / weight).toFloat() else 0f
+    }
+
+    private fun inReadingOrder(boxes: List<Box>) =
+        boxes.sortedWith(compareBy<Box> { (it.minY / ROW_BUCKET).toInt() }.thenBy { it.minX })
+
+    private fun Box.map(f: (Pt) -> Pt) = Box(f(tl), f(tr), f(br), f(bl))
 
     // ---------- 检测 ----------
 
-    private fun detect(image: Rgb): List<Box> {
+    private fun detect(image: Pixels): List<Box> {
         // 截图长边 2000+，全分辨率检测在手机上太慢；1536 仍让常见字号的字高保持在 20px 以上
         val s = min(1f, DET_LIMIT / max(image.width, image.height))
         val nw = max(32, (image.width * s / 32).roundToInt() * 32)
@@ -76,7 +141,13 @@ class PpOcrEngine(
 
     // ---------- 识别 ----------
 
-    private fun recognizeBox(image: Rgb, detected: Box): OcrLine? {
+    /**
+     * 一个框读出来的结果。[line] 是按 [DROP_SCORE] 筛过的；[confidence] 是原样的（一个字也没读出来的按 0 算），
+     * [length] 是框沿阅读方向的长度，试方向时拿这两个加权比。
+     */
+    private class Read(val line: OcrLine?, val confidence: Float, val length: Float)
+
+    private fun read(image: Pixels, detected: Box): Read? {
         // 竖排的框转 90° 再识别（PaddleOCR 的 get_rotate_crop_image 同一个口径）
         val box = if (detected.height >= detected.width * 1.5f) {
             Box(detected.tr, detected.br, detected.bl, detected.tl)
@@ -97,12 +168,15 @@ class PpOcrEngine(
             gray[i] = (0.299f * c.r + 0.587f * c.g + 0.114f * c.b) / 255f
         }
 
-        val decoded = run(rec, input, longArrayOf(1, 3, REC_HEIGHT.toLong(), w.toLong())) { buf, shape ->
+        val (result, steps) = run(rec, input, longArrayOf(1, 3, REC_HEIGHT.toLong(), w.toLong())) { buf, shape ->
             CtcDecoder.decode(buf, shape[1].toInt(), shape[2].toInt(), dict).let { it to shape[1].toInt() }
         }
-        val (result, steps) = decoded
-        if (result.chars.none { it.isNotBlank() } || result.confidence < DROP_SCORE) return null
+        val empty = result.chars.none { it.isNotBlank() }
+        val line = if (empty || result.confidence < DROP_SCORE) null else line(box, w, result, steps, gray)
+        return Read(line, if (empty) 0f else result.confidence, box.width)
+    }
 
+    private fun line(box: Box, w: Int, result: CtcDecoder.Decoded, steps: Int, gray: FloatArray): OcrLine {
         val step = w.toFloat() / steps
         val centers = result.steps.map { (it.first + it.last + 1) / 2f * step }
         val gaps = WordGaps.find(gray, w, REC_HEIGHT)
@@ -144,32 +218,6 @@ class PpOcrEngine(
         options.close()
     }
 
-    /** ARGB 像素上的双线性采样，越界按边缘像素延伸（等价于 OpenCV 的 BORDER_REPLICATE）。 */
-    private class Rgb(val pixels: IntArray, val width: Int, val height: Int) {
-        class Color(val r: Float, val g: Float, val b: Float)
-
-        fun sample(x: Float, y: Float): Color {
-            val fx = x.coerceIn(0f, width - 1f)
-            val fy = y.coerceIn(0f, height - 1f)
-            val x0 = floor(fx).toInt()
-            val y0 = floor(fy).toInt()
-            val x1 = min(x0 + 1, width - 1)
-            val y1 = min(y0 + 1, height - 1)
-            val ax = fx - x0
-            val ay = fy - y0
-            val p00 = pixels[y0 * width + x0]
-            val p10 = pixels[y0 * width + x1]
-            val p01 = pixels[y1 * width + x0]
-            val p11 = pixels[y1 * width + x1]
-            fun ch(shift: Int): Float {
-                val top = ((p00 shr shift) and 0xFF) * (1 - ax) + ((p10 shr shift) and 0xFF) * ax
-                val bottom = ((p01 shr shift) and 0xFF) * (1 - ax) + ((p11 shr shift) and 0xFF) * ax
-                return top * (1 - ay) + bottom * ay
-            }
-            return Color(ch(16), ch(8), ch(0))
-        }
-    }
-
     private fun Pt.scale(sx: Float, sy: Float) = Pt(x * sx, y * sy)
 
     companion object {
@@ -182,6 +230,12 @@ class PpOcrEngine(
         const val DROP_SCORE = 0.5f
         /** 排序时把 y 相差不到这么多像素的框当作同一行，行内再按 x。 */
         private const val ROW_BUCKET = 10f
+
+        /** 横平的页读到这个平均置信度就不再怀疑它是倒着的。实测正着的页在 0.89–1.0，倒过来的身份证只有 0.43。 */
+        private const val UPRIGHT_SCORE = 0.8f
+
+        /** 换到不是默认的那个方向，置信度得高出这么多：两边差不多时不折腾。 */
+        private const val MARGIN = 0.1f
 
         /** 字典文件：一行一个字，UTF-8。 */
         fun parseDict(text: String): List<String> = text.split('\n').map { it.trimEnd('\r') }.let {
