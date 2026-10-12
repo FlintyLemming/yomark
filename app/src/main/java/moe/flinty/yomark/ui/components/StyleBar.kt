@@ -526,7 +526,7 @@ internal val MARKER_PALETTE = listOf(
     NamedColor(0xFF76FF03.toInt(), "绿色"),
 )
 
-/** 马赛克颗粒的六档，按 8 - divisor 排：0 最细（出厂），5 最粗。 */
+/** 马赛克颗粒的六档，按 8 - divisor 排：0 最细，2 是出厂，5 最粗。 */
 private val PIXEL_LEVELS = listOf("细", "较细", "适中", "较粗", "粗", "很粗")
 
 /** 模糊强度的五档，滑条也只停在这五处。 */

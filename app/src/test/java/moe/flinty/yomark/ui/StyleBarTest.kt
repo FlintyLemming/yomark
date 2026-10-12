@@ -212,7 +212,7 @@ class StyleBarTest {
     @Test fun mosaicAndBlurHaveTheirSliders() {
         show(open(MaskStyle.PIXELATE))
         compose.onNodeWithContentDescription("颗粒").assertIsDisplayed()
-        compose.onNodeWithText("细").assertIsDisplayed()
+        compose.onNodeWithText("适中").assertIsDisplayed()
     }
 
     @Test fun markerChangesColorButKeepsItsOpacity() {

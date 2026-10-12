@@ -10,6 +10,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
+import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
@@ -40,12 +41,16 @@ class MaskCompositeTest {
         1f, 200, 200, "image/png",
     )
 
-    private fun manual(id: String, rect: RectF, style: MaskStyle = MaskStyle.SOLID) = MaskItem(
-        id, Quad.fromRect(rect), SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED, MaskLook(style),
+    private fun manual(id: String, rect: RectF, look: MaskLook = MaskLook(MaskStyle.SOLID)) = MaskItem(
+        id, Quad.fromRect(rect), SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED, look,
     )
 
     private val bar = manual("bar", RectF(30f, 90f, 170f, 110f))
-    private val blur = manual("blur", RectF(20f, 20f, 180f, 180f), MaskStyle.BLUR)
+    // 最弱一档：糊得越狠，细细一条色块越淡，看不出糊开的是谁
+    private val blur = manual(
+        "blur", RectF(20f, 20f, 180f, 180f),
+        MaskLook(MaskStyle.BLUR, MaskOptions(blurRadiusRatio = MaskOptions.WEAKEST_BLUR_RATIO)),
+    )
 
     private fun preview(plan: MaskPlan, source: SourceImage = image()): Bitmap {
         val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
