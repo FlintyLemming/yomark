@@ -77,12 +77,6 @@ class WatermarkDrawer {
         val ink = if (dark) Color.argb(150, 0, 0, 0) else Color.argb(170, 255, 255, 255)
         val counterInk = if (dark) Color.argb(200, 255, 255, 255) else Color.argb(200, 0, 0, 0)
 
-        val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL; color = ink }
-        val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = counterInk
-            strokeWidth = max(1f, h * 0.06f)
-        }
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = ink
             textSize = h * 0.72f
@@ -90,14 +84,14 @@ class WatermarkDrawer {
             letterSpacing = 0.08f
         }
 
-        // 图标：圆角方块上一条横杠，与启动图标同构
-        val radius = h * 0.22f
-        canvas.drawRoundRect(glyph, radius, radius, fill)
-        val bar = RectF(
-            glyph.left + h * 0.22f, glyph.centerY() - h * 0.09f,
-            glyph.right - h * 0.22f, glyph.centerY() + h * 0.09f,
+        // 图标：应用图标去掉墨色底板（见 BrandGlyph）。亮图上白纸要描一圈淡墨色的细边才看得出纸的边
+        BrandGlyph.draw(
+            canvas,
+            glyph,
+            edge = if (dark) Color.argb(70, 0, 0, 0) else null,
+            outline = if (p.outlined) counterInk else null,
+            outlineWidth = max(1f, h * 0.06f),
         )
-        canvas.drawRoundRect(bar, h * 0.05f, h * 0.05f, Paint(fill).apply { color = counterInk })
 
         val baseline = p.rect.bottom - (h - textPaint.textSize) / 2f - textPaint.descent() * 0.6f
         val textX = glyph.right + h * GAP_RATIO
@@ -108,7 +102,6 @@ class WatermarkDrawer {
                 color = counterInk
                 alpha = 255
             })
-            canvas.drawRoundRect(glyph, radius, radius, stroke)
         }
         canvas.drawText(text, textX, baseline, textPaint)
         return p
