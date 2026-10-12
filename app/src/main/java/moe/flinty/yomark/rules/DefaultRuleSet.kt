@@ -6,7 +6,7 @@ import moe.flinty.yomark.rules.validator.KnownTlds
 import moe.flinty.yomark.R
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。17 条：12 条默认打码、5 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。20 条：15 条默认打码、5 条仅圈出。
  * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
@@ -16,16 +16,42 @@ object DefaultRuleSet {
 
     // ---------- 高置信：有校验位兜底，误报接近零，默认打码 ----------
 
-    private val CARD = RegexRule(
+    /** 13–19 位数字，容忍空格与连字符分组；前后不能紧邻数字。 */
+    private val CARD_NUMBER = Regex("""(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])""")
+
+    /**
+     * 银行卡 = Luhn 校验过的卡号 + 字段名后面的安全码和有效期。
+     *
+     * 卡背面的「CVV2 123」、正面的「VALID THRU 12/28」单凭形状什么都不是，跟在字段名后面才认。
+     * 有效期只认「月/年」：身份证背面的「有效期限 2015.08.20-2035.08.20」不是卡。
+     *
+     * 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn；身份证号也是，十个里有一个，
+     * 同一处让给护照和证件号码，不在身份证号上标「银行卡号」。
+     */
+    private val CARD = CompositeRule(
         id = "card",
         kind = SensitiveKind.PAYMENT_CARD,
         enabledByDefault = true,
-        // 13–19 位数字，容忍空格与连字符分组；前后不能紧邻数字
-        pattern = Regex("""(?<![\d-])(?:\d[ -]?){12,18}\d(?![\d-])"""),
-        confidence = 0.95f,
-        validate = { _, m -> Checksums.luhn(m.value.filter { it.isDigit() }) },
-        // 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn
-        yieldsTo = setOf(SensitiveKind.PASSPORT),
+        Finder { text ->
+            CARD_NUMBER.findAll(text).filter { Checksums.luhn(it.value.filter(Char::isDigit)) }
+                .map { RuleMatch(it.range, 0.95f) }.toList()
+        },
+        LabeledField(
+            labels = listOf("CVV2", "CVC2", "CVN2", "CVV", "CVC", "CID", "CSC", "安全码", "卡验证码", "卡片验证码"),
+            value = Regex("""\d{3,4}(?!\d)"""),
+            confidence = 0.8f,
+            ignoreCase = true,
+        ),
+        LabeledField(
+            labels = listOf(
+                "VALID THRU", "VALIDTHRU", "THRU", "GOOD THRU", "EXPIRES END", "EXP", "Expiry", "Expiry Date",
+                "Exp Date", "Expiration Date", "有效期", "有效期至",
+            ),
+            value = Regex("""(?:0[1-9]|1[0-2]) ?/ ?(?:20)?\d{2}(?![\d/])"""),
+            confidence = 0.8f,
+            ignoreCase = true,
+        ),
+        yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER),
     )
 
     private val IBAN = RegexRule(
@@ -100,6 +126,60 @@ object DefaultRuleSet {
             sameLine = true,
         ),
         MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, confidence = 0.9f),
+    )
+
+    /**
+     * 证件号码 = 字段名后面的号码 + 没有字段名也敢认的几种。
+     *
+     * 字段名（「公民身份号码」「证号」「档案编号」「ID No.」……见 IdNumbers.LABELS）后面的不验校验位：
+     * 字段名已经说明了是证件号，OCR 认错一两位照样该遮。没有字段名的要有校验位或者形状够特别：
+     * 大陆身份证（省份、生日、校验码，OCR 补的空格也认，见 ResidentIdNumber）、带括号的香港身份证、台湾身分证与居留证、
+     * 新加坡 NRIC，韩国居民登录号、马来西亚 MyKad（生日对得上），日本在留卡，带点的巴西 CPF。
+     * 一代身份证、澳门身份证、日本个人番号、各种通行证号没有校验位或太像别的号码，只在字段名后面认。
+     *
+     * 真机漏检补的：身份证正面的号码原先只圈成「长数字串」，过了 Luhn 的还标成「银行卡号」，末位是 X 的什么都不是；
+     * 照片上 OCR 在号码中间补了空格（「码3 202 01201109254526」），一处都没认出来。
+     * 同一处让给护照：机读码那几行、护照号由护照一类遮。
+     */
+    private val ID_NUMBER = CompositeRule(
+        id = "idnumber",
+        kind = SensitiveKind.ID_NUMBER,
+        enabledByDefault = true,
+        IdNumbers.labeled(confidence = 0.8f),
+        ResidentIdNumber,
+        IdNumbers.HKID,
+        IdNumbers.TAIWAN,
+        IdNumbers.NRIC,
+        IdNumbers.KOREA_RRN,
+        IdNumbers.MYKAD,
+        IdNumbers.ZAIRYU,
+        IdNumbers.CPF,
+        yieldsTo = setOf(SensitiveKind.PASSPORT),
+    )
+
+    /**
+     * 车牌号 = 字段名（「车牌号」「号牌号码」「Plate No.」）后面的 + 长得像号牌的。
+     * 号牌以省份简称打头、字母与位数有一套规矩（见 Vehicles.PLATE），单独出现也认；军牌这类太像型号的只在字段名后面认。
+     */
+    private val LICENSE_PLATE = CompositeRule(
+        id = "plate",
+        kind = SensitiveKind.LICENSE_PLATE,
+        enabledByDefault = true,
+        Vehicles.labeledPlate(confidence = 0.8f),
+        Vehicles.PLATE,
+    )
+
+    /**
+     * 车架号 = 字段名（「车辆识别代号」「车架号」「VIN」）后面的 17 位 + 发动机号 + 第九位校验位对得上的 17 位。
+     * 行驶证、登记证书、购车发票、保单上都有；发动机号没有格式，只在字段名后面认。
+     */
+    private val VIN = CompositeRule(
+        id = "vin",
+        kind = SensitiveKind.VIN,
+        enabledByDefault = true,
+        Vehicles.labeledVin(confidence = 0.8f),
+        Vehicles.labeledEngine(confidence = 0.8f),
+        Vehicles.VIN,
     )
 
     private val API_KEY = RegexRule(
@@ -357,7 +437,8 @@ object DefaultRuleSet {
         override val id = "tracking"
         override val kind = SensitiveKind.TRACKING_NO
         override val enabledByDefault = false
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT)
+        // 15 位的一代身份证号、字段名后面 12 位的档案编号也是这个长度
+        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
 
         private val ups = Regex("""(?<![A-Za-z0-9])1Z[0-9A-Za-z]{16}(?![A-Za-z0-9])""")
         // FedEx 12/15 位、USPS 20/22 位：无校验位，置信度调低
@@ -396,7 +477,8 @@ object DefaultRuleSet {
         override val id = "longnum"
         override val kind = SensitiveKind.LONG_NUMBER
         override val enabledByDefault = false
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT)
+        // 18 位的身份证号原先就落在这里，只圈不遮
+        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
 
         private val run = Regex("""(?<![A-Za-z0-9])\d{16,}(?![A-Za-z0-9])""")
         private val trackingLengths = setOf(20, 22)
@@ -416,14 +498,12 @@ object DefaultRuleSet {
     }
 
     val rules: List<Rule> = listOf(
-        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, API_KEY, NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE,
+        CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, ID_NUMBER, LICENSE_PLATE, VIN, API_KEY,
+        NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 
     // ---------- 人名的旁证 ----------
-
-    /** 18 位身份证号，查校验码。 */
-    private val ID_NUMBER = Regex("""(?<![0-9A-Za-z])\d{17}[\dXx](?![0-9A-Za-z])""")
 
     /**
      * 打了星的号码：证件号「3201**********1234」、卡号「6222****1234」、手机号「138****6612」。
@@ -469,7 +549,7 @@ object DefaultRuleSet {
         NameAnchor(R.string.anchor_phone, NameAnchor.Reach.NEARBY, PHONE),
         NameAnchor(R.string.anchor_email, NameAnchor.Reach.NEARBY, EMAIL),
         NameAnchor(R.string.anchor_address, NameAnchor.Reach.NEARBY, ADDRESS),
-        NameAnchor(R.string.anchor_id, NameAnchor.Reach.NEARBY, shape(ID_NUMBER, Checksums::chineseIdValid)),
+        NameAnchor(R.string.anchor_id, NameAnchor.Reach.NEARBY, ResidentIdNumber),
         NameAnchor(R.string.anchor_masked_number, NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
         NameAnchor(
             R.string.anchor_field, NameAnchor.Reach.NEARBY,
