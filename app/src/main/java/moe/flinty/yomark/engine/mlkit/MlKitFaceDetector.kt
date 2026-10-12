@@ -14,6 +14,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import kotlinx.coroutines.tasks.await
+import java.util.concurrent.Executor
 import kotlin.math.min
 
 /**
@@ -108,13 +109,11 @@ class MlKitFaceDetector(
         if (turns == 0) return detect(image)
         val src = image.bitmap
         val upright = Bitmap.createBitmap(src, 0, 0, src.width, src.height, Upright.matrix(src.width, src.height, turns), true)
-        try {
-            val faces = client.process(InputImage.fromBitmap(upright, 0)).await()
-            return faces.mapIndexed { i, face ->
-                FaceCandidates.fromUpright(i, face.trackingId, RectF(face.boundingBox), src.width, src.height, turns, masked)
-            }
-        } finally {
-            if (upright !== src) upright.recycle()
+        val task = client.process(InputImage.fromBitmap(upright, 0))
+        // 等 ML Kit 用完再回收：识别被取消时 await 当场返回，ML Kit 可能还在读这张位图
+        task.addOnCompleteListener(Executor { it.run() }) { if (upright !== src) upright.recycle() }
+        return task.await().mapIndexed { i, face ->
+            FaceCandidates.fromUpright(i, face.trackingId, RectF(face.boundingBox), src.width, src.height, turns, masked)
         }
     }
 
