@@ -13,6 +13,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import moe.flinty.yomark.ui.AppLocale
+import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.billing.PurchaseStore
 import moe.flinty.yomark.data.SettingsStore
@@ -32,7 +34,7 @@ import kotlinx.coroutines.launch
  * 设置（一级页）。首页和编辑器的右上角都进得来，所以「向上」就是 finish 回到来的那一页，
  * 不声明固定的 parentActivityName。
  */
-class SettingsActivity : ComponentActivity() {
+class SettingsActivity : YomarkActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableLightEdgeToEdge()
@@ -52,6 +54,8 @@ class SettingsActivity : ComponentActivity() {
                     onOpen = { page -> startActivity(SettingsPageActivity.intent(this, page)) },
                     onNavigateUp = ::finish,
                     developer = developer,
+                    // 改了语言 Activity 会重建，这里读一次就够
+                    language = remember { AppLocale.current(this) },
                 )
             }
         }
@@ -62,7 +66,7 @@ class SettingsActivity : ComponentActivity() {
  * 设置一级页以下的各页。共用这一个 Activity，打开哪一页由 [SettingsPage] 参数决定，
  * 文字里的一类另带规则 id；每次打开都是一个新实例，预见式返回照样是跨 Activity 的动画。
  */
-class SettingsPageActivity : ComponentActivity() {
+class SettingsPageActivity : YomarkActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableLightEdgeToEdge()
@@ -166,6 +170,11 @@ class SettingsPageActivity : ComponentActivity() {
                     )
                 }
             }
+            SettingsPage.LANGUAGE -> LanguageSettingsScreen(
+                language = remember { AppLocale.current(this) },
+                onLanguageChange = { next -> AppLocale.set(this, next) },
+                onNavigateUp = ::finish,
+            )
             SettingsPage.ABOUT -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
                 debugTrace?.let { on ->

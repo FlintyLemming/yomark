@@ -23,6 +23,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKindLabels
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 导出拦截（spec §7.4）。
@@ -46,10 +49,11 @@ fun PendingExportDialog(
     var stopReminding by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("还有 $pendingCount 处没打码") },
+        title = { Text(stringResource(R.string.pending_title, pendingCount)) },
         text = {
             Column {
-                Text(byKind.entries.joinToString("、") { (kind, n) -> SensitiveKindLabels.plural(kind, n) })
+                val res = LocalContext.current.resources
+                Text(byKind.entries.joinToString(stringResource(R.string.list_separator)) { (kind, n) -> SensitiveKindLabels.plural(res, kind, n) })
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -59,18 +63,18 @@ fun PendingExportDialog(
                 ) {
                     Checkbox(checked = stopReminding, onCheckedChange = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("不再提示")
+                    Text(stringResource(R.string.stop_reminding))
                 }
                 if (stopReminding) {
                     Text(
-                        "可在 设置 › 导出 里重新打开",
+                        stringResource(R.string.stop_reminding_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
         },
-        confirmButton = { TextButton(onClick = { onMaskAll(stopReminding) }) { Text("全部打码") } },
-        dismissButton = { TextButton(onClick = { onExportAnyway(stopReminding) }) { Text("仍然导出") } },
+        confirmButton = { TextButton(onClick = { onMaskAll(stopReminding) }) { Text(stringResource(R.string.mask_all)) } },
+        dismissButton = { TextButton(onClick = { onExportAnyway(stopReminding) }) { Text(stringResource(R.string.export_anyway)) } },
     )
 }

@@ -20,6 +20,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 首次安装的一屏引导（spec §12 M5）。只出现一次。
@@ -34,21 +36,21 @@ fun OnboardingScreen(onStart: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.Start,
     ) {
-        Text("有码", style = MaterialTheme.typography.displaySmall)
+        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
         Text(
-            "自动找出截图里的手机号、地址、人脸并打码。",
+            stringResource(R.string.onboarding_tagline),
             style = MaterialTheme.typography.titleMedium,
             modifier = Modifier.padding(top = 8.dp, bottom = 32.dp),
         )
 
-        Promise("不需要任何权限")
-        Promise("不联网，图片不离开手机")
-        Promise("导出时去掉位置、机型等隐藏信息")
+        Promise(stringResource(R.string.onboarding_no_permissions))
+        Promise(stringResource(R.string.onboarding_offline))
+        Promise(stringResource(R.string.onboarding_metadata))
 
         Button(
             onClick = onStart,
             modifier = Modifier.fillMaxWidth().padding(top = 40.dp),
-        ) { Text("选择图片") }
+        ) { Text(stringResource(R.string.pick_image)) }
     }
 }
 

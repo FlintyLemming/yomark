@@ -35,6 +35,7 @@ import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
+import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
 import moe.flinty.yomark.ui.settings.SettingsPage
 import moe.flinty.yomark.ui.settings.SettingsScreen
@@ -48,16 +49,21 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * 设置的一级页只是目录，选项都在二级页里；人脸、条码和文字规则一样能设成打码、仅圈出或关闭。
  * 各页改动即时发出新值（写 DataStore 由 Activity 管，这里只看发出了什么）。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class SettingsScreenTest {
 
     @get:Rule val compose = createComposeRule()
+
+    /** 和 @Config 里的语言一致：Robolectric 按它选 values-zh。 */
+    private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     private fun show(screen: @Composable () -> Unit) {
         compose.setContent { MaterialTheme { Surface { screen() } } }
@@ -74,7 +80,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "关于").forEach {
+        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "语言", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -117,7 +123,7 @@ class SettingsScreenTest {
             ),
             exportReminder = false,
         )
-        compose.onNodeWithText("仅圈出 · 精确识别").assertIsDisplayed()
+        compose.onNodeWithText("仅圈出 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
         compose.onNodeWithText("导出前提醒已关闭").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED }
@@ -149,6 +155,46 @@ class SettingsScreenTest {
         home(developer = true, onOpen = { opened += it })
         compose.onNodeWithText("开发者").performClick()
         assertThat(opened).containsExactly(SettingsPage.DEVELOPER)
+    }
+
+    // ---------- 语言 ----------
+
+    /** 语言在关于上面，小字是眼下的界面语言；没选过就是跟随系统。 */
+    @Test fun theLanguageRowSitsAboveAboutAndSaysTheCurrentLanguage() {
+        val opened = mutableListOf<SettingsPage>()
+        show {
+            SettingsScreen(RecognitionConfig(), true, { opened += it }, onNavigateUp = {}, language = AppLanguage.ENGLISH)
+        }
+        compose.onNodeWithText("English").assertIsDisplayed()
+        val language = compose.onNodeWithText("语言").fetchSemanticsNode().boundsInRoot
+        val about = compose.onNodeWithText("关于").fetchSemanticsNode().boundsInRoot
+        assertThat(language.bottom).isAtMost(about.top)
+        compose.onNodeWithText("语言").performClick()
+        assertThat(opened).containsExactly(SettingsPage.LANGUAGE)
+    }
+
+    @Test fun theLanguageRowSaysSystemDefaultWhenNothingWasPicked() {
+        home()
+        compose.onNodeWithText("跟随系统").assertIsDisplayed()
+    }
+
+    /** 跟随系统排第一，其余用各自的语言写名字。 */
+    @Test fun theLanguagePageListsSystemDefaultFirst() {
+        show { LanguageSettingsScreen(AppLanguage.SYSTEM, onLanguageChange = {}, onNavigateUp = {}) }
+        val tops = listOf("跟随系统", "简体中文", "English").map {
+            compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        }
+        assertThat(tops).isInOrder()
+        compose.onNodeWithText("跟随系统").assertIsSelected()
+    }
+
+    @Test fun pickingALanguageEmitsIt() {
+        val picked = mutableListOf<AppLanguage>()
+        show { LanguageSettingsScreen(AppLanguage.CHINESE_SIMPLIFIED, onLanguageChange = { picked += it }, onNavigateUp = {}) }
+        compose.onNodeWithText("简体中文").performClick()
+        compose.onNodeWithText("English").performClick()
+        compose.onNodeWithText("跟随系统").performClick()
+        assertThat(picked).containsExactly(AppLanguage.ENGLISH, AppLanguage.SYSTEM).inOrder()
     }
 
     // ---------- 人脸 ----------
@@ -294,7 +340,7 @@ class SettingsScreenTest {
         rulePage("url")
         compose.onNodeWithText("识别到网址时").assertIsDisplayed()
         compose.onNodeWithText("仅圈出").assertIsSelected()
-        compose.onNodeWithText(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" })).assertIsDisplayed()
+        compose.onNodeWithText(context.getString(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" }))).assertIsDisplayed()
     }
 
     @Test fun pickingAHandlingOnAKindPageEmitsIt() {
@@ -389,8 +435,9 @@ class SettingsScreenTest {
     }
 
     @Test fun mlKitTextVersionsAreWrittenOnceWhenTheyMatch() {
-        assertThat(mlKitSummary("16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
-        assertThat(mlKitSummary("16.0.1", "16.0.2", "16.1.7", "17.3.0"))
+        val res = context.resources
+        assertThat(mlKitSummary(res, "16.0.1", "16.0.1", "16.1.7", "17.3.0")).isEqualTo("文字 16.0.1 · 人脸 16.1.7 · 条码 17.3.0")
+        assertThat(mlKitSummary(res, "16.0.1", "16.0.2", "16.1.7", "17.3.0"))
             .isEqualTo("文字 16.0.1（英文）/ 16.0.2（中文） · 人脸 16.1.7 · 条码 17.3.0")
     }
 

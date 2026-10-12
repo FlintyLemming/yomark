@@ -49,6 +49,12 @@ internal object SettingsIconColors {
         content = Color(0xFF5C4300),
     )
 
+    /** 种子色 #3F51B5 */
+    val indigo = SettingsIconColor(
+        container = Color(0xFFDEE0FF),
+        content = Color(0xFF293CA0),
+    )
+
     /** 种子色 #1A73E8，彩度压到 6 */
     val gray = SettingsIconColor(
         container = Color(0xFFE2E2E9),

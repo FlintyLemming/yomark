@@ -43,7 +43,7 @@ import org.robolectric.annotation.Config
  * 手机上的面板是弹出来的底部动作条，在自己的对话框窗口里；查找节点时各个窗口都会找到。
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class StyleBarTest {
 
     @get:Rule val compose = createComposeRule()

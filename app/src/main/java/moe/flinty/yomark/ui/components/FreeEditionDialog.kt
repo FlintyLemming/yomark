@@ -16,6 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.billing.Edition
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 开源版里去水印按钮打开的是它，不是 [PaywallDialog]（见 [Edition]）。
@@ -40,15 +42,15 @@ fun FreeEditionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("全功能免费版") },
+        title = { Text(stringResource(R.string.free_edition)) },
         text = {
             Column {
-                Text(if (unlocked) "水印已去除，可在设置 → 导出里改回。" else "开源版可以免费去除水印。")
-                Text("如果有码帮到了你，欢迎打赏。")
+                Text(stringResource(if (unlocked) R.string.free_edition_unlocked_text else R.string.free_edition_text))
+                Text(stringResource(R.string.free_edition_donate))
                 if (noBrowser) {
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "没有找到可以打开网页的应用，请在浏览器里访问 ${Edition.DONATE_URL}",
+                        stringResource(R.string.no_browser, Edition.DONATE_URL),
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
@@ -56,16 +58,16 @@ fun FreeEditionDialog(
         },
         confirmButton = {
             if (unlocked) {
-                TextButton(onClick = { donate() }) { Text("打赏") }
+                TextButton(onClick = { donate() }) { Text(stringResource(R.string.donate)) }
             } else {
-                TextButton(onClick = onUnlock) { Text("去除水印") }
+                TextButton(onClick = onUnlock) { Text(stringResource(R.string.remove_watermark)) }
             }
         },
         dismissButton = {
             if (unlocked) {
-                TextButton(onClick = onDismiss) { Text("关闭") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
             } else {
-                TextButton(onClick = { donate() }) { Text("打赏") }
+                TextButton(onClick = { donate() }) { Text(stringResource(R.string.donate)) }
             }
         },
     )

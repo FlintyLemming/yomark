@@ -3,6 +3,7 @@ package moe.flinty.yomark.rules
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.SensitiveKind
 import org.junit.Test
+import moe.flinty.yomark.R
 
 /**
  * 从字面认人名（滴滴出票页实测漏检）。
@@ -170,7 +171,7 @@ class PersonNameRecognizerTest {
     /** 设置页上只有一行「人名」，它的页上交代字面猜的那部分要旁证。 */
     @Test fun `the settings row is one plain name row that explains the evidence`() {
         assertThat(RuleCatalog.all.filter { it.kind == SensitiveKind.PERSON_NAME }).containsExactly(rule)
-        assertThat(RuleCatalog.label(rule)).isEqualTo("人名")
-        assertThat(RuleCatalog.description(rule)).contains("要有旁证才算")
+        assertThat(RuleCatalog.label(rule)).isEqualTo(R.string.kind_name)
+        assertThat(RuleCatalog.description(rule)).isEqualTo(R.string.rule_desc_name)
     }
 }

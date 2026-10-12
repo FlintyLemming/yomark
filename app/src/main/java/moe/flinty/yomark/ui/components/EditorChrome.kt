@@ -34,6 +34,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 @Composable
 fun EditorTopBar(
@@ -58,30 +60,30 @@ fun EditorTopBar(
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // 向上回到首页，放在 Android 约定的左上角
-        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回") }
+        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
         Row(Modifier.weight(1f)) {}
-        IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, "撤销") }
-        IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, "重做") }
+        IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, stringResource(R.string.undo)) }
+        IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, stringResource(R.string.redo)) }
         if (onRemoveWatermark != null) {
-            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, if (Edition.isFree) "全功能免费版" else "去除水印") }
+            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark)) }
         }
         IconButton(onClick = onPurpose) {
             Icon(
                 Icons.Filled.Layers,
-                if (purposeOn) "用途水印（已开启）" else "用途水印",
+                stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
                 tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
             )
         }
         if (compare != null) {
             // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
             IconButton(onClick = {}, enabled = canCompare, interactionSource = compare) {
-                Icon(Icons.Filled.Compare, "按住对比原图")
+                Icon(Icons.Filled.Compare, stringResource(R.string.compare_original))
             }
         }
         if (onDebug != null) {
-            IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, "调试信息") }
+            IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
         }
-        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
+        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
     }
 }
 
@@ -137,7 +139,7 @@ fun EditorActionRow(
             AiReviewButton(aiReview, onAiReview)
             Spacer(Modifier.weight(1f))
         }
-        Button(onClick = onExport, enabled = !exporting) { Text(if (exporting) "导出中…" else "导出") }
+        Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else R.string.export)) }
     }
 }
 
@@ -154,13 +156,13 @@ internal fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
         AiReview.Ready -> TextButton(onClick = onClick) {
             SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("AI 增强识别")
+            Text(stringResource(R.string.ai_review))
         }
         AiReview.Running -> TextButton(onClick = {}, enabled = false) {
             // 按钮灰掉了，星星仍着主题色，看得出它在干活
             SparkleIcon(animating = true, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(6.dp))
-            Text("增强识别中…")
+            Text(stringResource(R.string.ai_reviewing))
         }
         is AiReview.Done -> TextButton(
             onClick = {},
@@ -170,7 +172,7 @@ internal fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
         ) {
             Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text(if (state.found == 0) "没有新发现" else "新发现 ${state.found} 处")
+            Text(if (state.found == 0) stringResource(R.string.ai_review_none) else stringResource(R.string.ai_review_found, state.found))
         }
         AiReview.Failed -> TextButton(
             onClick = onClick,
@@ -178,7 +180,7 @@ internal fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
         ) {
             SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text("识别失败，点击重试")
+            Text(stringResource(R.string.ai_review_failed))
         }
     }
 }

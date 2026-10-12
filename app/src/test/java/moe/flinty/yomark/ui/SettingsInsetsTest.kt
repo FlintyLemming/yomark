@@ -37,7 +37,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class SettingsInsetsTest {
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
@@ -77,7 +77,7 @@ class SettingsInsetsTest {
         show { TextSettingsScreen(RecognitionConfig(), {}, {}, {}, onNavigateUp = {}) }
         val last = RuleCatalog.inSettingsOrder.last()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey(last.id)
-        val row = compose.onNodeWithText(RuleCatalog.label(last)).getUnclippedBoundsInRoot()
+        val row = compose.onNodeWithText(compose.activity.getString(RuleCatalog.label(last))).getUnclippedBoundsInRoot()
         val screen = compose.onRoot().getUnclippedBoundsInRoot()
         assertThat(row.bottom).isAtMost(screen.bottom - navigationBar)
     }

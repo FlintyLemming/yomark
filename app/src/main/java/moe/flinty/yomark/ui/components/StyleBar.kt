@@ -73,6 +73,9 @@ import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.render.NearColor
 import moe.flinty.yomark.ui.ColorTarget
 import kotlin.math.roundToInt
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /** 样式栏要显示的东西。 */
 @Immutable
@@ -180,7 +183,7 @@ private fun StyleTool(
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                MaskStyleInfo.label(style),
+                stringResource(MaskStyleInfo.label(style)),
                 style = MaterialTheme.typography.labelMedium,
                 color = if (selected) colors.onSurface else colors.onSurfaceVariant,
                 maxLines = 1,
@@ -309,7 +312,7 @@ private fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
                 .verticalScroll(rememberScrollState())
                 .padding(start = 16.dp, end = 4.dp, bottom = 8.dp),
         ) {
-            PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
+            PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
             StylePanelBody(model, actions)
         }
     }
@@ -357,7 +360,7 @@ internal fun StylePanel(
                 .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
         ) {
             if (standalone) {
-                PanelHeader(model, actions, title = MaskStyleInfo.label(model.look.style))
+                PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
             } else {
                 PanelHeader(model, actions)
             }
@@ -374,7 +377,7 @@ private fun PanelHeader(model: StyleBarModel, actions: StyleBarActions, title: S
             if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
         }
         IconButton(onClick = actions::onCollapse) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "收起样式面板")
+            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.collapse_style_panel))
         }
     }
 }
@@ -388,13 +391,13 @@ private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions) {
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         TextButton(onClick = actions::onReset, enabled = !look.options.isDefaultFor(look.style)) {
-            Text("恢复默认")
+            Text(stringResource(R.string.reset_defaults))
         }
         Spacer(Modifier.weight(1f))
         TextButton(onClick = actions::onApplyToAll, enabled = model.applicable > 0) {
             Icon(Icons.Filled.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
-            Text(if (model.applicable > 0) "应用到全部 ${model.applicable} 处" else "应用到全部")
+            Text(if (model.applicable > 0) stringResource(R.string.apply_to_all_n, model.applicable) else stringResource(R.string.apply_to_all))
         }
     }
 }
@@ -421,18 +424,18 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
 
     when (look.style) {
         // 近似色排在色板最前面：原先的「抹除」，并进色块之后就是色块的一种取色方式
-        MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, "颜色", NearChoice(options.solidNear, nearColors))
+        MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, stringResource(R.string.color), NearChoice(options.solidNear, nearColors))
 
         MaskStyle.PIXELATE -> {
             // 滑条往右是更粗：divisor 越小块越大
             val finest = MaskOptions.PIXEL_DIVISOR_RANGE.last
             val coarsest = MaskOptions.PIXEL_DIVISOR_RANGE.first
             SliderRow(
-                label = "颗粒",
+                label = stringResource(R.string.grain),
                 value = (finest - options.pixelBlockDivisor).toFloat(),
                 range = 0f..(finest - coarsest).toFloat(),
                 steps = finest - coarsest - 1,
-                valueText = PIXEL_LEVELS.getOrElse(finest - options.pixelBlockDivisor) { "" },
+                valueText = PIXEL_LEVELS.getOrNull(finest - options.pixelBlockDivisor)?.let { stringResource(it) }.orEmpty(),
                 onChange = { emit(options.copy(pixelBlockDivisor = finest - it.roundToInt()), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -442,11 +445,11 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         MaskStyle.BLUR -> {
             val range = MaskOptions.BLUR_RATIO_RANGE
             SliderRow(
-                label = "强度",
+                label = stringResource(R.string.strength),
                 value = options.blurRadiusRatio,
                 range = range,
                 steps = BLUR_LEVELS.size - 2,
-                valueText = BLUR_LEVELS[blurLevel(options.blurRadiusRatio)],
+                valueText = stringResource(BLUR_LEVELS[blurLevel(options.blurRadiusRatio)]),
                 onChange = { emit(options.copy(blurRadiusRatio = it), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -454,9 +457,9 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         }
 
         MaskStyle.MARKER -> {
-            Colors(ColorTarget.MARKER, MARKER_PALETTE, "颜色")
+            Colors(ColorTarget.MARKER, MARKER_PALETTE, stringResource(R.string.color))
             SliderRow(
-                label = "浓淡",
+                label = stringResource(R.string.marker_opacity),
                 value = options.markerAlpha,
                 range = MaskOptions.MARKER_ALPHA_RANGE,
                 valueText = "${(options.markerAlpha * 100).roundToInt()}%",
@@ -498,39 +501,39 @@ private const val MAX_NEAR_COLORS = 3
 
 /** 色板上的一个颜色：不透明的 RGB 和读屏念的名字。 */
 @Immutable
-internal data class NamedColor(val argb: Int, val name: String)
+internal data class NamedColor(val argb: Int, @StringRes val name: Int)
 
 /** 色块：出厂的天蓝排第一，黑白灰之后是常用的几种。 */
 internal val SOLID_PALETTE = listOf(
-    NamedColor(MaskOptions.SKY_BLUE, "天蓝"),
-    NamedColor(0xFF000000.toInt(), "黑色"),
-    NamedColor(0xFF5F6368.toInt(), "灰色"),
-    NamedColor(0xFFFFFFFF.toInt(), "白色"),
-    NamedColor(0xFFE53935.toInt(), "红色"),
-    NamedColor(0xFFFB8C00.toInt(), "橙色"),
-    NamedColor(0xFFFDD835.toInt(), "黄色"),
-    NamedColor(0xFF43A047.toInt(), "绿色"),
-    NamedColor(0xFF1E88E5.toInt(), "蓝色"),
-    NamedColor(0xFF8E24AA.toInt(), "紫色"),
+    NamedColor(MaskOptions.SKY_BLUE, R.string.color_sky_blue),
+    NamedColor(0xFF000000.toInt(), R.string.color_black),
+    NamedColor(0xFF5F6368.toInt(), R.string.color_gray),
+    NamedColor(0xFFFFFFFF.toInt(), R.string.color_white),
+    NamedColor(0xFFE53935.toInt(), R.string.color_red),
+    NamedColor(0xFFFB8C00.toInt(), R.string.color_orange),
+    NamedColor(0xFFFDD835.toInt(), R.string.color_yellow),
+    NamedColor(0xFF43A047.toInt(), R.string.color_green),
+    NamedColor(0xFF1E88E5.toInt(), R.string.color_blue),
+    NamedColor(0xFF8E24AA.toInt(), R.string.color_purple),
 )
 
 /** 马克笔：荧光笔的几种颜色。浓淡另外调。 */
 internal val MARKER_PALETTE = listOf(
-    NamedColor(MaskOptions.DEFAULT_MARKER_COLOR or 0xFF000000.toInt(), "黄色"),
-    NamedColor(0xFFFF9800.toInt(), "橙色"),
-    NamedColor(0xFFFF4081.toInt(), "粉色"),
-    NamedColor(0xFFF44336.toInt(), "红色"),
-    NamedColor(0xFFE040FB.toInt(), "紫色"),
-    NamedColor(0xFF448AFF.toInt(), "蓝色"),
-    NamedColor(0xFF18FFFF.toInt(), "青色"),
-    NamedColor(0xFF76FF03.toInt(), "绿色"),
+    NamedColor(MaskOptions.DEFAULT_MARKER_COLOR or 0xFF000000.toInt(), R.string.color_yellow),
+    NamedColor(0xFFFF9800.toInt(), R.string.color_orange),
+    NamedColor(0xFFFF4081.toInt(), R.string.color_pink),
+    NamedColor(0xFFF44336.toInt(), R.string.color_red),
+    NamedColor(0xFFE040FB.toInt(), R.string.color_purple),
+    NamedColor(0xFF448AFF.toInt(), R.string.color_blue),
+    NamedColor(0xFF18FFFF.toInt(), R.string.color_cyan),
+    NamedColor(0xFF76FF03.toInt(), R.string.color_green),
 )
 
 /** 马赛克颗粒的六档，按 8 - divisor 排：0 最细，2 是出厂，5 最粗。 */
-private val PIXEL_LEVELS = listOf("细", "较细", "适中", "较粗", "粗", "很粗")
+private val PIXEL_LEVELS = listOf(R.string.level_fine, R.string.level_finer, R.string.level_medium, R.string.level_coarser, R.string.level_coarse, R.string.level_very_coarse)
 
 /** 模糊强度的五档，滑条也只停在这五处。 */
-private val BLUR_LEVELS = listOf("轻", "较轻", "适中", "较重", "重")
+private val BLUR_LEVELS = listOf(R.string.blur_light, R.string.blur_lighter, R.string.level_medium, R.string.blur_heavier, R.string.blur_heavy)
 
 private fun blurLevel(ratio: Float): Int {
     val range = MaskOptions.BLUR_RATIO_RANGE

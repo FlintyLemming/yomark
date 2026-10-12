@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import kotlin.math.roundToInt
+import androidx.annotation.StringRes
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 用途水印的调节面板：文案、颜色、角度、透明度、密度。
@@ -62,27 +65,27 @@ fun PurposeWatermarkPanel(
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("用途水印", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(R.string.purpose_watermark), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onReset) { Text("恢复默认") }
-            TextButton(onClick = onRemove) { Text("移除") }
+            TextButton(onClick = onReset) { Text(stringResource(R.string.reset_defaults)) }
+            TextButton(onClick = onRemove) { Text(stringResource(R.string.remove)) }
             Spacer(Modifier.width(4.dp))
-            Button(onClick = onDone) { Text("完成") }
+            Button(onClick = onDone) { Text(stringResource(R.string.done)) }
         }
         OutlinedTextField(
             value = draft,
             onValueChange = { draft = it; onTextChange(it) },
             singleLine = true,
-            placeholder = { Text("如：仅供办理签证使用") },
+            placeholder = { Text(stringResource(R.string.purpose_placeholder)) },
             modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
         )
 
-        LabeledRow("颜色") {
+        LabeledRow(stringResource(R.string.color)) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 PurposeWatermarkStyle.PALETTE.forEach { argb ->
                     ColorSwatch(
                         color = Color(argb),
-                        name = COLOR_NAMES[argb] ?: "",
+                        name = COLOR_NAMES[argb]?.let { stringResource(it) }.orEmpty(),
                         selected = argb == style.color,
                         onClick = { onStyleChange(style.copy(color = argb)) },
                     )
@@ -90,7 +93,7 @@ fun PurposeWatermarkPanel(
             }
         }
         SliderRow(
-            label = "角度",
+            label = stringResource(R.string.angle),
             value = style.angle,
             range = PurposeWatermarkStyle.ANGLE_RANGE,
             // 15° 一档：角度是凭眼睛对齐的，连续值反而难停在 0°、±45° 上；档再细刻度点就密成一条线
@@ -101,17 +104,17 @@ fun PurposeWatermarkPanel(
         )
         SliderRow(
             // 叫「不透明度」：数字越大越显眼，和拖动方向、显示的百分比是一回事
-            label = "不透明度",
+            label = stringResource(R.string.opacity),
             value = style.opacity,
             range = PurposeWatermarkStyle.OPACITY_RANGE,
             valueText = "${(style.opacity * 100).roundToInt()}%",
             onChange = { onStyleChange(style.copy(opacity = it)) },
         )
         SliderRow(
-            label = "密度",
+            label = stringResource(R.string.density),
             value = style.density,
             range = PurposeWatermarkStyle.DENSITY_RANGE,
-            valueText = densityText(style.density),
+            valueText = stringResource(densityText(style.density)),
             onChange = { onStyleChange(style.copy(density = it)) },
         )
     }
@@ -121,14 +124,15 @@ fun PurposeWatermarkPanel(
 @Composable
 internal fun purposePanelMaxHeight(): Dp = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
 
-private fun densityText(density: Float) = when {
-    density < 0.8f -> "稀疏"
-    density <= 1.25f -> "适中"
-    else -> "密集"
+@StringRes
+private fun densityText(density: Float): Int = when {
+    density < 0.8f -> R.string.density_sparse
+    density <= 1.25f -> R.string.level_medium
+    else -> R.string.density_dense
 }
 
 private const val ANGLE_STEP = 15f
 
 private val COLOR_NAMES = PurposeWatermarkStyle.PALETTE.zip(
-    listOf("黑色", "灰色", "白色", "红色", "蓝色", "绿色")
+    listOf(R.string.color_black, R.string.color_gray, R.string.color_white, R.string.color_red, R.string.color_blue, R.string.color_green)
 ).toMap()

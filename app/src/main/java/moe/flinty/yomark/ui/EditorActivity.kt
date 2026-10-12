@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.material3.Surface
@@ -34,6 +33,7 @@ import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import moe.flinty.yomark.R
 
 /**
  * 编辑器：从首页选图进来（intent.data / clipData，可多选），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
  * 那时的 BackHandler 只随它们存在，返回先收起它们。左上角的向上按钮按 Android 的导航约定走：
  * 从别的应用分享进来时，向上回到本应用自己的首页，而不是回到别人的应用里。
  */
-class EditorActivity : ComponentActivity() {
+class EditorActivity : YomarkActivity() {
 
     private val settings by lazy { SettingsStore(applicationContext) }
 
@@ -62,6 +62,8 @@ class EditorActivity : ComponentActivity() {
                     settings = SettingsStore(app),
                     savedState = createSavedStateHandle(),
                     traceLog = sharedTraceLog(app),
+                    // 从 Activity 取：Android 12 及以下应用内选的语言只换在 Activity 上（见 AppLocale）
+                    defaultPurposeText = getString(R.string.purpose_default),
                 )
             }
         }

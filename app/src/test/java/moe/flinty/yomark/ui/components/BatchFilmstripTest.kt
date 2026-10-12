@@ -52,7 +52,7 @@ import kotlin.math.ceil
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "w412dp-h860dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
 class BatchFilmstripTest {
 
     @get:Rule val compose = createComposeRule()

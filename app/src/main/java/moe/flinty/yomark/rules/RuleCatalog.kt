@@ -3,6 +3,9 @@ package moe.flinty.yomark.rules
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
+import android.content.res.Resources
+import androidx.annotation.StringRes
+import moe.flinty.yomark.R
 
 /**
  * 规则表的可配置视图（2026-09-04 增补设计 §2）。
@@ -45,47 +48,49 @@ object RuleCatalog {
      * 设置页上这一行的名字，就是类型名。一种类型只有一条规则（几种认法合成一条，见 CompositeRule），
      * 设置页上也就只有一行——两行都叫「人名」时，用户不知道关的是哪一个。
      */
-    fun label(rule: Rule): String = SensitiveKindLabels.display(rule.kind)
+    @StringRes
+    fun label(rule: Rule): Int = SensitiveKindLabels.nameRes(rule.kind)
 
     /**
      * 这一类的详情页上「怎么认的」那一段。用户点进某一类，最想知道的是它到底会遮什么、为什么会误遮。
      * 写的是认法，不是推荐：哪一类该打码由用户自己看。
      */
-    fun description(rule: Rule): String = DESCRIPTIONS.getValue(rule.id)
+    @StringRes
+    fun description(rule: Rule): Int = DESCRIPTIONS.getValue(rule.id)
 
     private val DESCRIPTIONS = mapOf(
-        "card" to "13 到 19 位、通过 Luhn 校验的卡号。",
-        "iban" to "国际银行账号，按国家核对长度和校验位。",
-        "ssn" to "美国社会安全号，形如 123-45-6789，不会发放的号段不算。",
-        "mac" to "网卡地址，形如 AA:BB:CC:DD:EE:FF。",
-        "email" to "带常见域名后缀的邮箱地址。",
-        "phone" to "按各地号码规则解析的电话号码，打了星的手机号也认。紧挨着「订单」「单号」的数字不算。",
-        "passport" to "护照、身份证底部的机读码，以及「Passport No.」这类字段旁边或下面的号码。",
-        "apikey" to "以 sk-、ghp_、AKIA、eyJ 等开头、足够随机的长串。",
-        "name" to "「收货人」「姓名」「Ship to」这类字段后面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，" +
-            "证件上「Surname」「Given names」下面的名字。没有字段名时从字面猜，要有旁证才算。",
-        "address" to "「收货地址」「送至」这类字段后面的内容，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，" +
-            "证件上「Place of birth」下面的出生地。",
-        "pickup" to "「取件码」「取货码」这类字段后面的码。",
-        "url" to "只遮路径和参数，域名保留。",
-        "ip" to "IPv4 和 IPv6 地址。前面写着 v 或 version 的版本号不算。",
-        "tracking" to "UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈。",
-        "longnum" to "16 位以上、不属于其他任何一类的数字，比如交易号、订单号。没有校验位，可能误圈。",
-        "datetime" to "日期、时间，英文的「Feb 5, 1965」「05 FEB 1965」也认。出生日期另算一类。",
-        "birthdate" to "「出生日期」「Date of birth」「DOB」这类字段后面或下面的日期，以及护照机读码里的生日。",
+        "card" to R.string.rule_desc_card,
+        "iban" to R.string.rule_desc_iban,
+        "ssn" to R.string.rule_desc_ssn,
+        "mac" to R.string.rule_desc_mac,
+        "email" to R.string.rule_desc_email,
+        "phone" to R.string.rule_desc_phone,
+        "passport" to R.string.rule_desc_passport,
+        "apikey" to R.string.rule_desc_apikey,
+        "name" to R.string.rule_desc_name,
+        "address" to R.string.rule_desc_address,
+        "pickup" to R.string.rule_desc_pickup,
+        "url" to R.string.rule_desc_url,
+        "ip" to R.string.rule_desc_ip,
+        "tracking" to R.string.rule_desc_tracking,
+        "longnum" to R.string.rule_desc_longnum,
+        "datetime" to R.string.rule_desc_datetime,
+        "birthdate" to R.string.rule_desc_birthdate,
     )
 
     /**
      * 人名页上「旁证是……」那句话，照着旁证表（DefaultRuleSet.nameAnchors）拼：表里加一行，这句话跟着变。
      * 「旁证是紧挨着名字的先生、女士这类称呼，或者同一行、上下相邻一行的电话、邮箱……」
      */
-    fun nameAnchorNote(): String {
+    fun nameAnchorNote(res: Resources): String {
         val (attached, nearby) = DefaultRuleSet.nameAnchors.partition { it.reach == NameAnchor.Reach.ATTACHED }
+        val sep = res.getString(R.string.list_separator)
+        fun names(anchors: List<NameAnchor>) = anchors.joinToString(sep) { res.getString(it.label) }
         val parts = listOfNotNull(
-            attached.takeIf { it.isNotEmpty() }?.joinToString("、", prefix = "紧挨着名字的") { it.label },
-            nearby.takeIf { it.isNotEmpty() }?.joinToString("、", prefix = "同一行、上下相邻一行的") { it.label },
+            attached.takeIf { it.isNotEmpty() }?.let { res.getString(R.string.anchor_attached, names(it)) },
+            nearby.takeIf { it.isNotEmpty() }?.let { res.getString(R.string.anchor_nearby, names(it)) },
         )
-        return "旁证是" + parts.joinToString("，或者") + "。"
+        return res.getString(R.string.anchor_note, parts.joinToString(res.getString(R.string.anchor_or)))
     }
 
     private fun Rule.withDefaultState(masked: Boolean): Rule =

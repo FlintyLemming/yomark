@@ -65,6 +65,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlin.math.sign
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 批量里在各张图之间挑的胶片条，仿 iOS「照片」看大图时底下那一条（排法见 [FilmstripGeometry]）。
@@ -154,12 +156,13 @@ fun BatchFilmstrip(
                     bitmap?.let { state.aspects[i] = it.width.toFloat() / it.height }
                 }
                 val current = i == selected
+                val description = stringResource(R.string.filmstrip_item, i + 1, uris.size)
                 Box(
                     Modifier
                         .clip(RoundedCornerShape(CORNER))
                         .background(placeholder)
                         .semantics {
-                            contentDescription = "第 ${i + 1} 张，共 ${uris.size} 张"
+                            contentDescription = description
                             this.selected = current
                         }
                         .clickable {

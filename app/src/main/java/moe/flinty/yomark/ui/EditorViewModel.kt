@@ -55,6 +55,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.EmptyCoroutineContext
+import moe.flinty.yomark.R
 
 class EditorViewModel(
     private val intake: ImageIntake,
@@ -72,6 +73,8 @@ class EditorViewModel(
      * 换一张图、关掉编辑页再开都还在；单测里各用各的、只在内存里。
      */
     val traceLog: TraceLog = TraceLog(),
+    /** 用途水印第一次打开时填的文案，按系统语言给（Activity 传 R.string.purpose_default）。 */
+    private val defaultPurposeText: String = DEFAULT_PURPOSE_TEXT,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -324,7 +327,7 @@ class EditorViewModel(
             }.onFailure {
                 uiState = _state.value.copy(
                     loading = false,
-                    message = EditorMessage.Error("打不开这张图片"),
+                    message = EditorMessage.Error(R.string.error_open_image),
                 )
             }
         }
@@ -437,7 +440,7 @@ class EditorViewModel(
                 uiState = s.copy(
                     loading = false,
                     batch = batch.withFailed(index),
-                    message = EditorMessage.Error("打不开这张图片"),
+                    message = EditorMessage.Error(R.string.error_open_image),
                 )
                 return@launch
             }
@@ -995,7 +998,7 @@ class EditorViewModel(
         _state.value = s.copy(
             purposeSheetVisible = true,
             colorPick = null,
-            purposeText = s.purposeText ?: lastPurposeText ?: DEFAULT_PURPOSE_TEXT,
+            purposeText = s.purposeText ?: lastPurposeText ?: defaultPurposeText,
         )
     }
 
@@ -1071,7 +1074,7 @@ class EditorViewModel(
                 )
                 is ExportOutcome.Failure -> _state.value.copy(
                     exporting = false,
-                    message = EditorMessage.Error("导出失败，请重试"),
+                    message = EditorMessage.Error(R.string.error_export),
                 )
             }
         }
@@ -1103,7 +1106,7 @@ class EditorViewModel(
             uiState = _state.value.copy(
                 exporting = false,
                 message = if (failed == 0) EditorMessage.BatchExported(ok)
-                else EditorMessage.Error("$ok 张已保存，$failed 张失败"),
+                else EditorMessage.BatchPartial(ok, failed),
             )
         }
     }
