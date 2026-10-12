@@ -69,6 +69,37 @@ class BlurRendererTest {
     }
 
     @Test
+    fun `a hard edge blurs into a smooth ramp with no ripples`() {
+        val bmp = halfAndHalf()
+        renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(0f, 0f, 200f, 200f)),
+            MaskOptions(blurRadiusRatio = 0.16f))
+        for (y in listOf(60, 100, 140)) {
+            val row = (30..170).map { Color.red(bmp.getPixel(it, y)) }
+            // 从黑到白一路不回头：旧的缩放法在格点交汇处会鼓出亮暗斑
+            row.zipWithNext().forEach { (a, b) -> assertThat(b).isAtLeast(a - 1) }
+        }
+    }
+
+    @Test
+    fun `noise blurs without visible blocks`() {
+        val size = 240
+        val rnd = java.util.Random(7)
+        val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        for (y in 0 until size) for (x in 0 until size) {
+            val v = rnd.nextInt(256)
+            bmp.setPixel(x, y, Color.rgb(v, 255 - v, v / 2))
+        }
+        renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(0f, 0f, size.toFloat(), size.toFloat())),
+            MaskOptions(blurRadiusRatio = 0.32f))
+        var maxStep = 0
+        for (y in 10 until size - 10) for (x in 10 until size - 11) {
+            maxStep = maxOf(maxStep, kotlin.math.abs(Color.red(bmp.getPixel(x, y)) - Color.red(bmp.getPixel(x + 1, y))))
+        }
+        // 相邻像素几乎不跳变：看不出格子
+        assertThat(maxStep).isAtMost(3)
+    }
+
+    @Test
     fun `a tiny region does not crash`() {
         val bmp = halfAndHalf()
         renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(0f, 0f, 3f, 3f)), MaskOptions())
