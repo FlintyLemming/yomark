@@ -38,16 +38,12 @@
     display: flex; flex-direction: column; justify-content: center;
   }
   .lockup { display: flex; align-items: center; gap: 24px; }
-  /* 与启动图标同构：深色圆角方块上一条白色横杠（ic_launcher_foreground） */
+  /* 应用图标，母版是满版方形（docs/icon/icon.svg），圆角在这里裁 */
   .mark {
-    position: relative; flex: none;
-    width: 92px; height: 92px; border-radius: 24px; background: var(--ink);
+    flex: none;
+    width: 92px; height: 92px; border-radius: 24px;
+    background: url('../../icon/icon.svg') center / cover;
     box-shadow: 0 10px 24px rgba(16, 16, 20, 0.18);
-  }
-  .mark::after {
-    content: ''; position: absolute;
-    left: 28%; right: 28%; top: 39%; bottom: 39%;
-    background: #fff; border-radius: 3px;
   }
   .word { font-size: 88px; font-weight: 900; line-height: 1; letter-spacing: 6px; color: var(--ink); }
   .latin {

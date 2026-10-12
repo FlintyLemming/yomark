@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>有码 Yomark</title>
+  <defs>
+    <linearGradient id="g0" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1F2029"/>
+      <stop offset="1" stop-color="#17181F"/>
+    </linearGradient>
+    <linearGradient id="g1" x1="0" y1="156" x2="0" y2="868" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.993" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDE3EB"/>
+    </linearGradient>
+    <filter id="s2" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="3" result="offset"/>
+      <feFlood flood-color="#000000" flood-opacity="0.3"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="s3" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3" result="offset"/>
+      <feFlood flood-color="#0A3A5C" flood-opacity="0.28"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="g4" x1="0" y1="306" x2="0" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.45"/>
+      <stop offset="0.0347" stop-color="#FFFFFF" stop-opacity="0"/>
+      <stop offset="0.9653" stop-color="#1C76A8" stop-opacity="0"/>
+      <stop offset="1" stop-color="#1C76A8" stop-opacity="0.35"/>
+    </linearGradient>
+  </defs>
+  <path d="M0 0H1024V1024H0Z" fill="url(#g0)"/>
+  <!-- 截图 -->
+  <path d="M296 156H728A64 64 0 0 1 792 220V804A64 64 0 0 1 728 868H296A64 64 0 0 1 232 804V220A64 64 0 0 1 296 156Z" fill="url(#g1)" filter="url(#s2)"/>
+  <path d="M318 220H482A22 22 0 0 1 504 242V242A22 22 0 0 1 482 264H318A22 22 0 0 1 296 242V242A22 22 0 0 1 318 220Z" fill="#BAC3CF"/>
+  <!-- 琥珀虚线框和类型标签：识别到了，等你确认 -->
+  <path d="M290 580V530a10 10 0 0 1 10 -10H388a10 10 0 0 1 10 10V566H316A14 14 0 0 0 302 580Z" fill="#FFB300"/>
+  <path d="M296 597.5V580A20 20 0 0 1 316 560H404M645 560H660A20 20 0 0 1 680 580V597.5M680 614.5V632A20 20 0 0 1 660 652H645M331 652H316A20 20 0 0 1 296 632V614.5M421 560h27.8M465.8 560h27.8M510.6 560h27.8M555.4 560h27.8M600.2 560h27.8M348 652h32.5M397.5 652h32.5M447 652h32.5M496.5 652h32.5M546 652h32.5M595.5 652h32.5" fill="none" stroke="#FFB300" stroke-width="12"/>
+  <path d="M348 584H628A22 22 0 0 1 650 606V606A22 22 0 0 1 628 628H348A22 22 0 0 1 326 606V606A22 22 0 0 1 348 584ZM318 708H674A22 22 0 0 1 696 730V730A22 22 0 0 1 674 752H318A22 22 0 0 1 296 730V730A22 22 0 0 1 318 708ZM318 788H542A22 22 0 0 1 564 810V810A22 22 0 0 1 542 832H318A22 22 0 0 1 296 810V810A22 22 0 0 1 318 788Z" fill="#D3D9E2"/>
+  <!-- 天蓝胶带：已经打上的码 -->
+  <g transform="rotate(-7 512 378)">
+    <path d="M837.5 306L848 319.32L835.61 325.05L848 338.51L834.54 347.38L848 359.24L832.61 369.55L848 379.33L830.15 389.26L848 396.71L831.13 407.95L848 420.57L831.34 426.22L848 439.48L829.2 450L194.4 450L176 441.37L191.52 432.58L176 417.67L190.36 407.4L176 396.07L189.49 390.71L176 376.81L189.85 370.65L176 360.39L191.7 348.18L176 338.21L194.81 326.67L176 313.57L193.77 306Z" fill="#87CEEB" filter="url(#s3)"/>
+    <path d="M837.5 306L848 319.32L835.61 325.05L848 338.51L834.54 347.38L848 359.24L832.61 369.55L848 379.33L830.15 389.26L848 396.71L831.13 407.95L848 420.57L831.34 426.22L848 439.48L829.2 450L194.4 450L176 441.37L191.52 432.58L176 417.67L190.36 407.4L176 396.07L189.49 390.71L176 376.81L189.85 370.65L176 360.39L191.7 348.18L176 338.21L194.81 326.67L176 313.57L193.77 306Z" fill="url(#g4)"/>
+  </g>
+</svg>
