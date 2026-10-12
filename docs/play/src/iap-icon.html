@@ -2,8 +2,9 @@
 <!-- 一次性商品「去除水印」（yomark_remove_watermark）的商品图标，512×512。
      node docs/play/src/render.cjs iap-icon 渲染成 docs/play/iap-remove-watermark.png
      Play 要求商品图标不含文字、促销信息或品牌信息，所以不用应用图标，也不写「有码 Yomark」：
-     一张照片，右下角原本放水印的位置只剩虚线框，旁边一颗星表示「擦掉了」。
-     底色与应用图标（docs/icon/icon.svg）一样是 #1F2029 到 #17181F 的渐变；虚线框里和星星下面垫的也用它，看着才像透出底色。 -->
+     一张照片，右下角原本放水印的位置只剩一圈虚线，旁边两颗星表示「擦干净了」。
+     画法跟应用图标（docs/icon/icon.svg）一样：同一块底色，面上平涂，光影只留在边上；
+     照片用天蓝和琥珀上色，虚线框的角和短划也照应用图标的排法。坐标按 1024 写，缩到 512 显示。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -14,29 +15,52 @@
 </style>
 </head>
 <body>
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<svg width="512" height="512" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <clipPath id="photo"><rect x="97" y="127" width="318" height="258" rx="23"/></clipPath>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1024" gradientUnits="userSpaceOnUse">
       <stop offset="0" stop-color="#1F2029"/>
       <stop offset="1" stop-color="#17181F"/>
     </linearGradient>
+    <!-- 照片的白边：平涂，底边一道浅灰 -->
+    <linearGradient id="paper" x1="0" y1="232" x2="0" y2="792" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="0.9911" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#DDE3EB"/>
+    </linearGradient>
+    <!-- 贴边的一圈投影 -->
+    <filter id="paperShadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dy="3" result="offset"/>
+      <feFlood flood-color="#000000" flood-opacity="0.3"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="starShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dy="3" result="offset"/>
+      <feFlood flood-color="#0A3A5C" flood-opacity="0.28"/>
+      <feComposite in2="offset" operator="in"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="picture"><rect x="180" y="268" width="664" height="488" rx="40"/></clipPath>
   </defs>
-  <rect width="512" height="512" fill="url(#bg)"/>
-  <g clip-path="url(#photo)">
-    <circle cx="172" cy="200" r="28" fill="#6b6b78"/>
-    <path d="M60 400 L196 262 L262 330 L306 288 L460 400 Z" fill="#3a3a45"/>
-    <!-- 原本放水印的位置：只剩虚线框 -->
-    <rect x="276" y="316" width="122" height="52" rx="10" fill="url(#bg)"
-          stroke="#8a8a96" stroke-width="5" stroke-dasharray="11 8"/>
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+  <!-- 一张照片：浅天蓝的天、琥珀色的太阳、两层蓝色的山 -->
+  <rect x="144" y="232" width="736" height="560" rx="72" fill="url(#paper)" filter="url(#paperShadow)"/>
+  <g clip-path="url(#picture)">
+    <rect x="180" y="268" width="664" height="488" fill="#CDEBF8"/>
+    <circle cx="332" cy="388" r="50" fill="#FFB300"/>
+    <path d="M180 744L400 500L532 616L636 528L844 700V756H180Z" fill="#7CC3E6"/>
+    <path d="M180 792L292 664L444 752L612 596L844 668V756H180Z" fill="#4A93C8"/>
   </g>
-  <rect x="88" y="118" width="336" height="276" rx="32" fill="none" stroke="#fff" stroke-width="18"/>
-  <!-- 星星压在照片右上角的边框上，先垫一圈底色把边框断开 -->
-  <circle cx="420" cy="300" r="40" fill="url(#bg)"/>
-  <path transform="translate(420 300)" fill="#fff"
-        d="M0 -44 Q4 -4 44 0 Q4 4 0 44 Q-4 4 -44 0 Q-4 -4 0 -44 Z"/>
-  <path transform="translate(458 250)" fill="#fff"
-        d="M0 -18 Q2 -2 18 0 Q2 2 0 18 Q-2 2 -18 0 Q-2 -2 0 -18 Z"/>
+  <!-- 右下角原本放水印的地方只剩一圈虚线，落在深色的山上才看得清 -->
+  <path d="M548 661.5V648A20 20 0 0 1 568 628H583M749 628H764A20 20 0 0 1 784 648V661.5M784 678.5V692A20 20 0 0 1 764 712H749M583 712H568A20 20 0 0 1 548 692V678.5M600 628h32.67M649.67 628h32.67M699.33 628h32.67M600 712h32.67M649.67 712h32.67M699.33 712h32.67"
+        fill="none" stroke="#FFFFFF" stroke-width="12"/>
+  <!-- 两颗星：擦干净了 -->
+  <path transform="translate(824 604)" fill="#FFB300" filter="url(#starShadow)"
+        d="M0 -92Q8.28 -8.28 92 0Q8.28 8.28 0 92Q-8.28 8.28 -92 0Q-8.28 -8.28 0 -92Z"/>
+  <path transform="translate(890 498)" fill="#FFB300"
+        d="M0 -40Q3.6 -3.6 40 0Q3.6 3.6 0 40Q-3.6 3.6 -40 0Q-3.6 -3.6 0 -40Z"/>
 </svg>
 </body>
 </html>
