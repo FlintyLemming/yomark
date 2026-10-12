@@ -6,12 +6,16 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.IosShare
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.TextFields
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.BuildConfig
+import moe.flinty.yomark.R
+import moe.flinty.yomark.ui.AppLanguage
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.rules.RuleCatalog
@@ -20,7 +24,7 @@ import moe.flinty.yomark.rules.RuleCatalog
  * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
  * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
  */
-enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPORT, APPEARANCE, DEVELOPER, ABOUT, DEBUG_TRACE }
+enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPORT, APPEARANCE, DEVELOPER, LANGUAGE, ABOUT, DEBUG_TRACE }
 
 /**
  * 设置的一级页（2026-10-07 起，见 docs/superpowers/specs/2026-10-07-yomark-settings-pages-design.md）。
@@ -31,7 +35,8 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, EXPOR
  * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
  * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、导出和外观。
  * 最后是关于：版本号、隐私权政策、恢复默认设置（隐私权政策原先单独一行，恢复默认原先是一级页的最后一项，2026-10-11 都挪了进去）。
- * 在关于里连点版本号打开调试信息之后（[developer]），关于上面多一项「开发者」，照着 Android 系统设置里开发者选项的样子。
+ * 关于上面是「语言」（2026-10-12 起），小字写着眼下的界面语言。
+ * 在关于里连点版本号打开调试信息之后（[developer]），语言上面再多一项「开发者」，照着 Android 系统设置里开发者选项的样子。
  *
  * AI 那一行的小字是固定的，不写本机 Gemini Nano 眼下的情况：那得去问系统的 AICore 服务，
  * 不值得每次打开设置都问一遍，点进去再看。
@@ -44,6 +49,7 @@ fun SettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
     developer: Boolean = false,
+    language: AppLanguage = AppLanguage.SYSTEM,
 ) {
     SettingsScaffold(title = "设置", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -112,6 +118,13 @@ fun SettingsScreen(
                         onClick = { onOpen(SettingsPage.DEVELOPER) },
                     )
                 }
+                NavigationRow(
+                    title = stringResource(R.string.settings_language),
+                    summary = languageLabel(language),
+                    icon = Icons.Outlined.Language,
+                    iconColors = SettingsIconColors.indigo,
+                    onClick = { onOpen(SettingsPage.LANGUAGE) },
+                )
                 NavigationRow(
                     title = "关于",
                     summary = "版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置",

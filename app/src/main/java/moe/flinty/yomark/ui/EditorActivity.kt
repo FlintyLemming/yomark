@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.compose.material3.Surface
@@ -43,7 +42,7 @@ import kotlinx.coroutines.launch
  * 那时的 BackHandler 只随它们存在，返回先收起它们。左上角的向上按钮按 Android 的导航约定走：
  * 从别的应用分享进来时，向上回到本应用自己的首页，而不是回到别人的应用里。
  */
-class EditorActivity : ComponentActivity() {
+class EditorActivity : YomarkActivity() {
 
     private val settings by lazy { SettingsStore(applicationContext) }
 

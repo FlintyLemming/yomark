@@ -2,7 +2,6 @@ package moe.flinty.yomark.ui.home
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,6 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.billing.BillingRepository
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.billing.PurchaseStore
@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
  * 返回一律交给系统处理（finish 回到下面那一层），预见式返回的跨 Activity 动画才放得出来。
  * Picker 里取消就留在首页，不退出应用。
  */
-class HomeActivity : ComponentActivity() {
+class HomeActivity : YomarkActivity() {
 
     private val settings by lazy { SettingsStore(applicationContext) }
 
