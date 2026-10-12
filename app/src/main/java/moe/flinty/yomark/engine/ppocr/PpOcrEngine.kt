@@ -44,14 +44,20 @@ class PpOcrEngine(
     /**
      * 先在原图上检测，看文字行的走向（[TextAxis]）：
      * - 横平的（大多数截图）：照常逐框读。读得磕磕绊绊（平均置信度不到 [UPRIGHT_SCORE]）的，拿最长的几行倒过来再读一遍，
-     *   明显更好就是整页倒着，转半圈重读；
-     * - 竖着的、歪着的：转到行是横平的那个方向上重读。差半圈的两个方向里挑哪个，问识别器自己——
+     *   明显更好就是整页倒着，转半圈读；
+     * - 竖着的、歪着的：转到行是横平的那个方向上读。差半圈的两个方向里挑哪个，问识别器自己——
      *   各读一遍最长的几行，取读得更有把握的；
      * - 看不出走向的（横竖都有）：照常读。
      *
-     * 转正了读，检测、排序、拼行（RowGrouper）都在转正的画布上做，跟正着的页一模一样；最后把每行、每个字的框逐点映射回原图。
-     * 四个角仍按「阅读方向的左上、右上、右下、左下」排，TextLine.quad 的 p0→p1 就是原图上的阅读方向，规则层靠它转回来（ReadingFrame）。
-     * 行的先后是转正后的阅读顺序。
+     * 换方向要换得有底气：另一个方向得比默认的高出 [MARGIN]，自己也得读到 [UPRIGHT_SCORE]。
+     * 识别器认不得的文字（韩文、阿拉伯文）正着倒着都读不好，两边比出来的高低不作数。
+     *
+     * 转正了读不重新检测：原图上的框逐点转到转正的画布上，排序、拼行（RowGrouper）都在画布上做，跟正着的页一样；
+     * 最后把每行、每个字的框逐点映射回原图。四个角仍按「阅读方向的左上、右上、右下、左下」排，
+     * TextLine.quad 的 p0→p1 就是原图上的阅读方向，规则层靠它转回来（ReadingFrame）。
+     *
+     * 只有顺着走向的框在画布上读。垂直的（竖着放的证件旁边正着的聊天记录、表单）、斜着的（水印）还在原图上照常读、照常拼行，
+     * 一两个字的小框怎么分见 [readTurned]。行的先后：先是画布上的，按转正后的阅读顺序，再是原图上的。
      */
     fun recognize(pixels: IntArray, width: Int, height: Int): List<OcrLine> {
         val image = Argb(pixels, width, height)
@@ -62,37 +68,70 @@ class PpOcrEngine(
             val lines = RowGrouper.group(reads.mapNotNull { it?.line })
             if (axis == null || score(reads) >= UPRIGHT_SCORE) return lines
             val sample = TextAxis.sample(boxes, 0f)
-            val readOf = boxes.zip(reads).toMap()
-            return if (beats(score(sample.map { readOf[it] })) { score(image, sample, 180f) }) readTurned(image, 180f) else lines
+            val flipped = trial(image, boxes, sample, 180f)
+            return if (flipped.beats(score(sample.map { reads[it] }))) readTurned(image, boxes, 0f, flipped, reads) else lines
         }
         // 转多少度行才横平；竖着的默认往下读（逆时针转 90°），同以前逐框转的方向
         val turn = -axis
         val other = if (turn > 0) turn - 180 else turn + 180
         val (preferred, alternative) = if (abs(axis) > 45 && turn > 0) other to turn else turn to other
         val sample = TextAxis.sample(boxes, axis)
-        val alternativeWins = beats(score(image, sample, preferred)) { score(image, sample, alternative) }
-        return readTurned(image, if (alternativeWins) alternative else preferred)
+        val first = trial(image, boxes, sample, preferred)
+        // 默认的方向已经读到 1 − MARGIN 以上时，另一个不可能再高出这么多，不用试
+        val second = if (first.score + MARGIN < 1f) trial(image, boxes, sample, alternative) else null
+        return readTurned(image, boxes, axis, if (second != null && second.beats(first.score)) second else first, null)
     }
 
     /**
-     * 另一个方向是不是明显更好：置信度高出 [MARGIN]。默认的方向已经读到 1 − [MARGIN] 以上时，另一个不可能再高出这么多，不用试。
+     * 试一个方向：原图顺时针转 [degrees] 度，读 [sample] 这几个框。读出来的结果留着，选中这个方向时不再读第二遍。
+     * [score] 是按框长加权的平均置信度。
      */
-    private inline fun beats(default: Float, other: () -> Float): Boolean =
-        default + MARGIN < 1f && other() > default + MARGIN
+    private class Trial(val view: Turned, val reads: Map<Int, Read?>, val score: Float) {
 
-    /** 把 [image] 顺时针转 [degrees] 度读一遍，行和字的框映射回原图。 */
-    private fun readTurned(image: Pixels, degrees: Float): List<OcrLine> {
-        val view = Turned(image, degrees)
-        val lines = inReadingOrder(detect(view)).mapNotNull { read(view, it)?.line }
-        return RowGrouper.group(lines).map { line ->
-            line.copy(box = line.box.map(view::toSource), charBoxes = line.charBoxes.map { it?.map(view::toSource) })
-        }
+        /** 比默认的方向（读出 [default]）明显更好：高出 [MARGIN]，自己也读到 [UPRIGHT_SCORE]。 */
+        fun beats(default: Float): Boolean = score >= UPRIGHT_SCORE && score > default + MARGIN
     }
 
-    /** 拿 [sample] 这几行试一个方向：转 [degrees] 度之后读出来的置信度。 */
-    private fun score(image: Pixels, sample: List<Box>, degrees: Float): Float {
+    private fun trial(image: Pixels, boxes: List<Box>, sample: List<Int>, degrees: Float): Trial {
         val view = Turned(image, degrees)
-        return score(sample.map { b -> read(view, DbPostProcess.order(b.corners().map(view::fromSource))) })
+        val reads = sample.associateWith { read(view, upright(view, boxes[it])) }
+        return Trial(view, reads, score(sample.map { reads[it] }))
+    }
+
+    /** 原图上的框转到画布上，角重新按阅读方向排。 */
+    private fun upright(view: Turned, box: Box): Box = DbPostProcess.order(box.corners().map(view::fromSource))
+
+    /**
+     * 按 [chosen] 的方向读整页，行和字的框映射回原图。顺着 [axis] 的框在画布上读，垂直的、斜着的在原图上照常读。
+     * 方的小框（一两个字）跟着整页走；页上有垂直的行时，分不出它是哪边的，两边都读、取置信度高的——
+     * 转了直角的字读出来置信度差得远，斜几十度的字倒还读得出，所以斜着的方框按边的方向分，不比置信度。
+     * [inSource] 是原图上已经读过的结果（下标同 [boxes]），有就不再读。
+     */
+    private fun readTurned(image: Pixels, boxes: List<Box>, axis: Float, chosen: Trial, inSource: List<Read?>?): List<OcrLine> {
+        val view = chosen.view
+        val fits = boxes.map { TextAxis.fit(it, axis) }
+        val crossed = TextAxis.Fit.CROSS in fits
+        val turned = ArrayList<Pair<Box, OcrLine>>()
+        val level = ArrayList<OcrLine>()
+        boxes.forEachIndexed { i, box ->
+            val onCanvas = upright(view, box)
+            val canvasRead = { if (i in chosen.reads) chosen.reads[i] else read(view, onCanvas) }
+            val sourceRead = { if (inSource != null) inSource[i] else read(image, box) }
+            when (fits[i]) {
+                TextAxis.Fit.ALONG -> canvasRead()?.line?.let { turned += onCanvas to it }
+                TextAxis.Fit.CROSS, TextAxis.Fit.OTHER -> sourceRead()?.line?.let { level += it }
+                TextAxis.Fit.SQUARE -> if (!crossed) canvasRead()?.line?.let { turned += onCanvas to it } else {
+                    val c = canvasRead()
+                    val s = sourceRead()
+                    if (s != null && s.confidence > (c?.confidence ?: -1f)) s.line?.let { level += it }
+                    else c?.line?.let { turned += onCanvas to it }
+                }
+            }
+        }
+        val ordered = turned.sortedWith(compareBy(readingOrder) { it.first }).map { it.second }
+        return RowGrouper.group(ordered).map { line ->
+            line.copy(box = line.box.map(view::toSource), charBoxes = line.charBoxes.map { it?.map(view::toSource) })
+        } + RowGrouper.group(level)
     }
 
     /** 按框长加权的平均置信度，丢掉的行（不到 [DROP_SCORE]）也算：要比的就是读得有多磕绊。 */
@@ -107,8 +146,9 @@ class PpOcrEngine(
         return if (weight > 0) (sum / weight).toFloat() else 0f
     }
 
-    private fun inReadingOrder(boxes: List<Box>) =
-        boxes.sortedWith(compareBy<Box> { (it.minY / ROW_BUCKET).toInt() }.thenBy { it.minX })
+    private val readingOrder = compareBy<Box> { (it.minY / ROW_BUCKET).toInt() }.thenBy { it.minX }
+
+    private fun inReadingOrder(boxes: List<Box>) = boxes.sortedWith(readingOrder)
 
     private fun Box.map(f: (Pt) -> Pt) = Box(f(tl), f(tr), f(br), f(bl))
 
@@ -231,7 +271,10 @@ class PpOcrEngine(
         /** 排序时把 y 相差不到这么多像素的框当作同一行，行内再按 x。 */
         private const val ROW_BUCKET = 10f
 
-        /** 横平的页读到这个平均置信度就不再怀疑它是倒着的。实测正着的页在 0.89–1.0，倒过来的身份证只有 0.43。 */
+        /**
+         * 横平的页读到这个平均置信度就不再怀疑它是倒着的。实测正着的页在 0.89–1.0，倒过来的身份证只有 0.43。
+         * 也是换方向的底线：真倒着、真竖着的页，转对了的那个方向在 0.97 以上；认不得的文字两个方向都在 0.65 以下。
+         */
         private const val UPRIGHT_SCORE = 0.8f
 
         /** 换到不是默认的那个方向，置信度得高出这么多：两边差不多时不折腾。 */

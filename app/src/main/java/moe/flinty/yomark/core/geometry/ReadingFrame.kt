@@ -17,8 +17,10 @@ import kotlin.math.sin
  * 规则就一行不用改。
  *
  * 阅读方向取每行 quad 的 p0→p1（识别器按阅读方向给角：PP-OCR 转正读过的行映射回来仍是这个顺序，ML Kit 的 cornerPoints 也是），
- * 按行长加权求平均。先找众数再平均：横排的页上夹着几行竖排的小字，不该把整页拉歪；窗口里不到总长的 [MIN_SHARE]，
- * 横的竖的都有，看不出来，当作正着的。
+ * 按行长加权，先找众数，只在众数附近平均：横排的页上夹着几行竖排的小字，不该把整页拉歪。
+ * 众数是竖着的（截图里竖着放的证件照）就取它；横的、斜的，还要看：横平竖直的某个方向占到总长的 [LEVEL_SHARE] 就取它
+ * （斜着平铺的水印比证件上的字还长）；众数附近不到总长的 [MIN_SHARE]，横的竖的都有，看不出来，当作正着的；
+ * 歪着的页上众数以外的行还占 [OTHER_SHARE] 以上（歪了的证件上压着水印），也当作正着的。
  *
  * @param degrees 阅读方向：0 是从左往右，90 是从上往下（图像坐标，y 朝下，正值顺时针）。
  */
@@ -108,10 +110,21 @@ class ReadingFrame private constructor(val degrees: Float) {
                 if (length <= 0.0) null else Math.toDegrees(atan2(dy, dx)) to length
             }
             if (lines.isEmpty()) return null
-            // 众数：哪一行的方向上下 WINDOW 以内的行加起来最长
-            val mode = lines.maxBy { (a, _) -> lines.sumOf { (b, len) -> if (diff(a, b) <= WINDOW) len else 0.0 } }.first
-            val near = lines.filter { diff(it.first, mode) <= WINDOW }
-            if (near.sumOf { it.second } < MIN_SHARE * lines.sumOf { it.second }) return null
+            val total = lines.sumOf { it.second }
+            fun lengthNear(a: Double, window: Double) = lines.sumOf { (b, len) -> if (diff(a, b) <= window) len else 0.0 }
+            // 众数：哪一行的方向上下 TIGHT 以内的行加起来最长；只在这么窄的范围里平均，差二三十度的两组行不会混成一个角度
+            val mode = lines.maxBy { (a, _) -> lengthNear(a, TIGHT) }.first
+            // 竖着的一组最长（截图里竖着放的证件照）就是它，同 OCR 那边（TextAxis）；横的、斜的再看下面几条
+            if (diff(abs(mode), 90.0) > WINDOW) {
+                // 横平竖直的四个方向之一占得够多就是它：斜着平铺的水印不该把一页正着的证件带歪
+                val level = RIGHT_ANGLES.maxBy { lengthNear(it, LEVEL_SLACK) }
+                if (lengthNear(level, LEVEL_SLACK) >= LEVEL_SHARE * total) return level.toFloat()
+                val group = lengthNear(mode, WINDOW)
+                if (group < MIN_SHARE * total) return null
+                // 歪着的页上另有一组斜着的行（水印）也不少：哪个方向都有一组是歪的，照正着的看
+                if (abs(mode) <= 45 && total - group >= OTHER_SHARE * total) return null
+            }
+            val near = lines.filter { diff(it.first, mode) <= TIGHT }
             val x = near.sumOf { (a, len) -> len * cos(Math.toRadians(a)) }
             val y = near.sumOf { (a, len) -> len * sin(Math.toRadians(a)) }
             return Math.toDegrees(atan2(y, x)).toFloat()
@@ -122,6 +135,20 @@ class ReadingFrame private constructor(val degrees: Float) {
             val d = abs(a - b) % 360
             return if (d > 180) 360 - d else d
         }
+
+        private val RIGHT_ANGLES = listOf(0.0, 90.0, 180.0, -90.0)
+
+        /** 离横平竖直不到这么多度的行，算横平竖直的。同 OCR 那边（TextAxis）的取整口径。 */
+        private const val LEVEL_SLACK = 2.0
+
+        /** 横平竖直的某个方向占总长这么多，整页就是那个方向。 */
+        private const val LEVEL_SHARE = 0.25
+
+        /** 歪着的页上，众数那组以外的行占到这么多，就当正着的。 */
+        private const val OTHER_SHARE = 0.25
+
+        /** 求平均的窗口：众数上下这么多度以内。 */
+        private const val TIGHT = 5.0
 
         /** 众数上下这么多度以内的行算同一个方向。 */
         private const val WINDOW = 20.0

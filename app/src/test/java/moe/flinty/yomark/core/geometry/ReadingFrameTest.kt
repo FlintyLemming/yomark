@@ -61,6 +61,25 @@ class ReadingFrameTest {
         assertThat(ReadingFrame.of(page(0.0) + line(600f, 100f, 300f, 90.0)).isUpright).isTrue()
     }
 
+    /** 证件复印件上平铺的斜水印，加起来比证件上的字还长：证件的字横平，就是正着的。竖着的证件同理。 */
+    @Test fun `a tiled slanted watermark does not tilt the page`() {
+        val watermark = (0 until 5).map { line(0f, 100f + it * 100f, 600f, -35.0) }
+        assertThat(ReadingFrame.of(page(0.0) + watermark).isUpright).isTrue()
+        assertThat(ReadingFrame.of(page(90.0) + watermark).degrees).isEqualTo(90f)
+    }
+
+    /** 歪着的页：只在众数附近平均，差十五度的那行不掺进来；另一组占得不少（歪了的证件压着水印），当作正着的。 */
+    @Test fun `a second group on a tilted page is not blended in`() {
+        assertThat(ReadingFrame.of(page(8.0) + line(0f, 500f, 200f, -7.0)).degrees.toDouble()).isWithin(0.01).of(8.0)
+        assertThat(ReadingFrame.of(page(7.0) + line(0f, 500f, 500f, -18.0)).isUpright).isTrue()
+    }
+
+    /** 截图里一张竖着放、拍歪了的证件照：它最长就按它，旁边横着的界面文字占得再多也一样。 */
+    @Test fun `a sideways card in an upright screenshot sets the frame`() {
+        val ui = (0 until 3).map { line(0f, 900f + it * 40f, 300f, 0.0) }
+        assertThat(ReadingFrame.of(page(94.0) + ui).degrees.toDouble()).isWithin(0.01).of(94.0)
+    }
+
     /** 横的竖的一样多：看不出来，当作正着的。 */
     @Test fun `half across and half down stays upright`() {
         assertThat(ReadingFrame.of(page(0.0, 2) + page(90.0, 2)).isUpright).isTrue()

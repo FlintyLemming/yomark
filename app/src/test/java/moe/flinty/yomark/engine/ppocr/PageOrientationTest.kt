@@ -49,9 +49,14 @@ class PageOrientationTest {
         assertThat(TextAxis.of(emptyList())).isNull()
     }
 
-    /** 横的竖的一样多：看不出来，照常读。 */
-    @Test fun `half across and half down is undecided`() {
-        assertThat(TextAxis.of(page(0.0, 3) + page(90.0, 3))).isNull()
+    /** 横的竖的一样多：当横平的，照常读。 */
+    @Test fun `half across and half down stays level`() {
+        assertThat(TextAxis.of(page(0.0, 3) + page(90.0, 3))).isEqualTo(0f)
+    }
+
+    /** 斜着的行也是各个方向都有：看不出来，照常读。 */
+    @Test fun `slanted lines every which way are undecided`() {
+        assertThat(TextAxis.of(page(20.0, 3) + page(-40.0, 3))).isNull()
     }
 
     /** 护照样张上斜压的水印「SPECIMEN」：框很长，但它不该把整页拉歪。 */
@@ -59,10 +64,48 @@ class PageOrientationTest {
         assertThat(TextAxis.of(page(0.0) + box(500f, 300f, 600f, 80f, -22.0))).isEqualTo(0f)
     }
 
+    /** 证件复印件上平铺的「仅供办理银行开户使用」：比证件上的字还长，整页仍是横平的。 */
+    @Test fun `a tiled watermark longer than the text does not tilt the page`() {
+        val watermark = (0 until 6).map { box(500f, 50f + it * 100f, 900f, 40f, -35.0) }
+        assertThat(TextAxis.of(page(0.0) + watermark)).isEqualTo(0f)
+        val shallow = (0 until 6).map { box(500f, 50f + it * 100f, 900f, 40f, -15.0) }
+        assertThat(TextAxis.of(page(0.0) + shallow)).isEqualTo(0f)
+        assertThat(TextAxis.of(page(90.0) + watermark)).isEqualTo(90f)
+    }
+
+    /** 歪着拍的页上差十几度的一行长字：只在众数附近平均，不会混出一个谁都不是的角度。 */
+    @Test fun `a line a dozen degrees off is not averaged in`() {
+        assertThat(TextAxis.of(page(8.0) + box(500f, 300f, 900f, 40f, -5.0))!!.toDouble()).isWithin(0.1).of(8.0)
+    }
+
+    /** 歪了 7° 的证件上压着 −18° 的水印：转到哪边都有一组是歪的，照常读。竖着的页照转，另一组在原图上读。 */
+    @Test fun `a tilted page with a strong second group is read as it is`() {
+        assertThat(TextAxis.of(page(7.0) + box(500f, 300f, 900f, 40f, -18.0))).isEqualTo(0f)
+        assertThat(TextAxis.of(page(94.0) + box(500f, 300f, 900f, 40f, 60.0))!!.toDouble()).isWithin(0.1).of(-86.0)
+    }
+
+    /** 截图里一张竖着放的证件照：竖着的那组最长就转，旁边横着的界面文字再多也一样（它们在原图上照常读）。 */
+    @Test fun `a sideways card in an upright screenshot is turned`() {
+        val ui = (0 until 3).map { box(200f, 900f + it * 50f, 500f, 30f, 0.0) }
+        assertThat(TextAxis.of(page(94.0) + ui)!!.toDouble()).isWithin(0.1).of(-86.0)
+        assertThat(TextAxis.of(page(90.0) + ui)).isEqualTo(90f)
+    }
+
     @Test fun `the sample is the longest lines along the axis`() {
         val lines = page(90.0, 8)
         val sample = TextAxis.sample(lines + box(100f, 100f, 900f, 30f, 0.0), 90f)
-        assertThat(sample).containsExactlyElementsIn(lines.take(TextAxis.SAMPLE)).inOrder()
+        assertThat(sample).containsExactlyElementsIn(0 until TextAxis.SAMPLE).inOrder()
+    }
+
+    /** 分组读：顺着走向的在画布上读，垂直的、斜着的在原图上读，方的看边的方向。两个字的词（一倍半长）也看得出走向。 */
+    @Test fun `a box runs along the axis, across it, slanted, or cannot tell`() {
+        assertThat(TextAxis.fit(box(100f, 100f, 400f, 30f, 88.0), 90f)).isEqualTo(TextAxis.Fit.ALONG)
+        assertThat(TextAxis.fit(box(100f, 100f, 400f, 30f, -86.0), 90f)).isEqualTo(TextAxis.Fit.ALONG)
+        assertThat(TextAxis.fit(box(100f, 100f, 400f, 30f, 0.0), 90f)).isEqualTo(TextAxis.Fit.CROSS)
+        assertThat(TextAxis.fit(box(100f, 100f, 60f, 40f, 0.0), 90f)).isEqualTo(TextAxis.Fit.CROSS)
+        assertThat(TextAxis.fit(box(100f, 100f, 400f, 30f, -35.0), 90f)).isEqualTo(TextAxis.Fit.OTHER)
+        assertThat(TextAxis.fit(box(100f, 100f, 40f, 36f, 0.0), 90f)).isEqualTo(TextAxis.Fit.SQUARE)
+        assertThat(TextAxis.fit(box(100f, 100f, 40f, 36f, 6.0), -17f)).isEqualTo(TextAxis.Fit.OTHER)
     }
 
     // ---------- 转过的图 ----------
