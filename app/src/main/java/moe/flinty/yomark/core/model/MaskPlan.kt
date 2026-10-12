@@ -37,8 +37,8 @@ data class MaskOptions(
      */
     val solidNear: Boolean = false,
     /**
-     * 马赛克的粗细：块边长约为区域短边 / divisor，再受 12px 下限约束（spec §8）。
-     * 出厂的 8 就是最细的一档，只能往粗调（见 [PIXEL_DIVISOR_RANGE]、PixelateRenderer.blockSizeFor）。
+     * 马赛克的粗细：块边长 = 图片决定的基准块 × (8 / divisor)，与选框大小无关（spec §8）。
+     * 名字是历史遗留，存档的键也沿用它。出厂的 8 就是最细的一档，只能往粗调（见 [PIXEL_DIVISOR_RANGE]、PixelateRenderer.blockSizeFor）。
      */
     val pixelBlockDivisor: Int = FINEST_PIXEL_DIVISOR,
     /** 模糊的强度：缩小倍数 = 区域短边 × 它，越大越糊。 */

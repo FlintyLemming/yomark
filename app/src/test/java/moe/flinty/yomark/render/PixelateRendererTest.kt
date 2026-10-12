@@ -39,21 +39,35 @@ class PixelateRendererTest {
     }
 
     @Test
-    fun `block size is the short edge over the divisor`() {
-        val q = Quad.fromRect(RectF(0f, 0f, 320f, 160f))
-        assertThat(renderer.blockSizeFor(q, divisor = 8)).isWithin(0.1f).of(20f)
+    fun `block size does not depend on the size of the box`() {
+        val bmp = checkerboard(400)
+        val small = Quad.fromRect(RectF(0f, 0f, 120f, 40f))
+        val large = Quad.fromRect(RectF(0f, 0f, 400f, 400f))
+        // 同一张图，大框小框的颗粒一样粗——这是用户报的 bug
+        assertThat(renderer.willFallBack(small, 400f, divisor = 8)).isFalse()
+        assertThat(renderer.willFallBack(large, 400f, divisor = 8)).isFalse()
+        renderer.render(Canvas(bmp), bmp, small, MaskOptions())
+        renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(0f, 100f, 400f, 400f)), MaskOptions())
+        // 两个区域里都是 12px 一块：块边界在 12 的倍数上
+        assertThat(bmp.getPixel(13, 20)).isEqualTo(bmp.getPixel(23, 20))
+        assertThat(bmp.getPixel(13, 120)).isEqualTo(bmp.getPixel(23, 120))
+    }
+
+    @Test
+    fun `block size scales with the image, not the box`() {
+        assertThat(renderer.blockSizeFor(1080f, divisor = 8)).isWithin(0.1f).of(12f)
+        assertThat(renderer.blockSizeFor(1800f, divisor = 8)).isWithin(0.1f).of(20f)
     }
 
     @Test
     fun `block size never drops below the 12px floor`() {
-        val q = Quad.fromRect(RectF(0f, 0f, 200f, 40f))     // 短边 40 / 8 = 5 → 抬到 12
-        assertThat(renderer.blockSizeFor(q, divisor = 8)).isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
+        assertThat(renderer.blockSizeFor(200f, divisor = 8)).isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
     }
 
     @Test
     fun `a region too small for even one block falls back instead of faking a mosaic`() {
         val tiny = Quad.fromRect(RectF(0f, 0f, 20f, 10f))
-        assertThat(renderer.willFallBack(tiny, divisor = 8)).isTrue()
+        assertThat(renderer.willFallBack(tiny, 200f, divisor = 8)).isTrue()
 
         val bmp = checkerboard()
         renderer.render(Canvas(bmp), bmp, tiny, MaskOptions())
@@ -66,7 +80,7 @@ class PixelateRendererTest {
         val bmp = checkerboard()
         renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(40f, 40f, 160f, 160f)), MaskOptions())
 
-        // 块边长 = 120/8 = 15px，块内任意两点必然同色
+        // 200px 的图块边长取 12px 下限，(40..51) 是一块，块内任意两点必然同色
         val a = bmp.getPixel(60, 60)
         assertThat(bmp.getPixel(61, 60)).isEqualTo(a)
         assertThat(bmp.getPixel(60, 61)).isEqualTo(a)
@@ -95,30 +109,18 @@ class PixelateRendererTest {
         renderer.render(Canvas(bmp), bmp, Quad.fromRect(RectF(-50f, -50f, 60f, 60f)), MaskOptions())
     }
 
-    /**
-     * 往粗调时下限跟着抬：截图上的文字行短边多半不到 96px，出厂时起作用的一直是 12px 下限，
-     * 只放大比例的话，面板上的「颗粒」在文字上拖不出任何变化。
-     */
+    /** 「颗粒」往粗调，块按 8 / divisor 放大；文字行上也拖得出变化。 */
     @Test
-    fun `a coarser setting raises the floor too, so text lines get bigger blocks`() {
+    fun `a coarser setting makes bigger blocks`() {
+        assertThat(renderer.blockSizeFor(1080f, divisor = 8)).isWithin(0.1f).of(12f)
+        assertThat(renderer.blockSizeFor(1080f, divisor = 4)).isWithin(0.1f).of(24f)
+        assertThat(renderer.blockSizeFor(1080f, divisor = 3)).isWithin(0.1f).of(32f)
         val line = Quad.fromRect(RectF(0f, 0f, 400f, 40f))
-        assertThat(renderer.blockSizeFor(line, divisor = 8)).isWithin(0.1f).of(12f)
-        assertThat(renderer.blockSizeFor(line, divisor = 4)).isWithin(0.1f).of(24f)
-        assertThat(renderer.blockSizeFor(line, divisor = 3)).isWithin(0.1f).of(32f)
-        assertThat(renderer.willFallBack(line, divisor = 3)).isFalse()
+        assertThat(renderer.willFallBack(line, 1080f, divisor = 3)).isFalse()
     }
 
     @Test
-    fun `the factory setting keeps the original 12px floor`() {
-        val q = Quad.fromRect(RectF(0f, 0f, 200f, 40f))
-        assertThat(renderer.blockSizeFor(q, divisor = MaskOptions.FINEST_PIXEL_DIVISOR))
-            .isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
-    }
-
-    @Test
-    fun `a larger divisor makes smaller blocks but never below the floor`() {
-        val q = Quad.fromRect(RectF(0f, 0f, 400f, 400f))
-        assertThat(renderer.blockSizeFor(q, divisor = 4)).isWithin(0.1f).of(100f)
-        assertThat(renderer.blockSizeFor(q, divisor = 100)).isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
+    fun `a larger divisor never goes below the floor`() {
+        assertThat(renderer.blockSizeFor(200f, divisor = 100)).isWithin(0.1f).of(PixelateRenderer.MIN_BLOCK_PX)
     }
 }

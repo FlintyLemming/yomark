@@ -26,44 +26,51 @@ class PreviewExportParityTest {
 
     private fun inPreview(q: Quad) = q.scaled(analysisScale)
 
+    /** 原图短边，与 analysisScale 配套：分析图短边 = 它 × 0.5。 */
+    private val imageShort = 3000f
+
     @Test
     fun `pixelate block covers the same fraction of the region in preview and export`() {
-        // 原图上一条 100px 高的文本行；下限生效的量级
+        // 原图上一条 100px 高的文本行
         val export = Quad.fromRect(RectF(0f, 0f, 800f, 100f))
         val preview = inPreview(export)
 
-        val exportFraction = r.blockSizeFor(export, divisor) / export.shortEdge()
+        val exportFraction = r.blockSizeFor(imageShort, divisor) / export.shortEdge()
         val previewFraction =
-            r.blockSizeFor(preview, divisor, analysisScale) / preview.shortEdge()
+            r.blockSizeFor(imageShort * analysisScale, divisor, analysisScale) / preview.shortEdge()
 
         assertThat(previewFraction).isWithin(0.001f).of(exportFraction)
     }
 
     @Test
-    fun `the same holds when the divisor rather than the floor decides`() {
-        val export = Quad.fromRect(RectF(0f, 0f, 800f, 400f))
+    fun `the same holds when the 12px floor decides`() {
+        val small = 600f       // 600 / 90 < 12，下限起作用
+        val export = Quad.fromRect(RectF(0f, 0f, 800f, 100f))
         val preview = inPreview(export)
 
-        assertThat(r.blockSizeFor(preview, divisor, analysisScale) / preview.shortEdge())
-            .isWithin(0.001f).of(r.blockSizeFor(export, divisor) / export.shortEdge())
+        assertThat(r.blockSizeFor(small * analysisScale, divisor, analysisScale) / preview.shortEdge())
+            .isWithin(0.001f).of(r.blockSizeFor(small, divisor) / export.shortEdge())
     }
 
     @Test
     fun `pixelate falls back to solid in both spaces or in neither`() {
-        listOf(20f, 26f, 40f, 80f, 96f, 200f).forEach { h ->
-            val export = Quad.fromRect(RectF(0f, 0f, 600f, h))
-            val preview = inPreview(export)
-            assertThat(r.willFallBack(preview, divisor, analysisScale))
-                .isEqualTo(r.willFallBack(export, divisor))
+        listOf(600f, 3000f).forEach { img ->
+            listOf(20f, 26f, 33f, 40f, 80f, 96f, 200f).forEach { h ->
+                val export = Quad.fromRect(RectF(0f, 0f, 600f, h))
+                val preview = inPreview(export)
+                assertThat(r.willFallBack(preview, img * analysisScale, divisor, analysisScale))
+                    .isEqualTo(r.willFallBack(export, img, divisor))
+            }
         }
     }
 
     @Test
     fun `without the scale the preview over-promises, which is the bug this guards`() {
+        val small = 600f
         val export = Quad.fromRect(RectF(0f, 0f, 800f, 100f))
         val preview = inPreview(export)
         // renderScale 默认 1f = 不折算：预览的块占比明显大于导出，也就是预览更糊
-        assertThat(r.blockSizeFor(preview, divisor) / preview.shortEdge())
-            .isGreaterThan(r.blockSizeFor(export, divisor) / export.shortEdge())
+        assertThat(r.blockSizeFor(small * analysisScale, divisor) / preview.shortEdge())
+            .isGreaterThan(r.blockSizeFor(small, divisor) / export.shortEdge())
     }
 }
