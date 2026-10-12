@@ -30,7 +30,6 @@ fun DeveloperSettingsScreen(
             SettingsGroup {
                 SwitchRow(
                     title = "调试信息",
-                    summary = "编辑页顶栏多一个按钮，查看每次识别的文字识别结果、规则命中和 AI 的回答",
                     icon = Icons.Outlined.BugReport,
                     checked = debugTrace,
                     onCheckedChange = onDebugTraceChange,
@@ -60,7 +59,6 @@ fun DeveloperSettingsScreen(
                         )
                     }
                 }
-                FooterText("记录里有截图上识别出的原文，关掉调试信息时全部删掉。")
             }
         }
     }

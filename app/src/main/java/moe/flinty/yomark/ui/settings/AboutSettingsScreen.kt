@@ -108,7 +108,7 @@ fun AboutSettingsScreen(
             onDismissRequest = { confirmReset = false },
             icon = { Icon(Icons.Outlined.SettingsBackupRestore, contentDescription = null) },
             title = { Text("恢复默认设置？") },
-            text = { Text("文字、人脸、条码和导出的设置都会恢复出厂值。主题色和识别动效不变。") },
+            text = { Text("除外观外，全部恢复出厂值。") },
             confirmButton = {
                 TextButton(onClick = {
                     confirmReset = false

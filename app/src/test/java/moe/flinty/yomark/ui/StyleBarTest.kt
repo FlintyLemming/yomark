@@ -98,16 +98,6 @@ class StyleBarTest {
 
     // ---------- 面板 ----------
 
-    @Test fun thePanelSaysWhatItChanges() {
-        show(open(MaskStyle.SOLID))
-        compose.onNodeWithText("之后打码都用这个样式，打好的不变").assertIsDisplayed()
-    }
-
-    @Test fun withABoxSelectedThePanelSaysItChangesThatBox() {
-        show(open(MaskStyle.SOLID).copy(editingSelection = true))
-        compose.onNodeWithText("改的是选中的框，之后打码也用它").assertIsDisplayed()
-    }
-
     @Test fun pickingAPresetColorChangesTheSolidColor() {
         val actions = Recorder()
         show(open(MaskStyle.SOLID), actions)

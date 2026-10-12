@@ -111,7 +111,6 @@ fun TextSettingsScreen(
                 )
                 SwitchRow(
                     title = "AI 增强识别",
-                    summary = "编辑页多一个按钮，用 Gemini Nano 补查人名和地址，只圈出不打码",
                     icon = Icons.Outlined.AutoAwesome,
                     checked = config.semantic != SemanticOption.OFF,
                     onCheckedChange = { on ->
@@ -119,7 +118,6 @@ fun TextSettingsScreen(
                     },
                 )
             }
-            FooterText(supportedDevicesSentence("AI 增强识别离线运行，"))
             SectionHeader("敏感信息")
         }
         val rules = RuleCatalog.inSettingsOrder
@@ -185,7 +183,7 @@ fun TextRuleSettingsScreen(
     SettingsScaffold(title = label, onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             SectionHeader("识别到${label}时", first = true)
-            HandlingGroup(state, offSummary = "不识别$label") {
+            HandlingGroup(state) {
                 onChange(config.withRule(rule.id, it, RuleCatalog.factoryState(rule.id)))
             }
             FooterText(RuleCatalog.description(rule))
@@ -196,7 +194,7 @@ fun TextRuleSettingsScreen(
                 SettingsGroup {
                     SwitchRow(
                         title = "没有旁证的也圈出",
-                        summary = "圈出，不打码。会多圈到药名、品牌名",
+                        summary = "会多圈到药名、品牌名",
                         icon = Icons.Outlined.PersonSearch,
                         checked = config.outlineUnanchoredNames,
                         enabled = state != RuleState.OFF,
@@ -221,7 +219,7 @@ fun FaceSettingsScreen(
     SettingsScaffold(title = "人脸", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             SectionHeader("识别到人脸时", first = true)
-            HandlingGroup(config.faceState, offSummary = "不识别人脸") { onChange(config.copy(faceState = it)) }
+            HandlingGroup(config.faceState) { onChange(config.copy(faceState = it)) }
         }
         item {
             SectionHeader("识别模式")
@@ -229,10 +227,6 @@ fun FaceSettingsScreen(
                 FaceOption.entries.forEach { option ->
                     RadioRow(
                         title = faceModeLabel(option),
-                        summary = when (option) {
-                            FaceOption.FAST -> "速度更快"
-                            FaceOption.ACCURATE -> "漏检更少，速度更慢"
-                        },
                         selected = config.face == option,
                         enabled = config.faceState != RuleState.OFF,
                         onClick = { onChange(config.copy(face = option)) },
@@ -254,7 +248,7 @@ fun BarcodeSettingsScreen(
     SettingsScaffold(title = "条码", onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             SectionHeader("识别到条码时", first = true)
-            HandlingGroup(config.barcodeState, offSummary = "不识别条码") { onChange(config.copy(barcodeState = it)) }
+            HandlingGroup(config.barcodeState) { onChange(config.copy(barcodeState = it)) }
         }
         item {
             SectionHeader("识别模式")
@@ -263,8 +257,8 @@ fun BarcodeSettingsScreen(
                     RadioRow(
                         title = barcodeModeLabel(option),
                         summary = when (option) {
-                            BarcodeOption.STRICT -> "只认能解码的条码，歪斜、模糊的可能漏掉"
-                            BarcodeOption.LOOSE -> "无法解码的疑似条码也圈出（不打码），可能误圈花纹"
+                            BarcodeOption.STRICT -> "只认能解码的条码"
+                            BarcodeOption.LOOSE -> "解不出的疑似条码也圈出，可能误圈"
                         },
                         selected = config.barcode == option,
                         enabled = config.barcodeState != RuleState.OFF,
@@ -359,7 +353,7 @@ fun ExportSettingsScreen(
             SettingsGroup {
                 SwitchRow(
                     title = "导出前提醒",
-                    summary = "有圈出但未打码的内容时，导出前先列出来让你确认",
+                    summary = "有圈出但未打码的内容时",
                     icon = Icons.AutoMirrored.Outlined.FactCheck,
                     checked = exportReminder,
                     onCheckedChange = onExportReminderChange,
@@ -449,16 +443,12 @@ fun AppearanceSettingsScreen(
 
 /** 人脸、条码、文字的各类共用：打码 / 仅圈出 / 关闭，打码排第一。 */
 @Composable
-private fun HandlingGroup(selected: RuleState, offSummary: String, onSelect: (RuleState) -> Unit) {
+private fun HandlingGroup(selected: RuleState, onSelect: (RuleState) -> Unit) {
     SettingsGroup(Modifier.selectableGroup()) {
         listOf(RuleState.MASKED, RuleState.OUTLINED, RuleState.OFF).forEach { state ->
             RadioRow(
                 title = handlingLabel(state),
-                summary = when (state) {
-                    RuleState.MASKED -> "直接遮住"
-                    RuleState.OUTLINED -> "只画虚线框，点一下才打码"
-                    RuleState.OFF -> offSummary
-                },
+                summary = if (state == RuleState.OUTLINED) "只画虚线框，点一下才打码" else null,
                 selected = selected == state,
                 onClick = { onSelect(state) },
             )
@@ -540,10 +530,9 @@ internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
 /** 哪些机型有 Gemini Nano：Google 的文档。页尾「支持设备列表参考官方文档」那一句指向它。 */
 internal const val GENAI_DOCS_URL = "https://developers.google.cn/ml-kit/genai"
 
-/** 「[prefix]支持设备列表参考官方文档。」，「官方文档」是个链接。 */
+/** 「支持设备列表参考官方文档。」，「官方文档」是个链接。 */
 @Composable
-private fun supportedDevicesSentence(prefix: String = ""): AnnotatedString = buildAnnotatedString {
-    append(prefix)
+private fun supportedDevicesSentence(): AnnotatedString = buildAnnotatedString {
     append("支持设备列表参考")
     append(footerLink("官方文档", GENAI_DOCS_URL))
     append("。")

@@ -380,7 +380,6 @@ private fun styleBarModel(state: EditorUiState): StyleBarModel {
     return StyleBarModel(
         look = look,
         panelOpen = state.stylePanelOpen,
-        editingSelection = selected != null,
         colorPick = state.colorPick,
         applicable = state.plan.items.count { it.state == MaskState.MASKED && it.look != look },
         nearColors = nearColors,

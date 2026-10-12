@@ -80,8 +80,6 @@ data class StyleBarModel(
     /** 样式栏上的那一份：选中了手动框时是那个框的样子，否则是画笔（见 EditorUiState.barLook）。 */
     val look: MaskLook,
     val panelOpen: Boolean = false,
-    /** 选中了手动框：面板上的改动也落在它身上。 */
-    val editingSelection: Boolean = false,
     /** 吸管正在等着取色的那一项。 */
     val colorPick: ColorTarget? = null,
     /** 「应用到全部」会改动的已打码块数。0 时按钮不可点。 */
@@ -368,17 +366,12 @@ internal fun StylePanel(
     }
 }
 
-/** 面板顶上：一行小字说清楚改的是什么，右边是收起。弹出的面板上还有个标题，是当前样式的名字。 */
+/** 面板顶上：弹出的面板上是当前样式的名字，右边是收起。 */
 @Composable
 private fun PanelHeader(model: StyleBarModel, actions: StyleBarActions, title: String? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(
-                if (model.editingSelection) "改的是选中的框，之后打码也用它" else "之后打码都用这个样式，打好的不变",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
         IconButton(onClick = actions::onCollapse) {
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "收起样式面板")
