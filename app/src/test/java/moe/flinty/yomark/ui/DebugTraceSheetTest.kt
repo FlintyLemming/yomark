@@ -23,7 +23,7 @@ import org.robolectric.annotation.Config
 
 /** 编辑页的调试信息面板：最新一次展开，大段原文收着，复制拿到的是整份纯文本。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class DebugTraceSheetTest {
 
     @get:Rule val compose = createComposeRule()

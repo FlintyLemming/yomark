@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.billing.Edition
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 首页：正中一个大按钮选图，右上角是与具体某张图无关的入口（去水印、设置）。
@@ -50,12 +52,12 @@ fun HomeScreen(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                title = { Text("有码") },
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     if (onRemoveWatermark != null) {
-                        IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, if (Edition.isFree) "全功能免费版" else "去除水印") }
+                        IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark)) }
                     }
-                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, "设置") }
+                    IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
                 },
                 // 边到边（见 enableLightEdgeToEdge）：横屏时左右还要让开挖孔与三键导航
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -80,11 +82,11 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         Icon(Icons.Filled.AddPhotoAlternate, contentDescription = null, modifier = Modifier.size(56.dp))
-                        Text("选择图片", style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.pick_image), style = MaterialTheme.typography.titleLarge)
                     }
                 }
                 Text(
-                    "也可以在相册里分享图片到「有码」，支持多张",
+                    stringResource(R.string.home_share_hint),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

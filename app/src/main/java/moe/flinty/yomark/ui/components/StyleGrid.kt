@@ -34,6 +34,8 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskStyleInfo
 import kotlin.math.min
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 宽屏的样式按钮：四种样式排成两行两列的圆角方块（宽屏增补设计）。
@@ -139,7 +141,7 @@ private fun StyleTile(
             Spacer(Modifier.height(4.dp * scale))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    MaskStyleInfo.label(style),
+                    stringResource(MaskStyleInfo.label(style)),
                     style = if (large) MaterialTheme.typography.labelLarge else MaterialTheme.typography.labelMedium,
                     color = if (selected) colors.onSecondaryContainer else colors.onSurfaceVariant,
                     maxLines = 1,

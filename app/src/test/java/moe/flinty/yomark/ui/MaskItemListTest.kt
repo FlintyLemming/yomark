@@ -34,7 +34,7 @@ import org.robolectric.annotation.GraphicsMode
 /** 宽屏的框列表：顺序、缩略图，点一行报的是哪一块。点了之后怎么改 plan 由 ViewModel 管，见 EditorViewModelTest。 */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(qualifiers = "w400dp-h800dp-xhdpi")
+@Config(qualifiers = "zh-rCN-w400dp-h800dp-xhdpi")
 class MaskItemListTest {
 
     @get:Rule val compose = createComposeRule()

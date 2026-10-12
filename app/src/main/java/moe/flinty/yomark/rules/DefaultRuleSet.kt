@@ -3,6 +3,7 @@ package moe.flinty.yomark.rules
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.rules.validator.Checksums
 import moe.flinty.yomark.rules.validator.KnownTlds
+import moe.flinty.yomark.R
 
 /**
  * 全部规则（spec §6 + 2026-09-04 增补 §3）。17 条：12 条默认打码、5 条仅圈出。
@@ -464,17 +465,17 @@ object DefaultRuleSet {
      * 与姓名规则拿电话找锚同一个道理：电话、地址规则被用户关掉时照样算旁证——关的是「遮」，不是「认」。
      */
     val nameAnchors: List<NameAnchor> = listOf(
-        NameAnchor("先生、女士这类称呼", NameAnchor.Reach.ATTACHED, Words(PERSON_TITLES)),
-        NameAnchor("电话", NameAnchor.Reach.NEARBY, PHONE),
-        NameAnchor("邮箱", NameAnchor.Reach.NEARBY, EMAIL),
-        NameAnchor("地址", NameAnchor.Reach.NEARBY, ADDRESS),
-        NameAnchor("证件号", NameAnchor.Reach.NEARBY, shape(ID_NUMBER, Checksums::chineseIdValid)),
-        NameAnchor("打了星的号码", NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
+        NameAnchor(R.string.anchor_title, NameAnchor.Reach.ATTACHED, Words(PERSON_TITLES)),
+        NameAnchor(R.string.anchor_phone, NameAnchor.Reach.NEARBY, PHONE),
+        NameAnchor(R.string.anchor_email, NameAnchor.Reach.NEARBY, EMAIL),
+        NameAnchor(R.string.anchor_address, NameAnchor.Reach.NEARBY, ADDRESS),
+        NameAnchor(R.string.anchor_id, NameAnchor.Reach.NEARBY, shape(ID_NUMBER, Checksums::chineseIdValid)),
+        NameAnchor(R.string.anchor_masked_number, NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
         NameAnchor(
-            "「收货人」「乘车人」这类字段", NameAnchor.Reach.NEARBY,
+            R.string.anchor_field, NameAnchor.Reach.NEARBY,
             Words(NAME_LABELS + PERSON_FIELDS, boundedBefore = true),
         ),
-        NameAnchor("票种", NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
-        NameAnchor("「Passenger」「Ship to」这类英文字段", NameAnchor.Reach.NEARBY, shape(ENGLISH_PERSON_FIELDS)),
+        NameAnchor(R.string.anchor_ticket, NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
+        NameAnchor(R.string.anchor_english_field, NameAnchor.Reach.NEARBY, shape(ENGLISH_PERSON_FIELDS)),
     )
 }

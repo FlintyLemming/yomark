@@ -6,6 +6,8 @@ import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 import moe.flinty.yomark.debug.TraceLog
 
 /**
@@ -24,36 +26,36 @@ fun DeveloperSettingsScreen(
     onOpenTraceHistory: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = "开发者", onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_developer), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
             SettingsGroup {
                 SwitchRow(
-                    title = "调试信息",
+                    title = stringResource(R.string.debug_info),
                     icon = Icons.Outlined.BugReport,
                     checked = debugTrace,
                     onCheckedChange = onDebugTraceChange,
                 )
                 if (debugTrace) {
                     LinkRow(
-                        title = "调试记录",
-                        summary = "最近 $traceCapacity 次识别",
+                        title = stringResource(R.string.debug_log),
+                        summary = stringResource(R.string.debug_log_summary, traceCapacity),
                         icon = Icons.Outlined.History,
                         onClick = onOpenTraceHistory,
                     )
                 }
             }
             if (!debugTrace) {
-                FooterText("记录已删除。要再打开，在「关于」里连点版本号七下。")
+                FooterText(stringResource(R.string.debug_off_footer))
             }
         }
         if (debugTrace) {
             item {
-                SectionHeader("保留最近几次识别")
+                SectionHeader(stringResource(R.string.keep_runs))
                 SettingsGroup(Modifier.selectableGroup()) {
                     TraceLog.CAPACITY_OPTIONS.forEach { count ->
                         RadioRow(
-                            title = "$count 次",
+                            title = stringResource(R.string.runs_count, count),
                             selected = traceCapacity == count,
                             onClick = { onTraceCapacityChange(count) },
                         )

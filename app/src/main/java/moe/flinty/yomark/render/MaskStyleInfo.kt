@@ -1,6 +1,8 @@
 package moe.flinty.yomark.render
 
 import moe.flinty.yomark.core.model.MaskStyle
+import androidx.annotation.StringRes
+import moe.flinty.yomark.R
 
 /**
  * 安全性分档（spec §8 的「安全性」列）。
@@ -18,11 +20,12 @@ object MaskStyleInfo {
         MaskStyle.SOLID, MaskStyle.PIXELATE, MaskStyle.BLUR, MaskStyle.MARKER,
     )
 
-    fun label(style: MaskStyle): String = when (style) {
-        MaskStyle.SOLID -> "色块"
-        MaskStyle.PIXELATE -> "马赛克"
-        MaskStyle.BLUR -> "模糊"
-        MaskStyle.MARKER -> "马克笔"
+    @StringRes
+    fun label(style: MaskStyle): Int = when (style) {
+        MaskStyle.SOLID -> R.string.style_solid
+        MaskStyle.PIXELATE -> R.string.style_pixelate
+        MaskStyle.BLUR -> R.string.style_blur
+        MaskStyle.MARKER -> R.string.style_marker
     }
 
     /**

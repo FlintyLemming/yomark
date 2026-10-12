@@ -12,6 +12,9 @@ import moe.flinty.yomark.core.model.TextLine
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import moe.flinty.yomark.R
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * 从字面猜出的人名要有旁证（整页、出厂规则表）。
@@ -121,16 +124,18 @@ class NameAnchorPageTest {
      *
      * 往旁证表里加一行，就在这里加一个例子；漏了，`every anchor has an example` 会提醒。
      */
+    private val res = ApplicationProvider.getApplicationContext<Context>().resources
+
     private val examples = mapOf(
-        "先生、女士这类称呼" to Example("王小明", "王小明先生，您的快递到了"),
-        "电话" to Example("李思雨", "李思雨", "+86 138 0013 8000"),
-        "邮箱" to Example("李思雨", "李思雨", "lisiyu@example.com"),
-        "地址" to Example("李思雨", "李思雨", "送至 祁门路33号四方新村23幢605室"),
-        "证件号" to Example("李思雨", "李思雨", "11010519491231002X"),
-        "打了星的号码" to Example("李思雨", "李思雨", "3201**********1234"),
-        "「收货人」「乘车人」这类字段" to Example("李思雨", "乘车人", "李思雨"),
-        "票种" to Example("李思雨", "李思雨 成人"),
-        "「Passenger」「Ship to」这类英文字段" to Example("Emily Carter", "Passenger", "Emily Carter"),
+        R.string.anchor_title to Example("王小明", "王小明先生，您的快递到了"),
+        R.string.anchor_phone to Example("李思雨", "李思雨", "+86 138 0013 8000"),
+        R.string.anchor_email to Example("李思雨", "李思雨", "lisiyu@example.com"),
+        R.string.anchor_address to Example("李思雨", "李思雨", "送至 祁门路33号四方新村23幢605室"),
+        R.string.anchor_id to Example("李思雨", "李思雨", "11010519491231002X"),
+        R.string.anchor_masked_number to Example("李思雨", "李思雨", "3201**********1234"),
+        R.string.anchor_field to Example("李思雨", "乘车人", "李思雨"),
+        R.string.anchor_ticket to Example("李思雨", "李思雨 成人"),
+        R.string.anchor_english_field to Example("Emily Carter", "Passenger", "Emily Carter"),
     )
 
     private class Example(val name: String, vararg val page: String)
@@ -145,8 +150,8 @@ class NameAnchorPageTest {
             val example = examples.getValue(anchor.label)
             val lines = page(*example.page)
             val found = names(lines, anchors = listOf(anchor)).filter { it.text(lines) == example.name }
-            assertWithMessage(anchor.label).that(found).hasSize(1)
-            assertWithMessage(anchor.label).that(found.single().enabledByDefault).isTrue()
+            assertWithMessage(res.getString(anchor.label)).that(found).hasSize(1)
+            assertWithMessage(res.getString(anchor.label)).that(found.single().enabledByDefault).isTrue()
         }
     }
 
@@ -174,7 +179,7 @@ class NameAnchorPageTest {
 
     /** 人名页上「旁证是……」那句话照着旁证表拼，表里每一种都写进去。 */
     @Test fun `the settings note lists every anchor`() {
-        val note = RuleCatalog.nameAnchorNote()
-        DefaultRuleSet.nameAnchors.forEach { assertThat(note).contains(it.label) }
+        val note = RuleCatalog.nameAnchorNote(res)
+        DefaultRuleSet.nameAnchors.forEach { assertThat(note).contains(res.getString(it.label)) }
     }
 }

@@ -1,5 +1,7 @@
 package moe.flinty.yomark.rules
 
+import androidx.annotation.StringRes
+
 /**
  * 一种旁证：从字面猜出的人名（[NeedsAnchor]）要有一处旁证才算数，算数了按「人名」的设置打码，
  * 没有的出厂不圈（见 RuleClassifier）。
@@ -8,11 +10,11 @@ package moe.flinty.yomark.rules
  * 再在 NameAnchorPageTest 的例子表里给它配一个例子（不配，那里的测试会提醒）。
  * 设置页人名那一页上「旁证是……」那句话由这张表拼出来，不用另改。
  *
- * @param label 写给用户看的名字，拼进设置页上「旁证是……」那句话里。
+ * @param label 写给用户看的名字（字符串资源），拼进设置页上「旁证是……」那句话里。
  * @param reach 离名字多近才算。
  * @param finder 在一行里找出它。
  */
-class NameAnchor(val label: String, val reach: Reach, val finder: Finder) {
+class NameAnchor(@StringRes val label: Int, val reach: Reach, val finder: Finder) {
 
     enum class Reach {
         /**

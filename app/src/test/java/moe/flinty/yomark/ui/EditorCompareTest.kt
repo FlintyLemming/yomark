@@ -53,7 +53,7 @@ import java.io.File
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 模式下读不到像素
-@Config(qualifiers = "w412dp-h860dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
 class EditorCompareTest {
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()

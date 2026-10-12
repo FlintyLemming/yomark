@@ -8,11 +8,14 @@ import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.batch.BatchSession
+import androidx.annotation.StringRes
 
 sealed interface EditorMessage {
     data class Exported(val uri: Uri, val downscaled: Boolean, val width: Int, val height: Int) : EditorMessage
     data class BatchExported(val count: Int) : EditorMessage
-    data class Error(val text: String) : EditorMessage
+    /** 一批里有几张导出失败：成功几张、失败几张。 */
+    data class BatchPartial(val ok: Int, val failed: Int) : EditorMessage
+    data class Error(@StringRes val text: Int) : EditorMessage
 }
 
 /**

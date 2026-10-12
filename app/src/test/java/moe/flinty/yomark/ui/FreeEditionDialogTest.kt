@@ -19,7 +19,7 @@ import org.robolectric.annotation.Config
 
 /** 开源版里去水印按钮打开的对话框：没解锁时给「去除水印」，两种状态都给打赏入口。 */
 @RunWith(RobolectricTestRunner::class)
-@Config(qualifiers = "w412dp-h915dp-xxhdpi")
+@Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class FreeEditionDialogTest {
 
     @get:Rule val compose = createComposeRule()

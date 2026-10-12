@@ -13,35 +13,21 @@ import java.util.Locale
  * 界面语言。第一项「跟随系统」，其余是有译文的几种，名字一律用它自己的语言写（不随界面语言变），
  * 看不懂当前语言的人也认得出自己那一项。
  *
- * [tag] 是 BCP 47 标签，同 res/xml/locales_config.xml 里的一一对应：中文用文字（Hans / Hant）而不是地区区分，
- * 香港、澳门的系统落到繁体，新加坡的落到简体。资源目录对应 values-zh、values-b+zh+Hant、values-ja、values-ko，
- * 英文是缺省的 values/：没有译文的语言都回落到英文。
+ * [tag] 是 BCP 47 标签，同 res/xml/locales_config.xml 里的一一对应。资源目录：简体中文是 values-zh，
+ * 英文是缺省的 values/，没有译文的语言都回落到英文。
  */
 enum class AppLanguage(val tag: String?, val nativeName: String?) {
     SYSTEM(null, null),
     CHINESE_SIMPLIFIED("zh-Hans", "简体中文"),
-    CHINESE_TRADITIONAL("zh-Hant", "繁體中文"),
-    ENGLISH("en", "English"),
-    JAPANESE("ja", "日本語"),
-    KOREAN("ko", "한국어");
-
-    val locale: Locale? get() = tag?.let(Locale::forLanguageTag)
+    ENGLISH("en", "English");
 
     companion object {
         /** 把一个 locale 对到某一项；对不上（系统设置里不会出现，以防万一）就当跟随系统。 */
-        fun of(locale: Locale?): AppLanguage {
-            if (locale == null) return SYSTEM
-            return when (locale.language) {
-                "zh" -> if (isTraditional(locale)) CHINESE_TRADITIONAL else CHINESE_SIMPLIFIED
-                "en" -> ENGLISH
-                "ja" -> JAPANESE
-                "ko" -> KOREAN
-                else -> SYSTEM
-            }
+        fun of(locale: Locale?): AppLanguage = when (locale?.language) {
+            "zh" -> CHINESE_SIMPLIFIED
+            "en" -> ENGLISH
+            else -> SYSTEM
         }
-
-        private fun isTraditional(locale: Locale) =
-            locale.script == "Hant" || (locale.script.isEmpty() && locale.country in setOf("TW", "HK", "MO"))
     }
 }
 

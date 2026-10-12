@@ -68,6 +68,8 @@ import kotlin.math.exp
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.ui.res.stringResource
+import moe.flinty.yomark.R
 
 /**
  * 感谢页的内容（见 [ThanksActivity]）：会动的 🎉、一句谢谢、买到的是什么，再一个「好的」。
@@ -95,25 +97,25 @@ fun ThanksScreen(onDone: () -> Unit, modifier: Modifier = Modifier) {
                 PartyPopper(confetti, Modifier.size(176.dp))
                 Spacer(Modifier.height(32.dp))
                 Text(
-                    "感谢购买",
+                    stringResource(R.string.thanks_title),
                     style = MaterialTheme.typography.headlineMedium,
                     modifier = Modifier.semantics { heading() },
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "导出的图片不再带「有码 Yomark」水印。",
+                    stringResource(R.string.thanks_text),
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "一次付费，永久有效。重装或换手机后，只要用同一个 Google 账号，联网打开一次就会自动恢复。",
+                    stringResource(R.string.thanks_restore),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(36.dp))
-                Button(onClick = onDone, modifier = Modifier.widthIn(min = 160.dp)) { Text("好的") }
+                Button(onClick = onDone, modifier = Modifier.widthIn(min = 160.dp)) { Text(stringResource(R.string.ok)) }
             }
         }
     }

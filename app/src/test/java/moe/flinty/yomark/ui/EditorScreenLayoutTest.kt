@@ -56,6 +56,9 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import java.io.File
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.performSemanticsAction
 
 /**
  * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表，横过来样式和导出挪到画布右边；
@@ -141,7 +144,7 @@ class EditorScreenLayoutTest {
     private fun listBounds() = compose.onNodeWithText("框出 2 处").getUnclippedBoundsInRoot()
     private fun screenBounds() = compose.onRoot().getUnclippedBoundsInRoot()
 
-    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `a phone keeps the style bar and has no list`() {
         open()
         compose.onNodeWithText("色块").assertExists()
@@ -150,7 +153,7 @@ class EditorScreenLayoutTest {
     }
 
     /** 手机上样式的调节面板从底下弹出来盖在图上，不把底栏和画布往上顶。 */
-    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the style panel pops up over the image instead of pushing it up`() {
         val vm = open()
         val bar = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
@@ -167,7 +170,7 @@ class EditorScreenLayoutTest {
     }
 
     /** 吸管：弹出的面板先让开，点图取色，面板带着取到的颜色弹回来。 */
-    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the sheet steps aside for the eyedropper and comes back with the colour`() {
         val vm = open()
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
@@ -185,12 +188,13 @@ class EditorScreenLayoutTest {
     }
 
     /** 点面板外面（Material 3 的暗幕，读屏念「Close sheet」）、按返回，都把面板收起。 */
-    @Config(qualifiers = "w412dp-h860dp-xxhdpi")
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone tapping outside the sheet or pressing back folds it`() {
         val vm = open()
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
         frames(SETTLE_FRAMES)
-        compose.onNodeWithContentDescription("Close sheet").performClick()
+        // 点暗幕 = 面板的「关闭」语义动作；暗幕的读屏文字随系统语言变，不按它找
+        compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsActions.Dismiss)).performSemanticsAction(SemanticsActions.Dismiss)
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
@@ -207,7 +211,7 @@ class EditorScreenLayoutTest {
     }
 
     /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */
-    @Config(qualifiers = "sw412dp-w860dp-h412dp-land-xxhdpi")
+    @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
     @Test fun `a phone on its side moves the styles and export right of the image, without the list`() {
         open()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
@@ -218,7 +222,7 @@ class EditorScreenLayoutTest {
     }
 
     /** 手机横着拿，右边那一栏矮：调节面板弹出来时顶替样式方块，不盖在图上；导出还在底下，收起后方块回来。 */
-    @Config(qualifiers = "sw412dp-w860dp-h412dp-land-xxhdpi")
+    @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
     @Test fun `on a phone held sideways the style panel takes the styles' place`() {
         val vm = open()
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }   // 点当前这一种，弹出面板
@@ -234,7 +238,7 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("马克笔").assertIsDisplayed()
     }
 
-    @Config(qualifiers = "sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
     @Test fun `an upright tablet lists the boxes below the image`() {
         open()
         compose.onNodeWithText("导出").assertExists()
@@ -250,7 +254,7 @@ class EditorScreenLayoutTest {
         assertThat(solid.width).isGreaterThan(100.dp)
     }
 
-    @Config(qualifiers = "sw800dp-w1280dp-h800dp-land-xhdpi")
+    @Config(qualifiers = "zh-rCN-sw800dp-w1280dp-h800dp-land-xhdpi")
     @Test fun `a tablet on its side lists the boxes right of the image, below the styles`() {
         open()
         val list = listBounds()
@@ -263,13 +267,13 @@ class EditorScreenLayoutTest {
         assertThat(pixelate.right - solid.left).isGreaterThan(screen.width * 0.25f)
     }
 
-    @Config(qualifiers = "sw528dp-w528dp-h848dp-port-xhdpi")
+    @Config(qualifiers = "zh-rCN-sw528dp-w528dp-h848dp-port-xhdpi")
     @Test fun `a wide fold gets the list`() {
         open()
         listBounds()
     }
 
-    @Config(qualifiers = "sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
     @Test fun `tapping a row masks or unmasks that box`() {
         val vm = open()
         compose.onNodeWithText("网址").performClick()
@@ -280,7 +284,7 @@ class EditorScreenLayoutTest {
     }
 
     /** 样式的调节面板弹出来时占列表的位置，收起后列表回来。 */
-    @Config(qualifiers = "sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
     @Test fun `the style panel takes the list's place while it is open`() {
         val vm = open()
         compose.runOnUiThread {

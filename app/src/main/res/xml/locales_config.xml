@@ -2,8 +2,5 @@
 <!-- 系统设置「应用语言」里列出的语言，和 ui/AppLanguage.kt 的各项一一对应。缺省（values/）是英文。 -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="zh-Hans" />
-    <locale android:name="zh-Hant" />
     <locale android:name="en" />
-    <locale android:name="ja" />
-    <locale android:name="ko" />
 </locale-config>

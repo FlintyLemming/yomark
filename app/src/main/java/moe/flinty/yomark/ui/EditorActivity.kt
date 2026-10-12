@@ -33,6 +33,7 @@ import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import moe.flinty.yomark.R
 
 /**
  * 编辑器：从首页选图进来（intent.data / clipData，可多选），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
@@ -61,6 +62,8 @@ class EditorActivity : YomarkActivity() {
                     settings = SettingsStore(app),
                     savedState = createSavedStateHandle(),
                     traceLog = sharedTraceLog(app),
+                    // 从 Activity 取：Android 12 及以下应用内选的语言只换在 Activity 上（见 AppLocale）
+                    defaultPurposeText = getString(R.string.purpose_default),
                 )
             }
         }
