@@ -48,6 +48,24 @@ internal object TestPages {
         return out
     }
 
+    /**
+     * 物流页的上面 1080 像素（不缩，整页不到 2048 高，app 不减半）下面居中贴一张缩到 [scale]、顺时针转了 [degrees] 度的
+     * 测试图 [res]：同聊天截图里发了一张拍歪了的证件照，证件上的字比截图上的少，整页按截图的方向认。
+     */
+    fun screenshotWith(res: String, degrees: Float, scale: Float): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val doc = res("/ppocr/$res")
+        val small = Bitmap.createScaledBitmap(doc, (doc.width * scale).toInt(), (doc.height * scale).toInt(), true)
+        val turned = Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(degrees) }, true)
+        val out = Bitmap.createBitmap(1080, 1100 + turned.height + 40, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(page, Rect(0, 0, 1080, 1080), Rect(0, 0, 1080, 1080), null)
+            drawBitmap(turned, (1080 - turned.width) / 2f, 1100f, null)
+        }
+        return out
+    }
+
     /** 物流页上剪下 [from] 那一块贴在页顶，下面 [cardTop] 处居中贴一张顺时针转了 [cardDegrees] 的身份证人像面。 */
     private fun withCard(cardDegrees: Int, from: Rect, cardTop: Int): Bitmap {
         val page = res("/ppocr/logistics-page.png")

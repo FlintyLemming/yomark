@@ -18,6 +18,11 @@ import kotlin.math.min
  *   「预计10月14日送达」「张三 138****1234」），不是住址；
  * - 不是只有日期、号码的一行。
  * 最多接 [maxLines] 行。
+ *
+ * 按这一页的方向量；截图里一张拍歪了、转过的证件照（字少，RuleClassifier 不单分一组），值那一行、下面那几行有自己的方向的，
+ * 也按它们的方向各量一遍（Page.boxIn），哪个方向接得最多取哪个：歪 8° 的驾驶证上，「住址 Address 江苏省…」拼成一排的框是横平的、
+ * 字是斜的，按整页量，下面一行的中线不够低，接不上。按别的方向量时，值和接上的行都要顺着这个方向（[fits]）：截图上正着的两行
+ * 按照片的方向量，框一样斜着撑高，字高一高、「对齐」的余量跟着变大，会把住址下面的「王小明 86-139****5678」接上。
  */
 class FollowingLines(
     private val field: Finder,
@@ -27,30 +32,61 @@ class FollowingLines(
 ) : PageFinder {
 
     override fun findOnPage(page: Page): List<PageMatch> {
-        val out = ArrayList<PageMatch>()
-        val lines = page.texts.indices.map { Line.of(page, it) }
         val found = if (field is PageFinder) field.findOnPage(page)
         else page.texts.indices.flatMap { i -> field.findIn(page.texts[i]).map { PageMatch(i, it) } }
-        found.forEach { (i, m) ->
-            val text = page.texts[i]
-            val x0 = page.box(i, m.range.first..m.range.first).left
-            var above = page.box(i, m.range)
-            val h = above.height
-            if (h <= 0f) return@forEach
-            // 字段名那一栏的左沿：这一行值前面那一截的头一个字（字段名另成一行时，当它在左边几个字高以内）
-            val labelLeft = text.indexOfFirst { !it.isWhitespace() }.takeIf { it < m.range.first }
-                ?.let { page.box(i, it..it).left } ?: (x0 - LABEL_REACH * h)
-            repeat(maxLines) {
-                val next = lines.filterNotNull()
-                    .filter { it.index != i && it.continues(above, x0, h) }
-                    .minByOrNull { it.box.top } ?: return@forEach
-                val t = page.texts[next.index]
-                if (startsWithLabel(t) || !hasAddressWords(t) || !hasAddressPiece(t) || besideALabel(lines, next, labelLeft, x0, h)) {
-                    return@forEach
-                }
-                out += PageMatch(next.index, RuleMatch(next.range, confidence))
-                above = next.box
+        // 每个方向的各行算一次
+        val linesIn = HashMap<Int?, List<Line?>>()
+        val linesOf = { ref: Int? -> linesIn.getOrPut(ref) { page.texts.indices.map { Line.of(page, it, ref) } } }
+        return found.flatMap { (i, m) ->
+            refsOf(page, i, m.range).map { ref -> follow(page, i, m.range, ref, linesOf(ref), linesOf(null)) }
+                .maxByOrNull { it.size }.orEmpty()
+        }
+    }
+
+    /**
+     * 量第 [i] 行的值 [range] 往下接按哪几个方向（null 是这一页的，排第一，接得一样多时取它）：值那一行自己的，
+     * 下面一带（左沿差不多对着值、[maxLines] 行以内）转过的行自己的。这一页上没有转过的行就只有这一页的。
+     */
+    private fun refsOf(page: Page, i: Int, range: IntRange): List<Int?> {
+        val value = page.box(i, range)
+        val h = value.height
+        if (h <= 0f) return IN_PAGE
+        val below = page.texts.indices.filter { j ->
+            j != i && page.isTurned(j) && page.texts[j].isNotBlank() && page.box(j).let { b ->
+                b.top >= value.top && b.top - value.bottom <= REACH * maxLines * h && b.right >= value.left - LABEL_REACH * h && b.left <= value.right
             }
+        }
+        return IN_PAGE + listOfNotNull(i.takeIf { page.isTurned(it) }) + below
+    }
+
+    /**
+     * 按第 [ref] 行的方向（见 [refsOf]）从第 [i] 行的值 [range] 往下接；[lines] 是按这个方向量的各行，[inPage] 是按这一页量的。
+     */
+    private fun follow(page: Page, i: Int, range: IntRange, ref: Int?, lines: List<Line?>, inPage: List<Line?>): List<PageMatch> {
+        val out = ArrayList<PageMatch>()
+        val box = { j: Int, r: IntRange -> if (ref == null) page.box(j, r) else page.boxIn(j, r, ref) }
+        val text = page.texts[i]
+        val x0 = box(i, range.first..range.first).left
+        // 值前面连着读错了的英文译名（「住址 Aaaress 江苏省…」，译名没认出来，算进了值）：下面一行对着它后面的汉字
+        val han = MISREAD_TRANSLATION.matchAt(text, range.first)?.let { it.range.last + 1 }?.takeIf { it <= range.last }
+        val xs = listOf(x0) + listOfNotNull(han?.let { box(i, it..it).left })
+        var above = box(i, range)
+        val h = above.height
+        if (h <= 0f || ref != null && !fits(above, page.box(i, range))) return out
+        // 字段名那一栏的左沿：这一行值前面那一截的头一个字（字段名另成一行时，当它在左边几个字高以内）
+        val labelLeft = text.indexOfFirst { !it.isWhitespace() }.takeIf { it < range.first }
+            ?.let { box(i, it..it).left } ?: (x0 - LABEL_REACH * h)
+        repeat(maxLines) {
+            val next = lines.filterNotNull()
+                .filter { it.index != i && xs.any { x -> it.continues(above, x, h) } }
+                .filter { ref == null || inPage[it.index]?.let { p -> fits(it.box, p.box) } == true }
+                .minByOrNull { it.box.top } ?: return out
+            val t = page.texts[next.index]
+            if (startsWithLabel(t) || !hasAddressWords(t) || !hasAddressPiece(t) || besideALabel(lines, next, labelLeft, x0, h)) {
+                return out
+            }
+            out += PageMatch(next.index, RuleMatch(next.range, confidence))
+            above = next.box
         }
         return out
     }
@@ -66,15 +102,23 @@ class FollowingLines(
                 abs(box.height - h) <= SIZE * h
 
         companion object {
-            fun of(page: Page, j: Int): Line? {
+            /** 第 [j] 行，按第 [ref] 行的方向量（null 是这一页的）。 */
+            fun of(page: Page, j: Int, ref: Int?): Line? {
                 val t = page.texts[j]
                 val s = t.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return null
                 val e = t.indexOfLast { !it.isWhitespace() }
-                val box = page.box(j, s..e)
-                return Line(j, s..e, box, page.box(j, s..s).left).takeIf { box.height > 0f }
+                val box = { r: IntRange -> if (ref == null) page.box(j, r) else page.boxIn(j, r, ref) }
+                val all = box(s..e)
+                return Line(j, s..e, all, box(s..s).left).takeIf { all.height > 0f }
             }
         }
     }
+
+    /**
+     * 一段字顺着量出 [turned] 的那个方向：按它量出来的框不比按这一页量的（[inPage]）高。斜着的字按自己的方向量框最矮，
+     * 正着的字按斜的方向量，框跟着斜撑高。
+     */
+    private fun fits(turned: Bounds, inPage: Bounds): Boolean = turned.height <= FIT * inPage.height
 
     /** 同一排上、值那一栏左边还有一段字：那是下一个字段的字段名，这一行是它的值。 */
     private fun besideALabel(lines: List<Line?>, row: Line, labelLeft: Float, x0: Float, h: Float): Boolean =
@@ -95,6 +139,18 @@ class FollowingLines(
 
         /** 值在行首（字段名不在这一行）时，当字段名那一栏在左边几个字高以内。 */
         const val LABEL_REACH = 6f
+
+        /** 找转过的行（[refsOf]）时，每接一行往下看几个字高。 */
+        const val REACH = 3f
+
+        /** 按别的方向量的框最多比按这一页量的高这么多（[fits]），留一点给框的误差。 */
+        const val FIT = 1.02f
+
+        /** 只按这一页的方向量。 */
+        val IN_PAGE: List<Int?> = listOf(null)
+
+        /** 值打头的一个英文词，后面隔着空格是汉字：读错了的译名（「Aaaress」「Adsess」）。 */
+        val MISREAD_TRANSLATION = Regex("[A-Za-z]{3,} +(?=[\\u4e00-\\u9fa5])")
     }
 }
 

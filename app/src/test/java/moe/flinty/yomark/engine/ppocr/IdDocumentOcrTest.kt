@@ -202,6 +202,19 @@ class IdDocumentOcrTest {
         }
     }
 
+    /**
+     * 截图里一张拍歪了的驾驶证：证件上的字少，不单分一组。拼成一排的几段（「住址 Address 江苏省…」）框是横平的、字是斜的，
+     * 自成一段的住址第二行框跟着字斜。以前住址往下接按整页的方向量，顺时针歪 6° 以上就接不上，第二行只剩「号3栋2单元602室」那半截遮上，
+     * 门牌「41」露着。
+     */
+    @Test fun `a driving licence tilted inside an upright screenshot`() {
+        listOf(6f, 8f, 12f, -8f).forEach { d ->
+            val lines = read("screenshot-licence@$d") { TestPages.screenshotWith("driver-license.jpg", d, 0.6f) }
+            val masked = masked(lines)
+            DRIVING_LICENCE.forEach { (kind, text) -> assertWithMessage("歪 $d° $kind $text").that(covered(lines, masked, kind, text)).isTrue() }
+        }
+    }
+
     /** 打码的框，同 app 上一样先合并：转过的证件上折行的住址两行可能并成一个框。 */
     private fun masked(lines: List<TextLine>): List<Candidate> = runBlocking {
         CandidateMerger().merge(RuleClassifier(DefaultRuleSet.rules).classify(lines), ReadingFrame.of(lines.map { it.quad }))
