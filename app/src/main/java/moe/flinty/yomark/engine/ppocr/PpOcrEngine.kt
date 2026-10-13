@@ -125,29 +125,74 @@ class PpOcrEngine(
      * 倒过来只会更差；整页的平均置信度也常常很高，根本不试。
      * 横着的框里读得磕绊的（不到 [UPRIGHT_SCORE]）不只零星几个（[FLIP_LINES] 个以上、占横框总长的 [FLIP_SHARE]），
      * 把它们倒过来再读一遍：明显更好（同 [Trial.beats]），倒过来读得更好的那几个就是倒着的一组。
-     * 这一组围起来的那块里别的横框也倒过来读一遍，读得更好的也算：倒着的号码「330106199307180423」正着读成「3423」，置信度照样高。
+     * 整页算够不上的，按挨得近不近分堆（[piles]）各算各的，占比按一堆围起来的那块算：字多的截图下面一张倒着的车的照片
+     * （七块牌子，每块几个字）按整页够不上门槛；截图上零星几个读得磕绊的（图标、小字）各成一堆，凑不到一起。
+     * 这一组围起来的那块里、挨着它的别的横框也倒过来读一遍，读得更好的也算，一圈圈往外接（[near]）：
+     * 倒着的号码「330106199307180423」正着读成「3423」、倒着的「AB-123-CD」读成「AB-23-CD」，置信度照样高。
      */
     private fun upsideDownGroup(image: Pixels, boxes: List<Box>, reads: List<Read?>): Flipped? {
         val level = boxes.indices.filter { TextAxis.fit(boxes[it], 0f) == TextAxis.Fit.ALONG }
         val shaky = level.filter { (reads[it]?.confidence ?: 0f) < UPRIGHT_SCORE }
-        if (shaky.size < FLIP_LINES || shaky.sumOf { boxes[it].width.toDouble() } < FLIP_SHARE * level.sumOf { boxes[it].width.toDouble() }) {
-            return null
+        if (shaky.size < FLIP_LINES) return null
+        fun width(ks: List<Int>) = ks.sumOf { boxes[it].width.toDouble() }
+        val tried = if (width(shaky) >= FLIP_SHARE * width(level)) listOf(shaky) else piles(boxes, shaky).filter { pile ->
+            val area = around(boxes, pile, 0f)
+            pile.size >= FLIP_LINES && width(pile) >= FLIP_SHARE * width(level.filter { boxes[it] in area })
         }
-        val trial = trial(image, boxes, shaky, 180f)
-        if (!trial.beats(score(shaky.map { reads[it] }))) return null
+        if (tried.isEmpty()) return null
+        val trial = trial(image, boxes, tried.flatten(), 180f)
         fun better(i: Int, flipped: Read?) = (flipped?.confidence ?: 0f) > (reads[i]?.confidence ?: 0f)
-        val group = shaky.filter { better(it, trial.reads[it]) }
+        val group = tried.filter { pile ->
+            val s = score(pile.map { trial.reads[it] })
+            s >= UPRIGHT_SCORE && s > score(pile.map { reads[it] }) + MARGIN
+        }.flatten().filter { better(it, trial.reads[it]) }
         if (group.isEmpty()) return null
-        val h = group.maxOf { boxes[it].height }
-        val left = group.minOf { boxes[it].minX } - h
-        val right = group.maxOf { boxes[it].maxX } + h
-        val top = group.minOf { boxes[it].minY } - h
-        val bottom = group.maxOf { boxes[it].maxY } + h
-        val inside = level.filter { i ->
-            i !in shaky && boxes[i].let { b -> (b.minX + b.maxX) / 2 in left..right && (b.minY + b.maxY) / 2 in top..bottom }
+        val got = LinkedHashMap<Int, Read?>()
+        group.forEach { got[it] = trial.reads[it] }
+        val seen = HashSet(tried.flatten())
+        val area = around(boxes, group, 1f)
+        var next = level.filter { i -> i !in seen && (boxes[i] in area || group.any { near(boxes[i], boxes[it]) }) }
+        while (next.isNotEmpty()) {
+            seen += next
+            val more = next.associateWith { read(trial.view, upright(trial.view, boxes[it])) }.filter { (i, r) -> better(i, r) }
+            got += more
+            next = level.filter { i -> i !in seen && more.keys.any { near(boxes[i], boxes[it]) } }
         }
-        val more = inside.associateWith { read(trial.view, upright(trial.view, boxes[it])) }.filter { (i, r) -> better(i, r) }
-        return Flipped(trial.view, group.associateWith { trial.reads[it] } + more)
+        return Flipped(trial.view, got)
+    }
+
+    /** 一块地方：[left]..[right] × [top]..[bottom]。框的中心落在里面就算在里面。 */
+    private class Area(val left: Float, val right: Float, val top: Float, val bottom: Float) {
+        operator fun contains(b: Box): Boolean = (b.minX + b.maxX) / 2 in left..right && (b.minY + b.maxY) / 2 in top..bottom
+    }
+
+    /** [group] 这几个框围起来的那块，四边各往外放 [margin] 个字高（最高的那个框）。 */
+    private fun around(boxes: List<Box>, group: List<Int>, margin: Float): Area {
+        val h = margin * group.maxOf { boxes[it].height }
+        return Area(
+            group.minOf { boxes[it].minX } - h, group.maxOf { boxes[it].maxX } + h,
+            group.minOf { boxes[it].minY } - h, group.maxOf { boxes[it].maxY } + h,
+        )
+    }
+
+    /** 两个框挨着：横竖都隔着不到 [PILE_GAP] 个字高（两个里高的那个）。 */
+    private fun near(p: Box, q: Box): Boolean {
+        val reach = PILE_GAP * max(p.height, q.height)
+        return max(0f, max(q.minX - p.maxX, p.minX - q.maxX)) <= reach && max(0f, max(q.minY - p.maxY, p.minY - q.maxY)) <= reach
+    }
+
+    /** [indices] 这几个框按挨得近不近分堆：挨着的（[near]）在一堆，挨着的挨着的也在。一张照片上的几行字在一堆里，隔着大半页的不在。 */
+    private fun piles(boxes: List<Box>, indices: List<Int>): List<List<Int>> {
+        val pile = IntArray(indices.size) { it }
+        fun root(k: Int): Int {
+            var r = k
+            while (pile[r] != r) r = pile[r]
+            return r
+        }
+        for (a in indices.indices) for (b in a + 1 until indices.size) {
+            if (near(boxes[indices[a]], boxes[indices[b]])) pile[root(a)] = root(b)
+        }
+        return indices.indices.groupBy { root(it) }.values.map { ks -> ks.map { indices[it] } }
     }
 
     /**
@@ -155,6 +200,10 @@ class PpOcrEngine(
      * 方的小框（一两个字）跟着整页走；页上有垂直的行时，分不出它是哪边的，两边都读、取置信度高的——
      * 转了直角的字读出来置信度差得远，斜几十度的字倒还读得出，所以斜着的方框按边的方向分，不比置信度。
      * [inSource] 是原图上已经读过的结果（下标同 [boxes]），有就不再读。
+     *
+     * 顺着走向的框不分朝哪边读（转 90° 和转 270° 的框一样竖着），整页只挑了一个方向：截图里一张照片转 90°、另一张转 270°，
+     * 另一张在画布上是倒着的。画布上、原图上读的两拨里都找倒着的一组（[upsideDownGroup]），倒过来读：
+     * 一张转了 90° 的证件旁边倒着放的车的照片，照片上的字和证件的垂直，在原图上读，同样是倒着的。
      */
     private fun readTurned(image: Pixels, boxes: List<Box>, axis: Float, chosen: Trial, inSource: List<Read?>?): List<OcrLine> {
         val view = chosen.view
@@ -163,13 +212,16 @@ class PpOcrEngine(
         // 读不出字的也留着框：它可能是字和水印连成的一块（见 rowsIn）
         val turned = ArrayList<Pair<Box, OcrLine?>>()
         val level = ArrayList<Pair<Box, OcrLine?>>()
+        // 顺着走向的框（画布上的框、读出来的结果），垂直的、斜着的框（原图上的）
+        val along = Reads()
+        val across = Reads()
         boxes.forEachIndexed { i, box ->
             val onCanvas = upright(view, box)
             val canvasRead = { if (i in chosen.reads) chosen.reads[i] else read(view, onCanvas) }
             val sourceRead = { if (inSource != null) inSource[i] else read(image, box) }
             when (fits[i]) {
-                TextAxis.Fit.ALONG -> turned += onCanvas to canvasRead()?.line
-                TextAxis.Fit.CROSS, TextAxis.Fit.OTHER -> level += box to sourceRead()?.line
+                TextAxis.Fit.ALONG -> along.add(onCanvas, canvasRead())
+                TextAxis.Fit.CROSS, TextAxis.Fit.OTHER -> across.add(box, sourceRead())
                 TextAxis.Fit.SQUARE -> if (!crossed) canvasRead()?.line?.let { turned += onCanvas to it } else {
                     val c = canvasRead()
                     val s = sourceRead()
@@ -178,8 +230,33 @@ class PpOcrEngine(
                 }
             }
         }
+        val alongFlipped = along.unflipped(view, turned)
+        val acrossFlipped = across.unflipped(image, level)
         val ordered = turned.sortedWith(compareBy(readingOrder) { it.first })
-        return rowsIn(view, ordered, boxes.map { upright(view, it) }).map { it.toSource(view) } + rowsIn(image, level, boxes)
+        return alongFlipped.map { it.toSource(view) } + acrossFlipped +
+            rowsIn(view, ordered, boxes.map { upright(view, it) }).map { it.toSource(view) } + rowsIn(image, level, boxes)
+    }
+
+    /** 一个画面上读的一拨框和读出来的结果（见 [readTurned]）。 */
+    private inner class Reads {
+        val boxes = ArrayList<Box>()
+        val reads = ArrayList<Read?>()
+
+        fun add(box: Box, read: Read?) {
+            boxes += box
+            reads += read
+        }
+
+        /**
+         * 在 [view] 上找倒着的一组（[upsideDownGroup]）：那一组倒过来读，拼好行给回（框在 [view] 上）；其余的照原样放进 [rest]。
+         */
+        fun unflipped(view: Pixels, rest: MutableList<Pair<Box, OcrLine?>>): List<OcrLine> {
+            val group = upsideDownGroup(view, boxes, reads)
+            boxes.indices.forEach { k -> if (group == null || k !in group.reads) rest += boxes[k] to reads[k]?.line }
+            if (group == null) return emptyList()
+            val flipped = group.reads.map { (k, read) -> upright(group.view, boxes[k]) to read?.line }.sortedWith(compareBy(readingOrder) { it.first })
+            return rowsIn(group.view, flipped, flipped.map { it.first }).map { it.toSource(group.view) }
+        }
     }
 
     /**
@@ -192,15 +269,36 @@ class PpOcrEngine(
      * 横平的框斜了 [LEVEL_SLACK] 度以上的也当斜框：那是字和水印连成的一块。中文水印斜二十几度时，
      * 「浙江省杭州市西湖区文三路」和压着它的「仅供办理银行开户使用」连成了一个斜 9° 的框，什么都读不出来。
      *
+     * 斜框里拍歪了的照片上的字（[photos]）不是水印：不拿它们重读旁边的字，按它们自己的走向拼行。
+     *
      * @param read 在 [view] 上读的框和读出来的行（读不出的为 null）；[all] 页上所有的框，都在 [view] 上。
      */
     private fun rowsIn(view: Pixels, read: List<Pair<Box, OcrLine?>>, all: List<Box>): List<OcrLine> {
         if (all.none { TextAxis.fit(it, 0f) == TextAxis.Fit.OTHER }) return RowGrouper.group(read.mapNotNull { it.second })
         val (level, rest) = read.partition { (box, _) -> isLevel(box) }
         val tilted = all.filter { TextAxis.fit(it, 0f) != TextAxis.Fit.CROSS && !isLevel(it) }
-        val rows = RowGrouper.group(underTilted(view, level.mapNotNull { it.second }, tilted))
-        return (rows + RowGrouper.group(rest.mapNotNull { it.second })).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
+        val photo = photos(tilted, all.filter { isLevel(it) })
+        val rows = RowGrouper.group(underTilted(view, level.mapNotNull { it.second }, tilted.filter { it !in photo }))
+        val (inPhoto, others) = rest.partition { it.first in photo }
+        val tiltedRows = RowGrouper.group(others.mapNotNull { it.second }) + RowGrouper.group(inPhoto.mapNotNull { it.second }, ownTilt = true)
+        return (rows + tiltedRows).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
     }
+
+    /**
+     * 斜框里拍歪了的照片上的字：截图里一张歪了十几二十度的车的照片、证件照。挨在一起（[piles]）的几个斜框，走向差不到 [PARALLEL] 度，
+     * 围起来的那块里几乎没有横平的字（横框总长不到斜框的 [PHOTO_LEVEL]）。斜着平铺的水印压在证件上，那块里横平的字多（实测占斜框的
+     * 两成半以上），水印、字和水印连成的块走向也参差（差十几度以上）。
+     * 照片上的字不是水印：不拿它们横着重读旁边的字（[underTilted]，日本牌下一行读成横平方框的「さ」接上斜着的「12-34」，读成「さ 120」），
+     * 拼行时按它们自己的走向量（RowGrouper.group 的 ownTilt），上下错开的两块牌子不拼成一行。
+     */
+    private fun photos(tilted: List<Box>, level: List<Box>): Set<Box> =
+        piles(tilted, tilted.indices.toList()).filter { pile ->
+            // 两三个字的短框走向读不准（拍歪 16° 的照片上「苏·E」的框斜 10°），只看长的
+            val skews = pile.filter { tilted[it].let { b -> max(b.width, b.height) >= 2 * min(b.width, b.height) } }.map { skew(tilted[it]) }
+            val area = around(tilted, pile, 0f)
+            skews.size >= 2 && skews.max() - skews.min() <= PARALLEL &&
+                level.filter { it in area }.sumOf { it.width.toDouble() } <= PHOTO_LEVEL * pile.sumOf { tilted[it].width.toDouble() }
+        }.flatten().map { tilted[it] }.toSet()
 
     /** 横平的一行字或一两个字的方框：上沿偏离横平不过 [LEVEL_SLACK] 度。竖排的一列不算。 */
     private fun isLevel(box: Box): Boolean =
@@ -521,9 +619,18 @@ class PpOcrEngine(
         /** 换到不是默认的那个方向，置信度得高出这么多：两边差不多时不折腾。 */
         private const val MARGIN = 0.1f
 
-        /** 正着的页上读得磕绊的横框至少这么多个、占横框总长这么多，才倒过来试（见 upsideDownGroup）。 */
+        /** 正着的页上读得磕绊的一堆横框至少这么多个、占它围起来那块里横框总长这么多，才倒过来试（见 upsideDownGroup）。 */
         private const val FLIP_LINES = 3
         private const val FLIP_SHARE = 0.15
+
+        /** 两个框隔着不到这么多个字高，算挨着、一堆（见 near、piles）。照片上两块牌子之间隔着两三个字高。 */
+        private const val PILE_GAP = 3f
+
+        /** 一张拍歪了的照片上的字，走向最多差这么多度（见 photos）。实测照片上差不到 5°，水印的一堆差 18° 以上。 */
+        private const val PARALLEL = 6.0
+
+        /** 一张拍歪了的照片围起来的那块里，横平的字的总长最多是斜框的这么多（见 photos）。实测照片上不到 0.03，水印压着的证件 0.25 以上。 */
+        private const val PHOTO_LEVEL = 0.1
 
         /**
          * 页上有斜框时，顺着走向的框斜过这么多度就不是一行字（[isLevel]）。横平的字框差一两度，
@@ -563,25 +670,29 @@ class PpOcrEngine(
  */
 object RowGrouper {
 
-    fun group(lines: List<OcrLine>): List<OcrLine> =
-        rows(lines).map(::join).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
+    /**
+     * [ownTilt]：这几行是一张拍歪了的照片上的字（PpOcrEngine.photos），斜过 [MAX_TURN] 度也按它们自己的走向量：
+     * 按图的横竖量，歪了十几二十度的照片上上下错开的两块牌子（「苏·E」和「粤B·D12345」）拼成了一行。
+     */
+    fun group(lines: List<OcrLine>, ownTilt: Boolean = false): List<OcrLine> =
+        rows(lines, ownTilt).map(::join).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
 
-    /** 分好的排，每排里是拼之前的那几段。 */
-    fun rows(lines: List<OcrLine>): List<List<OcrLine>> {
+    /** 分好的排，每排里是拼之前的那几段。[ownTilt] 见 [group]。 */
+    fun rows(lines: List<OcrLine>, ownTilt: Boolean = false): List<List<OcrLine>> {
         val rows = ArrayList<MutableList<OcrLine>>()
         for (line in lines.sortedBy { it.box.minX }) {
-            val row = rows.firstOrNull { r -> r.any { sameRow(it, line) } && near(r.maxOf { it.box.maxX }, line) }
+            val row = rows.firstOrNull { r -> r.any { sameRow(it, line, ownTilt) } && near(r.maxOf { it.box.maxX }, line) }
             if (row != null) row += line else rows += mutableListOf(line)
         }
         return rows
     }
 
-    private fun sameRow(a: OcrLine, b: OcrLine): Boolean {
+    private fun sameRow(a: OcrLine, b: OcrLine, ownTilt: Boolean): Boolean {
         val lower = min(a.box.height, b.box.height)
         if (max(a.box.height, b.box.height) > MAX_HEIGHT_RATIO * lower) return false
         if (turned(a.box, b.box)) return false
         if (upright(a.box) && upright(b.box)) return false
-        val t = Math.toRadians(tilt(listOf(a.box, b.box)))
+        val t = Math.toRadians(tilt(listOf(a.box, b.box), ownTilt))
         val across = Pt(-kotlin.math.sin(t).toFloat(), kotlin.math.cos(t).toFloat())
         val along = Pt(kotlin.math.cos(t).toFloat(), kotlin.math.sin(t).toFloat())
         val (a0, a1) = span(a.box, across)
@@ -594,13 +705,13 @@ object RowGrouper {
 
     /**
      * 几段共同的走向（度）：看得出走向的那几段的平均。斜得不到 [MIN_TILT] 度的当横平（截图上的字照旧按图的横竖量），
-     * 过了 [MAX_TURN] 度的也是：那是斜着平铺的水印，不是拍歪了的证件，顺着它拼，一行行水印连成了一大块。
+     * 过了 [MAX_TURN] 度的也是（[ownTilt] 的除外）：那是斜着平铺的水印，不是拍歪了的证件，顺着它拼，一行行水印连成了一大块。
      */
-    private fun tilt(boxes: List<Box>): Double {
+    private fun tilt(boxes: List<Box>, ownTilt: Boolean): Double {
         val angles = boxes.filter { it.width >= TextAxis.ELONGATED * it.height }.map { direction(it) }
         if (angles.isEmpty()) return 0.0
         val t = angles.average()
-        return if (abs(t) < MIN_TILT || abs(t) > MAX_TURN) 0.0 else t
+        return if (abs(t) < MIN_TILT || (abs(t) > MAX_TURN && !ownTilt)) 0.0 else t
     }
 
     /** 框的四个角在方向 [d] 上的投影范围。 */

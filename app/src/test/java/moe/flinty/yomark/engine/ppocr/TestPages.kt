@@ -53,15 +53,30 @@ internal object TestPages {
      * 测试图 [res]：同聊天截图里发了一张拍歪了的证件照，证件上的字比截图上的少，整页按截图的方向认。
      */
     fun screenshotWith(res: String, degrees: Float, scale: Float): Bitmap {
-        val page = res("/ppocr/logistics-page.png")
+        val turned = turned(res, degrees, scale)
+        return screenshotWith(1080, Pasted(turned, (1080 - turned.width) / 2f, 1100f))
+    }
+
+    /** 贴在页上的一张图 [bitmap]，左上角在 ([left], [top])。 */
+    class Pasted(val bitmap: Bitmap, val left: Float, val top: Float)
+
+    /** 测试图 [res] 缩到 [scale]、顺时针转 [degrees] 度。 */
+    fun turned(res: String, degrees: Float, scale: Float): Bitmap {
         val doc = res("/ppocr/$res")
         val small = Bitmap.createScaledBitmap(doc, (doc.width * scale).toInt(), (doc.height * scale).toInt(), true)
-        val turned = Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(degrees) }, true)
-        val out = Bitmap.createBitmap(1080, 1100 + turned.height + 40, Bitmap.Config.ARGB_8888)
+        return Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(degrees) }, true)
+    }
+
+    /** 物流页的上面 [pageHeight] 像素，下面贴着几张图 [photos]（坐标是整页上的）：页宽 1080，贴得更宽的跟着放宽，下沿留 40。 */
+    fun screenshotWith(pageHeight: Int, vararg photos: Pasted): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val width = maxOf(1080, photos.maxOf { (it.left + it.bitmap.width).toInt() })
+        val height = photos.maxOf { (it.top + it.bitmap.height).toInt() } + 40
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         Canvas(out).apply {
             drawColor(Color.WHITE)
-            drawBitmap(page, Rect(0, 0, 1080, 1080), Rect(0, 0, 1080, 1080), null)
-            drawBitmap(turned, (1080 - turned.width) / 2f, 1100f, null)
+            drawBitmap(page, Rect(0, 0, 1080, pageHeight), Rect(0, 0, 1080, pageHeight), null)
+            photos.forEach { drawBitmap(it.bitmap, it.left, it.top, null) }
         }
         return out
     }
