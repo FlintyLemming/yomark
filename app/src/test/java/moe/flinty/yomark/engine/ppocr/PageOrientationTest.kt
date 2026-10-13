@@ -49,9 +49,19 @@ class PageOrientationTest {
         assertThat(TextAxis.of(emptyList())).isNull()
     }
 
-    /** 横的竖的一样多：当横平的，照常读。 */
-    @Test fun `half across and half down stays level`() {
-        assertThat(TextAxis.of(page(0.0, 3) + page(90.0, 3))).isEqualTo(0f)
+    /** 横的竖的一样多：竖着的那组转过来读，横着的在原图上照常读（PpOcrEngine）。 */
+    @Test fun `half across and half down turns the vertical half`() {
+        assertThat(TextAxis.of(page(0.0, 3) + page(90.0, 3))).isEqualTo(90f)
+    }
+
+    /**
+     * 聊天截图里一张转了九十度的证件照：聊天的字比证件上的多，竖着的那组照样转过来读。
+     * 零星一两行竖着的字（侧边栏的标签）不转。
+     */
+    @Test fun `a sideways card in a long chat is turned`() {
+        val chat = (0 until 12).map { box(400f, 100f + it * 60f, 600f, 30f, 0.0) }
+        assertThat(TextAxis.of(chat + page(90.0, 4))).isEqualTo(90f)
+        assertThat(TextAxis.of(chat + page(90.0, 2))).isEqualTo(0f)
     }
 
     /** 斜着的行也是各个方向都有：看不出来，照常读。 */
@@ -71,6 +81,17 @@ class PageOrientationTest {
         val shallow = (0 until 6).map { box(500f, 50f + it * 100f, 900f, 40f, -15.0) }
         assertThat(TextAxis.of(page(0.0) + shallow)).isEqualTo(0f)
         assertThat(TextAxis.of(page(90.0) + watermark)).isEqualTo(90f)
+    }
+
+    /**
+     * 竖着、倒着拍的证件上压着满页的中文水印，水印的字比证件上的多得多：转到证件的方向，不转到水印的方向（以前转到了水印的
+     * 方向，证件上的字一个都没读出来）。证件横着的（正着、倒着）照常读，倒没倒着由 PpOcrEngine 再试。
+     */
+    @Test fun `a dense watermark over a sideways card`() {
+        val slanted = (0 until 6).map { box(500f, 50f + it * 100f, 1500f, 40f, 65.0) }
+        assertThat(TextAxis.of(page(90.0) + slanted)).isEqualTo(90f)
+        val level = (0 until 6).map { box(500f, 50f + it * 100f, 1500f, 40f, -25.0) }
+        assertThat(TextAxis.of(page(0.0) + level)).isEqualTo(0f)
     }
 
     /** 歪着拍的页上差十几度的一行长字：只在众数附近平均，不会混出一个谁都不是的角度。 */

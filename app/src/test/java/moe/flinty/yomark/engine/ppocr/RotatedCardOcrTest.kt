@@ -136,7 +136,7 @@ class RotatedCardOcrTest {
     /** 每行的 quad 按阅读方向排角：p0→p1 在图上就是这一页的阅读方向，人脸检测按它转正。 */
     @Test fun `line quads point the way the card reads`() {
         SHOTS.forEach { d ->
-            assertWithMessage(label(d)).that(ReadingFrame.quarterTurns(lines(d).map { it.quad })).isEqualTo(Shot(d).quarterTurns)
+            assertWithMessage(label(d)).that(ReadingFrame.of(lines(d).map { it.quad }).quarterTurns).isEqualTo(Shot(d).quarterTurns)
         }
     }
 

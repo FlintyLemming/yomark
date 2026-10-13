@@ -68,6 +68,18 @@ class ReadingFrameTest {
         assertThat(ReadingFrame.of(page(90.0) + watermark).degrees).isEqualTo(90f)
     }
 
+    /**
+     * 竖着、倒着拍的证件上压着满页的中文水印，水印的字比证件上的多得多：按证件的方向看，不按水印的。
+     * 证件正着的，照正着的看。
+     */
+    @Test fun `a dense watermark over a sideways card`() {
+        val slanted = (0 until 6).map { line(0f, 100f + it * 100f, 1500f, 65.0) }
+        assertThat(ReadingFrame.of(page(90.0) + slanted).degrees).isEqualTo(90f)
+        val flipped = (0 until 6).map { line(0f, 100f + it * 100f, 1500f, -25.0) }
+        assertThat(ReadingFrame.of(page(180.0) + flipped).degrees).isEqualTo(180f)
+        assertThat(ReadingFrame.of(page(0.0) + flipped).isUpright).isTrue()
+    }
+
     /** 歪着的页：只在众数附近平均，差十五度的那行不掺进来；另一组占得不少（歪了的证件压着水印），当作正着的。 */
     @Test fun `a second group on a tilted page is not blended in`() {
         assertThat(ReadingFrame.of(page(8.0) + line(0f, 500f, 200f, -7.0)).degrees.toDouble()).isWithin(0.01).of(8.0)
@@ -98,17 +110,19 @@ class ReadingFrameTest {
         }
     }
 
+    private fun turns(quads: List<Quad>) = ReadingFrame.of(quads).quarterTurns
+
     @Test fun `quarter turns snap within thirty degrees`() {
-        assertThat(ReadingFrame.quarterTurns(page(0.0))).isEqualTo(0)
-        assertThat(ReadingFrame.quarterTurns(page(90.0))).isEqualTo(1)
-        assertThat(ReadingFrame.quarterTurns(page(94.0))).isEqualTo(1)
-        assertThat(ReadingFrame.quarterTurns(page(180.0))).isEqualTo(2)
-        assertThat(ReadingFrame.quarterTurns(page(-90.0))).isEqualTo(3)
-        assertThat(ReadingFrame.quarterTurns(page(-179.0))).isEqualTo(2)
-        assertThat(ReadingFrame.quarterTurns(page(115.0))).isEqualTo(1)
+        assertThat(turns(page(0.0))).isEqualTo(0)
+        assertThat(turns(page(90.0))).isEqualTo(1)
+        assertThat(turns(page(94.0))).isEqualTo(1)
+        assertThat(turns(page(180.0))).isEqualTo(2)
+        assertThat(turns(page(-90.0))).isEqualTo(3)
+        assertThat(turns(page(-179.0))).isEqualTo(2)
+        assertThat(turns(page(115.0))).isEqualTo(1)
         // 斜四十五度：转直角也转不正
-        assertThat(ReadingFrame.quarterTurns(page(45.0))).isEqualTo(0)
-        assertThat(ReadingFrame.quarterTurns(page(125.0))).isEqualTo(0)
-        assertThat(ReadingFrame.quarterTurns(emptyList())).isEqualTo(0)
+        assertThat(turns(page(45.0))).isEqualTo(0)
+        assertThat(turns(page(125.0))).isEqualTo(0)
+        assertThat(turns(emptyList())).isEqualTo(0)
     }
 }

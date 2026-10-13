@@ -19,7 +19,9 @@ import kotlin.math.sin
  * 阅读方向取每行 quad 的 p0→p1（识别器按阅读方向给角：PP-OCR 转正读过的行映射回来仍是这个顺序，ML Kit 的 cornerPoints 也是），
  * 按行长加权，先找众数，只在众数附近平均：横排的页上夹着几行竖排的小字，不该把整页拉歪。
  * 众数是竖着的（截图里竖着放的证件照）就取它；横的、斜的，还要看：横平竖直的某个方向占到总长的 [LEVEL_SHARE] 就取它
- * （斜着平铺的水印比证件上的字还长）；众数附近不到总长的 [MIN_SHARE]，横的竖的都有，看不出来，当作正着的；
+ * （斜着平铺的水印比证件上的字还长）；众数斜着、横竖附近的行占到 [SQUARE_SHARE]，众数是水印，取横竖附近那一组
+ * （同 OCR 那边，竖着、倒着拍的证件上压着中文水印；拍歪了几度的证件也按它歪的角度看，规则才对得上「同一排」）；
+ * 众数附近不到总长的 [MIN_SHARE]，横的竖的都有，看不出来，当作正着的；
  * 歪着的页上众数以外的行还占 [OTHER_SHARE] 以上（歪了的证件上压着水印），也当作正着的。
  *
  * @param degrees 阅读方向：0 是从左往右，90 是从上往下（图像坐标，y 朝下，正值顺时针）。
@@ -98,9 +100,6 @@ class ReadingFrame private constructor(val degrees: Float) {
             return ReadingFrame(d)
         }
 
-        /** 一组行的 [ReadingFrame.quarterTurns]。 */
-        fun quarterTurns(quads: List<Quad>): Int = of(quads).quarterTurns
-
         /** 加权平均的阅读方向（度，(−180, 180]）；没有行、或者看不出来时为 null。 */
         private fun direction(quads: List<Quad>): Float? {
             val lines = quads.mapNotNull { q ->
@@ -113,16 +112,22 @@ class ReadingFrame private constructor(val degrees: Float) {
             val total = lines.sumOf { it.second }
             fun lengthNear(a: Double, window: Double) = lines.sumOf { (b, len) -> if (diff(a, b) <= window) len else 0.0 }
             // 众数：哪一行的方向上下 TIGHT 以内的行加起来最长；只在这么窄的范围里平均，差二三十度的两组行不会混成一个角度
-            val mode = lines.maxBy { (a, _) -> lengthNear(a, TIGHT) }.first
+            var mode = lines.maxBy { (a, _) -> lengthNear(a, TIGHT) }.first
             // 竖着的一组最长（截图里竖着放的证件照）就是它，同 OCR 那边（TextAxis）；横的、斜的再看下面几条
             if (diff(abs(mode), 90.0) > WINDOW) {
                 // 横平竖直的四个方向之一占得够多就是它：斜着平铺的水印不该把一页正着的证件带歪
                 val level = RIGHT_ANGLES.maxBy { lengthNear(it, LEVEL_SLACK) }
                 if (lengthNear(level, LEVEL_SLACK) >= LEVEL_SHARE * total) return level.toFloat()
-                val group = lengthNear(mode, WINDOW)
-                if (group < MIN_SHARE * total) return null
-                // 歪着的页上另有一组斜着的行（水印）也不少：哪个方向都有一组是歪的，照正着的看
-                if (abs(mode) <= 45 && total - group >= OTHER_SHARE * total) return null
+                val square = lines.filter { (a, _) -> RIGHT_ANGLES.any { diff(a, it) <= WINDOW } }
+                if (RIGHT_ANGLES.none { diff(mode, it) <= WINDOW } && square.sumOf { it.second } >= SQUARE_SHARE * total) {
+                    // 众数是水印：在横竖附近那一组里再找众数
+                    mode = square.maxBy { (a, _) -> square.sumOf { (b, len) -> if (diff(a, b) <= TIGHT) len else 0.0 } }.first
+                } else {
+                    val group = lengthNear(mode, WINDOW)
+                    if (group < MIN_SHARE * total) return null
+                    // 歪着的页上另有一组斜着的行（水印）也不少：哪个方向都有一组是歪的，照正着的看
+                    if (abs(mode) <= 45 && total - group >= OTHER_SHARE * total) return null
+                }
             }
             val near = lines.filter { diff(it.first, mode) <= TIGHT }
             val x = near.sumOf { (a, len) -> len * cos(Math.toRadians(a)) }
@@ -146,6 +151,9 @@ class ReadingFrame private constructor(val degrees: Float) {
 
         /** 歪着的页上，众数那组以外的行占到这么多，就当正着的。 */
         private const val OTHER_SHARE = 0.25
+
+        /** 众数斜着时，横竖附近的行占到这么多，就是证件本身（众数是水印）。 */
+        private const val SQUARE_SHARE = 0.1
 
         /** 求平均的窗口：众数上下这么多度以内。 */
         private const val TIGHT = 5.0

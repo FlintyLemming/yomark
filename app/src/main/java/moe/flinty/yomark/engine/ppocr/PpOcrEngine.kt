@@ -45,7 +45,7 @@ class PpOcrEngine(
     /**
      * 先在原图上检测，看文字行的走向（[TextAxis]）：
      * - 横平的（大多数截图）：照常逐框读。读得磕磕绊绊（平均置信度不到 [UPRIGHT_SCORE]）的，拿最长的几行倒过来再读一遍，
-     *   明显更好就是整页倒着，转半圈读；
+     *   明显更好就是整页倒着，转半圈读。整页读得顺、可有一组横框读得磕绊的，那一组倒过来再试（[upsideDownGroup]）；
      * - 竖着的、歪着的：转到行是横平的那个方向上读。差半圈的两个方向里挑哪个，问识别器自己——
      *   各读一遍最长的几行，取读得更有把握的；
      * - 看不出走向的（横竖都有）：照常读。
@@ -68,12 +68,21 @@ class PpOcrEngine(
         val axis = TextAxis.of(boxes)
         if (axis == null || axis == 0f) {
             val reads = boxes.map { read(image, it) }
-            val lines = if (axis == null) RowGrouper.group(reads.mapNotNull { it?.line })
-            else rowsIn(image, boxes.zip(reads.map { it?.line }), boxes)
-            if (axis == null || score(reads) >= UPRIGHT_SCORE) return lines
-            val sample = TextAxis.sample(boxes, 0f)
-            val flipped = trial(image, boxes, sample, 180f)
-            return if (flipped.beats(score(sample.map { reads[it] }))) readTurned(image, boxes, 0f, flipped, reads) else lines
+            // 整页倒着时这些行用不上：倒过来读之前不拼（拼行时还要把压着水印的几排重读一遍）
+            val lines by lazy {
+                if (axis == null) RowGrouper.group(reads.mapNotNull { it?.line }) else rowsIn(image, boxes.zip(reads.map { it?.line }), boxes)
+            }
+            if (axis == null) return lines
+            if (score(reads) < UPRIGHT_SCORE) {
+                val sample = TextAxis.sample(boxes, 0f)
+                val flipped = trial(image, boxes, sample, 180f)
+                if (flipped.beats(score(sample.map { reads[it] }))) return readTurned(image, boxes, 0f, flipped, reads)
+            }
+            val group = upsideDownGroup(image, boxes, reads) ?: return lines
+            val rest = boxes.indices.filter { it !in group.reads }
+            val turned = group.reads.map { (i, read) -> upright(group.view, boxes[i]) to read?.line }.sortedWith(compareBy(readingOrder) { it.first })
+            return rowsIn(group.view, turned, turned.map { it.first }).map { it.toSource(group.view) } +
+                rowsIn(image, rest.map { boxes[it] to reads[it]?.line }, rest.map { boxes[it] })
         }
         // 转多少度行才横平；竖着的默认往下读（逆时针转 90°），同以前逐框转的方向
         val turn = -axis
@@ -105,6 +114,42 @@ class PpOcrEngine(
     /** 原图上的框转到画布上，角重新按阅读方向排。 */
     private fun upright(view: Turned, box: Box): Box = DbPostProcess.order(box.corners().map(view::fromSource))
 
+    /** 画布上读出的一行，行和字的框映射回原图。 */
+    private fun OcrLine.toSource(view: Turned) = copy(box = box.map(view::toSource), charBoxes = charBoxes.map { it?.map(view::toSource) })
+
+    /** 倒着的一组字（见 [upsideDownGroup]）：转了半圈的画布，和组里每个框在画布上读出的结果（键是框的下标）。 */
+    private class Flipped(val view: Turned, val reads: Map<Int, Read?>)
+
+    /**
+     * 正着的页上倒着的一组字：聊天截图里倒着放的证件照。聊天的字多，整页倒过来的那一试比的是最长的几行（聊天的），
+     * 倒过来只会更差；整页的平均置信度也常常很高，根本不试。
+     * 横着的框里读得磕绊的（不到 [UPRIGHT_SCORE]）不只零星几个（[FLIP_LINES] 个以上、占横框总长的 [FLIP_SHARE]），
+     * 把它们倒过来再读一遍：明显更好（同 [Trial.beats]），倒过来读得更好的那几个就是倒着的一组。
+     * 这一组围起来的那块里别的横框也倒过来读一遍，读得更好的也算：倒着的号码「330106199307180423」正着读成「3423」，置信度照样高。
+     */
+    private fun upsideDownGroup(image: Pixels, boxes: List<Box>, reads: List<Read?>): Flipped? {
+        val level = boxes.indices.filter { TextAxis.fit(boxes[it], 0f) == TextAxis.Fit.ALONG }
+        val shaky = level.filter { (reads[it]?.confidence ?: 0f) < UPRIGHT_SCORE }
+        if (shaky.size < FLIP_LINES || shaky.sumOf { boxes[it].width.toDouble() } < FLIP_SHARE * level.sumOf { boxes[it].width.toDouble() }) {
+            return null
+        }
+        val trial = trial(image, boxes, shaky, 180f)
+        if (!trial.beats(score(shaky.map { reads[it] }))) return null
+        fun better(i: Int, flipped: Read?) = (flipped?.confidence ?: 0f) > (reads[i]?.confidence ?: 0f)
+        val group = shaky.filter { better(it, trial.reads[it]) }
+        if (group.isEmpty()) return null
+        val h = group.maxOf { boxes[it].height }
+        val left = group.minOf { boxes[it].minX } - h
+        val right = group.maxOf { boxes[it].maxX } + h
+        val top = group.minOf { boxes[it].minY } - h
+        val bottom = group.maxOf { boxes[it].maxY } + h
+        val inside = level.filter { i ->
+            i !in shaky && boxes[i].let { b -> (b.minX + b.maxX) / 2 in left..right && (b.minY + b.maxY) / 2 in top..bottom }
+        }
+        val more = inside.associateWith { read(trial.view, upright(trial.view, boxes[it])) }.filter { (i, r) -> better(i, r) }
+        return Flipped(trial.view, group.associateWith { trial.reads[it] } + more)
+    }
+
     /**
      * 按 [chosen] 的方向读整页，行和字的框映射回原图。顺着 [axis] 的框在画布上读，垂直的、斜着的在原图上照常读。
      * 方的小框（一两个字）跟着整页走；页上有垂直的行时，分不出它是哪边的，两边都读、取置信度高的——
@@ -134,9 +179,7 @@ class PpOcrEngine(
             }
         }
         val ordered = turned.sortedWith(compareBy(readingOrder) { it.first })
-        return rowsIn(view, ordered, boxes.map { upright(view, it) }).map { line ->
-            line.copy(box = line.box.map(view::toSource), charBoxes = line.charBoxes.map { it?.map(view::toSource) })
-        } + rowsIn(image, level, boxes)
+        return rowsIn(view, ordered, boxes.map { upright(view, it) }).map { it.toSource(view) } + rowsIn(image, level, boxes)
     }
 
     /**
@@ -165,7 +208,7 @@ class PpOcrEngine(
 
     /** 框的上沿偏离横平几度，折到 (−45, 45]：方框哪条边算上沿说不准。 */
     private fun skew(b: Box): Double {
-        var a = Math.toDegrees(atan2((b.tr.y - b.tl.y).toDouble(), (b.tr.x - b.tl.x).toDouble())) % 90
+        var a = RowGrouper.direction(b) % 90
         if (a > 45) a -= 90
         if (a <= -45) a += 90
         return a
@@ -478,8 +521,12 @@ class PpOcrEngine(
         /** 换到不是默认的那个方向，置信度得高出这么多：两边差不多时不折腾。 */
         private const val MARGIN = 0.1f
 
+        /** 正着的页上读得磕绊的横框至少这么多个、占横框总长这么多，才倒过来试（见 upsideDownGroup）。 */
+        private const val FLIP_LINES = 3
+        private const val FLIP_SHARE = 0.15
+
         /**
-         * 页上有斜框时，顺着走向的框斜过这么多度就不是一行字（[levelRows]）。横平的字框差一两度，
+         * 页上有斜框时，顺着走向的框斜过这么多度就不是一行字（[isLevel]）。横平的字框差一两度，
          * 字和水印连成的一块斜九度上下。
          */
         private const val LEVEL_SLACK = 6.0
@@ -502,13 +549,17 @@ class PpOcrEngine(
  * 规则层一直按这个前提写。
  *
  * 两段算同一行：竖直方向重叠超过较矮那段高度的一半，且水平间距不超过行高的 3 倍
- * （再远多半是左右两栏，拼起来会让「名字在电话前面」这类判断串栏）。
+ * （再远多半是左右两栏，拼起来会让「名字在电话前面」这类判断串栏）。两段都斜着同一个角度的（截图里一张拍歪了的证件照，
+ * 整页照常读），「竖直」「水平」按它们自己的走向量：歪了六度的驾驶证上，左边一栏的字段名和右边一栏差着大半行，
+ * 按图的横竖量，「姓名 Name」拼上了下一排的住址。
  *
- * 另有三条是拍的证件照上补的（护照样张上十来行被串成了一行）：
+ * 另有四条是拍的证件照上补的（护照样张上十来行被串成了一行）：
  * - 字高差一倍以上的不拼：斜着压在版面上的水印「SPECIMEN」，检测框高一百多像素，竖直范围里的每一行都和它重叠过半；
  * - 走向差 [MAX_TURN] 度以上的不拼：斜着平铺的一行行小字水印和证件上的字一样高，从一排字中间穿过去，
  *   外接框照样重叠过半（合成卡上「民 族」「18 日」被串进了水印那一行）。一两个字的方框看不出走向，不管；
- * - 左右并排才拼，上下叠着的不拼：证件上字段名下面紧贴着值，框常常上下咬住一截，重叠能过半。
+ * - 左右并排才拼，上下叠着的不拼：证件上字段名下面紧贴着值，框常常上下咬住一截，重叠能过半；
+ * - 两列竖排的字不拼：聊天截图里转了九十度的证件，一列列竖着的行在原图上上下重叠，以前拼成了
+ *   「公 民 身 份 号 码 别 女 林知夏 姓 名」这样一行。
  */
 object RowGrouper {
 
@@ -529,21 +580,47 @@ object RowGrouper {
         val lower = min(a.box.height, b.box.height)
         if (max(a.box.height, b.box.height) > MAX_HEIGHT_RATIO * lower) return false
         if (turned(a.box, b.box)) return false
-        val overlap = min(a.box.maxY, b.box.maxY) - max(a.box.minY, b.box.minY)
-        if (overlap < 0.5f * min(a.box.maxY - a.box.minY, b.box.maxY - b.box.minY)) return false
-        val sideBySide = min(a.box.maxX, b.box.maxX) - max(a.box.minX, b.box.minX)
-        return sideBySide <= 0.5f * lower
+        if (upright(a.box) && upright(b.box)) return false
+        val t = Math.toRadians(tilt(listOf(a.box, b.box)))
+        val across = Pt(-kotlin.math.sin(t).toFloat(), kotlin.math.cos(t).toFloat())
+        val along = Pt(kotlin.math.cos(t).toFloat(), kotlin.math.sin(t).toFloat())
+        val (a0, a1) = span(a.box, across)
+        val (b0, b1) = span(b.box, across)
+        if (min(a1, b1) - max(a0, b0) < 0.5f * min(a1 - a0, b1 - b0)) return false
+        val (c0, c1) = span(a.box, along)
+        val (d0, d1) = span(b.box, along)
+        return min(c1, d1) - max(c0, d0) <= 0.5f * lower
     }
 
-    /** 两个都看得出走向（长边过短边 [ELONGATED] 倍）的框，走向差 [MAX_TURN] 度以上。 */
+    /**
+     * 几段共同的走向（度）：看得出走向的那几段的平均。斜得不到 [MIN_TILT] 度的当横平（截图上的字照旧按图的横竖量），
+     * 过了 [MAX_TURN] 度的也是：那是斜着平铺的水印，不是拍歪了的证件，顺着它拼，一行行水印连成了一大块。
+     */
+    private fun tilt(boxes: List<Box>): Double {
+        val angles = boxes.filter { it.width >= TextAxis.ELONGATED * it.height }.map { direction(it) }
+        if (angles.isEmpty()) return 0.0
+        val t = angles.average()
+        return if (abs(t) < MIN_TILT || abs(t) > MAX_TURN) 0.0 else t
+    }
+
+    /** 框的四个角在方向 [d] 上的投影范围。 */
+    private fun span(b: Box, d: Pt): Pair<Float, Float> {
+        val p = b.corners().map { it.x * d.x + it.y * d.y }
+        return p.min() to p.max()
+    }
+
+    /** 两个都看得出走向（长边过短边 [TextAxis.ELONGATED] 倍）的框，走向差 [MAX_TURN] 度以上。 */
     private fun turned(a: Box, b: Box): Boolean {
-        if (a.width < ELONGATED * a.height || b.width < ELONGATED * b.height) return false
+        if (a.width < TextAxis.ELONGATED * a.height || b.width < TextAxis.ELONGATED * b.height) return false
         val d = abs(direction(a) - direction(b)) % 360
         return min(d, 360 - d) > MAX_TURN
     }
 
+    /** 图上竖着的一列：外接框高过宽一倍半（同 PpOcrEngine.read 转过来读的口径）。 */
+    private fun upright(b: Box): Boolean = b.maxY - b.minY >= 1.5f * (b.maxX - b.minX)
+
     /** 框的阅读方向（tl→tr），度。 */
-    private fun direction(b: Box): Double = Math.toDegrees(atan2((b.tr.y - b.tl.y).toDouble(), (b.tr.x - b.tl.x).toDouble()))
+    internal fun direction(b: Box): Double = Math.toDegrees(atan2((b.tr.y - b.tl.y).toDouble(), (b.tr.x - b.tl.x).toDouble()))
 
     /** 同一排的两段，字高最多差这么多倍。 */
     private const val MAX_HEIGHT_RATIO = 2f
@@ -551,8 +628,8 @@ object RowGrouper {
     /** 同一排的两段，走向最多差这么多度：拍照的透视让同一排差出几度，水印一般斜二三十度以上。 */
     private const val MAX_TURN = 15.0
 
-    /** 长边过短边这么多倍才看得出走向，同 TextAxis。 */
-    private const val ELONGATED = 1.3f
+    /** 斜过这么多度，才按框自己的走向量重叠。 */
+    private const val MIN_TILT = 2.0
 
     /** 同一排的两段最远隔几个字高。 */
     const val REACH = 3f

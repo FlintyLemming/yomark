@@ -13,9 +13,14 @@ import kotlin.math.sin
  *
  * 先找众数（哪个方向上下 [TIGHT] 以内的行最长），只在众数附近求平均：差二三十度的两组行（字和水印）
  * 不会被平均成一个谁都不是的角度。众数是竖着的（离竖直不到 [WINDOW]），就是它：不转根本读不出来，
- * 别的行在原图上照常读（PpOcrEngine）。众数是横的、斜的，还有几条防着页上的「别的字」把整页带歪：
+ * 别的行在原图上照常读（PpOcrEngine）。竖着的一组不是众数、可也不只零星几行（[VERTICAL_LINES] 行以上、
+ * 占总长的 [VERTICAL_SHARE]）的，同样转过来读它：聊天截图里一张转了九十度的证件照，聊天的字比证件还多，
+ * 不转的话证件上的字只能一列列硬读，几列还会被拼成一行。众数是横的、斜的，还有几条防着页上的「别的字」把整页带歪：
  * - 横平或竖直的行占总长的 [LEVEL_SHARE] 以上，就是横平或竖直的。截图、扫描件上的字横平竖直，
  *   斜着平铺的水印（「仅供办理银行开户使用」）往往比证件上的字还长；
+ * - 众数斜着（离横平、竖直都过了 [WINDOW]）、横竖附近的行又不只零星几行（[SQUARE_SHARE] 以上），众数是水印，
+ *   取横竖附近那一组：竖着拍的证件上压着中文水印，水印的字比证件上的还多，转到水印的方向，证件上的字一个都读不出来。
+ *   那一组是横着的（正着、倒着拍的证件），照常读，倒没倒着由 PpOcrEngine 再试；
  * - 众数上下 [WINDOW] 以内不到总长的 [MIN_SHARE]，说明横的竖的斜的都有、没有一个占多数，看不出来；
  * - 歪着的页（众数离横平不到 45°）上，众数以外的行还占 [OTHER_SHARE] 以上，当它横平：歪了的证件上压着水印，
  *   转到水印的方向，证件上的字反倒更歪。
@@ -33,16 +38,24 @@ internal object TextAxis {
         val lines = lines(boxes)
         val total = lines.sumOf { it.length }
         if (total <= 0.0) return null
-        val mode = mode(lines) ?: return null
-        // 竖着的一组最长（截图里一张竖着放的证件照）：不转读不出来，横着的那些在原图上照常读（PpOcrEngine），下面几条都不用看
+        var mode = mode(lines) ?: return null
+        val vertical = lines.filter { diff(it.angle, 90.0) <= WINDOW }
+        if (vertical.size >= VERTICAL_LINES && vertical.sumOf { it.length } >= VERTICAL_SHARE * total) mode = mode(vertical)!!
+        // 竖着的一组最长或者不少（截图里一张竖着放的证件照）：不转读不出来，横着的那些在原图上照常读（PpOcrEngine），下面几条都不用看
         if (diff(mode, 90.0) > WINDOW) {
             val level = lengthNear(lines, 0.0, SNAP)
             val upright = lengthNear(lines, 90.0, SNAP)
             if (maxOf(level, upright) >= LEVEL_SHARE * total) return if (level >= upright) 0f else 90f
-            val group = lengthNear(lines, mode, WINDOW)
-            if (group < MIN_SHARE * total) return null
-            // 歪着拍的页上另有一组斜着的行（压在证件上的水印）也不少：转到哪一组，另一组都歪着，不如照常读——逐框切图本来就会摆正
-            if (abs(mode) <= 45 && total - group >= OTHER_SHARE * total) return 0f
+            val square = lines.filter { diff(it.angle, 0.0) <= WINDOW || diff(it.angle, 90.0) <= WINDOW }
+            if (diff(mode, 0.0) > WINDOW && square.sumOf { it.length } >= SQUARE_SHARE * total) {
+                mode = mode(square)!!
+                if (diff(mode, 0.0) <= WINDOW) return 0f
+            } else {
+                val group = lengthNear(lines, mode, WINDOW)
+                if (group < MIN_SHARE * total) return null
+                // 歪着拍的页上另有一组斜着的行（压在证件上的水印）也不少：转到哪一组，另一组都歪着，不如照常读——逐框切图本来就会摆正
+                if (abs(mode) <= 45 && total - group >= OTHER_SHARE * total) return 0f
+            }
         }
         val near = lines.filter { diff(it.angle, mode) <= TIGHT }
         val x = near.sumOf { it.length * cos(Math.toRadians(2 * it.angle)) }
@@ -136,14 +149,21 @@ internal object TextAxis {
     /** 横平或竖直的行占总长这么多，整页就当横平或竖直的。 */
     private const val LEVEL_SHARE = 0.25
 
+    /** 众数斜着时，横竖附近的行占到这么多，就是证件本身（众数是水印）。 */
+    private const val SQUARE_SHARE = 0.1
+
+    /** 竖着的一组至少这么多行、占总长这么多，不是众数也转过来读。 */
+    private const val VERTICAL_LINES = 3
+    private const val VERTICAL_SHARE = 0.15
+
     /** 歪着的页上，众数那组以外的行占到这么多，就不转了。 */
     private const val OTHER_SHARE = 0.25
 
     /** 离横平竖直不到这么多度的当作横平竖直：正着的截图一个像素都不转。 */
     private const val SNAP = 2.0
 
-    /** 长边至少是短边的这么多倍，才看得出一个框的走向。 */
-    private const val ELONGATED = 1.3f
+    /** 长边至少是短边的这么多倍，才看得出一个框的走向。RowGrouper 拼行时同一个口径。 */
+    const val ELONGATED = 1.3f
 
     const val SAMPLE = 5
 }

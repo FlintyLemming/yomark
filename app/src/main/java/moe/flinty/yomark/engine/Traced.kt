@@ -35,8 +35,6 @@ private class TracedTextRecognizer(private val inner: TextRecognizer) : TextReco
 }
 
 private class TracedRegionDetector(private val inner: RegionDetector) : RegionDetector by inner {
-    override val needsUpright: Boolean get() = inner.needsUpright
-
     override suspend fun detect(image: SourceImage): List<Candidate> {
         val trace = currentTrace() ?: return inner.detect(image)
         val title = "${SensitiveKindLabels.debugName(inner.kind)} · ${inner.id}"
