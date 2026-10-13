@@ -38,17 +38,22 @@ internal object Mrz {
     private fun isMrz(s: String): Boolean =
         (s.length >= MIN_FILLED && "<<" in s && s.count { it == '<' } >= 3) ||
             (s.length >= MIN_CHECKED && (documentLine(s)?.trusted == true || idCardLine2(s)?.trusted == true)) ||
-            permitLine(s)?.trusted == true
+            isPermit(s)
+
+    /** [chars]（[Line.chars]）是大陆通行证那一行：往来港澳台通行证的那一行，回乡证、台胞证的第一行。 */
+    fun isPermit(chars: String): Boolean = permitLine(chars)?.trusted == true
 
     /**
      * 机读码里读出来、校验位对得上的几样。生日是（两位年, 月, 日）。
      * [numberSuffix] 是回乡证、台胞证的换证（签发）次数：印在证件号旁边，OCR 常把两样读成一串「H1234567800」。
+     * [permit]：这一页是大陆的通行证（有通行证那一行），不是护照、身份证。
      */
     class Holder(
         val documentNumber: String?,
         val birth: Triple<Int, Int, Int>?,
         val names: Set<String>,
         val numberSuffix: String? = null,
+        val permit: Boolean = false,
     )
 
     /** 一页的机读码读成一个人。一行机读码都没有时给 null。 */
@@ -58,11 +63,13 @@ internal object Mrz {
         var number: String? = null
         var suffix: String? = null
         var birth: Triple<Int, Int, Int>? = null
+        var permit = false
         val names = LinkedHashSet<String>()
         all.forEach { s ->
             // 通行证那一行要先认：当护照第二行读，会把它的有效期读成生日
             permitLine(s)?.let { f ->
                 if (f.trusted) {
+                    permit = true
                     if (number == null) number = f.number?.also { suffix = f.suffix }
                     if (birth == null) birth = f.birth
                 }
@@ -76,7 +83,7 @@ internal object Mrz {
             idCardLine2(s)?.takeIf { it.trusted }?.let { if (birth == null) birth = it.birth }
             names += namesIn(s)
         }
-        return Holder(number, birth, names, suffix)
+        return Holder(number, birth, names, suffix, permit)
     }
 
     /** 读出来的字段：校验位对得上的才给值；[trusted] 是这一行的形状和校验位够不够认定它是机读码。 */
@@ -94,10 +101,32 @@ internal object Mrz {
      * 证件号 2..10 校验位 11，「<」，有效期 13..18 校验位 19，「<」，生日 21..26 校验位 27，「<」，前面三段的总校验位 29。
      * 官方样张「CSC000000004<2404200<8108038<6」四位校验位都对得上。有效期在生日前面，和护照反着。
      * 一行里没有成串的填充符，原先认不出来。
+     *
+     * 单个的「<」OCR 会漏读（「CSC000000004 2404200<8108038<6」），只剩 28、29 个字符时把它补回 12、20、28 位再看。
      */
     private fun exitPermitLine(raw: String): Fields? {
-        if (raw.length < 30 || raw[0] != 'C' || raw[1] !in "SD") return null
-        val s = corrected(raw.take(30), letters = 2..2, digits = listOf(4..11, 13..19, 21..27, 29..29), fillers = listOf(12, 20, 28))
+        if (raw.length < 28 || raw[0] != 'C' || raw[1] !in "SD") return null
+        val tries = if (raw.length >= 30) listOf(raw.take(30)) else withFillers(raw, 30 - raw.length)
+        val read = tries.mapNotNull { exitPermitFields(it) }
+        return read.firstOrNull { it.trusted } ?: read.firstOrNull()
+    }
+
+    /** 往来港澳台通行证那一行三个「<」的位置。 */
+    private val EXIT_PERMIT_FILLERS = listOf(12, 20, 28)
+
+    /** 在 [EXIT_PERMIT_FILLERS] 里挑 [missing] 个位置补上「<」，每种补法一个。位置按补完以后数。 */
+    private fun withFillers(raw: String, missing: Int): List<String> {
+        fun pick(from: Int, left: Int, s: String): List<String> =
+            if (left == 0) listOf(s)
+            else (from until EXIT_PERMIT_FILLERS.size).flatMap { k ->
+                val at = EXIT_PERMIT_FILLERS[k]
+                if (at > s.length) emptyList() else pick(k + 1, left - 1, s.substring(0, at) + "<" + s.substring(at))
+            }
+        return pick(0, missing, raw)
+    }
+
+    private fun exitPermitFields(raw: String): Fields? {
+        val s = corrected(raw, letters = 2..2, digits = listOf(4..11, 13..19, 21..27, 29..29), fillers = EXIT_PERMIT_FILLERS)
         if (s[12] != '<' || s[20] != '<' || s[28] != '<') return null
         if (!s.substring(4, 12).isDigits() || !s.substring(13, 20).isDigits() || !s.substring(21, 28).isDigits() || !s[29].isDigit()) {
             return null
@@ -234,29 +263,49 @@ internal object Mrz {
     private const val MIN_CHECKED = 28
 
     /** OCR 读机读码时常把「<」读成的字。 */
-    private const val FILLER_LOOKALIKES = "«‹〈＜"
+    private const val FILLER_LOOKALIKES = "«‹〈＜く≪"
 }
 
 /**
- * 机读码那两三行本身（PASSPORT 规则的第一种认法）。
+ * 机读码是哪种证件的。大陆的通行证（往来港澳台通行证、回乡证、台胞证）归证件号码，其余的（护照、身份证、签证）归护照：
+ * 用户眼里通行证号是证件号，不是护照号。
  */
-class MrzLines(private val confidence: Float) : Finder {
-    override fun findIn(text: String): List<RuleMatch> = Mrz.findIn(text).map { RuleMatch(it.range, confidence) }
+enum class MrzDocument { PASSPORT, PERMIT }
+
+/**
+ * 机读码那两三行本身（护照、证件号码两条规则的第一种认法）。[of] 是只要哪种证件的，null 是都要。
+ *
+ * 单看一行时按这一行自己分：通行证那一行（CS、CD、CR、CT 打头）归通行证。看整页时按页分：页上有通行证那一行，
+ * 这一页的机读码都是通行证的——回乡证、台胞证背面另外两行（汉字姓名的编码、港澳台的身份证号、拼音姓名）单看分不出是谁的。
+ */
+class MrzLines(private val confidence: Float, private val of: MrzDocument? = null) : PageFinder {
+
+    override fun findIn(text: String): List<RuleMatch> =
+        Mrz.findIn(text).filter { of == null || documentOf(Mrz.isPermit(it.chars)) == of }.map { RuleMatch(it.range, confidence) }
+
+    override fun findOnPage(page: Page): List<PageMatch> {
+        val mrz = page.texts.map { Mrz.findIn(it) }
+        if (of != null && documentOf(mrz.flatten().any { Mrz.isPermit(it.chars) }) != of) return emptyList()
+        return mrz.flatMapIndexed { i, lines -> lines.map { PageMatch(i, RuleMatch(it.range, confidence)) } }
+    }
 }
+
+private fun documentOf(permit: Boolean) = if (permit) MrzDocument.PERMIT else MrzDocument.PASSPORT
 
 /**
  * 拿机读码去对照页上别处：资料页上印着的证件号、生日、姓名，幽灵像旁边那行小字「05 02 65」，激光穿孔的号码。
  *
  * 字段名是哪国文字、OCR 有没有把字段名读对都不要紧：机读码的校验位对得上，页上一样的那一串就是同一样东西。
- * 机读码那几行自己不在这里认（那是 [MrzLines] 的事）。
+ * 机读码那几行自己不在这里认（那是 [MrzLines] 的事）。[of] 同 [MrzLines]：只对照哪种证件的，null 是都对照。
  */
-class MrzEcho(private val what: What, private val confidence: Float) : PageFinder {
+class MrzEcho(private val what: What, private val confidence: Float, private val of: MrzDocument? = null) : PageFinder {
 
     enum class What { DOCUMENT_NUMBER, BIRTH_DATE, NAME }
 
     override fun findOnPage(page: Page): List<PageMatch> {
         val mrz = page.texts.map { Mrz.findIn(it) }
         val holder = Mrz.read(mrz) ?: return emptyList()
+        if (of != null && documentOf(holder.permit) != of) return emptyList()
         val out = ArrayList<PageMatch>()
         page.texts.forEachIndexed { i, text ->
             if (mrz[i].isNotEmpty()) return@forEachIndexed

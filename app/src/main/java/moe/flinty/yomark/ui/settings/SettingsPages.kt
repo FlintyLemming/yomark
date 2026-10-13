@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.CarRepair
 import androidx.compose.material.icons.outlined.CreditCard
-import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.Domain
 import androidx.compose.material.icons.outlined.Edit
@@ -499,7 +498,6 @@ internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.PERSON_NAME -> Icons.Outlined.Person
     SensitiveKind.ORG_NAME -> Icons.Outlined.Domain
     SensitiveKind.ID_NUMBER -> Icons.Outlined.AssignmentInd
-    SensitiveKind.LICENSE_PLATE -> Icons.Outlined.DirectionsCar
     SensitiveKind.VIN -> Icons.Outlined.CarRepair
     SensitiveKind.FACE -> Icons.Outlined.Face
     SensitiveKind.BARCODE -> Icons.Outlined.QrCode2

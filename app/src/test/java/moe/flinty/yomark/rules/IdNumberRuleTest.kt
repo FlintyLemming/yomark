@@ -31,11 +31,35 @@ class IdNumberRuleTest {
         assertThat(matched("公民身份号码 110105 19900307 1239")).containsExactly("110105 19900307 1239")
     }
 
-    /** 末位 X 的各种读法：小写、乘号、全角，和单独隔开的一个 X。 */
+    /**
+     * 末位 X 的各种读法：小写、乘号、全角，希腊、西里尔字母，和单独隔开的一个 X。
+     * 跟在字段名后面的也整个认：字段名那一路先认，原先停在第 17 位，第 18 位露在外面。
+     */
     @Test fun `the check character x in any of its lookalikes`() {
-        listOf("11010519491231002X", "11010519491231002x", "11010519491231002×", "11010519491231002Ｘ")
-            .forEach { assertThat(matched("号码 $it")).containsExactly(it) }
+        val lookalikes = listOf("X", "x", "×", "Ｘ", "Χ", "Х").map { "11010519491231002$it" }
+        lookalikes.forEach { assertThat(matched("号码 $it")).containsExactly(it) }
+        lookalikes.forEach { assertThat(matched("身份证号 $it")).containsExactly(it) }
         assertThat(ResidentIdNumber.findAll("11010519491231002 X").single().number).isEqualTo("11010519491231002X")
+    }
+
+    /** 照片上 OCR 把字段名拆成几段、冒号前补了空格：号码认错一位也照样遮，靠的就是字段名。 */
+    @Test fun `a label split by ocr or spaced before its colon`() {
+        assertThat(matched("公民 身份号 码3 202 01201109254520")).containsExactly("3 202 01201109254520")
+        assertThat(matched("公民 身份号 码3 200 01201109254526")).containsExactly("3 200 01201109254526")
+        assertThat(matched("身份 号码 330106199307180424")).containsExactly("330106199307180424")
+        assertThat(matched("身份证号码 :330106199307180424")).containsExactly("330106199307180424")
+        assertThat(matched("证件号码 ： H12345678")).containsExactly("H12345678")
+        // 字段名前面紧挨着汉字的照旧不认
+        assertThat(matched("凭证 号 12345678")).isEmpty()
+    }
+
+    /** 字段名后面的值不吞下一段：空格后面是日期、手机号的那段不是号码的一部分。 */
+    @Test fun `a labeled value stops before a date or a phone number`() {
+        assertThat(matched("证件号码 H12345678 2026.10.12")).containsExactly("H12345678")
+        assertThat(matched("证件号码 H12345678 2026-10-12")).containsExactly("H12345678")
+        assertThat(matched("证件号码 H12345678 2026年10月12日")).containsExactly("H12345678")
+        assertThat(matched("身份证号 330106199307180423 13812345678")).containsExactly("330106199307180423")
+        assertThat(matched("公民身份号码 110105 19900307 1239 13812345678")).containsExactly("110105 19900307 1239")
     }
 
     @Test fun `residence permits and the 2023 foreigner card use the same numbers`() {
@@ -109,6 +133,36 @@ class IdNumberRuleTest {
         assertThat(matched("证件号码：护照")).isEmpty()
     }
 
+    /** 在别处也常见的字段名，后面的值要再像一点。 */
+    @Test fun `labels that also mean something else need a value of the right shape`() {
+        // 缩写只认大写；FIN、NRIC 要新加坡的写法，SIN 九位，VID 十六位
+        assertThat(matched("https://a.com/watch?vid=1234567")).isEmpty()
+        assertThat(matched("sin 123456")).isEmpty()
+        assertThat(matched("SIN 123456")).isEmpty()
+        assertThat(matched("SIN 130 456 783")).containsExactly("130 456 783")
+        assertThat(matched("FIN 202612345")).isEmpty()
+        assertThat(matched("FIN: G1234567X")).containsExactly("G1234567X")
+        assertThat(matched("VID 9123 4567 8901 2345")).containsExactly("9123 4567 8901 2345")
+        // 前面紧挨着别的英文词的「ID No.」是别的号码
+        assertThat(matched("Tracking ID Number 1Z999AA10123456784")).isEmpty()
+        assertThat(matched("Product ID No. 12345678")).isEmpty()
+        assertThat(matched("National ID No. 12345678")).containsExactly("12345678")
+        // 台湾公司的统一编号八位数字，个人的是一个字母打头
+        assertThat(matched("統一編號：12345675")).isEmpty()
+        // 产品认证证书的编号
+        assertThat(matched("证书编号 CQC2021010101234567")).isEmpty()
+        assertThat(matched("证书编号 1234567890123")).containsExactly("1234567890123")
+    }
+
+    /** 澳门身份证的字段名只是「編號」：后面要是七位加括号里一位的样子。 */
+    @Test fun `macau ids after their label`() {
+        assertThat(matched("編號 1234567(8)")).containsExactly("1234567(8)")
+        assertThat(matched("編號/Número 5123456（7）")).containsExactly("5123456（7）")
+        assertThat(matched("Numero 7123456 (1)")).containsExactly("7123456 (1)")
+        assertThat(matched("編號 1234567")).isEmpty()
+        assertThat(matched("1234567(8)")).isEmpty()
+    }
+
     /** 打了大半星的号码是截图的 app 已经遮过的，不另框；只打了几位的照样遮。 */
     @Test fun `starred numbers`() {
         assertThat(matched("身份证号 3201**********1234")).isEmpty()
@@ -137,8 +191,27 @@ class IdNumberRuleTest {
     @Test fun `letter led numbers after an order hint`() {
         assertThat(matched("E100000005")).containsExactly("E100000005")
         assertThat(matched("订单号：E100000005")).isEmpty()
+        assertThat(matched("取票号 E212345673")).isEmpty()
         assertThat(matched("Order S1234567D")).isEmpty()
+        assertThat(matched("货号 S1234567D")).isEmpty()
         assertThat(matched("型号 AB12345678CD")).isEmpty()
+    }
+
+    /**
+     * 地区码加日期再加四位的办件号、受理号只剩校验码一道关，十一个里有一个过得去；日期打头的订单号像韩国、马来西亚的号码。
+     * 跟在提示词后面的不算，提示词后面又说到身份证的照认。
+     */
+    @Test fun `numbers built from dates after an order hint`() {
+        listOf("330106202610110019", "110105202609300125").forEach { assertThat(ResidentIdNumber.isValid(it)).isTrue() }
+        assertThat(matched("办件编号 330106202610110019")).isEmpty()
+        assertThat(matched("受理号：110105202609300125")).isEmpty()
+        assertThat(matched("订单联系人身份证 330106199307180423")).containsExactly("330106199307180423")
+        assertThat(matched("证件编号 330106199307180423")).containsExactly("330106199307180423")
+        assertThat(matched("261012-1234567")).hasSize(1)
+        assertThat(matched("订单号 261012-1234567")).isEmpty()
+        assertThat(matched("单号：250101-3123456")).isEmpty()
+        assertThat(matched("流水号 241231-1000001")).isEmpty()
+        assertThat(matched("订单号 900101-14-5677")).isEmpty()
     }
 
     @Test fun `singapore nric and fin`() {
@@ -180,21 +253,37 @@ class IdNumberRuleTest {
 
     private fun cardMatched(text: String) = card.findIn(text).map { text.substring(it.range) }
 
+    /** 卡面上的年份写成两位：今年往后两年，测试不随年份过期。 */
+    private val yy = "%02d".format((LocalDate.now().year + 2) % 100)
+
     @Test fun `card security codes and expiry dates after their labels`() {
         assertThat(cardMatched("CVV2: 123")).containsExactly("123")
         assertThat(cardMatched("安全码 4321")).containsExactly("4321")
-        assertThat(cardMatched("VALID THRU 12/28")).containsExactly("12/28")
-        assertThat(cardMatched("Expiry Date: 09/2031")).containsExactly("09/2031")
-        assertThat(cardMatched("有效期至 06/29")).containsExactly("06/29")
+        assertThat(cardMatched("VALID THRU 12/$yy")).containsExactly("12/$yy")
+        assertThat(cardMatched("GOOD THRU 09/20$yy")).containsExactly("09/20$yy")
+        assertThat(cardMatched("EXPIRES END 03 / $yy")).containsExactly("03 / $yy")
+        assertThat(cardMatched("EXP DATE 03/$yy")).containsExactly("03/$yy")
+        assertThat(cardMatched("VALID FROM/THRU 01/20 - 01/$yy")).containsExactly("01/20 - 01/$yy")
     }
 
-    /** 身份证背面的「有效期限」、驾照护照上的完整日期都不是卡的有效期。 */
-    @Test fun `validity periods of ids are not card expiry dates`() {
+    /**
+     * 身份证背面的「有效期限」、驾照护照上的完整日期都不是卡的有效期；小写的英文、中文的「有效期」不认，
+     * 早就过期的、几十年后才到期的年份不是卡面上的。
+     */
+    @Test fun `validity periods of ids and coupons are not card expiry dates`() {
         assertThat(cardMatched("有效期限 2015.08.20-2035.08.20")).isEmpty()
         assertThat(cardMatched("有效期至 2029.05.31")).isEmpty()
         assertThat(cardMatched("有效期 2026/12/31")).isEmpty()
+        assertThat(cardMatched("有效期至 06/$yy")).isEmpty()
+        assertThat(cardMatched("Expiry Date: 09/20$yy")).isEmpty()
+        assertThat(cardMatched("Offer valid thru 12/$yy.")).isEmpty()
+        assertThat(cardMatched("VALID THRU 08/20")).isEmpty()
+        assertThat(cardMatched("VALID THRU 12/99")).isEmpty()
+        assertThat(cardMatched("VALID THRU 10/12-10/$yy")).isEmpty()
         assertThat(cardMatched("Expiry 10/14/2030")).isEmpty()
         assertThat(cardMatched("CVV 12")).isEmpty()
+        assertThat(cardMatched("cvv 123")).isEmpty()
+        assertThat(cardMatched("CID 1234")).isEmpty()
         assertThat(cardMatched("Experience 10/20")).isEmpty()
     }
 }

@@ -103,11 +103,25 @@ class MrzTest {
     @Test fun `the one line of an exit-entry permit card`() {
         listOf(exitPermit, "CSCA12345672<3306150<9503124<6", "CDL123456781<3001019<9001011<8")
             .forEach { assertThat(mrz(it)).containsExactly(it) }
-        // OCR 把「<」读成 K、在中间补空格，照样认
+        // OCR 把「<」读成 K、く、≪，在中间补空格，照样认
         assertThat(mrz("CSC000000004K2404200K8108038K6")).hasSize(1)
+        assertThat(mrz("CSC000000004く2404200く8108038く6")).hasSize(1)
+        assertThat(mrz("CSC000000004≪2404200<8108038≪6")).hasSize(1)
         assertThat(mrz("CSC00000000 4<2404200<810 8038<6")).hasSize(1)
         // 校验位只剩一位对得上的不认
         assertThat(mrz("CSC000000004<2404201<8108039<6")).isEmpty()
+    }
+
+    /** OCR 漏了一两个「<」，那一行只剩 29、28 个字符：补回去再看。 */
+    @Test fun `an exit-entry permit line with a filler dropped`() {
+        listOf(
+            "CSC000000004 2404200<8108038<6", "CSC000000004<2404200 8108038<6", "CSC000000004<2404200<81080386",
+            "CSC0000000042404200 8108038<6",
+        ).forEach { assertThat(mrz(it)).containsExactly(it) }
+        val p = page(Row("C00000000", 300f, 0f), Row("CSC000000004 2404200<8108038<6", 40f, 150f))
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("C00000000")
+        // 漏了的补回去校验位还是对不上的不认
+        assertThat(mrz("CSC000000004 2404201<8108039<6")).isEmpty()
     }
 
     /**
@@ -125,7 +139,30 @@ class MrzTest {
         )
         assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("C00000000")
         assertThat(MrzEcho(MrzEcho.What.BIRTH_DATE, 1f).texts(p)).containsExactly("1981.08.03")
-        assertThat(passport.findOnPage(p).map { p.text(it) }).containsExactly("C00000000", exitPermit)
+    }
+
+    private val idNumber = DefaultRuleSet.rules.first { it.id == "idnumber" }
+
+    /** 通行证的机读码和号码归证件号码，不归护照；护照的照旧归护照。 */
+    @Test fun `a permit's machine readable zone and number are id numbers`() {
+        val p = page(Row("往来港澳通行证", 40f, 0f), Row("C00000000", 300f, 0f), Row(exitPermit, 40f, 150f))
+        assertThat(idNumber.findOnPage(p).map { p.text(it) }).containsExactly(exitPermit, "C00000000")
+        assertThat(passport.findOnPage(p)).isEmpty()
+        assertThat(idNumber.findOnPage(specimen)).isEmpty()
+        assertThat(MrzLines(1f, MrzDocument.PERMIT).findIn(exitPermit)).hasSize(1)
+        assertThat(MrzLines(1f, MrzDocument.PASSPORT).findIn(exitPermit)).isEmpty()
+        assertThat(MrzLines(1f, MrzDocument.PERMIT).findIn(line2)).isEmpty()
+    }
+
+    /** 回乡证背面三行：第一行认得出是通行证，另外两行单看分不出，同一页上的一起归证件号码。 */
+    @Test fun `the other lines on the back of a mainland travel permit go with it`() {
+        val back = page(
+            Row("CRH1234567830003001019M9001011", 40f, 0f),
+            Row("CHAN<<TAI<MAN<<<<<<<<<<<<<<<<<", 40f, 60f),
+        )
+        assertThat(idNumber.findOnPage(back).map { back.text(it) })
+            .containsExactly("CRH1234567830003001019M9001011", "CHAN<<TAI<MAN<<<<<<<<<<<<<<<<<")
+        assertThat(passport.findOnPage(back)).isEmpty()
     }
 
     /** 回乡证（CR）、台胞证（CT）背面三行的第一行，整行没有成串的填充符。号码旁边粘着换证次数也算。 */

@@ -7,7 +7,6 @@ import kotlinx.coroutines.runBlocking
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind.ID_NUMBER
-import moe.flinty.yomark.core.model.SensitiveKind.LICENSE_PLATE
 import moe.flinty.yomark.core.model.SensitiveKind.LONG_NUMBER
 import moe.flinty.yomark.core.model.SensitiveKind.PAYMENT_CARD
 import moe.flinty.yomark.core.model.SensitiveKind.VIN
@@ -51,7 +50,7 @@ class IdNumberOcrTest {
     private fun numbers(res: String) = runBlocking {
         val lines = lines(res)
         RuleClassifier(DefaultRuleSet.rules).classify(lines)
-            .filter { it.kind in setOf(ID_NUMBER, PAYMENT_CARD, LONG_NUMBER, LICENSE_PLATE, VIN) }
+            .filter { it.kind in setOf(ID_NUMBER, PAYMENT_CARD, LONG_NUMBER, VIN) }
             .map { Triple(it.kind, it.text(lines), it.enabledByDefault) }
     }
 

@@ -7,7 +7,6 @@ import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKind.ID_NUMBER
-import moe.flinty.yomark.core.model.SensitiveKind.LICENSE_PLATE
 import moe.flinty.yomark.core.model.SensitiveKind.LONG_NUMBER
 import moe.flinty.yomark.core.model.SensitiveKind.PAYMENT_CARD
 import moe.flinty.yomark.core.model.SensitiveKind.PHONE
@@ -48,7 +47,7 @@ class IdNumberPageTest {
     private suspend fun found(lines: List<TextLine>): List<Triple<SensitiveKind, String, Boolean>> =
         RuleClassifier(DefaultRuleSet.rules).classify(lines).map { Triple(it.kind, it.text(lines), it.enabledByDefault) }
 
-    private val numberKinds = setOf(ID_NUMBER, PAYMENT_CARD, LONG_NUMBER, PHONE, LICENSE_PLATE, VIN)
+    private val numberKinds = setOf(ID_NUMBER, PAYMENT_CARD, LONG_NUMBER, PHONE, VIN)
 
     @Test fun `the synthetic id card front`() = runTest {
         val lines = page(
@@ -68,6 +67,23 @@ class IdNumberPageTest {
         val lines = page("名蒋馨悦", "性新女民 族汉", "出生201 1 年9 月25日", "公民 身份号 码3 202 01201109254526")
         assertThat(found(lines).filter { it.first in numberKinds })
             .containsExactly(Triple(ID_NUMBER, "3 202 01201109254526", true))
+    }
+
+    /** 同一张照片，号码认错一位：校验码对不上，靠被拆开的字段名认，照样只出一个证件号码的框。 */
+    @Test fun `the photo with a misread digit`() = runTest {
+        val lines = page("名蒋馨悦", "公民 身份号 码3 202 01201109254520")
+        assertThat(found(lines).filter { it.first in numberKinds })
+            .containsExactly(Triple(ID_NUMBER, "3 202 01201109254520", true))
+    }
+
+    /** 字段名后面末位是全角Ｘ的号码整个框；后面跟着的手机号另算电话，不并进号码里。 */
+    @Test fun `a labeled number keeps its x and leaves the phone after it alone`() = runTest {
+        val lines = page("身份证号 11010519491231002Ｘ", "身份证号 330106199307180423 +86 13800138000")
+        assertThat(found(lines).filter { it.first in numberKinds }).containsExactly(
+            Triple(ID_NUMBER, "11010519491231002Ｘ", true),
+            Triple(ID_NUMBER, "330106199307180423", true),
+            Triple(PHONE, "+86 13800138000", true),
+        )
     }
 
     /** 身份证号十个里有一个碰巧过得了 Luhn：标证件号码，不再另标银行卡号。 */

@@ -4,15 +4,15 @@ import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 
 /**
- * 证件号码、车牌号、车架号出厂打码，误报就是把用户不想遮的东西遮掉。这里是一批长得像、其实不是的字：
- * 订单号、快递单号、时间戳、电话、银行卡、备案号、型号、发票、版本号、哈希，和带省份简称的中文界面文字。
+ * 证件号码、车架号出厂打码，误报就是把用户不想遮的东西遮掉。这里是一批长得像、其实不是的字：
+ * 订单号、快递单号、时间戳、电话、银行卡、备案号、型号、发票、版本号、哈希，和夹着字母数字的中文界面文字。
  *
- * 新增这三类时拿它们和仓库里全部测试、评测语料的文字（两万三千多行）扫过一遍，三类一处都没命中；
- * 这一批是专门挑的难的，留下来防回归。
+ * 新增这两类时拿它们和仓库里全部测试、评测语料的文字（两万三千多行）扫过一遍，只命中一处，
+ * 是 NameAnchorPageTest 里 GB 11643 的样例身份证号，真的；这一批是专门挑的难的，留下来防回归。
  */
 class IdNumberFalsePositiveTest {
 
-    private val rules = DefaultRuleSet.rules.filter { it.id in setOf("idnumber", "plate", "vin") }
+    private val rules = DefaultRuleSet.rules.filter { it.id in setOf("idnumber", "vin") }
 
     private val notIds = listOf(
         // 订单号、交易号、流水号
@@ -30,6 +30,17 @@ class IdNumberFalsePositiveTest {
         "Invoice INV-2026-000123",
         "PO2026101200012AB",
         "SO20261012000123A",
+        // 日期、地区码拼出来的单据号：形状和校验位碰巧对得上，跟在提示词后面
+        "订单号 DD202507091718170",
+        "Order WX202507091718175",
+        "办件编号 330106202610110019",
+        "受理号：110105202609300125",
+        "订单号 261012-1234567",
+        "单号：250101-3123456",
+        "流水号 241231-1000001",
+        "订单号 900101-14-5677",
+        "取票号 E212345673",
+        "货号 S1234567D",
         // 快递单号
         "申通快递 773443899958908",
         "顺丰 SF1234567890123",
@@ -120,7 +131,7 @@ class IdNumberFalsePositiveTest {
         "CA1831 08:00",
         "G1234次 08车12F",
         "D301 二等座",
-        // 带省份简称、像车牌的中文界面
+        // 夹着字母数字的中文界面
         "京A1234",
         "沪A股 600519",
         "沪市A股 600519 贵州茅台",
@@ -179,11 +190,18 @@ class IdNumberFalsePositiveTest {
         "证书编号：无",
         "ID No. N/A",
         "FIN 2023 Q4",
+        "FIN 202612345",
         "FINLAND 12345",
         "VIDEO 123456",
-        "车牌识别",
-        "号牌种类 02",
-        "无车牌 12345",
+        "https://a.com/watch?vid=1234567",
+        "sin 123456",
+        "cpf 12345678901",
+        "Tracking ID Number 1Z999AA10123456784",
+        "Product ID No. 12345678",
+        "Order ID No. 1234567890",
+        "統一編號：12345675",
+        "证书编号 CQC2021010101234567",
+        "產品編號 1234567(8)",
         "车架号后六位：00234",
         "VIN码查询",
         "发动机号 待补充",
@@ -203,7 +221,7 @@ class IdNumberFalsePositiveTest {
         "评分 4.9",
     )
 
-    @Test fun `none of these is an id number a plate or a vin`() {
+    @Test fun `none of these is an id number or a vin`() {
         val hits = notIds.flatMap { text ->
             rules.flatMap { r -> r.findIn(text).map { "${r.id}: ${text.substring(it.range)}  ← $text" } }
         }
@@ -233,6 +251,20 @@ class IdNumberFalsePositiveTest {
         "CID 12",
         "DATE OF EXPIRY 14 OCT 2030",
         "有效期至 14 3月 /MAR 2029",
+        // 小写的英文、短缩写、优惠券
+        "Offer valid thru 12/31.",
+        "Mon thru 10/15",
+        "EXP 08/20",
+        "EXP 08/30",
+        "CID 1234",
+        "https://a.com/?cid=1234&x=1",
+        "CSC 2024",
+        "cvv 123",
+        "有效期 10/12-10/19",
+        "有效期：12/31",
+        "有效期至 06/30",
+        "Expiry Date: 09/31",
+        "VALID THRU 10/12-10/19",
     )
 
     @Test fun `none of these is a card security code or expiry date`() {
