@@ -179,15 +179,45 @@ internal object Dates {
  * 日本证件上的「平成2年 1月 1日生」，「1998年3月5日出生」。遮日期，不遮「生」。
  *
  * 「生」后面紧跟着别的汉字的多半是另一个词：「2026年9月3日生效」「生产」「生病」不算；「生于」「生人」算。
+ * 跑在 HanView 上：ML Kit 逐字切开的「自 2026 年 9 月 3 日 生 效」拼回来才看得出是「生效」。
+ * 「生」在行尾的，看折下去的那一行：「本协议自2026年9月3日生」下面是「效。」，也不算。
  */
-class BornOn(private val confidence: Float) : Finder {
-    override fun findIn(text: String): List<RuleMatch> =
-        PATTERN.findAll(text)
-            .filter { Dates.readings(it.value).isNotEmpty() }
-            .map { RuleMatch(it.range, confidence) }
-            .toList()
+class BornOn(private val confidence: Float) : PageFinder {
 
-    private companion object {
-        val PATTERN = Regex("""(?<![\d:.])${Dates.CHINESE_DAY}(?= *(?:出生|生(?![\u4e00-\u9fa5])|生[于於的人]))""")
+    override fun findIn(text: String): List<RuleMatch> = find(text).map { (r, _) -> RuleMatch(r, confidence) }
+
+    override fun findOnPage(page: Page): List<PageMatch> = page.texts.indices.flatMap { i ->
+        find(page.texts[i])
+            .filterNot { (_, atEnd) -> atEnd && wordGoesOn(page, i) }
+            .map { (r, _) -> PageMatch(i, RuleMatch(r, confidence)) }
+    }
+
+    /** 一行里的日期：（原串上的区间, 后面的「生」在不在行尾）。 */
+    private fun find(text: String): List<Pair<IntRange, Boolean>> {
+        val view = HanView.of(text)
+        return PATTERN.findAll(view.text)
+            .filter { Dates.readings(it.value).isNotEmpty() }
+            .map { m ->
+                val rest = view.text.substring(m.range.last + 1)
+                val sheng = LEADING_SHENG.find(rest)!!.range.last + 1
+                view.toSource(m.range) to rest.substring(sheng).isBlank()
+            }
+            .toList()
+    }
+
+    /** 折下去的那一行以汉字打头（「于」「的」「人」除外）：行尾的「生」是「生效」「生产」的半截。 */
+    private fun wordGoesOn(page: Page, i: Int): Boolean {
+        val j = page.wrapOf(i) ?: return false
+        val first = page.texts[j].trimStart().firstOrNull() ?: return false
+        return first.isHan() && first !in "于於的人"
+    }
+
+    internal companion object {
+        /** 日期后面的「生」「出生」；「生效」「生产」不算。 */
+        const val SHENG = """ *(?:出生|生(?![\u4e00-\u9fa5])|生[于於的人])"""
+
+        private val PATTERN = Regex("""(?<![\d:.])${Dates.CHINESE_DAY}(?=$SHENG)""")
+
+        private val LEADING_SHENG = Regex("""^ *出?生""")
     }
 }

@@ -64,6 +64,29 @@ class BirthDateRuleTest {
         assertThat(Dates.readings("二〇〇〇年二月二十九日")).containsExactly(Triple(2000, 2, 29))
     }
 
+    /** 学生证、工作证、简历上只写到月的。月份不对、后面还跟着日的不算这一种。 */
+    @Test fun `a year and month after the label`() {
+        assertThat(matched("出生年月 1990年01月")).containsExactly("1990年01月")
+        assertThat(matched("出生年月：2002.03")).containsExactly("2002.03")
+        assertThat(matched("出生日期 1993-07")).containsExactly("1993-07")
+        assertThat(matched("出生年月 2002.03.15")).containsExactly("2002.03.15")
+        assertThat(matched("出生年月 2002.13")).isEmpty()
+        assertThat(matched("出生年月写到月就行")).isEmpty()
+    }
+
+    /** 后面紧跟着数字的是一串编号；连写的八位要是日历上有的一天。 */
+    @Test fun `a compact date must stand alone and be real`() {
+        assertThat(matched("出生 202001011234")).isEmpty()
+        assertThat(matched("生日 20240230")).isEmpty()
+        assertThat(matched("生日 20240229")).containsExactly("20240229")
+    }
+
+    /** ML Kit 逐字切开的「生 效」拼回来才看得出是「生效」。 */
+    @Test fun `a split sheng xiao is not a birth`() {
+        assertThat(matched("自 2026 年 9 月 3 日 生 效")).isEmpty()
+        assertThat(matched("1998 年 3 月 5 日 生")).hasSize(1)
+    }
+
     /** 字段名后面不是日期：出生地、只有年份。 */
     @Test fun `a label without a date after it`() {
         assertThat(matched("出生地 江苏")).isEmpty()

@@ -152,9 +152,10 @@ class StackedField(
 
         /**
          * 中国护照、永居证的姓名栏：「姓名/Name」下面两行，汉字名、拼音「ZHANG, SAN」。
-         * 只认连着中文的写法：单独一个「Name」在表单上什么都可能领着。
+         * 只认连着中文的写法：单独一个「Name」在表单上什么都可能领着。斜杠常被读成 1、l、I、竖线，或者读丢了
+         * （「姓名1Name」「姓名Name」）。
          */
-        val CHINESE_NAME_LABELS = listOf("姓名/name", "name/姓名")
+        val CHINESE_NAME_LABELS = listOf("/", "1", "l", "i", "|", "").flatMap { listOf("姓名${it}name", "name${it}姓名") }
 
         /** 证件号的字段名。 */
         val DOCUMENT_NUMBER_LABELS = listOf(
@@ -199,13 +200,18 @@ class StackedField(
 
         private fun documentLabels(text: String) = compactFind(text, ALL_DOCUMENT).map { withChinese(text, it) }
 
-        /** 「出生日期/Date of birth」：英文字段名前面隔着斜杠的一段汉字，并进字段名。 */
+        /**
+         * 「出生日期/Date of birth」：英文字段名前面隔着斜杠的一段汉字，并进字段名。
+         * 斜杠读成了 1、l、I、竖线（「出生日期1Date of birth」），或者读丢了（「出生日期Date of birth」），一样。
+         */
         private fun withChinese(text: String, label: IntRange): IntRange {
             var k = label.first - 1
             while (k >= 0 && text[k] == ' ') k--
-            if (k < 0 || text[k] !in "/／") return label
-            k--
-            while (k >= 0 && text[k] == ' ') k--
+            if (k >= 0 && text[k] in "/／|｜1lI") {
+                var s = k - 1
+                while (s >= 0 && text[s] == ' ') s--
+                if (s >= 0 && text[s].isHan()) k = s
+            }
             var start = -1
             while (k >= 0 && text[k].isHan()) start = k--
             return if (start >= 0) start..label.last else label
@@ -219,6 +225,9 @@ class StackedField(
         /** 字段名去掉空格、转小写后拼成的正则，长的在前：「given names」不会只认出「given name」。 */
         private fun keys(words: List<String>) =
             Regex(words.map { it.replace(" ", "") }.distinct().sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) })
+
+        /** 字母，汉字除外：中文字段名后面直接跟着英文（「出生日期Date of birth」）照样认。 */
+        private fun Char.isNonHanLetter() = isLetter() && !isHan()
 
         /**
          * 在去掉空格、转了小写的行里找，映射回原串；前后紧挨字母的不算（「Typeface」里没有「Type」）。
@@ -234,7 +243,7 @@ class StackedField(
                 val last = origin[m.range.last]
                 val before = text.getOrNull(first - 1)
                 val after = text.getOrNull(last + 1)
-                if (before?.isLetter() == true || after?.isLetter() == true) null else first..last
+                if (before?.isNonHanLetter() == true || after?.isNonHanLetter() == true) null else first..last
             }.toList()
         }
     }

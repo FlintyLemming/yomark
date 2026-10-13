@@ -14,6 +14,8 @@ import kotlin.math.min
  * - 离上一行不到一个字高，字高相差不过四成；
  * - 不是下一个字段：不以字段名打头（[startsWithLabel]）；同一排上字段名那一栏里没有字——表格里字段名和值
  *   常常各成一行，「入住时间」右边那个「10月12日」也对着值的左沿；
+ * - 是住址的一截（[hasAddressPiece]）：订单、地图页上对着值的左沿的常是按钮和备注（「修改」「导航」
+ *   「预计10月14日送达」「张三 138****1234」），不是住址；
  * - 不是只有日期、号码的一行。
  * 最多接 [maxLines] 行。
  */
@@ -43,7 +45,9 @@ class FollowingLines(
                     .filter { it.index != i && it.continues(above, x0, h) }
                     .minByOrNull { it.box.top } ?: return@forEach
                 val t = page.texts[next.index]
-                if (startsWithLabel(t) || !hasAddressWords(t) || besideALabel(lines, next, labelLeft, x0, h)) return@forEach
+                if (startsWithLabel(t) || !hasAddressWords(t) || !hasAddressPiece(t) || besideALabel(lines, next, labelLeft, x0, h)) {
+                    return@forEach
+                }
                 out += PageMatch(next.index, RuleMatch(next.range, confidence))
                 above = next.box
             }
@@ -107,3 +111,54 @@ internal fun hasAddressWords(text: String): Boolean {
 }
 
 private val BRACKETED = Regex("""[(（\[【].*[)）\]】]""")
+
+/**
+ * 住址的一截：有门牌、楼栋、地名用字（「88号6幢2单元501 室」「民族大道136号」「车辆段宿舍3号楼」「128号」）。
+ * 「10号线」「3号口」的「号」不算；带着「距」「步行」「预计」「送达」的是到那儿的路、送货的时间，不是地址。
+ */
+internal fun hasAddressPiece(text: String): Boolean = ADDRESS_PIECE.containsMatchIn(text) && !DIRECTIONS.containsMatchIn(text)
+
+private val ADDRESS_PIECE =
+    Regex("""号(?![线口门站])|[省市区县镇乡村路街巷弄楼栋幢室院苑园庄屯组座寓舍厦队坊里湾]|大道|胡同|单元|小区|新村|花园|公寓|家园|大厦|社区|广场""")
+
+private val DIRECTIONS = Regex("""距|步行|驾车|公里|分钟|预计|送达""")
+
+/**
+ * 通行证上名字下面一行的拼音：往来港澳通行证、往来台湾通行证、港澳台居民居住证上「姓名 张三」，
+ * 下面一行和名字左对齐的是「ZHANG,SAN」。从 [field] 认出的汉字名往下看紧挨着的一行，整行是 [ROMANISED_NAME] 才遮：
+ * 「OK」「Thanks a lot」、下一个字段都不算。
+ */
+class PinyinBelow(private val field: PageFinder, private val confidence: Float) : PageFinder {
+
+    override fun findOnPage(page: Page): List<PageMatch> =
+        field.findOnPage(page).mapNotNull { (i, m) ->
+            if (page.texts[i].substring(m.range).none { it.isHan() }) return@mapNotNull null
+            val name = page.box(i, m.range)
+            val h = name.height
+            if (h <= 0f) return@mapNotNull null
+            val (j, r) = page.texts.indices.filter { it != i }
+                .mapNotNull { j ->
+                    val t = page.texts[j]
+                    val s = t.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return@mapNotNull null
+                    val r = s..t.indexOfLast { !it.isWhitespace() }
+                    val b = page.box(j, r)
+                    val below = b.top >= name.centerY && b.top - name.bottom <= h
+                    if (below && abs(page.box(j, s..s).left - name.left) <= ALIGN * h) j to r else null
+                }
+                .minByOrNull { (j, r) -> page.box(j, r).top } ?: return@mapNotNull null
+            PageMatch(j, RuleMatch(r, confidence)).takeIf { ROMANISED_NAME.matches(page.texts[j].substring(r)) }
+        }
+
+    private companion object {
+        /** 拼音的左沿离名字的左沿最多几个字高。 */
+        const val ALIGN = 1.5f
+    }
+}
+
+/**
+ * 证件上的拼音、罗马字名：全大写，「姓, 名」带逗号（「ZHANG,SAN」「CHEUNG, TAI MAN」「GARCIA LOPEZ, MARIA」），
+ * 或者两到四个词（「OUYANG NA NA」）。
+ */
+internal val ROMANISED_NAME = Regex(
+    """[A-Z][A-Z'\-]*(?: [A-Z][A-Z'\-]*){0,2} ?, ?[A-Z][A-Z'\-]*(?: [A-Z][A-Z'\-]*){0,2}|[A-Z][A-Z'\-]*(?: [A-Z][A-Z'\-]*){1,3}"""
+)
