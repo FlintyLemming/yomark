@@ -8,6 +8,7 @@ import moe.flinty.yomark.core.geometry.Quad
  *
  * @param scale 降采样图边长 / 原图边长，取值 (0, 1]。导出时按 1/scale 反算坐标。
  * @param originalWidth/originalHeight **转正之后**的原图尺寸——全流程只有一个坐标系。
+ * @param original 原图文件。不是从文件读的（测试里直接造的位图）为 null。
  */
 data class SourceImage(
     val bitmap: Bitmap,
@@ -15,6 +16,7 @@ data class SourceImage(
     val originalWidth: Int,
     val originalHeight: Int,
     val mimeType: String,
+    val original: OriginalFile? = null,
 ) {
     val width: Int get() = bitmap.width
     val height: Int get() = bitmap.height

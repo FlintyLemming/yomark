@@ -3,6 +3,9 @@
 
 多个 Claude Code 窗口并行时，各自用 -read-only 起一个同 AVD 的实例，互不覆盖 APK、不抢前台。
 端口靠 $env:TEMP\yomark-emu\<port> 目录加锁（New-Item 建目录是原子的）。
+
+冷启动（-no-snapshot）：从 default_boot 快照恢复的只读实例，写 /metadata（encryptionkey.img）会一直挂着，
+am instrument 之类碰到它的命令跟着卡死、杀不掉。冷启动多花一两分钟，没有这个问题；也不往共用的 AVD 存快照。
 同一个 worktree 重复调用会直接返回已领到的 serial，所以每次需要 serial 时再跑一遍即可。
 
 用法：
@@ -83,7 +86,7 @@ $log = Join-Path $logDir "$port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 
 Write-Host "启动 $Avd -> $serial（$owner）"
 $proc = Start-Process $emulator -PassThru `
-    -ArgumentList '-avd', $Avd, '-read-only', '-port', $port, '-no-boot-anim' `
+    -ArgumentList '-avd', $Avd, '-read-only', '-port', $port, '-no-boot-anim', '-no-snapshot' `
     -RedirectStandardOutput $log -RedirectStandardError "$log.err"
 
 try {

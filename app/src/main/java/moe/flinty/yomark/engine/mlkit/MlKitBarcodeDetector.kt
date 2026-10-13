@@ -1,7 +1,12 @@
 package moe.flinty.yomark.engine.mlkit
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.BitmapRegionDecoder
 import android.graphics.PointF
+import android.graphics.Rect
 import android.graphics.RectF
+import android.os.Build
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
@@ -15,6 +20,7 @@ import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlin.math.max
 
 /**
  * 条码候选的构造（2026-09-04 增补设计 §1）。
@@ -25,8 +31,8 @@ import kotlinx.coroutines.withContext
 object BarcodeCandidates {
 
     /**
-     * @param decodable 内容解得出来。解不出的（potential）多半只是布料印花、
-     *   格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的。
+     * @param decodable 内容解得出来，或者紧挨着一个解得出的同样大小的码（[BarcodeHits.besideDecoded]）。
+     *   其余解不出的（potential）多半只是布料印花、格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的。
      *   彩色照片在进这里之前已经被 [TwoInks] 筛掉；剩下的仍然报出来（漏检是事故），
      *   但只圈不打码，交给导出拦截兜底。
      * @param masked 设置里条码的处理方式是「打码」。设成「仅圈出」时解得出的也只圈出。
@@ -89,8 +95,9 @@ class MlKitBarcodeDetector(
      * 收窄格式**之后**再放宽解码要求，两者不冲突：格式白名单决定「拿哪几种形状去匹配」，
      * potential 决定「匹配上了但校验没过要不要报」。
      *
-     * 放宽之后 ML Kit 会把彩色照片（真机上是一张酒店缩略图）也当疑似条码报上来，
-     * 所以 detect 里对解不出的那部分再加一道像素判断，见 [TwoInks]。
+     * 严格模式也放宽：解不出的码挨着一个解出来的码时要认（[BarcodeHits.besideDecoded]），
+     * 不放宽就根本拿不到它。其余解不出的严格模式丢掉，宽松模式过一道像素判断（[TwoInks]）后只圈出：
+     * 放宽之后 ML Kit 会把彩色照片（真机上是一张酒店缩略图）也当疑似条码报上来。
      */
     private val client by lazy {
         BarcodeScanning.getClient(
@@ -99,36 +106,101 @@ class MlKitBarcodeDetector(
                     BarcodeFormats.ALLOWED.first(),
                     *BarcodeFormats.ALLOWED.drop(1).toIntArray(),
                 )
-                .apply { if (strategy == BarcodeOption.LOOSE) enableAllPotentialBarcodes() }
+                .enableAllPotentialBarcodes()
                 .build()
         )
     }
 
     override suspend fun detect(image: SourceImage): List<Candidate> {
-        val input = InputImage.fromBitmap(image.bitmap, 0)
-        val barcodes = client.process(input).await()
+        val hits = scan(image.bitmap) { x, y -> PointF(x, y) } + tiles(image)
         // 疑似条码要逐像素看一遍（TwoInks），不放在主线程上
         return withContext(Dispatchers.Default) {
-            barcodes.mapIndexedNotNull { i, code ->
-                val quad = code.cornerPoints?.takeIf { it.size >= 4 }?.let {
-                    Quad(
-                        PointF(it[0].x.toFloat(), it[0].y.toFloat()),
-                        PointF(it[1].x.toFloat(), it[1].y.toFloat()),
-                        PointF(it[2].x.toFloat(), it[2].y.toFloat()),
-                        PointF(it[3].x.toFloat(), it[3].y.toFloat()),
-                    )
-                } ?: code.boundingBox?.let { Quad.fromRect(RectF(it)) } ?: return@mapIndexedNotNull null
-
-                // rawValue 只在这里做一次「有没有」的判断，绝不读出来、更不落盘。
-                val decodable = code.rawValue != null
-                // 解不出内容的，像素上不是两种墨色（彩色照片）就整个丢掉，连框都不画。
-                // 这里用的是外扩之前的框：外扩出来的那圈是静区，不该算进墨色统计。
-                // 判不了（读像素出错）就留着：这一步只许少报误报，不许让整个条码检测失败。
-                if (!decodable && !runCatching { TwoInks.looksPrinted(image.bitmap, quad) }.getOrDefault(true)) {
-                    return@mapIndexedNotNull null
+            val codes = BarcodeHits.dedupe(hits)
+            val decoded = codes.filter { it.decoded }.map { it.quad }
+            codes.mapIndexedNotNull { i, hit ->
+                val real = hit.decoded || BarcodeHits.besideDecoded(hit.quad, decoded)
+                if (!real) {
+                    if (strategy == BarcodeOption.STRICT) return@mapIndexedNotNull null
+                    // 解不出内容的，像素上不是两种墨色（彩色照片）就整个丢掉，连框都不画。
+                    // 这里用的是外扩之前的框：外扩出来的那圈是静区，不该算进墨色统计。
+                    // 判不了（读像素出错）就留着：这一步只许少报误报，不许让整个条码检测失败。
+                    if (!runCatching { TwoInks.looksPrinted(image.bitmap, hit.quad) }.getOrDefault(true)) {
+                        return@mapIndexedNotNull null
+                    }
                 }
-                BarcodeCandidates.from(i, quad, decodable, masked)
+                BarcodeCandidates.from(i, hit.quad, real, masked)
             }
+        }
+    }
+
+    /** 扫一张图，角点用 [toImage] 换到识别图坐标。[keep] 按图上的角点、解没解出决定留不留。 */
+    private suspend fun scan(
+        bitmap: Bitmap,
+        keep: (corners: List<PointF>, decoded: Boolean) -> Boolean = { _, _ -> true },
+        toImage: (Float, Float) -> PointF,
+    ): List<BarcodeHits.Hit> =
+        client.process(InputImage.fromBitmap(bitmap, 0)).await().mapNotNull { code ->
+            val corners = code.cornerPoints?.takeIf { it.size >= 4 }?.take(4)?.map { PointF(it.x.toFloat(), it.y.toFloat()) }
+                ?: code.boundingBox?.let { Quad.fromRect(RectF(it)).points() }
+                ?: return@mapNotNull null
+            // rawValue 只在这里做一次「有没有」的判断，绝不读出来、更不落盘。
+            val decoded = BarcodeHits.decoded(code.rawValue)
+            if (!keep(corners, decoded)) return@mapNotNull null
+            val p = corners.map { toImage(it.x, it.y) }
+            BarcodeHits.Hit(Quad(p[0], p[1], p[2], p[3]), decoded)
+        }
+
+    /**
+     * 识别图是降采样过的（照片、长截图）时，回原图上分块再扫一遍。
+     *
+     * ML Kit 自己会把长边超过 2048 的图缩到 2048 再找（见 [BarcodeHits.TILE]），整张原图喂给它跟喂识别图一样；
+     * 切成 2048 的块，每块按原分辨率看。真机拍的两张 4096×3072 的照片，桌上 SIM 卡贴纸的四个二维码，
+     * 整张扫一张照片一个没找到、另一张解出一个；分块扫各解出一到两个，剩下的也都找到了（解不出，挨着解出来的，见
+     * [BarcodeHits.besideDecoded]）。6 块在模拟器上 0.8–0.9 s，跟文字识别并行跑。
+     *
+     * 读不了原图（文件被换图清掉了、格式不支持分块读）就算了，整张扫的结果照用。
+     */
+    private suspend fun tiles(image: SourceImage): List<BarcodeHits.Hit> {
+        val original = image.original ?: return emptyList()
+        if (image.scale >= 1f) return emptyList()
+        return withContext(Dispatchers.IO) {
+            runCatching {
+                val decoder = if (Build.VERSION.SDK_INT >= 31) BitmapRegionDecoder.newInstance(original.file.path)
+                else @Suppress("DEPRECATION") BitmapRegionDecoder.newInstance(original.file.path, false)
+                try {
+                    val sample = BarcodeHits.sampleSize(max(original.width, original.height))
+                    val tile = BarcodeHits.TILE * sample
+                    val overlap = BarcodeHits.OVERLAP * sample
+                    val hits = ArrayList<BarcodeHits.Hit>()
+                    for ((top, bottom) in BarcodeHits.spans(original.height, tile, overlap)) {
+                        for ((left, right) in BarcodeHits.spans(original.width, tile, overlap)) {
+                            val opts = BitmapFactory.Options().apply {
+                                inSampleSize = sample
+                                inPreferredConfig = Bitmap.Config.ARGB_8888
+                            }
+                            val bmp = decoder.decodeRegion(Rect(left, top, right, bottom), opts) ?: continue
+                            // 块边切过的疑似码不要（框是歪的），旁边那块会整个报它；解出来的照留
+                            val whole = { corners: List<PointF>, decoded: Boolean ->
+                                decoded || BarcodeHits.wholeInTile(
+                                    corners, bmp.width, bmp.height,
+                                    cutLeft = left > 0, cutTop = top > 0, cutRight = right < original.width, cutBottom = bottom < original.height,
+                                )
+                            }
+                            try {
+                                hits += scan(bmp, whole) { x, y ->
+                                    val up = original.toUpright(left + x * sample, top + y * sample)
+                                    PointF(up.x * image.scale, up.y * image.scale)
+                                }
+                            } finally {
+                                bmp.recycle()
+                            }
+                        }
+                    }
+                    hits
+                } finally {
+                    decoder.recycle()
+                }
+            }.getOrDefault(emptyList())
         }
     }
 }

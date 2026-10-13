@@ -5,12 +5,18 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.PointF
+import androidx.exifinterface.media.ExifInterface
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.engine.BarcodeOption
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import java.io.File
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -77,8 +83,26 @@ class MlKitBarcodeDetectorTest {
         out.forEach {
             assertThat(it.kind).isEqualTo(SensitiveKind.BARCODE)
             assertThat(it.source).isEqualTo(DetectorSource.BARCODE)
-            assertThat(it.enabledByDefault).isTrue()
         }
+    }
+
+    @Test
+    fun a_decoded_code_is_masked_by_default() = runTest {
+        val out = MlKitBarcodeDetector().detect(qrImage())
+        assertThat(out).hasSize(1)
+        assertThat(out.single().enabledByDefault).isTrue()
+    }
+
+    /**
+     * 手画的条纹 ML Kit 认得出是条码、解不出内容：宽松模式只圈出，严格模式不报。
+     * 疑似条码的 rawValue 是空串，以前按 != null 判，它被当成解出来的，默认打码。
+     */
+    @Test
+    fun an_undecodable_code_is_only_outlined() = runTest {
+        val loose = MlKitBarcodeDetector(BarcodeOption.LOOSE).detect(barcodeImage())
+        assertThat(loose).isNotEmpty()
+        loose.forEach { assertThat(it.enabledByDefault).isFalse() }
+        assertThat(MlKitBarcodeDetector(BarcodeOption.STRICT).detect(barcodeImage())).isEmpty()
     }
 
     @Test
@@ -103,6 +127,49 @@ class MlKitBarcodeDetectorTest {
             val b = it.quad.bounds()
             assertThat(b.left).isAtLeast(-1f)
             assertThat(b.right).isAtMost(image.width + 1f)
+        }
+    }
+
+    /**
+     * 4096×3072 的「照片」上一个 112 px 宽的二维码，码的左上角在原图 (2500, 1100)。[orientation] 是写进文件的 EXIF 方向：
+     * 像素照原样存，转正交给读图的一方。
+     */
+    private fun photoWithCode(orientation: Int): File {
+        val qr = context.assets.open("barcodes/qr-sample.png").use { BitmapFactory.decodeStream(it) }
+        val photo = Bitmap.createBitmap(4096, 3072, Bitmap.Config.ARGB_8888)
+        Canvas(photo).apply {
+            drawColor(Color.rgb(236, 236, 236))
+            drawBitmap(Bitmap.createScaledBitmap(qr, 112, 112 * qr.height / qr.width, true), 2500f, 1100f, null)
+        }
+        val file = File(InstrumentationRegistry.getInstrumentation().targetContext.cacheDir, "photo-$orientation.jpg")
+        file.outputStream().use { photo.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+        if (orientation != ExifInterface.ORIENTATION_NORMAL) {
+            ExifInterface(file).apply { setAttribute(ExifInterface.TAG_ORIENTATION, "$orientation"); saveAttributes() }
+        }
+        return file
+    }
+
+    /**
+     * 照片降到 2048 宽识别，码在识别图上只剩 56 px，ML Kit 解不出；回原图分块扫，每块按原分辨率看，解得出。
+     * 框换回识别图坐标：码的中心在原图 (2556, 1156)，识别图上是一半；EXIF 转了 90° 的，先转正再取一半。
+     */
+    @Test
+    fun a_small_code_in_a_large_photo_is_found_on_the_original() = runTest {
+        val expected = mapOf(
+            ExifInterface.ORIENTATION_NORMAL to PointF(1278f, 578f),
+            ExifInterface.ORIENTATION_ROTATE_90 to PointF((3072 - 1156) / 2f, 2556 / 2f),
+        )
+        for ((orientation, center) in expected) {
+            val image = SourceImageLoader.loadForAnalysis(photoWithCode(orientation), "image/jpeg")
+            val detector = MlKitBarcodeDetector(BarcodeOption.STRICT)
+            assertWithMessage("$orientation 只扫识别图").that(detector.detect(image.copy(original = null))).isEmpty()
+
+            val out = detector.detect(image)
+            assertWithMessage("$orientation").that(out).hasSize(1)
+            val b = out.single().quad.bounds()
+            assertWithMessage("$orientation x").that(b.centerX()).isWithin(8f).of(center.x)
+            assertWithMessage("$orientation y").that(b.centerY()).isWithin(8f).of(center.y)
+            assertWithMessage("$orientation").that(out.single().enabledByDefault).isTrue()
         }
     }
 

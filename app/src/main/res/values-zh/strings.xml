@@ -252,7 +252,7 @@
     <string name="face_accurate">精确</string>
     <string name="barcode_strict">严格</string>
     <string name="barcode_loose">宽松</string>
-    <string name="barcode_strict_summary">只认能解码的条码</string>
+    <string name="barcode_strict_summary">只认能解码的条码，和紧挨着的同款码</string>
     <string name="barcode_loose_summary">解不出的疑似条码也圈出，可能误圈</string>
     <string name="barcode_footer">包括二维码和条形码。</string>
 
