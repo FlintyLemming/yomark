@@ -3,6 +3,7 @@ package moe.flinty.yomark.rules
 import android.graphics.PointF
 import android.graphics.RectF
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.SensitiveKind
@@ -69,6 +70,75 @@ class RotatedPageRuleTest {
         for (degrees in listOf(90.0, 180.0, 270.0, 94.0, -3.5)) {
             assertThat(found(page(degrees))).containsExactlyElementsIn(upright)
         }
+    }
+
+    // ---------- 证件：按版面认的几种（IdDocumentRows） ----------
+
+    /**
+     * [rows] 整页绕 (500, 500) 顺时针转 [degrees] 度：每个字一个 element，框的四个角按阅读方向排，同 [page]。
+     * 一排里分开的几段在这里仍是一行（同 PP-OCR 的 RowGrouper）。
+     */
+    private fun turned(rows: List<Row>, degrees: Double): List<TextLine> {
+        val r = Math.toRadians(degrees)
+        fun turn(x: Float, y: Float): PointF {
+            val dx = x - 500f
+            val dy = y - 500f
+            return PointF((500 + dx * cos(r) - dy * sin(r)).toFloat(), (500 + dx * sin(r) + dy * cos(r)).toFloat())
+        }
+        fun quad(b: Bounds) = Quad(turn(b.left, b.top), turn(b.right, b.top), turn(b.right, b.bottom), turn(b.left, b.bottom))
+        return rows.map { row ->
+            val boxes = row.boxes()
+            val els = boxes.mapIndexedNotNull { i, b -> b?.let { TextElement(quad(it), row.text[i].toString(), i..i) } }
+            val all = boxes.filterNotNull()
+            TextLine(quad(Bounds(all.minOf { it.left }, row.y, all.maxOf { it.right }, row.y + row.h)), row.text, 0.95f, els)
+        }
+    }
+
+    /**
+     * 版面上的几种认法都按「下面 = +y」量：住址折行（FollowingLines）、字段名读坏了的人像面（IdCardFront）、
+     * 字段名和值隔着大半栏（LabeledField 接同一排右边那一段）、值在字段名下面（StackedField）、名字下面的拼音（PinyinBelow）。
+     * 竖着、倒着、拍歪了的页上，RuleClassifier 先把框转到阅读方向上，认出来的和正着的一模一样。
+     */
+    @Test fun `id documents turned any way find the same things`() = runTest {
+        val documents = mapOf(
+            "身份证" to IdDocumentRows.idCard,
+            "身份证照片" to IdDocumentRows.idPhoto,
+            "驾驶证" to IdDocumentRows.drivingLicence,
+            "行驶证" to IdDocumentRows.vehicleLicence,
+            "护照" to IdDocumentRows.chinesePassport,
+            "通行证" to IdDocumentRows.travelPermit,
+        )
+        documents.forEach { (name, rows) ->
+            val upright = found(turned(rows, 0.0))
+            for (degrees in listOf(90.0, 180.0, 270.0, 94.0, -3.5)) {
+                assertWithMessage("$name 转 $degrees°").that(found(turned(rows, degrees))).containsExactlyElementsIn(upright)
+            }
+        }
+    }
+
+    /** 正着的时候认出了该认的：上面那条只比转前转后，这里看转前的就是对的。 */
+    @Test fun `the upright id documents`() = runTest {
+        suspend fun masked(rows: List<Row>) = found(turned(rows, 0.0)).filter { it.third }.map { it.first to it.second }
+        assertThat(masked(IdDocumentRows.idPhoto)).containsAtLeast(
+            SensitiveKind.PERSON_NAME to "宋语桐",
+            SensitiveKind.BIRTH_DATE to "201 2 年4 月17日",
+            SensitiveKind.POSTAL_ADDRESS to "浙江省杭州市上城区解放路",
+            SensitiveKind.POSTAL_ADDRESS to "128号",
+            SensitiveKind.ID_NUMBER to "3 301 02201204174527",
+        )
+        assertThat(masked(IdDocumentRows.drivingLicence)).containsAtLeast(
+            SensitiveKind.ID_NUMBER to "320105198602143729",
+            SensitiveKind.PERSON_NAME to "周 以宁",
+            SensitiveKind.POSTAL_ADDRESS to "江苏省南京市玄武区北京东路",
+            SensitiveKind.POSTAL_ADDRESS to "41号3栋2单元602室",
+            SensitiveKind.BIRTH_DATE to "1986-02-14",
+        )
+        assertThat(masked(IdDocumentRows.chinesePassport)).containsAtLeast(
+            SensitiveKind.PERSON_NAME to "周以宁",
+            SensitiveKind.PERSON_NAME to "ZHOU, YINING",
+            SensitiveKind.BIRTH_DATE to "14 FEB 1986",
+        )
+        assertThat(masked(IdDocumentRows.travelPermit)).contains(SensitiveKind.PERSON_NAME to "LI, XIAOMING")
     }
 
     /** 候选的框始终是图上的：转过的页上，名字的框落在转过去的那三个字上。 */
