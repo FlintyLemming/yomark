@@ -9,38 +9,33 @@ import moe.flinty.yomark.rules.validator.Checksums
 internal object Vins {
 
     /**
-     * 行驶证上中英文字段名并排：「车辆识别代号 VIN」「车辆识别代号(VIN)」「车辆识别代号 (VIN)」，
-     * 连在一起时英文那个前面紧挨着汉字或括号，单独认不出。
+     * 车架号的字段名。行驶证上中英文并排的「车辆识别代号 VIN」「车辆识别代号(VIN)」，英文那半由 LabeledField 当译名跳过去；
+     * 值在右边一栏、OCR 拆成两段的也接得上。
      */
     val LABELS: List<String> = listOf(
         "车辆识别代号", "车辆识别代码", "车辆识别号", "车架号码", "车架号", "识别代号", "VIN码", "VIN",
         "Vehicle Identification Number",
-    ).let { labels ->
-        labels + listOf("车辆识别代号", "车辆识别代码", "车架号").flatMap { cn ->
-            listOf("VIN", " VIN", "/VIN", "(VIN)", "（VIN）", " (VIN)", " （VIN）").map { cn + it }
-        }
-    }
+    )
 
     /**
      * 字段名后面的车架号：17 位，OCR 补的单个空格不算位数；不验校验位，I、O、Q 也收（认错的字），
      * 打了星的「LFWADRJF0******46」也收，至少要露出四位、有一位数字。
      */
     fun labeled(confidence: Float): Finder =
-        Checked(LabeledField(LABELS, LOOSE, confidence, ignoreCase = true)) { text, r ->
+        Checked(LabeledField(LABELS, LOOSE, confidence, ignoreCase = true, bareRow = true)) { text, r ->
             val v = text.substring(r)
-            v.count { it.isLetterOrDigit() } >= 4 && v.any { it.isDigit() }
+            r.takeIf { v.count { it.isLetterOrDigit() } >= 4 && v.any { it.isDigit() } }
         }
 
     private val LOOSE = Regex("""[A-Z0-9*＊](?: ?[A-Z0-9*＊]){16}(?![A-Za-z0-9*＊])""")
 
-    val ENGINE_LABELS: List<String> = listOf("发动机号码", "发动机号", "电动机号码", "电动机号", "Engine No.", "Engine Number").let { labels ->
-        labels + listOf("发动机号码", "电动机号码").flatMap { cn -> listOf("Engine No.", " Engine No.").map { cn + it } }
-    }
+    /** 发动机号的字段名，「发动机号码 Engine No.」的英文同样当译名跳过。 */
+    val ENGINE_LABELS: List<String> = listOf("发动机号码", "发动机号", "电动机号码", "电动机号", "Engine No.", "Engine Number")
 
     /** 发动机号没有统一格式（「CSS123456」「4G15S12345」），只在字段名后面认：五到二十个字母数字或连字符、至少三位数字。 */
     fun engine(confidence: Float): Finder =
-        Checked(LabeledField(ENGINE_LABELS, ENGINE, confidence, ignoreCase = true)) { text, r ->
-            text.substring(r).count { it.isDigit() } >= 3
+        Checked(LabeledField(ENGINE_LABELS, ENGINE, confidence, ignoreCase = true, bareRow = true)) { text, r ->
+            r.takeIf { text.substring(r).count { it.isDigit() } >= 3 }
         }
 
     private val ENGINE = Regex("""[A-Z0-9](?:-?[A-Z0-9]){4,19}(?![A-Za-z0-9\-])""")

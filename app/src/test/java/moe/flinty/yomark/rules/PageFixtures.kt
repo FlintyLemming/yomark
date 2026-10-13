@@ -17,16 +17,17 @@ internal class Row(val y: Float, val h: Float, vararg val segments: Segment, val
 /** 一段字，[left, right) 之间均匀排开。 */
 internal class Segment(val text: String, val left: Float, val right: Float)
 
-internal fun page(vararg rows: Row): Page {
-    val boxes = rows.map { row ->
-        row.segments.flatMapIndexed { n, seg ->
-            val w = (seg.right - seg.left) / seg.text.length
-            val chars = seg.text.indices.map { i ->
-                if (seg.text[i] == ' ') null else Bounds(seg.left + i * w, row.y, seg.left + (i + 1) * w, row.y + row.h)
-            }
-            if (n == 0 || row.glued) chars else listOf(null) + chars
-        }
+/** 这一行每个字的框，与 [Row.text] 逐字对齐；空格（段里的、段与段之间补的）是 null。 */
+internal fun Row.boxes(): List<Bounds?> = segments.flatMapIndexed { n, seg ->
+    val w = (seg.right - seg.left) / seg.text.length
+    val chars = seg.text.indices.map { i ->
+        if (seg.text[i] == ' ') null else Bounds(seg.left + i * w, y, seg.left + (i + 1) * w, y + h)
     }
+    if (n == 0 || glued) chars else listOf(null) + chars
+}
+
+internal fun page(vararg rows: Row): Page {
+    val boxes = rows.map { it.boxes() }
     return Page(rows.map { it.text }) { line, range ->
         val hit = range.mapNotNull { boxes[line].getOrNull(it) }
         if (hit.isEmpty()) {

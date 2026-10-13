@@ -30,6 +30,8 @@ package moe.flinty.yomark.rules
  * @param nextField 同一排右边那一段以别的字段名打头，就不是这个字段的值（见 [findOnPage]）。
  * @param valid 值还要过的一道：生日要是日历上有的一天。
  * @param spacedValue [spaced] 里的字段名领着的值还要过的一道，收下视图上的整行和值的区间。
+ * @param bareRow 字段名没带英文译名，也接同一排右边那一段（见 [findOnPage]）：值的形状够严的才这样（证件号码要五位以上数字），
+ *   表头的下一格、「去设置 >」都对不上。
  */
 class LabeledField(
     labels: List<String>,
@@ -40,6 +42,7 @@ class LabeledField(
     private val nextField: (String) -> Boolean = { false },
     private val valid: (String) -> Boolean = { true },
     private val spacedValue: (line: String, value: IntRange) -> Boolean = { _, _ -> true },
+    private val bareRow: Boolean = false,
 ) : PageFinder {
 
     /**
@@ -119,6 +122,7 @@ class LabeledField(
      * 只在中文字段名自己带着英文译名时这样接（「姓名 Name」「Name/姓名」，或者译名单独成一段：「姓名」|「Name」|「周以宁」），
      * 那是证件的排版。单单一个「姓名」，右边隔得老远的可能是表头的下一格（「姓名　学号　成绩」）；
      * 「收货地址：」右边可能是「去设置 >」；设置页的「IP 地址」「Email 地址」右边是 IP 和邮箱——那一段里的英文不是译名。
+     * 值的形状够严的（[bareRow]）不管这些：驾驶证上的「证号」没有译名，号码在右边一栏。
      *
      * 右边那一段从它的头一个字起要像值；以别的字段名打头的（[nextField]），或者本身就是一个中英文字段名的
      * （空着没填的双语表单：「姓名 Name」右边是「房号 Room No.」），不是值。
@@ -138,10 +142,10 @@ class LabeledField(
             var j = rightOf(page, i, near, h) ?: return@forEachIndexed
             var v = HanView.of(page.texts[j])
             var start = v.text.indexOfFirst { !it.isWhitespace() }
-            if (!translated) {
+            val (end, n) = if (translated) start to 0 else Translations.skip(v.text, start)
+            if (!translated && n == 0 && !bareRow) return@forEachIndexed
+            if (n > 0) {
                 // 译名单独成一段：跳过它，值在它后面，或者在它右边的下一段
-                val (end, n) = Translations.skip(v.text, start)
-                if (n == 0) return@forEachIndexed
                 if (v.text.substring(end).isBlank()) {
                     near = page.box(j)
                     j = rightOf(page, j, near, h) ?: return@forEachIndexed
@@ -181,6 +185,8 @@ class LabeledField(
      * OCR 常读错一个字母（「Adress」「Date of Brith」「Valid Periad」），「m」常读成「rn」（「Narne」）：
      * 七个字母以上的译名差一个字母（多、少、换一个、相邻两个对调）也算；短的只认「rn」，「Nana」「Bob」是名字。
      * 全大写的缩写（VIN、DOB、M&F）只认大写：「姓名 Vin Diesel」里的「Vin」是名字。
+     * 两个字母的「No.」要带着句点：「NO」单独是个姓（韩国的노）。
+     * 译名可以括在括号里：「车辆识别代号(VIN)」。
      */
     internal object Translations {
 
@@ -190,15 +196,21 @@ class LabeledField(
             "Issue Date", "Date of Issue", "Date of Expiry", "Class", "Valid Period", "Valid From", "Valid For",
             "Period of Validity", "Plate No.", "Vehicle Type", "Owner", "Use Character", "Model", "VIN", "Engine No.",
             "Register Date", "ID No.", "Card No.", "Passport No.", "Holder", "Legal Representative", "Domicile",
+            // 驾驶证「证号」的译名（翻译件、部分卡面）
+            "No.",
         )
 
-        /** 去掉空格、句点，小写；打头是全大写的缩写的（「VIN」「ID No.」），记下它有几个字母，这几个只认大写。长的在前。 */
-        private class Key(val compact: String, val upperHead: Int)
+        /**
+         * 去掉空格、句点，小写；打头是全大写的缩写的（「VIN」「ID No.」），记下它有几个字母，这几个只认大写；
+         * [dotted]：句点不能少。长的在前。
+         */
+        private class Key(val compact: String, val upperHead: Int, val dotted: Boolean)
 
         private val KEYS = ALL.map { t ->
             val head = t.substringBefore(' ').trimEnd('.')
             val acronym = head.length <= 3 && head.none { it.isLowerCase() }
-            Key(t.filter { it.isLetter() || it == '&' }.lowercase(), if (acronym) head.length else 0)
+            val compact = t.filter { it.isLetter() || it == '&' }.lowercase()
+            Key(compact, if (acronym) head.length else 0, dotted = compact.length <= 2 && t.endsWith('.'))
         }.sortedByDescending { it.compact.length }
 
         /** 七个字母以上的译名才容一个字母的错。 */
@@ -220,7 +232,12 @@ class LabeledField(
 
         private fun step(text: String, from: Int): Int? {
             val p = spaces(text, from)
-            if (p < text.length && text[p] in "/／|｜1lI") at(text, spaces(text, p + 1))?.let { return it }
+            val c = text.getOrNull(p)
+            if (c != null && c in "/／|｜1lI") at(text, spaces(text, p + 1))?.let { return it }
+            if (c != null && c in "(（") at(text, spaces(text, p + 1))?.let { e ->
+                val q = spaces(text, e)
+                if (text.getOrNull(q)?.let { it in ")）" } == true) return q + 1
+            }
             return at(text, p)
         }
 
@@ -265,7 +282,9 @@ class LabeledField(
                 val ok = listOf(got, got.replace("rn", "m")).any { if (fuzzy) withinOne(it, key.compact) else it == key.compact }
                 if (!ok) continue
                 if (upper.substring(0, minOf(len, key.upperHead)).any { it.isLowerCase() }) continue
-                return if (end < text.length && text[end] == '.') end + 1 else end
+                val dot = end < text.length && text[end] == '.'
+                if (key.dotted && !dot) continue
+                return if (dot) end + 1 else end
             }
             return null
         }

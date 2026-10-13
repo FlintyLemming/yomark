@@ -59,7 +59,7 @@ object DefaultRuleSet {
         Checked(LabeledField(labels, Regex("""$value(?![\d/\-])"""), confidence = 0.8f)) { text, r ->
             val year = 2000 + text.substring(r).takeLast(2).toInt()
             val now = LocalDate.now().year
-            year in now - 1..now + 12
+            r.takeIf { year in now - 1..now + 12 }
         }
 
     private val IBAN = RegexRule(
@@ -143,7 +143,8 @@ object DefaultRuleSet {
      * 往来港澳台通行证、回乡证、台胞证上的机读码（见 Mrz），和机读码里读出的号码在卡上别处又出现的
      * （往来港澳通行证右上角那个「C00000000」没有字段名），同护照一样认，归这一类。
      * 字段名（「公民身份号码」「证号」「档案编号」「ID No.」……见 IdNumbers.labeled）后面的不验校验位：
-     * 字段名已经说明了是证件号，OCR 认错一两位照样该遮。没有字段名的要有校验位或者形状够特别：
+     * 字段名已经说明了是证件号，OCR 认错一两位照样该遮；同姓名、住址一样认法（LabeledField），字段名读散了、
+     * 带着英文译名（「证件号码/Card No.」）、号码在右边一栏的都认。没有字段名的要有校验位或者形状够特别：
      * 大陆身份证（省份、生日、校验码，OCR 补的空格也认，见 ResidentIdNumber）、带括号的香港身份证、台湾身分证与居留证、
      * 新加坡 NRIC，韩国居民登录号、马来西亚 MyKad（生日对得上），日本在留卡，带点的巴西 CPF；
      * 跟在「订单号」「编号」这类提示词后面的不算（单据号常是同一个形状，见 notAfterOrderHint）。
@@ -158,7 +159,7 @@ object DefaultRuleSet {
         kind = SensitiveKind.ID_NUMBER,
         enabledByDefault = true,
         MrzLines(confidence = 0.95f, MrzDocument.PERMIT),
-        IdNumbers.labeled(confidence = 0.8f),
+        *IdNumbers.labeled(confidence = 0.8f),
         IdNumbers.RESIDENT,
         IdNumbers.HKID,
         IdNumbers.TAIWAN,
@@ -422,13 +423,14 @@ object DefaultRuleSet {
     )
 
     /**
-     * 证件、表格上姓名、地址、出生日期以外的字段名。户口簿一行有好几个字段（「出生地 江苏省南京市 民族 汉」），
-     * 出生地遮到它们前面为止；住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
+     * 证件、表格上姓名、地址、出生日期以外的字段名：证件号码、车架号的那些，再加上没有规则的。
+     * 户口簿一行有好几个字段（「出生地 江苏省南京市 民族 汉」），出生地遮到它们前面为止；
+     * 住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
      */
-    private val OTHER_FIELDS = listOf(
-        "公民身份号码", "身份证", "证件号", "证号", "号码", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期",
-        "档案编号", "准驾车型", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆", "发动机", "号牌",
-        "户号", "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
+    private val OTHER_FIELDS = IdNumbers.LABELS + Vins.LABELS + Vins.ENGINE_LABELS + listOf(
+        "身份证", "号码", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期",
+        "准驾车型", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆类型", "车辆", "号牌",
+        "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
         "经营范围", "成立日期", "注册资本", "类型", "名称", "营业期限", "电话", "手机", "邮编", "邮政编码", "备注",
     )
 
@@ -440,7 +442,7 @@ object DefaultRuleSet {
      */
     private val BIRTH_PLACE_FIELD = LabeledField(
         labels = emptyList(),
-        value = Regex("""[^\s/／|｜、，,。；;：:]\S{1,29}(?: (?!${OTHER_FIELDS.joinToString("|")})\S{1,29}){0,7}"""),
+        value = Regex("""[^\s/／|｜、，,。；;：:]\S{1,29}(?: (?!${OTHER_FIELDS.joinToString("|") { Regex.escape(it) }})\S{1,29}){0,7}"""),
         confidence = 0.8f,
         spaced = listOf("出生地点", "出生地"),
         nextField = ::startsWithField,

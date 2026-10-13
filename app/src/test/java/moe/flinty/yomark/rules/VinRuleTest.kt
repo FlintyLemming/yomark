@@ -52,6 +52,22 @@ class VinRuleTest {
         assertThat(vins("发动机号 ENGINE")).isEmpty()
     }
 
+    /**
+     * 行驶证上值在右边一栏，OCR 拆成了同一排的两段：「车辆识别代号 VIN」|「LFW…」。号码认错了一位（校验位对不上），
+     * 单靠形状认不出，只能靠字段名接过去；「车架号(VIN)」的英文在括号里。
+     */
+    @Test fun `a vin in the column beside its label`() {
+        val p = page(
+            Row(340f, 24f, Segment("车辆识别代号 VIN", 40f, 190f)),
+            Row(340f, 24f, Segment("LFWADRJF011002347", 400f, 680f)),
+            Row(380f, 24f, Segment("发动机号码", 40f, 160f), Segment("Engine No.", 160f, 260f)),
+            Row(380f, 24f, Segment("CSS123456", 400f, 560f)),
+            Row(420f, 24f, Segment("车架号(VIN)", 40f, 190f)),
+            Row(420f, 24f, Segment("LFWADRJF0******46", 400f, 680f)),
+        )
+        assertThat(vin.findOnPage(p).map { p.text(it) }).containsExactly("LFWADRJF011002347", "CSS123456", "LFWADRJF0******46")
+    }
+
     @Test fun `masked by default as its own kind`() {
         assertThat(vin.enabledByDefault).isTrue()
         assertThat(vin.kind).isEqualTo(SensitiveKind.VIN)

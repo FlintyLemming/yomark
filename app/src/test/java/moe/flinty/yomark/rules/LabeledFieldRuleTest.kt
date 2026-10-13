@@ -220,6 +220,16 @@ class LabeledFieldRuleTest {
         listOf("Vin Diesel", "Id No", "Nana", "Bob", "Holden", "Owen", "Names", "ZHANG SAN").forEach {
             assertThat(skipped(it)).isNull()
         }
+        // 括在括号里的；两个字母的「No.」要带句点
+        assertThat(skipped("(VIN)LFV")).isEqualTo("(VIN)")
+        assertThat(skipped(" （VIN） LFV")).isEqualTo("（VIN）")
+        assertThat(skipped("No. 3201")).isEqualTo("No.")
+        listOf("NO MIN HO", "No 3201", "Nora", "(ZHANG)").forEach { assertThat(skipped(it)).isNull() }
+    }
+
+    /** 「NO」是个姓（韩国的노），不当译名跳过。 */
+    @Test fun `a surname that looks like a translation`() {
+        assertThat(matched("name", "姓名 NO MIN HO")).containsExactly("NO MIN HO")
     }
 
     /** 缩写的译名只认大写：「Vin」是名字，不是 VIN。 */

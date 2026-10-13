@@ -1,51 +1,20 @@
 package moe.flinty.yomark.rules
 
-import moe.flinty.yomark.rules.validator.Checksums
 import kotlin.math.abs
 
 /**
- * 一行里的 18 位公民身份号码（GB 11643）：去掉 OCR 补的空格再认——身份证上号码的字距拉得很开，
- * 用户拍的那张读成了「码3 301 0220…」，头一位还粘在字段名上。校验码要对得上，中间八位要是日历上真有的一天。
- *
- * 临时的：集成时换成身份证号规则那边共用的认法。
- */
-internal object ChineseIdNumbers {
-
-    /** 一个号码：在原串上的 [range]，号码里的生日 [birth]（年, 月, 日）。 */
-    class Found(val range: IntRange, val birth: Triple<Int, Int, Int>)
-
-    fun findIn(text: String): List<Found> {
-        val origin = ArrayList<Int>(text.length)
-        val sb = StringBuilder(text.length)
-        text.forEachIndexed { i, c ->
-            if (c.isWhitespace()) return@forEachIndexed
-            origin += i
-            sb.append(if (c in X_LIKE) 'X' else c)
-        }
-        return SHAPE.findAll(sb).mapNotNull { m ->
-            val v = m.value
-            val birth = Triple(v.substring(6, 10).toInt(), v.substring(10, 12).toInt(), v.substring(12, 14).toInt())
-            val real = birth.first >= 1880 && Dates.isRealDate(birth.first, birth.second, birth.third)
-            if (real && Checksums.chineseIdValid(v)) Found(origin[m.range.first]..origin[m.range.last], birth) else null
-        }.toList()
-    }
-
-    private val SHAPE = Regex("""(?<![0-9A-Za-z])[1-9]\d{16}[\dX](?![0-9A-Za-z])""")
-
-    /** 校验码 X 常被读成的字。 */
-    private const val X_LIKE = "x×ＸｘΧХ"
-}
-
-/**
  * 身份证号里的生日在页上别处又出现：身份证人像面的「出生」一行（字段名读坏了也不要紧）、驾驶证的出生日期、
- * 户口簿、app 里的个人资料页。号码的校验码对得上，页上读出来是同一天的就是生日，写成什么样都行：
+ * 户口簿、app 里的个人资料页。号码（[IdNumbers.residents]：OCR 在中间补的空格也认，「码3 301 0220…」）
+ * 的省份、生日、校验码都对得上，页上读出来是同一天的就是生日，写成什么样都行：
  * 「1993 年 7 月 18 日」「1993-07-18」「1993.07.18」「19930718」。年份要四位，两位年对不出是哪个世纪。
  */
 class IdBirthEcho(private val confidence: Float) : PageFinder {
 
     override fun findOnPage(page: Page): List<PageMatch> {
-        val ids = page.texts.map { ChineseIdNumbers.findIn(it) }
-        val births = ids.flatten().map { it.birth }.toSet()
+        val ids = page.texts.map { IdNumbers.residents(it) }
+        val births = ids.flatten()
+            .mapNotNull { id -> ResidentIdNumber.birthDate(id.number)?.let { Triple(it.year, it.monthValue, it.dayOfMonth) } }
+            .toSet()
         if (births.isEmpty()) return emptyList()
         val out = ArrayList<PageMatch>()
         page.texts.forEachIndexed { i, text ->
@@ -164,7 +133,7 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
             fun all(page: Page): List<Card> {
                 val compact = page.texts.map { t -> t.filterNot { it.isWhitespace() } }
                 val labelled = compact.indices.filter { idLabel(compact[it]) && compact[it].count(Char::isDigit) >= 15 }
-                val valid = page.texts.indices.filter { ChineseIdNumbers.findIn(page.texts[it]).isNotEmpty() }
+                val valid = page.texts.indices.filter { IdNumbers.residents(page.texts[it]).isNotEmpty() }
                 return (labelled + valid).distinct().mapNotNull { idRow ->
                     val idBox = page.box(idRow)
                     // 号码那一行上面、一张卡的高度以内，离它最近的性别民族、出生两行
