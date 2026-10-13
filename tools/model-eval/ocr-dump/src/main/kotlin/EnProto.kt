@@ -267,8 +267,8 @@ class EnProto(private val namesDir: File, private val v3: Boolean = false) {
 
     // ---------- 电话：中文系统上按 US / GB 再试一遍 ----------
 
-    private val usPhone = PhoneRule("US")
-    private val gbPhone = PhoneRule("GB")
+    private val usPhone = PhoneRule(listOf("US"))
+    private val gbPhone = PhoneRule(listOf("GB"))
 
     /** 拉丁字母为主的行（没有汉字），按 US、GB 各认一遍。 */
     val foreignPhone = Finder { text ->

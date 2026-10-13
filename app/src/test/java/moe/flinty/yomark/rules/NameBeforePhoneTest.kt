@@ -18,7 +18,7 @@ class NameBeforePhoneTest {
         nameRule.findIn(text).filterNot { it.needsAnchor }.map { text.substring(it.range) }
 
     /** libphonenumber 按地区校验，大陆手机号得用 CN 才认；打了星的号码不看地区。 */
-    private val cn = NameBeforePhone(PhoneRule(defaultRegion = "CN"), confidence = 0.7f)
+    private val cn = NameBeforePhone(PhoneRule(listOf("CN")), confidence = 0.7f)
 
     private fun cnNames(text: String): List<String> = cn.findIn(text).map { text.substring(it.range) }
 
