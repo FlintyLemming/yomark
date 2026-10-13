@@ -18,10 +18,13 @@ data class IntakeResult(val file: File, val mimeType: String)
  * 2. 用户可能在编辑期间把原图删了。
  *
  * 此后全流程只读私有副本。副本在导出成功或 Activity 销毁时由调用方 clear()。
+ *
+ * @param dirName 副本放在缓存下的哪个目录。clear() 清的是整个目录，同时开着的两个编辑器要各用各的，
+ *   才不会把对方的副本删掉（替别的应用选图时另用一个，见 EditorActivity）。
  */
-class ImageIntake(private val context: Context) {
+class ImageIntake(private val context: Context, private val dirName: String = DIR) {
 
-    private val dir: File get() = File(context.cacheDir, DIR).apply { mkdirs() }
+    private val dir: File get() = File(context.cacheDir, dirName).apply { mkdirs() }
 
     suspend fun copyToPrivate(
         uri: Uri,

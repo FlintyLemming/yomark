@@ -13,4 +13,11 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowLightNavigationBar">true</item>
     </style>
+
+    <!-- 替别的应用选图的那一层（PickImageActivity）：自己不画任何东西，系统的选图界面直接盖在调用方上面 -->
+    <style name="Theme.Yomark.Transparent">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
 </resources>

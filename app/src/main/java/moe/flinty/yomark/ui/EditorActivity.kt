@@ -22,6 +22,7 @@ import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.buildEngine
 import moe.flinty.yomark.export.Exporter
+import moe.flinty.yomark.export.FileProviderSink
 import moe.flinty.yomark.export.MediaStoreSink
 import moe.flinty.yomark.export.WatermarkDrawer
 import moe.flinty.yomark.render.RendererRegistry
@@ -36,27 +37,33 @@ import kotlinx.coroutines.launch
 import moe.flinty.yomark.R
 
 /**
- * 编辑器：从首页选图进来（intent.data / clipData，可多选），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE）。
+ * 编辑器：从首页选图进来（intent.data / clipData，可多选），或作为分享目标从相册进来（ACTION_SEND / SEND_MULTIPLE），
+ * 或者别的应用来要图（见 PickImageActivity），这时从不导出的入口 EditorForCaller 进来，导出的图交回给它。
  *
  * 返回就是 finish：回到首页，或回到分享它的那个应用。系统返回不拦（不常驻 BackHandler），
  * 预见式返回的跨 Activity 动画才放得出来。例外是用途水印面板、样式面板开着，或吸管正等着取色的时候：
  * 那时的 BackHandler 只随它们存在，返回先收起它们。左上角的向上按钮按 Android 的导航约定走：
  * 从别的应用分享进来时，向上回到本应用自己的首页，而不是回到别人的应用里。
+ * 别的应用来要图时例外，向上和返回一样，什么也不交，退回它那里。
  */
 class EditorActivity : YomarkActivity() {
 
     private val settings by lazy { SettingsStore(applicationContext) }
+
+    /** 别的应用来要图：导出的图交回给它，不进相册。只认本应用自己才打得开的那个入口（见 AndroidManifest）。 */
+    private val forCaller by lazy { componentName.className == CALLER_ENTRY }
 
     private val vm: EditorViewModel by viewModels {
         val app = applicationContext
         viewModelFactory {
             initializer {
                 EditorViewModel(
-                    intake = ImageIntake(app),
+                    // 自己的编辑器可能还开着：副本另放一处，各清各的
+                    intake = if (forCaller) ImageIntake(app, CALLER_INTAKE_DIR) else ImageIntake(app),
                     exporter = Exporter(
                         RendererRegistry.default(),
                         WatermarkDrawer(),
-                        MediaStoreSink(app),
+                        if (forCaller) FileProviderSink(app) else MediaStoreSink(app),
                     ),
                     engineProvider = { cfg -> buildEngine(app, cfg) },
                     settings = SettingsStore(app),
@@ -64,6 +71,7 @@ class EditorActivity : YomarkActivity() {
                     traceLog = sharedTraceLog(app),
                     // 从 Activity 取：Android 12 及以下应用内选的语言只换在 Activity 上（见 AppLocale）
                     defaultPurposeText = getString(R.string.purpose_default),
+                    forCaller = forCaller,
                 )
             }
         }
@@ -95,7 +103,8 @@ class EditorActivity : YomarkActivity() {
                         onRestoreClicked = { restorePurchase(billing) },
                         onUnlockFree = billing::unlockFree,
                         onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
-                        onNavigateUp = ::navigateUpToHome,
+                        onNavigateUp = if (forCaller) ::finish else ::navigateUpToHome,
+                        onHandOver = ::handOver,
                     )
                 }
             }
@@ -142,9 +151,21 @@ class EditorActivity : YomarkActivity() {
         finish()
     }
 
+    /** 别的应用来要图，图导出好了：交回给它（读权限随结果授予），编辑器关掉。 */
+    private fun handOver(images: List<Uri>) {
+        if (images.isEmpty()) return
+        setResult(
+            RESULT_OK,
+            Intent().setData(images.first())
+                .apply { clipData = clipOf(images) }
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+        )
+        finish()
+    }
+
     /**
-     * 批量（spec §7.6）有两个入口：相册分享来的 ACTION_SEND_MULTIPLE，和首页 Picker 多选。
-     * 首页选的图全放在 clipData 里（第一张同时放 intent.data）。
+     * 批量（spec §7.6）有三个入口：相册分享来的 ACTION_SEND_MULTIPLE，首页 Picker 多选，和别的应用来要多张图。
+     * 后两种选的图全放在 clipData 里（第一张同时放 intent.data）。
      */
     private fun incomingUris(intent: Intent): List<Uri> = when (intent.action) {
         Intent.ACTION_SEND ->
@@ -158,14 +179,25 @@ class EditorActivity : YomarkActivity() {
     }
 
     companion object {
-        /** 首页选好图后打开编辑器。多张时读权限要随 clipData 一起授予，光放 data 只覆盖第一张。 */
-        fun intent(context: Context, images: List<Uri>): Intent =
-            Intent(context, EditorActivity::class.java)
+        /** AndroidManifest 里那个不导出的入口（activity-alias）。 */
+        private const val CALLER_ENTRY = "moe.flinty.yomark.ui.EditorForCaller"
+
+        private const val CALLER_INTAKE_DIR = "intake-caller"
+
+        /**
+         * 选好图后打开编辑器。多张时读权限要随 clipData 一起授予，光放 data 只覆盖第一张。
+         *
+         * @param forCaller 别的应用来要图（见 PickImageActivity）：导出的图交回给它，不进相册
+         */
+        fun intent(context: Context, images: List<Uri>, forCaller: Boolean = false): Intent =
+            Intent()
+                .setClassName(context, if (forCaller) CALLER_ENTRY else EditorActivity::class.java.name)
                 .setData(images.first())
-                .apply {
-                    clipData = ClipData.newRawUri(null, images.first())
-                        .also { clip -> images.drop(1).forEach { clip.addItem(ClipData.Item(it)) } }
-                }
+                .apply { clipData = clipOf(images) }
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+        private fun clipOf(images: List<Uri>): ClipData =
+            ClipData.newRawUri(null, images.first())
+                .also { clip -> images.drop(1).forEach { clip.addItem(ClipData.Item(it)) } }
     }
 }
