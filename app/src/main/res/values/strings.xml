@@ -234,7 +234,7 @@
     <string name="rule_desc_name">Names after fields like “Recipient”, “Name” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, and under “Surname” / “Given names” on IDs. Without a field name they are guessed and need evidence.</string>
     <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to”; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs.</string>
     <string name="rule_desc_pickup">Codes after fields like “Pickup code”.</string>
-    <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more), including two-row plates, and plates after fields like “License plate”. Other formats, such as German or Spanish, are only outlined when they stand on a line of their own.</string>
+    <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more) and plates after fields like “License plate”, two-row plates included. Other formats, such as German or Spanish, are only outlined, and only when nothing else is written around them, as on a car in a photo.</string>
     <string name="rule_desc_url">Only the path and query are masked; the domain stays.</string>
     <string name="rule_desc_ip">IPv4 and IPv6. Version numbers after “v” or “version” don\'t count.</string>
     <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives.</string>
