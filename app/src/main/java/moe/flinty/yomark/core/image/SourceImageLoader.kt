@@ -49,6 +49,7 @@ object SourceImageLoader {
             originalWidth = origW,
             originalHeight = origH,
             mimeType = mimeType,
+            original = OriginalFile(file, orientation, rawW, rawH),
         )
     }
 
@@ -114,7 +115,7 @@ object SourceImageLoader {
      * 把方向烘进像素。此后不再有旋转角这个概念——
      * ML Kit 虽然接受 rotation 参数，但统一坐标系比到处传角度省事得多。
      */
-    private fun applyOrientation(src: Bitmap, orientation: Int): Bitmap {
+    internal fun applyOrientation(src: Bitmap, orientation: Int): Bitmap {
         val m = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> m.setScale(-1f, 1f)
