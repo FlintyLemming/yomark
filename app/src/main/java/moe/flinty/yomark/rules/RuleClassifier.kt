@@ -118,7 +118,8 @@ class RuleClassifier(
      * 地址让给车牌，让给一个只圈出的车牌就是把打了码的降成只圈出。
      *
      * 那边只占了 [m] 的后半截（地址取到行尾，「地址：南京市玄武区中山路1号 车牌：苏A12345」）：截到它前面为止，
-     * 夹在中间的车牌字段名（「车牌：」「号牌号码 Plate No.」）和空格标点一起去掉。剩下不到两个字的，或者那边占了 [m] 的大半
+     * 夹在中间的车牌字段名（「车牌：」「号牌号码 Plate No.」）和空格标点一起去掉。别的字段名（「车辆：」「车位：」「Vehicle:」）
+     * 认不全，跟着冒号的、隔着空格或逗号的末一段（没有数字：「1号：」是地址）也当字段名去掉。剩下不到两个字的，或者那边占了 [m] 的大半
      * （「苏A12345D」像爱尔兰邮编），整个让掉；只圈出的、落在几行上的（上下两行的车牌）也整个让掉。
      */
     private fun yielded(rule: Rule, m: PageMatch, found: List<List<PageMatch>>, texts: List<String>): PageMatch? {
@@ -136,9 +137,17 @@ class RuleClassifier(
         if (2 * range.count { i -> !text[i].isWhitespace() && taken.any { i in it } } > solid) return null
         var end = cut
         while (true) {
+            val before = end
             while (end > range.first && (text[end - 1].isWhitespace() || text[end - 1] in TRAILING)) end--
-            val label = Plates.LABEL_AT_END.find(text.substring(range.first, end)) ?: break
-            end = range.first + label.range.first
+            val label = Plates.LABEL_AT_END.find(text.substring(range.first, end))
+            if (label != null) {
+                end = range.first + label.range.first
+                continue
+            }
+            if ((end until before).none { text[it] in COLONS }) break
+            val word = (end - 1 downTo range.first).firstOrNull { text[it].isWhitespace() || text[it] in WORD_BREAKS } ?: break
+            if ((word + 1 until end).any { text[it].isDigit() }) break
+            end = word + 1
         }
         if ((range.first until end).count { !text[it].isWhitespace() } <= 1) return null
         return m.copy(match = m.match.copy(range = range.first until end))
@@ -266,6 +275,12 @@ class RuleClassifier(
 
         /** 让开以后截短的一段末尾去掉的标点。 */
         private const val TRAILING = ",，、;；:：|｜/／·•.。-－–—"
+
+        /** 截短的一段末尾跟着它的，前面那一段是字段名（见 yielded）。 */
+        private const val COLONS = ":："
+
+        /** 字段名和前面的值之间：空格之外的（「12 Main Street, Vehicle:」）。 */
+        private const val WORD_BREAKS = ",，、;；|｜"
 
         /** 竖直方向重叠过这么多（按矮的那个框算）就是同一排。 */
         private const val SAME_ROW = 0.5f

@@ -287,6 +287,8 @@ object DefaultRuleSet {
      * - 值到行尾为止，或者后面隔着空格是下一个字段、电话；后面还连着字、跟着逗号的是一句话；
      * - 汉字名两三个字（复姓四个），头一个字是姓，不以「明天」「马上」这样的词打头（PersonNameRecognizer.startsLikeName），
      *   后面没有「了」「都」「很」这类句子里的字。带间隔点的少数民族名照收；
+     * - 字段名和值之间只隔着空格的，值不能整个是一个寻常词（PersonNameRecognizer.isOrdinaryWord）：车主 app 上的「车主 福利」
+     *   「车主 余额 120.00」「车主 车险」是并排的两个词。隔着冒号、英文译名的（「车主：高峰」「所有人 Owner 高峰」）是证件、表单，照收；
      * - 拉丁字母的名字要像证件上的拼音（[ROMANISED_NAME]）：「所有人 OK」不算。
      */
     private fun nameAfterCommonWord(line: String, r: IntRange): Boolean {
@@ -301,7 +303,12 @@ object DefaultRuleSet {
         if (v.any { it in HanNames.DOT_CHARS }) return true
         val name = v.filterNot { it.isWhitespace() }
         val max = if (PersonNameRecognizer.COMPOUND_SURNAMES.any { name.startsWith(it) }) 4 else 3
-        return name.length in 2..max && name.drop(1).none { it in HanNames.SENTENCE_CHARS } && PersonNameRecognizer.startsLikeName(name)
+        if (name.length !in 2..max || name.drop(1).any { it in HanNames.SENTENCE_CHARS } || !PersonNameRecognizer.startsLikeName(name)) {
+            return false
+        }
+        // 字段名都以汉字结尾：值前面紧挨着（隔着空格）的还是汉字，中间就只有空格
+        val spaceOnly = line.substring(0, r.first).trimEnd().lastOrNull()?.isHan() == true
+        return !spaceOnly || !PersonNameRecognizer.isOrdinaryWord(name)
     }
 
     /** 人名字段名领着的值：「姓名 张三」。下面一行的拼音由 [PinyinBelow] 从它往下接。 */
@@ -825,7 +832,6 @@ object DefaultRuleSet {
         ),
         NameAnchor(R.string.anchor_ticket, NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
         NameAnchor(R.string.anchor_english_field, NameAnchor.Reach.NEARBY, regexFinder(ENGLISH_PERSON_FIELDS, 1f)),
-        // 停车、违章、ETC 页上车牌旁边的是车主：「张三 苏A12345」
-        NameAnchor(R.string.anchor_plate, NameAnchor.Reach.NEARBY, PLATE),
+        // 车牌不当旁证：停车、ETC、违章页上挨着车牌的多是停车场、地名、店名（「苏A12345 汤山」「万象城 B2层」），猜出来也像人名
     )
 }

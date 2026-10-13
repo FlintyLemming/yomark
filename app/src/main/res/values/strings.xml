@@ -225,7 +225,6 @@
     <string name="anchor_field">a Chinese field like 收货人 or 乘车人</string>
     <string name="anchor_ticket">a ticket type</string>
     <string name="anchor_english_field">a field like “Passenger” or “Ship to”</string>
-    <string name="anchor_plate">a license plate</string>
     <string name="rule_desc_card">13 to 19 digits passing the Luhn check, plus the code after “CVV” and the month/year after “VALID THRU” on a card.</string>
     <string name="rule_desc_iban">Length and check digits verified per country.</string>
     <string name="rule_desc_ssn">US SSN like 123-45-6789; never-issued ranges don\'t count.</string>

@@ -228,9 +228,12 @@ internal object Plates {
 
     /**
      * 头一段读进了欧盟蓝条上的国别字母（[head] 是那一段打头的几个字母：「PAB」「FAB」）：连着字母是个词、单位（「SKU-123-CD」），
-     * 或者这一行写着货号、批号的，不是。
+     * 哪一段是颜色代号（「BLK-100-WH」），或者这一行写着货号、批号的，不是。
      */
-    fun gluedBandOk(text: String, head: String): Boolean = head !in WORDS && head !in UNITS && !CODE_CONTEXT.containsMatchIn(text)
+    fun gluedBandOk(text: String, head: String): Boolean =
+        head !in WORDS && head !in UNITS && text.split(NOT_LETTERS).none { it in COLOURS } && !CODE_CONTEXT.containsMatchIn(text)
+
+    private val NOT_LETTERS = Regex("[^A-Z]+")
 
     // ---------- 写法不够独特的：只认照片上孤零零的一行 ----------
 
@@ -513,8 +516,6 @@ class PlateShapes(private val confidence: Float) : Finder {
         Plates.DISTINCT.forEach { s ->
             s.findAll(text).forEach { m -> if (out.none { it.overlaps(m.range) }) out += m.range }
         }
-        // 照片上欧盟蓝条的国别字母和号码读成了一段：「PAB-123-CD」
-        if (out.isEmpty()) LonePlate.gluedBand(text)?.let { out += it }
         return out.sortedBy { it.first }.map { RuleMatch(it, confidence) }
     }
 }
@@ -546,13 +547,18 @@ class PlateLabel(private val confidence: Float) : Finder {
  *   「OE 1234 BCD」）、法国右边的省份号（「… 75」）、意大利的省份贴（「… RM」）。行首至多去掉两段、行尾至多去掉一段再对；
  * - 附近没有别的字：上下左右两个字高以内没有别的行，牌上的小字（州名、国别、「RUS」）不算。
  * 认了只圈出。
+ *
+ * 欧盟蓝条的国别字母粘在号码上、去掉它是写法独特的一种的（「PAB-123-CD」，见 [gluedBand]），也要孤零零一行才认，认了打码：
+ * 去掉头一个字母就像法国的牌，截图里、规格表里的型号多的是（「HDX-500-WH」「MSR-150-BK」「DHL-123-AB」）。
  */
 class LonePlate(private val confidence: Float) : PageFinder {
 
     override fun findOnPage(page: Page): List<PageMatch> = page.texts.indices.mapNotNull { i ->
-        val r = bodyOf(page.texts[i]) ?: return@mapNotNull null
+        val text = page.texts[i]
+        val glued = gluedBand(text)
+        val r = glued ?: bodyOf(text) ?: return@mapNotNull null
         if (!alone(page, i, listOf(i))) return@mapNotNull null
-        PageMatch(i, RuleMatch(r, confidence, outlineOnly = true))
+        PageMatch(i, RuleMatch(r, confidence, outlineOnly = glued == null))
     }
 
     companion object {
@@ -645,7 +651,7 @@ class LonePlate(private val confidence: Float) : PageFinder {
                 val small = b.height <= SMALL_PRINT * mainHeight && text.count { !it.isWhitespace() } <= SMALL_PRINT_CHARS
                 // 欧盟蓝条自成一行（「O D」「NL」）时和牌子一样高
                 val band = TOKEN.findAll(text).all { BAND.matches(it.value) }
-                !small && !band && bodyOf(text) == null && SHAPES.findIn(text).isEmpty()
+                !small && !band && bodyOf(text) == null && gluedBand(text) == null && SHAPES.findIn(text).isEmpty()
             }
         }
     }

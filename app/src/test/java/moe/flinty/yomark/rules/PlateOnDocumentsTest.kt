@@ -45,6 +45,28 @@ class PlateOnDocumentsTest {
             .containsExactly(POSTAL_ADDRESS to "12 Main Street", LICENSE_PLATE to "AB12 CDE")
     }
 
+    /**
+     * 车牌前面别的字段名（「车辆：」「车位：」「Vehicle:」）不在车牌的字段名里，以前截短的地址带着它：跟着冒号的末一段一起去掉。
+     * 「1号：」有数字，是地址的一截。
+     */
+    @Test fun `a field name before the plate is cut off with it`() = runTest {
+        mapOf(
+            "地址：南京市玄武区中山路1号 车辆：苏A12345" to "南京市玄武区中山路1号",
+            "地址：南京市玄武区中山路1号 车型：苏A12345" to "南京市玄武区中山路1号",
+            "地址：南京市玄武区中山路1号 登记车辆：苏A12345" to "南京市玄武区中山路1号",
+            "地址：南京市玄武区中山路1号 停车证号：苏A12345" to "南京市玄武区中山路1号",
+            "地址：南京市玄武区中山路1号 车位：苏A12345" to "南京市玄武区中山路1号",
+            "地址：南京市玄武区中山路1号：苏A12345" to "南京市玄武区中山路1号",
+        ).forEach { (line, address) ->
+            assertWithMessage(line).that(found(line)).containsExactly(POSTAL_ADDRESS to address, LICENSE_PLATE to "苏A12345")
+        }
+        assertThat(found("Address: 12 Main Street, Vehicle: AB12 CDE"))
+            .containsExactly(POSTAL_ADDRESS to "12 Main Street", LICENSE_PLATE to "AB12 CDE")
+        val placeholder = found("地址：N/A Plate: AB12 CDE")
+        assertThat(placeholder).contains(LICENSE_PLATE to "AB12 CDE")
+        assertThat(placeholder.filter { it.first == POSTAL_ADDRESS && "Plate" in it.second }).isEmpty()
+    }
+
     /** 截掉车牌以后只剩一个字的，或者车牌占了大半的（「苏A12345D」像爱尔兰邮编），地址整个让掉。 */
     @Test fun `an address that is mostly the plate yields`() = runTest {
         assertThat(found("住址 1 苏A12345")).containsExactly(LICENSE_PLATE to "苏A12345")
@@ -109,11 +131,42 @@ class PlateOnDocumentsTest {
 
     // ---------- 车主 ----------
 
-    /** 停车、违章页上的车主：「车主姓名」「车主」是字段名；车牌旁边从字面猜出的名字，车牌是旁证。 */
+    /** 停车、违章页上的车主：「车主姓名」「车主」是字段名。 */
     @Test fun `the owner next to a plate`() = runTest {
         assertThat(found("车主 张三 车牌 京A·D12345")).containsExactly(PERSON_NAME to "张三", LICENSE_PLATE to "京A·D12345")
         assertThat(found("车主姓名 张三 车牌号码 京AD12345")).containsExactly(PERSON_NAME to "张三", LICENSE_PLATE to "京AD12345")
-        assertThat(found("张三 苏A12345")).containsExactly(PERSON_NAME to "张三", LICENSE_PLATE to "苏A12345")
+        assertThat(found("车主：高峰")).containsExactly(PERSON_NAME to "高峰")
+        assertThat(found("所有人 Owner 高峰")).containsExactly(PERSON_NAME to "高峰")
+    }
+
+    /**
+     * 车牌不是人名的旁证：停车缴费、ETC、违章页上挨着车牌的是停车场、地名、店名，从字面猜也像人名（「万象城」「汤山」「杨国福」）。
+     * 以前车牌当旁证，这些全被当成车主打了码。没有字段名的「张三 苏A12345」也就只认车牌。
+     */
+    @Test fun `places next to a plate are not names`() = runTest {
+        assertThat(found("停车缴费", "苏A12345", "万象城 B2层", "入场时间 2024-05-01 10:00").filter { it.first == PERSON_NAME }).isEmpty()
+        assertThat(found("苏A12345", "汤山")).containsExactly(LICENSE_PLATE to "苏A12345")
+        listOf(
+            "苏A12345 白马湖", "苏A12345 程桥", "苏A12345 汤山", "苏A12345 万象城", "京A12345 周大福", "苏A12345 杨国福", "张三 苏A12345",
+        ).forEach { line ->
+            assertWithMessage(line).that(found(line).map { it.first }).containsExactly(LICENSE_PLATE)
+        }
+    }
+
+    /**
+     * 车主 app 上「车主」和后面的词只隔着空格、后面那个词是个寻常词（福利、权益、余额……）：并排的两个词，不是「车主 张三」。
+     * 「所有人」「负责人」也是这样。
+     */
+    @Test fun `car-app words after the owner label are not names`() = runTest {
+        listOf(
+            "车主 福利", "车主 权益", "车主 余额", "车主 钱包", "车主 商城", "车主 平台", "车主 保养", "车主 车险", "车主 金卡", "车主 任务",
+            "车主 安全", "车主 卫士", "车主 何时到", "车主 余额 120.00", "车主 权益 3", "车主 金卡 6折", "所有人 福利", "负责人 平台",
+        ).forEach { line ->
+            assertWithMessage(line).that(found(line).filter { it.first == PERSON_NAME }).isEmpty()
+        }
+        listOf("车主 张三" to "张三", "车主 张伟" to "张伟", "所有人 李明" to "李明").forEach { (line, name) ->
+            assertWithMessage(line).that(found(line)).containsExactly(PERSON_NAME to name)
+        }
     }
 
     /** 「车主」也是常用词：后面紧跟着字的、跟着一句话的，不是名字。 */

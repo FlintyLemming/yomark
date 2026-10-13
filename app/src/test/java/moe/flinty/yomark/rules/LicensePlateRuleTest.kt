@@ -133,12 +133,17 @@ class LicensePlateRuleTest {
     }
 
     /**
-     * 照片上欧盟蓝条的国别字母和号码读成了一段：「PAB-123-CD」（F 读成了 P）、「FAB-123-CD」。整行就是这块牌时去掉它再认；
-     * 一句话里的、连着字母是个词的（「SKU」）、不是国别字母打头的，不认。
+     * 照片上欧盟蓝条的国别字母和号码读成了一段：「PAB-123-CD」（F 读成了 P）、「FAB-123-CD」。一行里看不出它是不是照片上孤零零的一块牌，
+     * 一行一行地不认，见 LicensePlatePageTest；去掉头一个字母像法国牌的型号（「HDX-500-WH」「MSR-150-BK」）一行里也就不认。
      */
-    @Test fun `a band letter glued onto a plate on its own line`() {
-        assertFound(mapOf("PAB-123-CD" to "AB-123-CD", "FAB-123-CD" to "AB-123-CD", "DAB12 CDE" to "AB12 CDE"))
-        assertNothing(listOf("SKU-123-CD", "Order PAB-123-CD", "PAB-123-CD shipped", "XAB-123-CD"))
+    @Test fun `a band letter glued onto a plate is not found line by line`() {
+        assertNothing(
+            listOf(
+                "PAB-123-CD", "FAB-123-CD", "DAB12 CDE", "SKU-123-CD", "Order PAB-123-CD", "PAB-123-CD shipped", "XAB-123-CD",
+                "HDX-500-WH", "MSR-150-BK", "LFC-100-BK", "ABC-123-XY", "BLK-100-WH", "BUS 123 AB", "SIA 321 SQ", "DHL 123 DE",
+                "DHL-123-AB", "EMS 123 CN", "AMG 450 GT", "VIP 888 CN", "PSN 123 HK", "AXA 123 DE", "ABS 123 AB",
+            )
+        )
     }
 
     /** 两头是尺码、单位、机场、财年的；行里写着货号、批号的；小写的；校验字母不对的。 */
