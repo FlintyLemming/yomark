@@ -5,9 +5,11 @@ import android.graphics.PointF
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
+import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.debug.textUnder
 import moe.flinty.yomark.engine.RedactionEngine
@@ -94,6 +96,29 @@ class PlatesInTurnedPhotoTest {
         listOf(0.0, 30.0, 45.0).forEach { d ->
             assertWithMessage("转 $d°").that(plates(chat.textLines() + pasted(photo, d))).containsExactlyElementsIn(upright)
         }
+    }
+
+    /**
+     * 缩小了一半、拍歪了 8° 的照片上真 OCR 读出来的黄牌：「苏·E」的框歪 7.2°，「05863」的框只歪 4°。按「苏·E」的方向量，
+     * 两行的框咬住的多出门槛 0.1 个像素；按这一页的方向量就拼得上。短行的框方向不准，几个方向都试。
+     */
+    @Test fun `a two-row plate whose rows read at slightly different angles`() = runTest {
+        val rows = listOf(
+            "苏·E" to listOf(203.14865f, 894.1267f, 231.40619f, 897.7091f, 229.50806f, 913.1101f, 201.2505f, 909.5277f),
+            "05863" to listOf(184.44142f, 898.5595f, 252.97842f, 903.40906f, 250.8157f, 934.8488f, 182.2787f, 929.99927f),
+        ).map { (text, p) -> lineOn(text, Quad(PointF(p[0], p[1]), PointF(p[2], p[3]), PointF(p[4], p[5]), PointF(p[6], p[7]))) }
+        val small = chat.map { Row(it.text, 20f, 100f + chat.indexOf(it) * 35f, 20f) }
+        assertThat(plates(small.textLines() + rows)).containsExactly("苏·E / 05863" to true)
+    }
+
+    /** OCR 读出来的一行：框是 [quad]，每个字的框沿着它均匀排开。 */
+    private fun lineOn(text: String, quad: Quad): TextLine {
+        fun at(a: PointF, b: PointF, t: Float) = PointF(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t)
+        val els = text.indices.filter { text[it] != ' ' }.map { i ->
+            val (t0, t1) = i.toFloat() / text.length to (i + 1f) / text.length
+            TextElement(Quad(at(quad.p0, quad.p1, t0), at(quad.p0, quad.p1, t1), at(quad.p3, quad.p2, t1), at(quad.p3, quad.p2, t0)), text[i].toString(), i..i)
+        }
+        return TextLine(quad, text, 0.95f, els)
     }
 
     /** 照片上摞着的四块法国牌子，相隔 80 像素：合并之后还是四个框，每个框只盖一块。 */

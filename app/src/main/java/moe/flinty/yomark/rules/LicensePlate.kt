@@ -666,7 +666,7 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
     override fun findOnPage(page: Page): List<PageMatch> {
         val out = ArrayList<PageMatch>()
         val used = HashSet<Int>()
-        // 只看短行；框算一次：一页上百行，两两比的时候再算就是上万次。按转过的那一行的方向量的（见 refOf），每个方向各算一份
+        // 只看短行；框算一次：一页上百行，两两比的时候再算就是上万次。按转过的那一行的方向量的（见 refsOf），每个方向各算一份
         val ranges = page.texts.map { t -> trimmed(t)?.takeIf { compactLength(t) <= MAX_BOTTOM } }
         val inPage = ranges.mapIndexed { i, r -> r?.let { page.box(i, it) }?.takeIf { it.height > 0f } }
         val turned = HashMap<Int, List<Bounds?>>()
@@ -696,18 +696,16 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
     }
 
     /**
-     * 量 [top] 和它下面的 [j] 这一对按哪一行自己的阅读方向（截图里一张转过、拍歪了的车的照片，见 Page.boxIn）：
-     * 下一行转过的按下一行的——字大、长，框的方向读得准；上一行常只有两三个字，框时歪时正，照片歪了 10° 还读出过横平的框。
-     * 下一行没转过、上一行转过的按上一行的；都没转过的按这一页的（null）。
+     * 量 [top] 和它下面的 [j] 这一对按哪几个方向（截图里一张转过、拍歪了的车的照片，见 Page.boxIn），先到先试，哪个对得上算哪个：
+     * 下一行转过的按下一行自己的——字大、长，框的方向读得准些；上一行转过的按上一行的；最后按这一页的（null）。
+     * 短行的框方向时准时不准（照片歪了 10° 还读出过横平的框），差一两度，两行的框咬住多少就差过门槛。都没转过的只按这一页的。
      */
-    private fun refOf(page: Page, top: Int, j: Int): Int? = when {
-        page.isTurned(j) -> j
-        page.isTurned(top) -> top
-        else -> null
-    }
+    private fun refsOf(page: Page, top: Int, j: Int): List<Int?> =
+        if (!page.isTurned(j) && !page.isTurned(top)) IN_PAGE
+        else listOfNotNull(j.takeIf { page.isTurned(it) }, top.takeIf { page.isTurned(it) }) + IN_PAGE
 
     /**
-     * 紧贴在 [top] 下面的那一排：最近的一行，加上同一排左右挨着的几段（日本牌的假名），按从左到右排好；和量它们的方向（[refOf]）。
+     * 紧贴在 [top] 下面的那一排：最近的一行，加上同一排左右挨着的几段（日本牌的假名），按从左到右排好；和量它们的方向（[refsOf]）。
      * 没有，或者上一行不在它的横向范围里，给 null。[boxesIn] 给出按哪一行的方向量的各行的框。
      */
     private fun rowBelow(page: Page, boxesIn: (Int?) -> List<Bounds?>, top: Int, used: Set<Int>): Pair<List<Int>, Int?>? {
@@ -716,18 +714,20 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
         var ref: Int? = null
         for (j in page.texts.indices) {
             if (j == top || j in used) continue
-            val r = refOf(page, top, j)
-            val boxes = boxesIn(r)
-            val topBox = boxes[top] ?: continue
-            val b = boxes[j] ?: continue
-            if (b.centerY - topBox.centerY < 0.5f * min(b.height, topBox.height)) continue
-            val gap = b.top - topBox.bottom
-            if (gap > ROW_GAP * max(b.height, topBox.height) || gap < -OVERLAP * min(b.height, topBox.height)) continue
-            if (b.right <= topBox.left || b.left >= topBox.right) continue
-            if (first == null || gap < firstGap) {
-                first = j
-                firstGap = gap
-                ref = r
+            for (r in refsOf(page, top, j)) {
+                val boxes = boxesIn(r)
+                val topBox = boxes[top] ?: continue
+                val b = boxes[j] ?: continue
+                if (b.centerY - topBox.centerY < 0.5f * min(b.height, topBox.height)) continue
+                val gap = b.top - topBox.bottom
+                if (gap > ROW_GAP * max(b.height, topBox.height) || gap < -OVERLAP * min(b.height, topBox.height)) continue
+                if (b.right <= topBox.left || b.left >= topBox.right) continue
+                if (first == null || gap < firstGap) {
+                    first = j
+                    firstGap = gap
+                    ref = r
+                }
+                break
             }
         }
         if (first == null) return null
@@ -781,5 +781,8 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
 
         /** 同一排两段之间最宽隔几个字高。 */
         const val SIDE_GAP = 1.5f
+
+        /** 只按这一页的方向量（见 refsOf）。 */
+        val IN_PAGE: List<Int?> = listOf(null)
     }
 }
