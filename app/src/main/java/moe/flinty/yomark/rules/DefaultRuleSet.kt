@@ -204,20 +204,40 @@ object DefaultRuleSet {
     /** 物流轨迹里「签收人：」后面常见的非人名：「本人」「菜鸟驿站」「门卫」。 */
     private const val NOT_A_NAME_VALUE = "本人|他人|家人|同事|邻居|门卫|保安|前台|物业|收发室|快递柜|驿站|代收"
 
+    /** 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。 */
+    private const val NEXT_FIELD = "电话|手机|性别|性別|民族|出生|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名"
+
+    /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
+    private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""
+
+    /**
+     * 带间隔点的名字里的一个字：音译的名里没有地名、称呼的字。「签收人：菜鸟驿站·文三路店」「收件人 王先生.北京市朝阳区」
+     * 里的点不是名字的间隔点。
+     */
+    private const val DOTTED_NAME_CHAR = """(?:(?![省市区县镇乡村路街巷号楼室店]|先生|女士|小姐)$NAME_CHAR)"""
+
+    /** 复姓和名之间隔着空格：「欧阳 娜娜」。 */
+    private val COMPOUND_SURNAME_SPACED =
+        """(?:${PersonNameRecognizer.COMPOUND_SURNAMES.joinToString("|")}) $NAME_CHAR{1,2}(?![\u4e00-\u9fa5])"""
+
     /**
      * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
      *
-     * 三个分支对应三种排版：连写的汉字名、字距拉开后被空格隔开的名、拉丁名。
-     * 连写分支放在最前，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
-     * 逐字切分的行拼回来成了「张三手机」时，不把「手机」也吞进去。
+     * 六个分支对应六种排版：带间隔点的少数民族名（「阿依古丽·买买提」，点常被读成「•」「.」，两边还会多出空格）、复姓后面隔着空格的名
+     * （「欧阳 娜娜」）、连写的汉字名、字距拉开后被空格隔开的名（隔得不匀的「周 以宁」也算）、
+     * 证件上「姓, 名」的拼音（「ZHANG, SAN」「SMITH,JOHN」，姓全大写）、拉丁名。
+     * 连写分支在拆字分支前面，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
+     * 逐字切分的行拼回来成了「张三手机」「张三户主或与户主关系」时，不把后面的也吞进去。
      *
      * 值里含 NOT_A_NAME_VALUE 的词、或者紧跟着它们，整个值作废，而不是停在它们前面——
      * 否则「菜鸟驿站」会剩下「菜鸟」两个字被当成名字。
      */
     private val NAME_VALUE = Regex(
-        """(?:(?!电话|手机|性别|民族|出生|地址|住址|身份|证件|联系|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5]){2,6}""" +
-            """(?!$NOT_A_NAME_VALUE)""" +
-            """|[\u4e00-\u9fa5](?:[ ][\u4e00-\u9fa5]){1,5}""" +
+        """$DOTTED_NAME_CHAR{1,8}(?:(?: ?[·•・‧] ?|[.．])$DOTTED_NAME_CHAR{1,8}){1,3}(?!$NOT_A_NAME_VALUE)""" +
+            """|$COMPOUND_SURNAME_SPACED""" +
+            """|$NAME_CHAR{2,6}(?!$NOT_A_NAME_VALUE)""" +
+            """|$NAME_CHAR{1,2}(?: $NAME_CHAR{1,2}){1,4}""" +
+            """|[A-Z][A-Z'\-]* ?, ?[A-Z][A-Za-z.'\-]*(?:[ ][A-Z][A-Za-z.'\-]*){0,2}""" +
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
     )
 
@@ -226,7 +246,48 @@ object DefaultRuleSet {
         "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
         "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
         "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
+        // 户口簿、出生医学证明、结婚证，日本的在留卡、驾照
+        "户主姓名", "新生儿姓名", "母亲姓名", "父亲姓名", "配偶姓名", "氏名",
     )
+
+    /**
+     * 也是常用词的人名字段名：行驶证的「所有人 Owner」，营业执照的「法定代表人」「经营者」「投资人」「执行事务合伙人」，
+     * 结婚证的「持证人」，户口簿的「曾用名」，「监护人」。群聊里的「@所有人」「所有人都到了」「曾用名也要写吗」、
+     * 条文里的「经营者应当」「法定代表人签字」也是它们，所以后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），
+     * 值还要像个名字（[nameAfterCommonWord]），也不当旁证。
+     */
+    private val COMMON_WORD_NAME_LABELS =
+        listOf("所有人", "持证人", "法定代表人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名")
+
+    /** 句子里的字，名字里几乎没有。 */
+    private const val SENTENCE_CHARS = "的了是都也与或在我你他她它们这那吗呢吧啊呀哦嘛哈很没不就还要会"
+
+    /**
+     * 也是常用词的字段名后面的值。隔着空格、冒号的照样可能是一句话（「所有人：今晚八点开会，别迟到」
+     * 「经营者 注意了」「投资人 都很满意」「监护人 签字确认」「曾用名 没有」），所以：
+     * - 值到行尾为止，或者后面隔着空格是下一个字段、电话；后面还连着字、跟着逗号的是一句话；
+     * - 汉字名两三个字（复姓四个），头一个字是姓，不以「明天」「马上」这样的词打头（PersonNameRecognizer.startsLikeName），
+     *   后面没有「了」「都」「很」这类句子里的字。带间隔点的少数民族名照收；
+     * - 拉丁字母的名字要像证件上的拼音（[ROMANISED_NAME]）：「所有人 OK」不算。
+     */
+    private fun nameAfterCommonWord(line: String, r: IntRange): Boolean {
+        val rest = line.substring(r.last + 1)
+        if (rest.isNotBlank()) {
+            if (!rest.first().isWhitespace()) return false
+            val next = rest.trimStart()
+            if (!next.first().isDigit() && next.first() != '+' && !startsWithField(next)) return false
+        }
+        val v = line.substring(r)
+        if (v.none { it.isHan() }) return ROMANISED_NAME.matches(v)
+        if (v.any { it in "·•・.．‧" }) return true
+        val name = v.filterNot { it.isWhitespace() }
+        val max = if (PersonNameRecognizer.COMPOUND_SURNAMES.any { name.startsWith(it) }) 4 else 3
+        return name.length in 2..max && name.drop(1).none { it in SENTENCE_CHARS } && PersonNameRecognizer.startsLikeName(name)
+    }
+
+    /** 人名字段名领着的值：「姓名 张三」。下面一行的拼音由 [PinyinBelow] 从它往下接。 */
+    private val NAME_FIELD =
+        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f, nextField = ::startsWithField)
 
     /**
      * 跟在名字后面的称呼。认名字时拿它补全「赵」+「师傅」、放过「张三老师」「张老师好」（见 PersonNameRecognizer）；
@@ -254,17 +315,33 @@ object DefaultRuleSet {
      * 英文的两种（2026-10）：[EnglishNameCues] 是英文界面上自己说明「这是人」的写法（「Ship to:」「Hi David,」
      * 「Sarah Johnson <…@…>」），与字段名同一档；[EnglishNameGuess] 按名单从字面猜「Emily Carter」，
      * 与 HanLP 同一档，要旁证。调研与评测见 docs/english-recognition-research.md。
+     *
+     * 证件上的（2026-10，用户反馈身份证遮不全）：身份证人像面上字段名读坏了的那一行（[IdCardFront]），
+     * 毕业证、学位证正文里的「张三，男，……生」（[DiplomaName]），通行证上名字下面一行的拼音（[PinyinBelow]）。
      */
     private val NAME = CompositeRule(
         id = "name",
         kind = SensitiveKind.PERSON_NAME,
         enabledByDefault = true,
-        LabeledField(labels = NAME_LABELS, value = NAME_VALUE, confidence = 0.8f),
+        NAME_FIELD,
+        LabeledField(
+            labels = emptyList(),
+            value = NAME_VALUE,
+            confidence = 0.8f,
+            spaced = COMMON_WORD_NAME_LABELS,
+            nextField = ::startsWithField,
+            spacedValue = ::nameAfterCommonWord,
+        ),
+        PinyinBelow(NAME_FIELD, confidence = 0.8f),
         NameBeforePhone(PHONE, confidence = 0.7f),
         EnglishNameCues(confidence = 0.8f, weakConfidence = 0.7f),
         StackedField(StackedField.document(StackedField.NAME_LABELS), ::documentNameIn, confidence = 0.8f),
+        // 中国护照的「姓名/Name」下面两行：汉字名、拼音
+        StackedField(StackedField.document(StackedField.CHINESE_NAME_LABELS), ::chineseDocumentNameIn, confidence = 0.8f, maxLines = 2),
         StackedField(StackedField.header(StackedField.NAME_HEADER), ::formNameIn, confidence = 0.7f),
         MrzEcho(MrzEcho.What.NAME, confidence = 0.8f),
+        IdCardFront(IdCardFront.What.NAME, confidence = 0.8f),
+        DiplomaName(confidence = 0.8f),
         NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
         NeedsAnchor(EnglishNameGuess(confidence = 0.6f)),
     )
@@ -278,6 +355,21 @@ object DefaultRuleSet {
     private fun documentNameIn(cell: String): IntRange? =
         cell.indices.takeIf { DOCUMENT_NAME.matches(cell) && !cell.first().isLowerCase() }
 
+    /** 汉字名：两到八个字，可带间隔点，字间可隔空格。 */
+    private val HAN_NAME = Regex("""[\u4e00-\u9fa5](?: ?(?:[·•・.．‧] ?)?[\u4e00-\u9fa5]){1,7}""")
+
+    /**
+     * 「姓名/Name」下面的：汉字名、[ROMANISED_NAME] 的拼音（「ZHOU, YINING」），或者同一行先汉字后拼音。
+     * 双语表单上也是这个字段名（斜杠读丢了的「姓名 Name」更是），下面一行可能是下一个字段「电话/Phone」，
+     * 所以比 [documentNameIn] 严。
+     */
+    private fun chineseDocumentNameIn(cell: String): IntRange? {
+        val han = HAN_NAME.matchAt(cell, 0)?.range?.let { it.last + 1 } ?: 0
+        val rest = cell.substring(han).trim()
+        val ok = ROMANISED_NAME.matches(rest) || (han > 0 && (rest.isEmpty() || rest.all { it in 'A'..'Z' }))
+        return cell.indices.takeIf { ok }
+    }
+
     /** 表单上单独一行的「Name」「Customer」下面那个：与「Name: …」同一套值的形状，「Order Details」、品牌名不算。 */
     private fun formNameIn(cell: String): IntRange? =
         cell.indices.takeIf { EnglishNameCues.VALUE.matches(cell) && EnglishNameCues.looksLikeNameValue(cell) }
@@ -288,29 +380,90 @@ object DefaultRuleSet {
      *
      * 因此「收货地址 …… 电话 138……」会把电话一起遮掉。这是过遮，方向是安全的
      * （spec §13：多遮一块只是麻烦，漏遮一块是事故），何况电话本来也该遮。
+     *
+     * 开头不是标点：增值税发票上「地 址、电 话：」的「地 址」后面是「、电 话：」，不是地址。
      */
-    private val ADDRESS_VALUE = Regex("""\S.{2,58}\S""")
+    private val ADDRESS_VALUE = Regex("""[^\s/／|｜、，,。；;：:].{2,58}[^\s/／|｜]""")
+
+    private val ADDRESS_LABELS = listOf(
+        "收货地址", "收件地址", "寄件地址", "发货地址", "退货地址", "取件地址", "寄送地址",
+        "送货地址", "配送地址", "送达地址", "详细地址", "联系地址", "通讯地址", "家庭地址",
+        "居住地址", "户籍地址", "家庭住址", "现住址", "所在地区", "住址", "地址",
+        "配送至", "送货至", "送至", "寄至", "Address", "Ship to", "Deliver to",
+        // 户口簿、居住证；增值税发票的「地址、电话」
+        "现居住地址", "本市（县）其他住址", "本市(县)其他住址", "何时由何地迁来本市（县）", "何时由何地迁来本市(县)",
+        "何时由何地迁来本址", "地址、电话",
+    )
+
+    /**
+     * 也是常用词的地址字段名：营业执照（「住　　所」两端对齐）、户口簿、居住证，日本的在留卡、驾照。
+     * 合同条文里的「住所地人民法院」、聊天里的「居住地在北京」「户籍所在地在哪里呀」也是它们，
+     * 后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），值也不能以「是」「在」「不」这类字打头（[notASentence]）。
+     */
+    private val SPACED_ADDRESS_LABELS =
+        listOf("住所", "经营场所", "主要经营场所", "营业场所", "户籍所在地", "现居住地", "居住地", "住居地")
+
+    /**
+     * 句子接在字段名后面的头一个字：「出生地 不重要」「居住地 在北京」。地名不以它们打头；
+     * 「都」「来」「会」不在里面：都匀、来宾、会理是地名。
+     */
+    private const val SENTENCE_START = "是在不没也就还很要能把被给让跟到去说呢吗吧啊"
+
+    private fun notASentence(line: String, r: IntRange): Boolean = line[r.first] !in SENTENCE_START
+
+    /** 地址字段名后面那一段。证件上折到下一行的那几行由 [FollowingLines] 从它往下接。 */
+    private val ADDRESS_FIELD = LabeledField(
+        labels = ADDRESS_LABELS,
+        value = ADDRESS_VALUE,
+        confidence = 0.8f,
+        spaced = SPACED_ADDRESS_LABELS,
+        nextField = ::startsWithField,
+        spacedValue = ::notASentence,
+    )
+
+    /**
+     * 证件、表格上姓名、地址、出生日期以外的字段名。户口簿一行有好几个字段（「出生地 江苏省南京市 民族 汉」），
+     * 出生地遮到它们前面为止；住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
+     */
+    private val OTHER_FIELDS = listOf(
+        "公民身份号码", "身份证", "证件号", "证号", "号码", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期",
+        "档案编号", "准驾车型", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆", "发动机", "号牌",
+        "户号", "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
+        "经营范围", "成立日期", "注册资本", "类型", "名称", "营业期限", "电话", "手机", "邮编", "邮政编码", "备注",
+    )
+
+    /**
+     * 出生地：户口簿、出生医学证明、护照上常常只写一个省（「江苏」），比住址短。
+     * 出生医学证明上省市县之间隔着空格，表上还印着「省」「市」「县（区）」（「山东 省 青岛 市 黄岛 县（区）」），
+     * 一段一段接，到下一个字段名为止，至多八段。
+     * 「出生地是哪儿来着」「出生地呢？」是聊天：字段名后面要隔着空格、冒号或英文译名（同 [SPACED_ADDRESS_LABELS]）。
+     */
+    private val BIRTH_PLACE_FIELD = LabeledField(
+        labels = emptyList(),
+        value = Regex("""[^\s/／|｜、，,。；;：:]\S{1,29}(?: (?!${OTHER_FIELDS.joinToString("|")})\S{1,29}){0,7}"""),
+        confidence = 0.8f,
+        spaced = listOf("出生地点", "出生地"),
+        nextField = ::startsWithField,
+        spacedValue = ::notASentence,
+    )
 
     /**
      * 地址 = 字段名后面的值 + 长得像门牌的串。
      *
      * 后一种是真机漏检补的：菜鸟快递详情页只写「送至」，淘宝收货卡片什么都不写，
      * 驿站地址夹在一句通知中间。见 AddressShape；英文的门牌、城市州邮编、各国邮编见 EnglishAddressShape。
+     *
+     * 证件上的住址一行写不下，折到下面不带字段名的几行，见 FollowingLines；
+     * 身份证上「住址」读坏了的，按人像面的排版认，见 IdCardFront。
      */
     private val ADDRESS = CompositeRule(
         id = "address",
         kind = SensitiveKind.POSTAL_ADDRESS,
         enabledByDefault = true,
-        LabeledField(
-            labels = listOf(
-                "收货地址", "收件地址", "寄件地址", "发货地址", "退货地址", "取件地址", "寄送地址",
-                "送货地址", "配送地址", "送达地址", "详细地址", "联系地址", "通讯地址", "家庭地址",
-                "居住地址", "户籍地址", "家庭住址", "现住址", "所在地区", "住址", "地址",
-                "配送至", "送货至", "送至", "寄至", "Address", "Ship to", "Deliver to",
-            ),
-            value = ADDRESS_VALUE,
-            confidence = 0.8f,
-        ),
+        ADDRESS_FIELD,
+        FollowingLines(ADDRESS_FIELD, ::startsWithField, confidence = 0.8f),
+        BIRTH_PLACE_FIELD,
+        IdCardFront(IdCardFront.What.ADDRESS, confidence = 0.8f),
         StackedField(StackedField.document(StackedField.BIRTH_PLACE_LABELS), ::placeIn, confidence = 0.8f),
         StackedField(StackedField.header(StackedField.ADDRESS_HEADER), ::addressLineIn, confidence = 0.7f, maxLines = 4),
         AddressShape(confidence = 0.7f),
@@ -359,26 +512,42 @@ object DefaultRuleSet {
         ),
     )
 
+    private val BIRTH_DATE_LABELS = listOf(
+        "出生日期", "出生年月日", "出生年月", "出生时间", "出生", "生年月日", "生日",
+        "Date of birth", "Birth date", "Birthdate", "Birthday", "DOB", "D.O.B.", "Born",
+    )
+
+    /**
+     * 只写到月的生日：「1990年01月」「2002.03」「2002-03」。年要像年，月在 1 到 12；
+     * 后面再跟着数字、分隔符的是带日的写法或者别的编号，不算。
+     */
+    private const val YEAR_MONTH =
+        """(?:18|19|20)\d{2} *(?:年 *(?:0?[1-9]|1[0-2]) *月|[.．/\-](?:0?[1-9]|1[0-2]))(?![\d.．/\-])"""
+
     /**
      * 出生日期：字段名指明了的那个日期，误报少，默认打码；没有字段名的日期仍归日期时间，只圈出。
      *
-     * 三种认法：同一行的「出生日期：1990-01-01」「DOB 01/07/1973」「出生 1990年1月1日」（身份证）；
+     * 五种认法：同一行的「出生日期：1990-01-01」「DOB 01/07/1973」「出生 1990年1月1日」（身份证）；
      * 字段名在上、日期在下的护照资料页（「Date of birth」下面的「05 FEB 1965」）；机读码里的生日在页上别处出现
-     * （幽灵像旁边那行「05 02 65」）。前面写着字段名，日期可以写得随意些：两位年、空格分隔都认（Dates.LENIENT）。
+     * （幽灵像旁边那行「05 02 65」）；身份证号里的生日在页上别处出现（IdBirthEcho：「出生」读坏了的那一行也遮得上）；
+     * 毕业证、日本证件上没有字段名、后面跟着「生」的「一九九八年三月五日生」（BornOn）。
+     * 前面写着字段名，日期可以写得随意些：两位年、空格分隔、数字里夹空格、民国和年号纪年都认（Dates.LENIENT）；
+     * 后面不能紧跟着数字（「出生 202001011234」是一串编号），连写的八位要是日历上有的一天（「生日 20240230」不是）。
+     * 学生证、工作证、简历上只写到月的（「出生年月 1990年01月」「出生日期 2002.03」）另认，见 [YEAR_MONTH]。
      */
     private val BIRTH_DATE = CompositeRule(
         id = "birthdate",
         kind = SensitiveKind.BIRTH_DATE,
         enabledByDefault = true,
         LabeledField(
-            labels = listOf(
-                "出生日期", "出生年月日", "出生年月", "出生", "生日",
-                "Date of birth", "Birth date", "Birthdate", "Birthday", "DOB", "D.O.B.", "Born",
-            ),
-            value = Regex(Dates.LENIENT),
+            labels = BIRTH_DATE_LABELS,
+            value = Regex("""(?:${Dates.LENIENT})(?!\d)"""),
             confidence = 0.8f,
             ignoreCase = true,
+            nextField = ::startsWithField,
+            valid = { v -> !v.all(Char::isDigit) || Dates.readings(v).any { (y, m, d) -> Dates.isRealDate(y, m, d) } },
         ),
+        LabeledField(labels = listOf("出生年月", "出生日期"), value = Regex(YEAR_MONTH), confidence = 0.8f),
         StackedField(
             StackedField.document(StackedField.BIRTH_DATE_LABELS),
             value = Dates::findLenient,
@@ -386,7 +555,31 @@ object DefaultRuleSet {
             sameLine = true,
         ),
         MrzEcho(MrzEcho.What.BIRTH_DATE, confidence = 0.9f),
+        IdBirthEcho(confidence = 0.9f),
+        BornOn(confidence = 0.8f),
     )
+
+    /**
+     * 住址折行时，以字段名（OTHER_FIELDS，姓名、地址、出生日期的字段名，英文译名）打头的一行是下一个字段，
+     * 不是住址的下半截（见 FollowingLines）；同一排右边那一段以它打头，也不是左边那个字段的值（LabeledField 的 nextField）。
+     *
+     * 字段名后面紧跟着汉字的不算：「民族大道136号」「车辆段宿舍3号楼」「职业学院路」是路名，不是「民族」「车辆」「职业」。
+     * 后面是空格、冒号、数字（「公民身份号码330106…」）才是。字段名的字与字之间可以夹空格（「公民 身份号 码3…」）。
+     * 英文的照写法或者全大写：「Vin Diesel」不是「VIN」。
+     */
+    private val FIELD_START = run {
+        val all = (OTHER_FIELDS + NAME_LABELS + COMMON_WORD_NAME_LABELS + ADDRESS_LABELS + SPACED_ADDRESS_LABELS +
+            listOf("出生地点", "出生地") + BIRTH_DATE_LABELS + LabeledField.Translations.ALL)
+            .flatMap { if (it.any(Char::isLowerCase)) listOf(it, it.uppercase()) else listOf(it) }
+            .distinct().sortedByDescending { it.length }
+        fun spaced(fields: List<String>) = fields.joinToString("|") { f ->
+            f.filterNot { it == ' ' }.map { Regex.escape(it.toString()) }.joinToString("[ 　]*")
+        }
+        val (han, latin) = all.partition { it.last().isHan() || it.last() in "）)" }
+        Regex("""^[ 　]*(?:(?:${spaced(han)})(?![\u4e00-\u9fa5])|(?:${spaced(latin)})(?![A-Za-z]))""")
+    }
+
+    private fun startsWithField(line: String): Boolean = FIELD_START.containsMatchIn(line)
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
 

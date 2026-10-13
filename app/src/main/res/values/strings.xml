@@ -234,15 +234,15 @@
     <string name="rule_desc_idnumber">Chinese ID numbers checked by region, birth date and check digit, even with OCR spaces; numbers after fields like “证件号码”, “证号” or “ID No.”; the MRZ on exit-entry and Mainland travel permits, and its number wherever it\'s printed; Hong Kong (A123456(3)), Taiwan, Singapore, Korean and Malaysian IDs, Japanese residence cards and CPF.</string>
     <string name="rule_desc_vin">17-character VINs whose check digit matches, plus values after fields like “车辆识别代号”, “VIN” or “Engine No.”.</string>
     <string name="rule_desc_apikey">Long random strings starting with sk-, ghp_, AKIA, eyJ and the like.</string>
-    <string name="rule_desc_name">Names after fields like “Recipient”, “Name” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, and under “Surname” / “Given names” on IDs. Without a field name they are guessed and need evidence.</string>
-    <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to”; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs.</string>
+    <string name="rule_desc_name">Names after fields like “Recipient”, “Name” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, under “Surname” / “Given names” on IDs, the pinyin under a name on Chinese travel permits, on Chinese ID cards whose field names didn\'t scan, and in diploma sentences. Without a field name they are guessed and need evidence.</string>
+    <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to” and the lines it wraps onto; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs; addresses on Chinese ID cards whose field names didn\'t scan.</string>
     <string name="rule_desc_pickup">Codes after fields like “Pickup code”.</string>
     <string name="rule_desc_url">Only the path and query are masked; the domain stays.</string>
     <string name="rule_desc_ip">IPv4 and IPv6. Version numbers after “v” or “version” don\'t count.</string>
     <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives.</string>
     <string name="rule_desc_longnum">16+ digits matching no other kind, such as transaction or order numbers. No check digit, may be false positives.</string>
     <string name="rule_desc_datetime">Dates and times, including “Feb 5, 1965” and “05 FEB 1965”. Dates of birth are a separate kind.</string>
-    <string name="rule_desc_birthdate">Dates after or under fields like “Date of birth” or “DOB”, and the birth date from a passport MRZ.</string>
+    <string name="rule_desc_birthdate">Dates after or under fields like “Date of birth” or “DOB”, including year-month only, ROC and Japanese era years; dates matching the birth date in a passport MRZ or a Chinese ID number; dates followed by “生” on diplomas.</string>
 
     <!-- settings: faces / barcodes -->
     <string name="detect_mode">Mode</string>

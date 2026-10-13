@@ -20,6 +20,25 @@ data class Bounds(val left: Float, val top: Float, val right: Float, val bottom:
     val centerY: Float get() = (top + bottom) / 2
 }
 
+/**
+ * 第 [line] 行折下去的那一行：紧挨在它下面（空隙不到一个字高）、字高差不多，左沿在它左沿往左三个字高（首行缩进）
+ * 到往右一个字高之间。一句话写不下时，下半句就在这一行（「王小明，男，」下面的「2000年1月1日生。」）。没有就是 null。
+ */
+internal fun Page.wrapOf(line: Int): Int? {
+    val t = texts[line]
+    val s = t.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return null
+    val above = box(line, s..t.indexOfLast { !it.isWhitespace() })
+    val h = above.height
+    if (h <= 0f) return null
+    return texts.indices.filter { it != line && texts[it].isNotBlank() }
+        .map { it to box(it) }
+        .filter { (_, b) ->
+            b.top >= above.centerY && b.top - above.bottom <= h && kotlin.math.abs(b.height - h) <= 0.4f * h &&
+                b.left >= above.left - 3 * h && b.left <= above.left + h
+        }
+        .minByOrNull { (_, b) -> b.top }?.first
+}
+
 /** 一页上的一处：第 [line] 行（Page.texts 的下标）上的 [match]。 */
 data class PageMatch(val line: Int, val match: RuleMatch)
 

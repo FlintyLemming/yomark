@@ -116,6 +116,142 @@ class LabeledFieldRuleTest {
         assertThat(matched("address", "预计明天送至驿站")).isEmpty()
     }
 
+    // ---------- 证件 ----------
+
+    /** 证件上的字段名常带英文译名：跳过去取值，粘在一起、隔着斜杠、英文在前都一样。 */
+    @Test fun `a bilingual label is skipped to the value`() {
+        assertThat(matched("name", "姓名 Name 张三")).containsExactly("张三")
+        assertThat(matched("name", "姓名Name张三")).containsExactly("张三")
+        assertThat(matched("name", "姓名/Name SMITH, JOHN")).containsExactly("SMITH, JOHN")
+        assertThat(matched("name", "Name/姓名 张三")).containsExactly("张三")
+        assertThat(matched("name", "所有人 Owner 沈墨白")).containsExactly("沈墨白")
+        assertThat(matched("address", "住址 Address 江苏省南京市玄武区北京东路")).containsExactly("江苏省南京市玄武区北京东路")
+        assertThat(matched("birthdate", "出生日期 Date of Birth 1990-03-07")).containsExactly("1990-03-07")
+        assertThat(matched("birthdate", "出生日期/Date of Birth/DOB 1990.03.07")).containsExactly("1990.03.07")
+    }
+
+    /** 只跳认得的译名：值本身是拉丁字母的名字不能被当成译名跳过去。 */
+    @Test fun `a latin value is not skipped as a translation`() {
+        assertThat(matched("name", "姓名 ZHANG SAN")).containsExactly("ZHANG SAN")
+        assertThat(matched("name", "持证人 ZHANG, SAN")).containsExactly("ZHANG, SAN")
+    }
+
+    /** 字距拉开、两端对齐的字段名：营业执照的「住　　所」，没被认成逐字切分的「姓 名」。 */
+    @Test fun `spaces inside a chinese label`() {
+        assertThat(matched("address", "住　　所 浙江省杭州市西湖区三墩镇")).containsExactly("浙江省杭州市西湖区三墩镇")
+        assertThat(matched("name", "姓　名 欧阳娜娜")).containsExactly("欧阳娜娜")
+        assertThat(matched("name", "法定代表人 陈一鸣")).containsExactly("陈一鸣")
+    }
+
+    @Test fun `names with a middle dot and surname comma given`() {
+        assertThat(matched("name", "姓名 阿依古丽·买买提")).containsExactly("阿依古丽·买买提")
+        assertThat(matched("name", "姓名 阿依古丽•买买提 性别 女")).containsExactly("阿依古丽•买买提")
+        assertThat(matched("name", "Name: SMITH,JOHN")).containsExactly("SMITH,JOHN")
+    }
+
+    /** 户口簿：名字后面紧跟着下一个字段名（逐字切分拼回来时连在一起）。 */
+    @Test fun `a household register name stops at the next field`() {
+        assertThat(matched("name", "姓 名 张 三 户 主 或 与 户 主 关 系 户 主")).containsExactly("张 三")
+        assertThat(matched("name", "户主姓名 王五")).containsExactly("王五")
+        assertThat(matched("address", "本市（县）其他住址 南京市鼓楼区中山北路8号")).containsExactly("南京市鼓楼区中山北路8号")
+        assertThat(matched("address", "出生地 江苏省南京市 民族 汉")).containsExactly("江苏省南京市")
+    }
+
+    /** 也是常用词的字段名后面紧跟着字的是一句话。 */
+    @Test fun `common word labels need a gap before the value`() {
+        assertThat(matched("name", "所有人都到齐了吗")).isEmpty()
+        assertThat(matched("name", "@所有人 明天下午三点开会")).isEmpty()
+        assertThat(matched("name", "经营者应当依法纳税")).isEmpty()
+        assertThat(matched("name", "法定代表人签字")).isEmpty()
+    }
+
+    /** 也是常用词的字段名，后面是一个名字、到行尾或下一个字段为止的，照样认。 */
+    @Test fun `common word labels with a name after them`() {
+        assertThat(matched("name", "法定代表人：陈一鸣")).containsExactly("陈一鸣")
+        assertThat(matched("name", "监护人：张三")).containsExactly("张三")
+        assertThat(matched("name", "经营者：王五 13800138000")).containsExactly("王五")
+        assertThat(matched("name", "曾用名 张小三 性别 男")).containsExactly("张小三")
+        assertThat(matched("name", "投资人 欧阳娜娜")).containsExactly("欧阳娜娜")
+        assertThat(matched("name", "所有人 Owner ZHANG SAN")).containsExactly("ZHANG SAN")
+    }
+
+    /** 也是常用词的地址字段名后面要隔着空格、冒号。 */
+    @Test fun `common word address labels need a gap`() {
+        assertThat(matched("address", "住所：北京市朝阳区建国路88号")).containsExactly("北京市朝阳区建国路88号")
+        assertThat(matched("address", "现居住地：上海市浦东新区")).containsExactly("上海市浦东新区")
+        assertThat(matched("address", "户籍所在地 江苏省南京市鼓楼区")).containsExactly("江苏省南京市鼓楼区")
+        assertThat(matched("address", "出生地 江苏")).containsExactly("江苏")
+        assertThat(matched("address", "住所地人民法院管辖")).isEmpty()
+        assertThat(matched("address", "居住地在北京朝阳")).isEmpty()
+    }
+
+    /** 字段名和值之间隔着表格的竖线、斜杠：值从它后面起，竖线斜杠不遮。 */
+    @Test fun `a separator between label and value`() {
+        assertThat(matched("address", "收货地址 | 朝阳公园南门东侧小区")).containsExactly("朝阳公园南门东侧小区")
+        assertThat(matched("address", "地址 | 西溪湿地东区游客中心")).containsExactly("西溪湿地东区游客中心")
+        assertThat(matched("address", "| 地址 | 北京市朝阳区建国路88号 |")).containsExactly("北京市朝阳区建国路88号")
+        assertThat(matched("address", "地址/西溪湿地东区游客中心")).containsExactly("西溪湿地东区游客中心")
+        assertThat(matched("address", "收货地址：/")).isEmpty()
+    }
+
+    /** 增值税发票的「地 址、电 话：」：值从冒号后面起，不带上「、电 话：」。 */
+    @Test fun `the address and phone field of an invoice`() {
+        assertThat(matched("address", "地 址、电 话：杭州市西湖区文三路88号 0571-88888888"))
+            .containsExactly("杭州市西湖区文三路88号 0571-88888888")
+    }
+
+    /** 英文小字读错一个字母、「m」读成「rn」：照样跳过去。 */
+    @Test fun `a misread translation is still skipped`() {
+        assertThat(matched("name", "姓名 Narne 周以宁")).containsExactly("周以宁")
+        assertThat(matched("address", "住址 Adress 江苏省南京市玄武区北京东路")).containsExactly("江苏省南京市玄武区北京东路")
+        assertThat(matched("birthdate", "出生日期 Date of Brith 1986-02-14")).containsExactly("1986-02-14")
+    }
+
+    /** 认得出的译名：照写法、全大写、读错一个字母的长词、「m」读成「rn」的；名字不能被当成译名。 */
+    @Test fun `which english words are translations`() {
+        fun skipped(s: String) = LabeledField.Translations.skip(s, 0).let { (end, n) -> s.substring(0, end).trim().takeIf { n > 0 } }
+        assertThat(skipped("Surname 张")).isEqualTo("Surname")
+        assertThat(skipped("ID No. 123")).isEqualTo("ID No.")
+        assertThat(skipped("Plate No 浙A")).isEqualTo("Plate No")
+        assertThat(skipped("M&F 女")).isEqualTo("M&F")
+        assertThat(skipped("Date of Birth/DOB 1990")).isEqualTo("Date of Birth/DOB")
+        assertThat(skipped("Narne 周")).isEqualTo("Narne")
+        assertThat(skipped("Valid Periad 2018")).isEqualTo("Valid Periad")
+        listOf("Vin Diesel", "Id No", "Nana", "Bob", "Holden", "Owen", "Names", "ZHANG SAN").forEach {
+            assertThat(skipped(it)).isNull()
+        }
+    }
+
+    /** 缩写的译名只认大写：「Vin」是名字，不是 VIN。 */
+    @Test fun `an acronym translation only in capitals`() {
+        assertThat(matched("name", "姓名 Vin Diesel")).containsExactly("Vin Diesel")
+    }
+
+    /** 复姓和名之间隔着空格；间隔点两边隔着空格。 */
+    @Test fun `spaced compound surnames and middle dots`() {
+        assertThat(matched("name", "姓名：欧阳 娜娜")).containsExactly("欧阳 娜娜")
+        assertThat(matched("name", "姓名 阿依古丽 • 买买提")).containsExactly("阿依古丽 • 买买提")
+        assertThat(matched("name", "收货人 张三 已签收")).containsExactly("张三")
+    }
+
+    /** 点后面是店名、地名的不是间隔点。 */
+    @Test fun `a dot before a store or a place`() {
+        assertThat(matched("name", "签收人：菜鸟驿站·文三路店")).isEmpty()
+        assertThat(matched("name", "收件人 王先生.北京市朝阳区")).containsExactly("王先生")
+    }
+
+    /** 表单上没填的格子里是提示语。 */
+    @Test fun `a prompt is not a value`() {
+        assertThat(matched("name", "姓名：请输入真实姓名")).isEmpty()
+        assertThat(matched("address", "收货地址 请填写详细地址")).isEmpty()
+    }
+
+    /** 译名没读对（「Adress」）时值里会带着它，但不会只遮一个斜杠开头的英文字段名。 */
+    @Test fun `a value never starts with the slash of a label`() {
+        assertThat(matched("address", "出生地点/Place ofbirth")).isEmpty()
+        assertThat(matched("address", "住址/Adress")).isEmpty()
+    }
+
     // ---------- 出厂态 ----------
     @Test fun `both are registered with the right kinds and masked by default`() {
         val name = DefaultRuleSet.rules.first { it.id == "name" }
