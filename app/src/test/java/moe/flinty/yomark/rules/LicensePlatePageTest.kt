@@ -55,4 +55,13 @@ class LicensePlatePageTest {
         val de = page(Row(100f, 20f, Segment("Kennzeichen", 40f, 172f)), Row(128f, 24f, Segment("M AB 1234", 40f, 170f)))
         assertThat(found(de)).containsExactly(listOf("M AB 1234") to false)
     }
+
+    /**
+     * 照片转过来读，欧盟蓝条的国别字母粘在了号码上：法国的「PAB-123-CD」去掉它照样打码；它是一块牌子，不是「附近的字」，
+     * 下面那块德国的牌子（「BB MW 1234」，D 读成了 B）照样圈出。以前两块都丢了。
+     */
+    @Test fun `a band letter glued onto the plate`() {
+        val p = page(Row(100f, 64f, Segment("PAB-123-CD", 480f, 741f)), Row(250f, 66f, Segment("BB MW 1234", 204f, 468f)))
+        assertThat(found(p)).containsExactly(listOf("AB-123-CD") to false, listOf("BB MW 1234") to true)
+    }
 }

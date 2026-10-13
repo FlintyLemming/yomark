@@ -226,6 +226,12 @@ internal object Plates {
     private fun latinOk(text: String, m: MatchResult): Boolean =
         !CODE_CONTEXT.containsMatchIn(text.replaceRange(m.range, " ".repeat(m.value.length)))
 
+    /**
+     * 头一段读进了欧盟蓝条上的国别字母（[head] 是那一段打头的几个字母：「PAB」「FAB」）：连着字母是个词、单位（「SKU-123-CD」），
+     * 或者这一行写着货号、批号的，不是。
+     */
+    fun gluedBandOk(text: String, head: String): Boolean = head !in WORDS && head !in UNITS && !CODE_CONTEXT.containsMatchIn(text)
+
     // ---------- 写法不够独特的：只认照片上孤零零的一行 ----------
 
     /** 照片上孤零零一行才认、认了只圈出的写法（[LonePlate]）。整行对得上才算。 */
@@ -507,6 +513,8 @@ class PlateShapes(private val confidence: Float) : Finder {
         Plates.DISTINCT.forEach { s ->
             s.findAll(text).forEach { m -> if (out.none { it.overlaps(m.range) }) out += m.range }
         }
+        // 照片上欧盟蓝条的国别字母和号码读成了一段：「PAB-123-CD」
+        if (out.isEmpty()) LonePlate.gluedBand(text)?.let { out += it }
         return out.sortedBy { it.first }.map { RuleMatch(it, confidence) }
     }
 }
@@ -548,8 +556,20 @@ class LonePlate(private val confidence: Float) : PageFinder {
     }
 
     companion object {
-        /** 这一行去掉牌上的杂字以后，整段对得上 [Plates.ALONE] 的那一段。 */
-        internal fun bodyOf(text: String): IntRange? {
+        /** 这一行去掉牌上的杂字以后，整段对得上 [Plates.ALONE] 的那一段。国别字母粘在号码上的（见 [gluedBand]），去掉它再对。 */
+        internal fun bodyOf(text: String): IntRange? = body(text, Plates.ALONE, glued = false) ?: body(text, Plates.ALONE, glued = true)
+
+        /**
+         * 欧盟蓝条上的国别字母和号码读成了一段（「PAB-123-CD」「FAB-123-CD」，F 常读成 P）：头一段去掉打头那个字母，
+         * 整段对得上写法独特的一种（[Plates.DISTINCT]）的那一段。照片上的牌子自成一行，牌上没有的字不该在这一行里。
+         */
+        internal fun gluedBand(text: String): IntRange? = body(text, Plates.DISTINCT, glued = true)
+
+        /**
+         * 这一行去掉牌上的杂字（行首至多两段国别字母、星圈，行尾一段省份号），整段对得上 [shapes] 里一种的那一段。
+         * [glued]：剩下的头一段打头的那个字母是读进来的国别字母（[GLUED]），也去掉再对。
+         */
+        private fun body(text: String, shapes: List<PlateShape>, glued: Boolean): IntRange? {
             val tokens = TOKEN.findAll(text).map { it.range }.toList()
             if (tokens.isEmpty() || tokens.size > MAX_TOKENS) return null
             for (skip in 0..min(MAX_LEADING, tokens.size - 1)) {
@@ -560,13 +580,22 @@ class LonePlate(private val confidence: Float) : PageFinder {
                     var last = tokens[tokens.size - 1 - drop].last
                     while (first < last && (text[first] in JUNK || text[first].isWhitespace())) first++
                     while (last > first && (text[last] in JUNK || text[last].isWhitespace())) last--
-                    if (Plates.ALONE.any { it.matches(text.substring(first, last + 1)) }) return first..last
+                    if (glued) {
+                        if (text[first] !in GLUED || !text.getOrElse(first + 1) { ' ' }.isLetter()) continue
+                        val head = text.substring(first).takeWhile { it.isLetter() }
+                        if (!Plates.gluedBandOk(text, head)) continue
+                        first++
+                    }
+                    if (shapes.any { it.matches(text.substring(first, last + 1)) }) return first..last
                 }
             }
             return null
         }
 
         private val TOKEN = Regex("[^ ]+")
+
+        /** 读进了号码头一段的国别字母：[BAND] 里单个字母的那几个，星圈读成的 O。 */
+        private const val GLUED = "DFIEPBLAHSNMVO"
 
         /** 行首的国别字母、星圈、年检标：「D」「OF」「NL」「O」「:」。 */
         private val BAND = Regex(
@@ -594,23 +623,26 @@ class LonePlate(private val confidence: Float) : PageFinder {
          * [lines] 这几行（一块牌）附近有没有别的字。不算的：牌上的小字（比号码矮一截、字数不多）、自成一行的欧盟蓝条，
          * 别的车的牌子（停车场的照片上几块牌子挨着）。
          * 截图里单独一行的价钱、工单号、型号，上下总挨着标题、说明，过不了这一关。
+         *
+         * 按第 [ref] 行自己的阅读方向量（Page.boxIn）：截图里一张转过、拍歪了的车的照片，按整页的方向量「附近」「矮一截」全不对。
          */
-        internal fun alone(page: Page, main: Int, lines: List<Int>): Boolean {
-            val boxes = lines.map { page.box(it) }
+        internal fun alone(page: Page, main: Int, lines: List<Int>, ref: Int = main): Boolean {
+            val boxes = lines.map { page.boxIn(it, ref = ref) }
             val h = boxes.maxOf { it.height }
             if (h <= 0f) return false
             val left = boxes.minOf { it.left }
             val right = boxes.maxOf { it.right }
             val top = boxes.minOf { it.top }
             val bottom = boxes.maxOf { it.bottom }
+            val mainHeight = page.boxIn(main, ref = ref).height
             return page.texts.indices.none { j ->
                 val text = page.texts[j]
                 if (j in lines || text.isBlank()) return@none false
-                val b = page.box(j)
+                val b = page.boxIn(j, ref = ref)
                 val dx = max(0f, max(b.left - right, left - b.right))
                 val dy = max(0f, max(b.top - bottom, top - b.bottom))
                 if (dx > NEAR * h || dy > NEAR * h) return@none false
-                val small = b.height <= SMALL_PRINT * page.box(main).height && text.count { !it.isWhitespace() } <= SMALL_PRINT_CHARS
+                val small = b.height <= SMALL_PRINT * mainHeight && text.count { !it.isWhitespace() } <= SMALL_PRINT_CHARS
                 // 欧盟蓝条自成一行（「O D」「NL」）时和牌子一样高
                 val band = TOKEN.findAll(text).all { BAND.matches(it.value) }
                 !small && !band && bodyOf(text) == null && SHAPES.findIn(text).isEmpty()
@@ -634,19 +666,23 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
     override fun findOnPage(page: Page): List<PageMatch> {
         val out = ArrayList<PageMatch>()
         val used = HashSet<Int>()
-        // 只看短行；框算一次：一页上百行，两两比的时候再算就是上万次
+        // 只看短行；框算一次：一页上百行，两两比的时候再算就是上万次。按转过的那一行的方向量的（见 refOf），每个方向各算一份
         val ranges = page.texts.map { t -> trimmed(t)?.takeIf { compactLength(t) <= MAX_BOTTOM } }
-        val boxes = ranges.mapIndexed { i, r -> r?.let { page.box(i, it) }?.takeIf { it.height > 0f } }
+        val inPage = ranges.mapIndexed { i, r -> r?.let { page.box(i, it) }?.takeIf { it.height > 0f } }
+        val turned = HashMap<Int, List<Bounds?>>()
+        val boxesIn = { ref: Int? ->
+            if (ref == null) inPage
+            else turned.getOrPut(ref) { ranges.mapIndexed { i, r -> r?.let { page.boxIn(i, it, ref) }?.takeIf { it.height > 0f } } }
+        }
         for (top in page.texts.indices) {
             if (top in used) continue
             val topRange = ranges[top] ?: continue
             if (compactLength(page.texts[top]) !in 2..MAX_TOP) continue
-            val topBox = boxes[top] ?: continue
-            val row = rowBelow(boxes, top, topBox, used) ?: continue
+            val (row, ref) = rowBelow(page, boxesIn, top, used) ?: continue
             val joined = (listOf(top) + row).joinToString(" ") { page.texts[it].substring(ranges[it]!!) }
             val strong = Plates.TWO_ROW.any { it.matches(joined) } || Plates.DISTINCT.any { it.matches(joined) }
             val loose = !strong && (Plates.TWO_ROW_LOOSE.any { it.matches(joined) } || Plates.ALONE.any { it.matches(joined) }) &&
-                LonePlate.alone(page, row.first(), listOf(top) + row)
+                LonePlate.alone(page, row.first(), listOf(top) + row, ref ?: top)
             if (!strong && !loose) continue
             out += PageMatch(
                 top,
@@ -660,25 +696,44 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
     }
 
     /**
-     * 紧贴在 [top] 下面的那一排：最近的一行，加上同一排左右挨着的几段（日本牌的假名），按从左到右排好。
-     * 没有，或者上一行不在它的横向范围里，给 null。
+     * 量 [top] 和它下面的 [j] 这一对按哪一行自己的阅读方向（截图里一张转过、拍歪了的车的照片，见 Page.boxIn）：
+     * 下一行转过的按下一行的——字大、长，框的方向读得准；上一行常只有两三个字，框时歪时正，照片歪了 10° 还读出过横平的框。
+     * 下一行没转过、上一行转过的按上一行的；都没转过的按这一页的（null）。
      */
-    private fun rowBelow(boxes: List<Bounds?>, top: Int, topBox: Bounds, used: Set<Int>): List<Int>? {
+    private fun refOf(page: Page, top: Int, j: Int): Int? = when {
+        page.isTurned(j) -> j
+        page.isTurned(top) -> top
+        else -> null
+    }
+
+    /**
+     * 紧贴在 [top] 下面的那一排：最近的一行，加上同一排左右挨着的几段（日本牌的假名），按从左到右排好；和量它们的方向（[refOf]）。
+     * 没有，或者上一行不在它的横向范围里，给 null。[boxesIn] 给出按哪一行的方向量的各行的框。
+     */
+    private fun rowBelow(page: Page, boxesIn: (Int?) -> List<Bounds?>, top: Int, used: Set<Int>): Pair<List<Int>, Int?>? {
         var first: Int? = null
-        var firstBox: Bounds? = null
-        for (j in boxes.indices) {
+        var firstGap = 0f
+        var ref: Int? = null
+        for (j in page.texts.indices) {
             if (j == top || j in used) continue
+            val r = refOf(page, top, j)
+            val boxes = boxesIn(r)
+            val topBox = boxes[top] ?: continue
             val b = boxes[j] ?: continue
             if (b.centerY - topBox.centerY < 0.5f * min(b.height, topBox.height)) continue
             val gap = b.top - topBox.bottom
             if (gap > ROW_GAP * max(b.height, topBox.height) || gap < -OVERLAP * min(b.height, topBox.height)) continue
             if (b.right <= topBox.left || b.left >= topBox.right) continue
-            if (firstBox == null || b.top < firstBox.top) {
+            if (first == null || gap < firstGap) {
                 first = j
-                firstBox = b
+                firstGap = gap
+                ref = r
             }
         }
-        if (first == null || firstBox == null) return null
+        if (first == null) return null
+        val boxes = boxesIn(ref)
+        val topBox = boxes[top]!!
+        val firstBox = boxes[first]!!
         // 同一排挨着的几段；中线比上一行的中线低一截的才算这一排，不把上一行的另一段拉进来
         val row = mutableListOf(first)
         var left = firstBox.left
@@ -701,7 +756,7 @@ class TwoRowPlate(private val confidence: Float) : PageFinder {
         val slack = 0.5f * firstBox.height
         if (topBox.centerX < left - slack || topBox.centerX > right + slack) return null
         if (topBox.right - topBox.left > 1.5f * (right - left) + firstBox.height) return null
-        return row.sortedBy { boxes[it]!!.left }
+        return row.sortedBy { boxes[it]!!.left } to ref
     }
 
     private fun trimmed(text: String): IntRange? {

@@ -6,11 +6,27 @@ package moe.flinty.yomark.rules
  * RuleClassifier 从 OCR 的行拼出它（只收置信度够的行）。规则不直接拿 TextLine，是为了不碰 android.graphics：
  * 评测台（tools/model-eval/ocr-dump）在桌面 JVM 上跑同一套规则。
  *
+ * @param turned 自己的阅读方向和这一页的差得多的那几行（截图里一张转过、拍歪了的小照片上的字，字少，RuleClassifier 不单分一组）：
+ *   第几行 → 按那一行自己的方向怎么量，同 [locate]。见 [boxIn]。
  * @param locate 第 line 行 range 那几个字的外接框。精度随识别器：PP-OCR 到字，ML Kit 到词。
  */
-class Page(val texts: List<String>, private val locate: (line: Int, range: IntRange) -> Bounds) {
+class Page(
+    val texts: List<String>,
+    private val turned: Map<Int, (line: Int, range: IntRange) -> Bounds> = emptyMap(),
+    private val locate: (line: Int, range: IntRange) -> Bounds,
+) {
 
     fun box(line: Int, range: IntRange = texts[line].indices): Bounds = locate(line, range)
+
+    /** 第 [ref] 行自己的阅读方向和这一页的不一样（见 [boxIn]）。 */
+    fun isTurned(ref: Int): Boolean = ref in turned
+
+    /**
+     * 按第 [ref] 行自己的阅读方向量的框：照片上的「下面一行」「旁边」按照片上的字的方向看，按整页的方向看全对不上。
+     * 只看一小块地方的认法（上下两行的车牌、孤零零一行的车牌）拿它量。[ref] 的方向同这一页的，就是 [box]。
+     */
+    fun boxIn(line: Int, range: IntRange = texts[line].indices, ref: Int): Bounds =
+        turned[ref]?.invoke(line, range) ?: locate(line, range)
 }
 
 /** 图上一个横平竖直的框，像素坐标。 */

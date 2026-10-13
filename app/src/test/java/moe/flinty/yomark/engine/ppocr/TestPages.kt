@@ -30,6 +30,24 @@ internal object TestPages {
      */
     fun screenshotWithCard(cardDegrees: Int): Bitmap = withCard(cardDegrees, Rect(0, 0, 1080, 1500), 1540)
 
+    /**
+     * 一整页正着的物流页下面贴着一张缩到 [scale]、顺时针转了 [photoDegrees] 度的车的照片（plate-photo.jpg），左沿在 [left]：
+     * 同聊天截图里发了一张拍歪了的车的照片，照片上的字少，不单分一组。
+     */
+    fun screenshotWithPlatePhoto(photoDegrees: Float, scale: Float, left: Float): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val photo = res("/ppocr/plate-photo.jpg")
+        val small = Bitmap.createScaledBitmap(photo, (photo.width * scale).toInt(), (photo.height * scale).toInt(), true)
+        val turned = Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(photoDegrees) }, true)
+        val out = Bitmap.createBitmap(1080, 1520 + turned.height + 40, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(page, Rect(0, 0, 1080, 1500), Rect(0, 0, 1080, 1500), null)
+            drawBitmap(turned, left, 1520f, null)
+        }
+        return out
+    }
+
     /** 物流页上剪下 [from] 那一块贴在页顶，下面 [cardTop] 处居中贴一张顺时针转了 [cardDegrees] 的身份证人像面。 */
     private fun withCard(cardDegrees: Int, from: Rect, cardTop: Int): Bitmap {
         val page = res("/ppocr/logistics-page.png")

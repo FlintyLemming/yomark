@@ -72,6 +72,9 @@ class ReadingFrame private constructor(val degrees: Float) {
         return RectF(left, top, right, bottom)
     }
 
+    /** 和 [other] 的阅读方向差几度，0..180。 */
+    fun angleTo(other: ReadingFrame): Float = diff(degrees.toDouble(), other.degrees.toDouble()).toFloat()
+
     /** [bounds] 反过来：阅读方向上的一个框转回图上，角按阅读方向排（左上、右上、右下、左下）。 */
     fun toImage(r: RectF): Quad = Quad(back(r.left, r.top), back(r.right, r.top), back(r.right, r.bottom), back(r.left, r.bottom))
 
@@ -88,8 +91,14 @@ class ReadingFrame private constructor(val degrees: Float) {
         val UPRIGHT = ReadingFrame(0f)
 
         /** 一组行（各行的 quad）的阅读方向。离横平竖直不到 [SNAP] 度的取整：正着的截图一个像素都不转。 */
-        fun of(quads: List<Quad>): ReadingFrame {
-            val d = direction(quads) ?: return UPRIGHT
+        fun of(quads: List<Quad>): ReadingFrame = direction(quads)?.let { at(it) } ?: UPRIGHT
+
+        /** 朝 [degrees] 读的（同 [ReadingFrame.degrees]，候选带着的 Candidate.readingDegrees）。取整同 [of]。 */
+        fun at(degrees: Float): ReadingFrame {
+            // 归到 (−180, 180]
+            var d = degrees % 360f
+            if (d > 180f) d -= 360f
+            if (d <= -180f) d += 360f
             val k = (d / 90).roundToInt()
             if (abs(d - k * 90) < SNAP) return when (Math.floorMod(k, 4)) {
                 0 -> UPRIGHT

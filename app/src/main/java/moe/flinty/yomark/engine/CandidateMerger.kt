@@ -17,7 +17,8 @@ import kotlin.math.min
  * 3. 按面积降序输出，让 UI 先渲染大块。
  *
  * 「水平」「行高」按页面的阅读方向算（[ReadingFrame]）：竖着拍的页上一行字在图上是竖的，
- * 按图上的横竖算，上下两行地址会被当成同一行拼成一大块。
+ * 按图上的横竖算，上下两行地址会被当成同一行拼成一大块。候选自己带着方向的（Candidate.readingDegrees：
+ * 截图里一张转过的证件照、车牌照上的）按它自己的方向量，也只和同一个方向的合并。
  */
 class CandidateMerger(
     private val iouThreshold: Float = 0.6f,
@@ -89,9 +90,11 @@ class CandidateMerger(
         return out
     }
 
-    private fun canJoin(a: Candidate, b: Candidate, frame: ReadingFrame): Boolean {
+    private fun canJoin(a: Candidate, b: Candidate, page: ReadingFrame): Boolean {
         if (a.kind != b.kind) return false
         if (a.source in REGION_SOURCES || b.source in REGION_SOURCES) return false  // 人脸/条码不参与合并
+        // 方向不同的只在叠在一起时合并：斜着的水印那一行里又读出一遍的名字，和证件上那个是同一处
+        val frame = shared(a, b, page) ?: return a.quad.iou(b.quad) > 0f
         val ra = frame.bounds(a.quad)
         val rb = frame.bounds(b.quad)
         val lineHeight = max(ra.height(), rb.height())
@@ -101,8 +104,9 @@ class CandidateMerger(
         return gap < lineHeight * gapRatio
     }
 
-    /** 两个框在阅读方向上的外接框；正着的页就是图上的外接矩形。 */
-    private fun join(a: Candidate, b: Candidate, frame: ReadingFrame): Candidate {
+    /** 两个框在阅读方向上的外接框（方向不同的按整页的）；正着的页就是图上的外接矩形。 */
+    private fun join(a: Candidate, b: Candidate, page: ReadingFrame): Candidate {
+        val frame = shared(a, b, page) ?: page
         val r = RectF(frame.bounds(a.quad)).apply { union(frame.bounds(b.quad)) }
         return a.copy(
             id = "${a.id}+${b.id}",
@@ -113,6 +117,15 @@ class CandidateMerger(
         )
     }
 
+    /** 两个候选同一个方向时按哪个方向量：自己带着方向的按它的，没带的按整页的。方向不同为 null。 */
+    private fun shared(a: Candidate, b: Candidate, page: ReadingFrame): ReadingFrame? {
+        val frame = frameOf(a, page)
+        return frame.takeIf { it.angleTo(frameOf(b, page)) <= SAME_DIRECTION }
+    }
+
+    private fun frameOf(c: Candidate, page: ReadingFrame): ReadingFrame =
+        c.readingDegrees?.takeIf { it != page.degrees }?.let { ReadingFrame.at(it) } ?: page
+
     private fun priority(source: DetectorSource): Int = when (source) {
         DetectorSource.RULE, DetectorSource.FACE, DetectorSource.BARCODE, DetectorSource.MANUAL -> 0
         DetectorSource.ENTITY_MODEL -> 1
@@ -121,5 +134,8 @@ class CandidateMerger(
 
     private companion object {
         val REGION_SOURCES = setOf(DetectorSource.FACE, DetectorSource.BARCODE)
+
+        /** 两个候选的方向差不过这么多度，算同一个方向（同 RuleClassifier 里一行算不算转过的口径）。 */
+        const val SAME_DIRECTION = 5f
     }
 }

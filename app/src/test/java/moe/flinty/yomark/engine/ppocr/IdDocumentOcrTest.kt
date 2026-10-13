@@ -18,6 +18,8 @@ import moe.flinty.yomark.core.model.SensitiveKind.PERSON_NAME
 import moe.flinty.yomark.core.model.SensitiveKind.POSTAL_ADDRESS
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.engine.CandidateMerger
+import moe.flinty.yomark.engine.RedactionEngine
+import moe.flinty.yomark.engine.TextRecognizer
 import moe.flinty.yomark.rules.DefaultRuleSet
 import moe.flinty.yomark.rules.RuleClassifier
 import org.junit.Test
@@ -175,6 +177,28 @@ class IdDocumentOcrTest {
             val lines = read("screenshot-card@$d") { TestPages.screenshotWithCard(d) }
             val masked = masked(lines)
             ID_CARD.forEach { (kind, text) -> assertWithMessage("转 $d° $kind $text").that(covered(lines, masked, kind, text)).isTrue() }
+        }
+    }
+
+    /**
+     * 同一张截图走一遍识别引擎：合并也按证件自己的方向量。以前合并按整页的方向，证件上上下两行住址在图上是左右挨着的两个竖条，
+     * 拼成了一个框（盖住两行中间的空白，也少了一个能单独点开的框）。
+     */
+    @Test fun `the address lines of a card turned inside a screenshot stay apart after merging`() {
+        listOf(90, 270).forEach { d ->
+            val lines = read("screenshot-card@$d") { TestPages.screenshotWithCard(d) }
+            val ocr = object : TextRecognizer {
+                override val id = "cached"
+                override suspend fun recognize(image: SourceImage) = lines
+            }
+            val blank = SourceImage(Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888), 1f, 1, 1, "image/png")
+            val merged = runBlocking { RedactionEngine(ocr, emptyList(), listOf(RuleClassifier(DefaultRuleSet.rules))).analyze(blank) }
+                .candidates.filter { it.kind == POSTAL_ADDRESS }
+            val first = merged.filter { covered(lines, listOf(it), POSTAL_ADDRESS, "浙江省杭州市西湖区文三路") }
+            val second = merged.filter { covered(lines, listOf(it), POSTAL_ADDRESS, "88号6幢2单元501室") }
+            assertWithMessage("转 $d°").that(first).hasSize(1)
+            assertWithMessage("转 $d°").that(second).hasSize(1)
+            assertWithMessage("转 $d°").that(first.single()).isNotEqualTo(second.single())
         }
     }
 

@@ -61,17 +61,23 @@ class RuleClassifier(
     override suspend fun classify(lines: List<TextLine>): List<Candidate> = withContext(Dispatchers.Default) {
         val kept = lines.indices.filter { lines[it].confidence >= minLineConfidence }
         // 按行排回去，同一行里按规则表的先后：与逐行跑规则时的出法一样
-        orientationGroups(lines, kept).flatMap { classifyGroup(lines, it) }.sortedBy { it.first }.map { it.second }
+        groups(lines, kept).flatMap { classifyGroup(lines, it) }.sortedBy { it.first }.map { it.second }
     }
 
     /**
-     * 一页上的一组行（[kept]，lines 的下标）当一页认。规则按「下面 = +y」认版面：竖着、倒着拍的页先转到阅读方向上再取框
+     * 一页上的一组行当一页认。规则按「下面 = +y」认版面：竖着、倒着拍的页先转到阅读方向上再取框
      * （正着的页原样）。候选的 quad 仍是图上的。给回（行号, 候选）。
      */
-    private fun classifyGroup(lines: List<TextLine>, kept: List<Int>): List<Pair<Int, Candidate>> {
-        val frame = ReadingFrame.of(kept.map { lines[it].quad })
-        // 全角数字（台湾证件上的「民國７９年１月１日」）逐字换成半角：下标不变，规则不用各认一遍
-        val page = Page(kept.map { halfWidthDigits(lines[it].text) }) { i, range -> frame.bounds(lines[kept[i]].quadForRange(range)).toBounds() }
+    private fun classifyGroup(lines: List<TextLine>, group: Group): List<Pair<Int, Candidate>> {
+        val kept = group.kept
+        val frame = group.frame
+        fun measure(f: ReadingFrame) = { i: Int, range: IntRange -> f.bounds(lines[kept[i]].quadForRange(range)).toBounds() }
+        val page = Page(
+            // 全角数字（台湾证件上的「民國７９年１月１日」）逐字换成半角：下标不变，规则不用各认一遍
+            texts = kept.map { halfWidthDigits(lines[it].text) },
+            turned = group.own.withIndex().filter { it.value !== frame }.associate { (i, f) -> i to measure(f) },
+            locate = measure(frame),
+        )
         // 单条规则出错不能拖垮整次判定
         val found = rules.map { rule -> runCatching { rule.findOnPage(page) }.getOrElse { emptyList() } }
 
@@ -98,36 +104,12 @@ class RuleClassifier(
                     confidence = m.confidence,
                     // 有旁证的猜测照规则的设置打码；没有旁证、又被设置留下来的只圈出
                     enabledByDefault = rule.enabledByDefault && anchored && !m.outlineOnly,
+                    // 落在几行上的按头一行的方向
+                    readingDegrees = group.own[pm.line].degrees,
                 )
             }
         }
         return out
-    }
-
-    /**
-     * 一页上走向不同的几组字各当一页认：聊天截图里一张转了九十度、倒着放的证件照，聊天的字横着，证件的字竖着、倒着，
-     * 整页只有一个阅读方向的话，证件上「下一行」「右边一栏」全对不上。行的阅读方向（quad 的 p0→p1）离哪个直角不到
-     * [QUARTER] 度就归哪个直角；最长的那组之外，至少 [GROUP_LINES] 行、占总长 [GROUP_SHARE] 的才单独成组，
-     * 斜着的水印、零星几行竖排的字归最长的那组。只有一组就是整页，同以前一样。
-     */
-    private fun orientationGroups(lines: List<TextLine>, kept: List<Int>): List<List<Int>> {
-        val length = kept.associateWith { lines[it].quad.let { q -> hypot(q.p1.x - q.p0.x, q.p1.y - q.p0.y).toDouble() } }
-        val quarter = kept.associateWith { quarterOf(lines[it].quad) }
-        val total = length.values.sum()
-        val byQuarter = kept.filter { quarter[it] != null }.groupBy { quarter[it]!! }
-        val main = byQuarter.maxByOrNull { (_, group) -> group.sumOf { length.getValue(it) } }?.key ?: return listOf(kept)
-        val apart = byQuarter.filter { (q, group) ->
-            q != main && group.size >= GROUP_LINES && group.sumOf { length.getValue(it) } >= GROUP_SHARE * total
-        }.keys
-        if (apart.isEmpty()) return listOf(kept)
-        return listOf(kept.filter { quarter[it] !in apart }) + apart.map { q -> kept.filter { quarter[it] == q } }
-    }
-
-    /** 一行的阅读方向离哪个直角不到 [QUARTER] 度：0 朝右、1 朝下、2 朝左、3 朝上；都差得远（斜着的）为 null。 */
-    private fun quarterOf(q: Quad): Int? {
-        val d = Math.toDegrees(atan2((q.p1.y - q.p0.y).toDouble(), (q.p1.x - q.p0.x).toDouble()))
-        val k = (d / 90).roundToInt()
-        return if (abs(d - k * 90) <= QUARTER) Math.floorMod(k, 4) else null
     }
 
     /**
@@ -223,8 +205,67 @@ class RuleClassifier(
         }
     }
 
+    /**
+     * 一组行当一页认：[kept] 是 lines 的下标，[frame] 是这一组的阅读方向，[own] 与 [kept] 对齐、是每一行按哪个方向量：
+     * 一般就是 [frame]；自己的方向和它差 [TURNED] 度以上的（截图里一张转过、拍歪了的小照片上的字，不够单分一组）是它自己的。
+     */
+    private class Group(val kept: List<Int>, val frame: ReadingFrame, val own: List<ReadingFrame>)
+
     companion object {
         const val MIN_LINE_CONFIDENCE = 0.5f
+
+        /**
+         * 每一行按哪个阅读方向认（度，同 ReadingFrame.degrees），分法同 classify；置信度不到 [minLineConfidence] 的行为 null。
+         * 别的判定器（Gemini Nano）的候选也带上它，合并时才同规则的候选一样按各自的方向量（Candidate.readingDegrees）。
+         */
+        fun readingDegrees(lines: List<TextLine>, minLineConfidence: Float = MIN_LINE_CONFIDENCE): List<Float?> {
+            val out = arrayOfNulls<Float>(lines.size)
+            groups(lines, lines.indices.filter { lines[it].confidence >= minLineConfidence }).forEach { g ->
+                g.kept.forEachIndexed { k, i -> out[i] = g.own[k].degrees }
+            }
+            return out.toList()
+        }
+
+        private fun groups(lines: List<TextLine>, kept: List<Int>): List<Group> = orientationGroups(lines, kept).map { g ->
+            val frame = ReadingFrame.of(g.map { lines[it].quad })
+            Group(g, frame, g.map { i ->
+                val q = lines[i].quad
+                val own = if (hypot(q.p1.x - q.p0.x, q.p1.y - q.p0.y) > 0f) ReadingFrame.of(listOf(q)) else frame
+                if (own.angleTo(frame) > TURNED) own else frame
+            })
+        }
+
+        /**
+         * 一页上走向不同的几组字各当一页认：聊天截图里一张转了九十度、倒着放的证件照，聊天的字横着，证件的字竖着、倒着，
+         * 整页只有一个阅读方向的话，证件上「下一行」「右边一栏」全对不上。行的阅读方向（quad 的 p0→p1）离哪个直角不到
+         * [QUARTER] 度就归哪个直角；最长的那组之外，至少 [GROUP_LINES] 行、占总长 [GROUP_SHARE] 的才单独成组，
+         * 斜着的水印、零星几行竖排的字归最长的那组。只有一组就是整页，同以前一样。
+         */
+        private fun orientationGroups(lines: List<TextLine>, kept: List<Int>): List<List<Int>> {
+            val length = kept.associateWith { lines[it].quad.let { q -> hypot(q.p1.x - q.p0.x, q.p1.y - q.p0.y).toDouble() } }
+            val quarter = kept.associateWith { quarterOf(lines[it].quad) }
+            val total = length.values.sum()
+            val byQuarter = kept.filter { quarter[it] != null }.groupBy { quarter[it]!! }
+            val main = byQuarter.maxByOrNull { (_, group) -> group.sumOf { length.getValue(it) } }?.key ?: return listOf(kept)
+            val apart = byQuarter.filter { (q, group) ->
+                q != main && group.size >= GROUP_LINES && group.sumOf { length.getValue(it) } >= GROUP_SHARE * total
+            }.keys
+            if (apart.isEmpty()) return listOf(kept)
+            return listOf(kept.filter { quarter[it] !in apart }) + apart.map { q -> kept.filter { quarter[it] == q } }
+        }
+
+        /** 一行的阅读方向离哪个直角不到 [QUARTER] 度：0 朝右、1 朝下、2 朝左、3 朝上；都差得远（斜着的）为 null。 */
+        private fun quarterOf(q: Quad): Int? {
+            val d = Math.toDegrees(atan2((q.p1.y - q.p0.y).toDouble(), (q.p1.x - q.p0.x).toDouble()))
+            val k = (d / 90).roundToInt()
+            return if (abs(d - k * 90) <= QUARTER) Math.floorMod(k, 4) else null
+        }
+
+        /** 一行自己的方向和它那一组的差过这么多度，按它自己的量（见 Group）。 */
+        private const val TURNED = 5f
+
+        /** 让开以后截短的一段末尾去掉的标点。 */
+        private const val TRAILING = ",，、;；:：|｜/／·•.。-－–—"
 
         /** 竖直方向重叠过这么多（按矮的那个框算）就是同一排。 */
         private const val SAME_ROW = 0.5f
@@ -241,8 +282,5 @@ class RuleClassifier(
         /** 走向不同的一组至少这么多行、占总长这么多，才单独当一页认。 */
         private const val GROUP_LINES = 3
         private const val GROUP_SHARE = 0.15
-
-        /** 让开以后截短的一段末尾去掉的标点。 */
-        private const val TRAILING = ",，、;；:：|｜/／·•.。-－–—"
     }
 }

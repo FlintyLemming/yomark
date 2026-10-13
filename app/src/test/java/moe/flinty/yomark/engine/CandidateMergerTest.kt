@@ -22,7 +22,8 @@ class CandidateMergerTest {
         source: DetectorSource = DetectorSource.RULE,
         confidence: Float = 0.9f,
         enabled: Boolean = true,
-    ) = Candidate(id, Quad.fromRect(RectF(l, t, r, b)), kind, source, confidence, enabled)
+        degrees: Float? = null,
+    ) = Candidate(id, Quad.fromRect(RectF(l, t, r, b)), kind, source, confidence, enabled, degrees)
 
     private val merger = CandidateMerger()
 
@@ -175,5 +176,45 @@ class CandidateMergerTest {
     fun `pieces of one line on a page turned on its side are merged`() {
         val out = merger.merge(listOf(c("a", 100f, 0f, 120f, 50f), c("b", 100f, 58f, 120f, 100f)), downwards)
         assertThat(out.single().quad.bounds()).isEqualTo(RectF(100f, 0f, 120f, 100f))
+    }
+
+    // ---------- 候选自己带着方向：正着的截图里一张转过的照片 ----------
+
+    /**
+     * 正着的页上一张竖着的证件照，两行地址在图上是左右挨着的两个竖条。候选带着照片上的方向（朝下），按它量是上下两行，不拼；
+     * 没带方向的照旧按整页量。
+     */
+    @Test
+    fun `stacked lines of a turned photo on an upright page stay apart`() {
+        assertThat(merger.merge(listOf(c("a", 100f, 0f, 120f, 200f, degrees = 90f), c("b", 80f, 0f, 100f, 200f, degrees = 90f)))).hasSize(2)
+        assertThat(merger.merge(listOf(c("a", 100f, 0f, 120f, 200f), c("b", 80f, 0f, 100f, 200f)))).hasSize(1)
+    }
+
+    /** 照片上同一行的两段照样拼，按照片的方向拼出来的框还在图上原处。 */
+    @Test
+    fun `pieces of one line in a turned photo are merged`() {
+        val out = merger.merge(listOf(c("a", 100f, 0f, 120f, 50f, degrees = 90f), c("b", 100f, 58f, 120f, 100f, degrees = 90f)))
+        assertThat(out.single().quad.bounds()).isEqualTo(RectF(100f, 0f, 120f, 100f))
+    }
+
+    /** 方向不同的两处，按整页量挨着也不拼：照片上的一块牌子和聊天里的一行字。 */
+    @Test
+    fun `candidates read in different directions are not merged`() {
+        val out = merger.merge(listOf(c("chat", 0f, 0f, 50f, 20f, degrees = 0f), c("photo", 55f, 0f, 75f, 20f, degrees = 90f)))
+        assertThat(out).hasSize(2)
+    }
+
+    /** 方向不同、叠在一起的是同一处读了两遍（斜着的水印那一行里又读出一遍名字）：拼成一个，按整页的方向。 */
+    @Test
+    fun `overlapping candidates read in different directions are merged`() {
+        val out = merger.merge(listOf(c("card", 0f, 0f, 60f, 20f, degrees = 0f), c("watermark", 40f, 5f, 90f, 30f, degrees = 30f)))
+        assertThat(out.single().quad.bounds()).isEqualTo(RectF(0f, 0f, 90f, 30f))
+    }
+
+    /** 差几度的算同一个方向：拍歪了的照片上，各行的框读出来的方向差一两度。 */
+    @Test
+    fun `directions a few degrees apart are the same direction`() {
+        val out = merger.merge(listOf(c("a", 0f, 0f, 50f, 20f, degrees = 8f), c("b", 55f, 0f, 100f, 20f, degrees = 6.5f)))
+        assertThat(out).hasSize(1)
     }
 }

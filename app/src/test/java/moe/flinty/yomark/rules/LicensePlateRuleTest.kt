@@ -132,6 +132,15 @@ class LicensePlateRuleTest {
         )
     }
 
+    /**
+     * 照片上欧盟蓝条的国别字母和号码读成了一段：「PAB-123-CD」（F 读成了 P）、「FAB-123-CD」。整行就是这块牌时去掉它再认；
+     * 一句话里的、连着字母是个词的（「SKU」）、不是国别字母打头的，不认。
+     */
+    @Test fun `a band letter glued onto a plate on its own line`() {
+        assertFound(mapOf("PAB-123-CD" to "AB-123-CD", "FAB-123-CD" to "AB-123-CD", "DAB12 CDE" to "AB12 CDE"))
+        assertNothing(listOf("SKU-123-CD", "Order PAB-123-CD", "PAB-123-CD shipped", "XAB-123-CD"))
+    }
+
     /** 两头是尺码、单位、机场、财年的；行里写着货号、批号的；小写的；校验字母不对的。 */
     @Test fun `codes, sizes and flights that look like plates`() {
         assertNothing(
