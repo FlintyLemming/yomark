@@ -27,6 +27,8 @@ object SensitiveKindLabels {
         SensitiveKind.POSTAL_ADDRESS -> R.string.kind_address
         SensitiveKind.PERSON_NAME -> R.string.kind_name
         SensitiveKind.ORG_NAME -> R.string.kind_org
+        SensitiveKind.ID_NUMBER -> R.string.kind_id_number
+        SensitiveKind.VIN -> R.string.kind_vin
         SensitiveKind.FACE -> R.string.kind_face
         SensitiveKind.BARCODE -> R.string.kind_barcode
         SensitiveKind.MANUAL -> R.string.kind_manual
@@ -68,6 +70,8 @@ object SensitiveKindLabels {
         SensitiveKind.POSTAL_ADDRESS -> "地址"
         SensitiveKind.PERSON_NAME -> "人名"
         SensitiveKind.ORG_NAME -> "机构名"
+        SensitiveKind.ID_NUMBER -> "证件号码"
+        SensitiveKind.VIN -> "车架号"
         SensitiveKind.FACE -> "人脸"
         SensitiveKind.BARCODE -> "条码"
         SensitiveKind.MANUAL -> "手动"

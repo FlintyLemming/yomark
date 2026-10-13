@@ -23,8 +23,8 @@ object RuleCatalog {
      * 人名、电话、地址、取件码打头，IBAN、社保号这些海外的格式排到最后。只是显示顺序，不改识别。
      */
     val inSettingsOrder: List<Rule> = listOf(
-        "name", "phone", "address", "pickup", "card", "tracking", "email", "datetime",
-        "url", "longnum", "birthdate", "passport", "apikey", "ip", "mac", "iban", "ssn",
+        "name", "phone", "address", "pickup", "idnumber", "card", "tracking", "email", "datetime",
+        "url", "longnum", "birthdate", "passport", "vin", "apikey", "ip", "mac", "iban", "ssn",
     ).map { id -> all.first { it.id == id } }
 
     /** 出厂态由规则自己的 `enabledByDefault` 决定，不另立一张表——两处会走散。 */
@@ -66,6 +66,8 @@ object RuleCatalog {
         "email" to R.string.rule_desc_email,
         "phone" to R.string.rule_desc_phone,
         "passport" to R.string.rule_desc_passport,
+        "idnumber" to R.string.rule_desc_idnumber,
+        "vin" to R.string.rule_desc_vin,
         "apikey" to R.string.rule_desc_apikey,
         "name" to R.string.rule_desc_name,
         "address" to R.string.rule_desc_address,

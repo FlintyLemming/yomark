@@ -6,6 +6,8 @@ import java.text.Normalizer
 /**
  * 证件底部的机读码（MRZ，ICAO 9303）：护照两行各 44 个字符（TD3），身份证、居留证三行各 30 个（TD1），
  * 部分证件、签证两行各 36 个（TD2）。姓名、证件号、生日、有效期全在里面，是一页上最该遮的一块。
+ * 大陆的几种通行证排法各不相同：往来港澳、台湾通行证卡正面一行 30 个（CS、CD 打头），
+ * 回乡证、台胞证背面三行的第一行（CR、CT 打头），这两种行里都没有成串的填充符，靠校验位认。
  *
  * 原先只认一字不差的 44 个字符，拍的护照上一行也没认出来：
  * - OCR 在等宽字里补空格：窄的「1」两边留白宽，第二行读成「…F301 01 49500101920<091 824」；
@@ -35,19 +37,44 @@ internal object Mrz {
 
     private fun isMrz(s: String): Boolean =
         (s.length >= MIN_FILLED && "<<" in s && s.count { it == '<' } >= 3) ||
-            (s.length >= MIN_CHECKED && (documentLine(s)?.trusted == true || idCardLine2(s)?.trusted == true))
+            (s.length >= MIN_CHECKED && (documentLine(s)?.trusted == true || idCardLine2(s)?.trusted == true)) ||
+            isPermit(s)
 
-    /** 机读码里读出来、校验位对得上的几样。生日是（两位年, 月, 日）。 */
-    class Holder(val documentNumber: String?, val birth: Triple<Int, Int, Int>?, val names: Set<String>)
+    /** [chars]（[Line.chars]）是大陆通行证那一行：往来港澳台通行证的那一行，回乡证、台胞证的第一行。 */
+    fun isPermit(chars: String): Boolean = permitLine(chars)?.trusted == true
+
+    /**
+     * 机读码里读出来、校验位对得上的几样。生日是（两位年, 月, 日）。
+     * [numberSuffix] 是回乡证、台胞证的换证（签发）次数：印在证件号旁边，OCR 常把两样读成一串「H1234567800」。
+     * [permit]：这一页是大陆的通行证（有通行证那一行），不是护照、身份证。
+     */
+    class Holder(
+        val documentNumber: String?,
+        val birth: Triple<Int, Int, Int>?,
+        val names: Set<String>,
+        val numberSuffix: String? = null,
+        val permit: Boolean = false,
+    )
 
     /** 一页的机读码读成一个人。一行机读码都没有时给 null。 */
     fun read(lines: List<List<Line>>): Holder? {
         val all = lines.flatten().map { it.chars }
         if (all.isEmpty()) return null
         var number: String? = null
+        var suffix: String? = null
         var birth: Triple<Int, Int, Int>? = null
+        var permit = false
         val names = LinkedHashSet<String>()
         all.forEach { s ->
+            // 通行证那一行要先认：当护照第二行读，会把它的有效期读成生日
+            permitLine(s)?.let { f ->
+                if (f.trusted) {
+                    permit = true
+                    if (number == null) number = f.number?.also { suffix = f.suffix }
+                    if (birth == null) birth = f.birth
+                }
+                return@forEach
+            }
             documentLine(s)?.takeIf { it.trusted }?.let { f ->
                 if (number == null) number = f.number
                 if (birth == null) birth = f.birth
@@ -56,11 +83,96 @@ internal object Mrz {
             idCardLine2(s)?.takeIf { it.trusted }?.let { if (birth == null) birth = it.birth }
             names += namesIn(s)
         }
-        return Holder(number, birth, names)
+        return Holder(number, birth, names, suffix, permit)
     }
 
     /** 读出来的字段：校验位对得上的才给值；[trusted] 是这一行的形状和校验位够不够认定它是机读码。 */
-    private class Fields(val number: String?, val birth: Triple<Int, Int, Int>?, val trusted: Boolean)
+    private class Fields(
+        val number: String?,
+        val birth: Triple<Int, Int, Int>?,
+        val trusted: Boolean,
+        val suffix: String? = null,
+    )
+
+    private fun permitLine(s: String): Fields? = exitPermitLine(s) ?: travelPermitLine(s)
+
+    /**
+     * 往来港澳通行证（CS）、往来台湾通行证（CD）卡正面底下那一行，30 个字符：
+     * 证件号 2..10 校验位 11，「<」，有效期 13..18 校验位 19，「<」，生日 21..26 校验位 27，「<」，前面三段的总校验位 29。
+     * 官方样张「CSC000000004<2404200<8108038<6」四位校验位都对得上。有效期在生日前面，和护照反着。
+     * 一行里没有成串的填充符，原先认不出来。
+     *
+     * 单个的「<」OCR 会漏读（「CSC000000004 2404200<8108038<6」），只剩 28、29 个字符时把它补回 12、20、28 位再看。
+     */
+    private fun exitPermitLine(raw: String): Fields? {
+        if (raw.length < 28 || raw[0] != 'C' || raw[1] !in "SD") return null
+        val tries = if (raw.length >= 30) listOf(raw.take(30)) else withFillers(raw, 30 - raw.length)
+        val read = tries.mapNotNull { exitPermitFields(it) }
+        return read.firstOrNull { it.trusted } ?: read.firstOrNull()
+    }
+
+    /** 往来港澳台通行证那一行三个「<」的位置。 */
+    private val EXIT_PERMIT_FILLERS = listOf(12, 20, 28)
+
+    /** 在 [EXIT_PERMIT_FILLERS] 里挑 [missing] 个位置补上「<」，每种补法一个。位置按补完以后数。 */
+    private fun withFillers(raw: String, missing: Int): List<String> {
+        fun pick(from: Int, left: Int, s: String): List<String> =
+            if (left == 0) listOf(s)
+            else (from until EXIT_PERMIT_FILLERS.size).flatMap { k ->
+                val at = EXIT_PERMIT_FILLERS[k]
+                if (at > s.length) emptyList() else pick(k + 1, left - 1, s.substring(0, at) + "<" + s.substring(at))
+            }
+        return pick(0, missing, raw)
+    }
+
+    private fun exitPermitFields(raw: String): Fields? {
+        val s = corrected(raw, letters = 2..2, digits = listOf(4..11, 13..19, 21..27, 29..29), fillers = EXIT_PERMIT_FILLERS)
+        if (s[12] != '<' || s[20] != '<' || s[28] != '<') return null
+        if (!s.substring(4, 12).isDigits() || !s.substring(13, 20).isDigits() || !s.substring(21, 28).isDigits() || !s[29].isDigit()) {
+            return null
+        }
+        val numberOk = Checksums.mrzCheck(s.substring(2, 11)) == s[11]
+        val expiryOk = Checksums.mrzCheck(s.substring(13, 19)) == s[19]
+        val birthOk = Checksums.mrzCheck(s.substring(21, 27)) == s[27]
+        val compositeOk = Checksums.mrzCheck(s.substring(2, 12) + s.substring(13, 20) + s.substring(21, 28)) == s[29]
+        return Fields(
+            number = s.substring(2, 11).takeIf { numberOk },
+            birth = date(s.substring(21, 27)).takeIf { birthOk },
+            trusted = listOf(numberOk, expiryOk, birthOk, compositeOk).count { it } >= 2,
+        )
+    }
+
+    /**
+     * 回乡证（CR）、台胞证（CT）背面三行机读码的第一行，30 个字符，整行没有成串的填充符：
+     * 证件号 2..10 校验位 11（台胞证号八位数字，第 10 位补「<」），换证或签发次数 12..13 校验位 14，
+     * 有效期 15..20 校验位 21，性别 22，生日 23..28 校验位 29。
+     */
+    private fun travelPermitLine(raw: String): Fields? {
+        if (raw.length < 30 || raw[0] != 'C' || raw[1] !in "RT") return null
+        val hk = raw[1] == 'R'
+        val s = corrected(
+            raw.take(30),
+            letters = if (hk) 2..2 else IntRange.EMPTY,
+            digits = listOf(if (hk) 3..11 else 2..9, 11..21, 23..29),
+            fillers = if (hk) emptyList() else listOf(10),
+        )
+        if (hk && s[2] !in "HM") return null
+        if (!hk && s[10] != '<') return null
+        if (!s.substring(if (hk) 3 else 2, if (hk) 11 else 10).isDigits() || !s.substring(11, 22).isDigits() || !s.substring(23, 30).isDigits()) {
+            return null
+        }
+        if (s[22] !in "MF<") return null
+        val numberOk = Checksums.mrzCheck(s.substring(2, 11)) == s[11]
+        val countOk = Checksums.mrzCheck(s.substring(12, 14)) == s[14]
+        val expiryOk = Checksums.mrzCheck(s.substring(15, 21)) == s[21]
+        val birthOk = Checksums.mrzCheck(s.substring(23, 29)) == s[29]
+        return Fields(
+            number = s.substring(2, 11).trimEnd('<').takeIf { numberOk },
+            birth = date(s.substring(23, 29)).takeIf { birthOk },
+            trusted = listOf(numberOk, countOk, expiryOk, birthOk).count { it } >= 2,
+            suffix = s.substring(12, 14),
+        )
+    }
 
     /**
      * 护照（TD3）、TD2 的第二行：证件号 0..8 校验位 9，国籍 10..12，生日 13..18 校验位 19，性别 20，有效期 21..26 校验位 27。
@@ -106,7 +218,9 @@ internal object Mrz {
      * 名字里只有字母，认岔成数字的（「MARL0WE」）换回来；换不回来的数字说明这不是姓名行。
      */
     private fun namesIn(raw: String): List<String> {
-        if ("<<" !in raw || documentLine(raw)?.trusted == true || idCardLine1(raw) != null || idCardLine2(raw)?.trusted == true) {
+        if ("<<" !in raw || permitLine(raw) != null || documentLine(raw)?.trusted == true || idCardLine1(raw) != null ||
+            idCardLine2(raw)?.trusted == true
+        ) {
             return emptyList()
         }
         val s = raw.map { asLetter(it) }.joinToString("")
@@ -115,10 +229,11 @@ internal object Mrz {
         return names.split('<').filter { it.length >= 2 }
     }
 
-    /** 按位置纠正：[letters] 里的位置只会是字母，[digits] 里的只会是数字。 */
-    private fun corrected(s: String, letters: IntRange, digits: List<IntRange>): String =
+    /** 按位置纠正：[letters] 里的位置只会是字母，[digits] 里的只会是数字，[fillers] 里的只会是「<」（OCR 常读成 K）。 */
+    private fun corrected(s: String, letters: IntRange, digits: List<IntRange>, fillers: List<Int> = emptyList()): String =
         String(CharArray(s.length) { i ->
             when {
+                i in fillers -> if (s[i] == 'K') '<' else s[i]
                 i in letters -> asLetter(s[i])
                 digits.any { i in it } -> asDigit(s[i])
                 else -> s[i]
@@ -148,34 +263,54 @@ internal object Mrz {
     private const val MIN_CHECKED = 28
 
     /** OCR 读机读码时常把「<」读成的字。 */
-    private const val FILLER_LOOKALIKES = "«‹〈＜"
+    private const val FILLER_LOOKALIKES = "«‹〈＜く≪"
 }
 
 /**
- * 机读码那两三行本身（PASSPORT 规则的第一种认法）。
+ * 机读码是哪种证件的。大陆的通行证（往来港澳台通行证、回乡证、台胞证）归证件号码，其余的（护照、身份证、签证）归护照：
+ * 用户眼里通行证号是证件号，不是护照号。
  */
-class MrzLines(private val confidence: Float) : Finder {
-    override fun findIn(text: String): List<RuleMatch> = Mrz.findIn(text).map { RuleMatch(it.range, confidence) }
+enum class MrzDocument { PASSPORT, PERMIT }
+
+/**
+ * 机读码那两三行本身（护照、证件号码两条规则的第一种认法）。[of] 是只要哪种证件的，null 是都要。
+ *
+ * 单看一行时按这一行自己分：通行证那一行（CS、CD、CR、CT 打头）归通行证。看整页时按页分：页上有通行证那一行，
+ * 这一页的机读码都是通行证的——回乡证、台胞证背面另外两行（汉字姓名的编码、港澳台的身份证号、拼音姓名）单看分不出是谁的。
+ */
+class MrzLines(private val confidence: Float, private val of: MrzDocument? = null) : PageFinder {
+
+    override fun findIn(text: String): List<RuleMatch> =
+        Mrz.findIn(text).filter { of == null || documentOf(Mrz.isPermit(it.chars)) == of }.map { RuleMatch(it.range, confidence) }
+
+    override fun findOnPage(page: Page): List<PageMatch> {
+        val mrz = page.texts.map { Mrz.findIn(it) }
+        if (of != null && documentOf(mrz.flatten().any { Mrz.isPermit(it.chars) }) != of) return emptyList()
+        return mrz.flatMapIndexed { i, lines -> lines.map { PageMatch(i, RuleMatch(it.range, confidence)) } }
+    }
 }
+
+private fun documentOf(permit: Boolean) = if (permit) MrzDocument.PERMIT else MrzDocument.PASSPORT
 
 /**
  * 拿机读码去对照页上别处：资料页上印着的证件号、生日、姓名，幽灵像旁边那行小字「05 02 65」，激光穿孔的号码。
  *
  * 字段名是哪国文字、OCR 有没有把字段名读对都不要紧：机读码的校验位对得上，页上一样的那一串就是同一样东西。
- * 机读码那几行自己不在这里认（那是 [MrzLines] 的事）。
+ * 机读码那几行自己不在这里认（那是 [MrzLines] 的事）。[of] 同 [MrzLines]：只对照哪种证件的，null 是都对照。
  */
-class MrzEcho(private val what: What, private val confidence: Float) : PageFinder {
+class MrzEcho(private val what: What, private val confidence: Float, private val of: MrzDocument? = null) : PageFinder {
 
     enum class What { DOCUMENT_NUMBER, BIRTH_DATE, NAME }
 
     override fun findOnPage(page: Page): List<PageMatch> {
         val mrz = page.texts.map { Mrz.findIn(it) }
         val holder = Mrz.read(mrz) ?: return emptyList()
+        if (of != null && documentOf(holder.permit) != of) return emptyList()
         val out = ArrayList<PageMatch>()
         page.texts.forEachIndexed { i, text ->
             if (mrz[i].isNotEmpty()) return@forEachIndexed
             val found = when (what) {
-                What.DOCUMENT_NUMBER -> holder.documentNumber?.let { numberIn(text, it) } ?: emptyList()
+                What.DOCUMENT_NUMBER -> holder.documentNumber?.let { numberIn(text, it, holder.numberSuffix) } ?: emptyList()
                 What.BIRTH_DATE -> holder.birth?.let { birthIn(text, it) } ?: emptyList()
                 What.NAME -> listOfNotNull(namesIn(text, holder.names))
             }
@@ -184,11 +319,15 @@ class MrzEcho(private val what: What, private val confidence: Float) : PageFinde
         return out
     }
 
-    /** 证件号：去掉空格比（OCR 可能在号码中间补空格），前后不能紧挨字母数字。 */
-    private fun numberIn(text: String, number: String): List<IntRange> {
+    /**
+     * 证件号：去掉空格比（OCR 可能在号码中间补空格），前后不能紧挨字母数字。
+     * 回乡证、台胞证的号码后面可能粘着换证次数（[suffix]），一起算。
+     */
+    private fun numberIn(text: String, number: String, suffix: String?): List<IntRange> {
         val origin = text.indices.filter { text[it] != ' ' }
         val compact = origin.map { text[it] }.joinToString("")
-        return Regex("""(?<![A-Z0-9])${Regex.escape(number)}(?![A-Z0-9])""").findAll(compact)
+        val tail = suffix?.let { "(?:${Regex.escape(it)})?" } ?: ""
+        return Regex("""(?<![A-Z0-9])${Regex.escape(number)}$tail(?![A-Z0-9])""").findAll(compact)
             .map { origin[it.range.first]..origin[it.range.last] }.toList()
     }
 
