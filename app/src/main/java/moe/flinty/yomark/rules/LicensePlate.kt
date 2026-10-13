@@ -303,8 +303,11 @@ internal object Plates {
         "nomor polisi", "nopol", "no. pendaftaran", "nombor pendaftaran", "biển số xe", "biển số", "bien so xe", "bien so",
     )
 
-    /** 中日文的字段名。「ナンバー」前面紧挨着片假名的不算：「シリアルナンバー」「マイナンバー」。 */
-    private val CJK_LABELS = listOf(
+    /**
+     * 中日文的字段名。「ナンバー」前面紧挨着片假名的不算：「シリアルナンバー」「マイナンバー」。
+     * 证件、表格上也是下一个字段的字段名（DefaultRuleSet.OTHER_FIELDS）：「所有人 张三 号牌号码 苏A12345」的名字到它为止。
+     */
+    internal val CJK_LABELS = listOf(
         "车牌号码", "车牌号", "车牌", "号牌号码", "号牌", "车辆号牌", "机动车号牌", "牌照号码", "牌照", "车牌照",
         "車牌號碼", "車牌號", "車牌", "車輛號牌",
         "ナンバープレート", "車のナンバー", "車両ナンバー", "ナンバー", "車両番号", "車番", "自動車登録番号",
@@ -323,6 +326,12 @@ internal object Plates {
      * 法文冒号前有空格（「Immatriculation : …」）。
      */
     private val FILLER = Regex("[ #.]*(?:[(（][^)）]{1,16}[)）])? *(?:[:：=＝#\\-–]|is(?= )|是|为|は)? *", RegexOption.IGNORE_CASE)
+
+    /**
+     * 一段字末尾的字段名，连同后面的冒号、括注：地址取到了行尾、车牌在后半截（「…中山路1号 车牌号：」「…1号 号牌号码 Plate No」），
+     * 地址让给车牌时截到它前面（RuleClassifier）。
+     */
+    val LABEL_AT_END = Regex("(?:${LABEL.pattern})${FILLER.pattern}$", RegexOption.IGNORE_CASE)
 
     /** 写明了这是字段名的分隔：冒号这类、「is」「是」，缩写的点（「Nr rej.」「Reg.」）。 */
     private val EXPLICIT = Regex("[:：=＝#.\\-–]|is|是|为|は", RegexOption.IGNORE_CASE)

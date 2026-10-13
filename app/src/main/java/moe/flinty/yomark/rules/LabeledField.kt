@@ -248,6 +248,8 @@ class LabeledField(
             "Issue Date", "Date of Issue", "Date of Expiry", "Class", "Valid Period", "Valid From", "Valid For",
             "Period of Validity", "Plate No.", "Vehicle Type", "Owner", "Use Character", "Model", "VIN", "Engine No.",
             "Register Date", "ID No.", "Card No.", "Passport No.", "Holder", "Legal Representative", "Domicile",
+            // 行驶证副页、驾驶证副页的「档案编号」
+            "File No.",
             // 驾驶证「证号」的译名（翻译件、部分卡面）
             "No.",
             // 澳门身份证的葡文

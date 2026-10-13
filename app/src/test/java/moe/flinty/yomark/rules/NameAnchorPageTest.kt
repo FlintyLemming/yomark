@@ -120,6 +120,7 @@ class NameAnchorPageTest {
         R.string.anchor_field to Example("李思雨", "乘车人", "李思雨"),
         R.string.anchor_ticket to Example("李思雨", "李思雨 成人"),
         R.string.anchor_english_field to Example("Emily Carter", "Passenger", "Emily Carter"),
+        R.string.anchor_plate to Example("张三", "张三 苏A12345"),
     )
 
     private class Example(val name: String, vararg val page: String)

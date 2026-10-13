@@ -79,9 +79,9 @@ class RuleClassifier(
         // 旁证只在有猜测要核对时才找：大多数页面上一个猜出来的人名都没有
         val anchorsOnPage by lazy { findAnchors(lines, kept, frame) }
         rules.forEachIndexed { r, rule ->
-            found[r].forEachIndexed { n, pm ->
+            found[r].forEachIndexed { n, hit ->
+                val pm = yielded(rule, hit, found, page.texts) ?: return@forEachIndexed
                 val m = pm.match
-                if (yields(rule, pm, found)) return@forEachIndexed
                 val lineIndex = kept[pm.line]
                 val line = lines[lineIndex]
                 val quad = line.quadForRange(m.range)
@@ -131,15 +131,36 @@ class RuleClassifier(
     }
 
     /**
-     * [rule] 的命中 [m] 要不要让给同一处的另一类：那一类在 Rule.yieldsTo 里；或者 [m] 只是只圈不打码的一档，
-     * 同一处别的类型认出了东西。只让给那边有把握的命中（不是只圈出的、不是要旁证的猜测）：
+     * [rule] 的命中 [m] 让给同一处的另一类之后还剩下的，null 是整个让掉。要让的：那一类在 Rule.yieldsTo 里；
+     * 或者 [m] 只是只圈不打码的一档，同一处别的类型认出了东西。只让给那边有把握的命中（不是只圈出的、不是要旁证的猜测）：
      * 地址让给车牌，让给一个只圈出的车牌就是把打了码的降成只圈出。
+     *
+     * 那边只占了 [m] 的后半截（地址取到行尾，「地址：南京市玄武区中山路1号 车牌：苏A12345」）：截到它前面为止，
+     * 夹在中间的车牌字段名（「车牌：」「号牌号码 Plate No.」）和空格标点一起去掉。剩下不到两个字的，或者那边占了 [m] 的大半
+     * （「苏A12345D」像爱尔兰邮编），整个让掉；只圈出的、落在几行上的（上下两行的车牌）也整个让掉。
      */
-    private fun yields(rule: Rule, m: PageMatch, found: List<List<PageMatch>>): Boolean =
-        (rule.yieldsTo.isNotEmpty() || m.match.outlineOnly) && rules.indices.any { o ->
-            rules[o] !== rule && (rules[o].kind in rule.yieldsTo || m.match.outlineOnly) &&
-                found[o].any { !it.match.outlineOnly && !it.match.needsAnchor && it.overlaps(m) }
+    private fun yielded(rule: Rule, m: PageMatch, found: List<List<PageMatch>>, texts: List<String>): PageMatch? {
+        if (rule.yieldsTo.isEmpty() && !m.match.outlineOnly) return m
+        val over = rules.indices.filter { o -> rules[o] !== rule && (rules[o].kind in rule.yieldsTo || m.match.outlineOnly) }
+            .flatMap { o -> found[o].filter { !it.match.outlineOnly && !it.match.needsAnchor && it.overlaps(m) } }
+        if (over.isEmpty()) return m
+        if (m.match.outlineOnly || m.also.isNotEmpty()) return null
+        val range = m.match.range
+        val text = texts[m.line]
+        val taken = over.flatMap { o -> o.spans.filter { it.line == m.line && it.range.overlaps(range) }.map { it.range } }
+        val cut = taken.minOf { it.first }
+        if (cut <= range.first) return null
+        val solid = range.count { !text[it].isWhitespace() }
+        if (2 * range.count { i -> !text[i].isWhitespace() && taken.any { i in it } } > solid) return null
+        var end = cut
+        while (true) {
+            while (end > range.first && (text[end - 1].isWhitespace() || text[end - 1] in TRAILING)) end--
+            val label = Plates.LABEL_AT_END.find(text.substring(range.first, end)) ?: break
+            end = range.first + label.range.first
         }
+        if ((range.first until end).count { !text[it].isWhitespace() } <= 1) return null
+        return m.copy(match = m.match.copy(range = range.first until end))
+    }
 
     private fun RectF.toBounds() = Bounds(left, top, right, bottom)
 
@@ -220,5 +241,8 @@ class RuleClassifier(
         /** 走向不同的一组至少这么多行、占总长这么多，才单独当一页认。 */
         private const val GROUP_LINES = 3
         private const val GROUP_SHARE = 0.15
+
+        /** 让开以后截短的一段末尾去掉的标点。 */
+        private const val TRAILING = ",，、;；:：|｜/／·•.。-－–—"
     }
 }

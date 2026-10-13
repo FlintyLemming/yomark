@@ -220,10 +220,11 @@ object DefaultRuleSet {
 
     /**
      * 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。
-     * 表头里跟在「姓名」后面的「学号 姓名 班级 备注」也是它们，不是名字。
+     * 表头里跟在「姓名」后面的「学号 姓名 班级 备注」也是它们，不是名字。OCR 连成一串的「姓名张三车牌苏A12345」到「车牌」为止。
      */
     private const val NEXT_FIELD =
-        "电话|手机|性别|性別|民族|出生|年龄|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名|学号|工号|班级|部门|职位|职务|备注|成绩"
+        "电话|手机|性别|性別|民族|出生|年龄|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名|学号|工号|班级|部门|职位|职务|备注|成绩|" +
+            "车牌|号牌|車牌"
 
     /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
     private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""
@@ -267,18 +268,18 @@ object DefaultRuleSet {
         "收货人", "收件人", "寄件人", "发件人", "签收人", "取件人", "提货人", "联系人",
         "收款人", "付款人", "持卡人", "开户人", "申请人", "真实姓名", "姓名", "户名", "开户名",
         "快递员", "派件员", "配送员", "收派员", "Name", "Recipient",
-        // 户口簿、出生医学证明、结婚证，日本的在留卡、驾照
-        "户主姓名", "新生儿姓名", "母亲姓名", "父亲姓名", "配偶姓名", "氏名",
+        // 户口簿、出生医学证明、结婚证，日本的在留卡、驾照；停车、违章、ETC 页上的车主
+        "户主姓名", "新生儿姓名", "母亲姓名", "父亲姓名", "配偶姓名", "氏名", "车主姓名",
     )
 
     /**
      * 也是常用词的人名字段名：行驶证的「所有人 Owner」，营业执照的「法定代表人」「经营者」「投资人」「执行事务合伙人」，
-     * 结婚证的「持证人」，户口簿的「曾用名」，「监护人」。群聊里的「@所有人」「所有人都到了」「曾用名也要写吗」、
-     * 条文里的「经营者应当」「法定代表人签字」也是它们，所以后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），
-     * 值还要像个名字（[nameAfterCommonWord]），也不当旁证。
+     * 结婚证的「持证人」，户口簿的「曾用名」，「监护人」，停车、违章页上的「车主」。群聊里的「@所有人」「所有人都到了」
+     * 「曾用名也要写吗」「车主请挪车」、条文里的「经营者应当」「法定代表人签字」也是它们，所以后面要隔着空格、冒号或英文译名才算
+     * （LabeledField 的 spaced），值还要像个名字（[nameAfterCommonWord]），也不当旁证。
      */
     private val COMMON_WORD_NAME_LABELS =
-        listOf("所有人", "持证人", "法定代表人", "负责人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名")
+        listOf("所有人", "持证人", "法定代表人", "负责人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名", "车主")
 
     /**
      * 也是常用词的字段名后面的值。隔着空格、冒号的照样可能是一句话（「所有人：今晚八点开会，别迟到」
@@ -446,13 +447,13 @@ object DefaultRuleSet {
     )
 
     /**
-     * 证件、表格上姓名、地址、出生日期以外的字段名：证件号码、车架号的那些，再加上没有规则的。
+     * 证件、表格上姓名、地址、出生日期以外的字段名：证件号码、车架号、车牌的那些，再加上没有规则的。
      * 户口簿一行有好几个字段（「出生地 江苏省南京市 民族 汉」），出生地遮到它们前面为止；
      * 住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
      */
-    private val OTHER_FIELDS = IdNumbers.LABELS + Vins.LABELS + Vins.ENGINE_LABELS + listOf(
+    private val OTHER_FIELDS = IdNumbers.LABELS + Vins.LABELS + Vins.ENGINE_LABELS + Plates.CJK_LABELS + listOf(
         "身份证", "号码", "户号", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期限", "有效期",
-        "准驾车型", "初次领证日期", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆类型", "车辆", "号牌",
+        "准驾车型", "初次领证日期", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆类型", "车辆",
         "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
         "经营范围", "成立日期", "注册资本", "类型", "名称", "营业期限", "电话", "手机", "邮编", "邮政编码", "备注",
     )
@@ -653,8 +654,8 @@ object DefaultRuleSet {
         PlateShapes(confidence = 0.9f),
         TwoRowPlate(confidence = 0.85f),
         LonePlate(confidence = 0.6f),
-        // 机读码、IBAN 里的一段字母数字碰巧像车牌
-        yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.IBAN),
+        // 机读码、IBAN、车架号、证件号里的一段字母数字碰巧像车牌：OCR 在车架号中间补了空格的「LFV2A21 K6D4123456」，头一段像巴西的牌
+        yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.IBAN, SensitiveKind.VIN, SensitiveKind.ID_NUMBER),
     )
 
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
@@ -824,5 +825,7 @@ object DefaultRuleSet {
         ),
         NameAnchor(R.string.anchor_ticket, NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
         NameAnchor(R.string.anchor_english_field, NameAnchor.Reach.NEARBY, regexFinder(ENGLISH_PERSON_FIELDS, 1f)),
+        // 停车、违章、ETC 页上车牌旁边的是车主：「张三 苏A12345」
+        NameAnchor(R.string.anchor_plate, NameAnchor.Reach.NEARBY, PLATE),
     )
 }

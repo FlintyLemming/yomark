@@ -225,6 +225,7 @@
     <string name="anchor_field">「收货人」「乘车人」这类字段</string>
     <string name="anchor_ticket">票种</string>
     <string name="anchor_english_field">「Passenger」「Ship to」这类英文字段</string>
+    <string name="anchor_plate">车牌</string>
     <string name="rule_desc_card">13 到 19 位、通过 Luhn 校验的卡号，以及卡上「CVV」后面的安全码、「VALID THRU」后面的月/年。</string>
     <string name="rule_desc_iban">国际银行账号，按国家核对长度和校验位。</string>
     <string name="rule_desc_ssn">美国社会安全号，形如 123-45-6789，不会发放的号段不算。</string>
