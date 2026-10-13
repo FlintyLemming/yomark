@@ -30,4 +30,5 @@
 - **JDK：** Android Studio 自带的 jbr 是 JDK 25，Gradle 8.14.3 不认（报错只有一行 `25.0.3`）。构建前先设 `$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"`，再跑 `.\gradlew.bat :app:assembleDebug`。
 - **安装：** APK 按 ABI 拆分，模拟器装 `app\build\outputs\apk\debug\app-x86_64-debug.apk`（没有 `app-debug.apk`）：`adb -s $s install -r <apk>`。
 - **启动与检查：** `adb -s $s shell monkey -p moe.flinty.yomark -c android.intent.category.LAUNCHER 1`，然后看 `pidof moe.flinty.yomark` 和 `logcat -d -b crash`。crash 日志里 `android.hardware.uwb-service` 的 SIGABRT 是模拟器自己的问题，不用管。
+- **打开测试图：** `.\tools\emu\open-image.ps1 <图片路径>`，把图放进媒体库并在编辑器里打开（现成的测试图在 `app\src\test\resources\`）。别自己用 `am start` 发分享 intent（`--eu android.intent.extra.STREAM`）：extra 里的 URI 拿不到读权限，编辑器是空白的。多张（批量）只能在首页点「选择图片」走 Photo Picker。截图时确认画布上真有图。
 - **截图：** `adb -s $s shell screencap -p /sdcard/x.png` 再 `adb pull` 到 scratchpad（别用 PowerShell 的 `exec-out ... >`，二进制会被弄坏），读图确认改动的界面，把图的路径告诉我。
