@@ -5,6 +5,7 @@ import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import java.nio.FloatBuffer
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
@@ -58,6 +59,8 @@ class PpOcrEngine(
      *
      * 只有顺着走向的框在画布上读。垂直的（竖着放的证件旁边正着的聊天记录、表单）、斜着的（水印）还在原图上照常读、照常拼行，
      * 一两个字的小框怎么分见 [readTurned]。行的先后：先是画布上的，按转正后的阅读顺序，再是原图上的。
+     *
+     * 斜着的框压住的那几排字（水印连着字检测成了一块），横着切出来再读一遍，见 [underTilted]。
      */
     fun recognize(pixels: IntArray, width: Int, height: Int): List<OcrLine> {
         val image = Argb(pixels, width, height)
@@ -65,7 +68,8 @@ class PpOcrEngine(
         val axis = TextAxis.of(boxes)
         if (axis == null || axis == 0f) {
             val reads = boxes.map { read(image, it) }
-            val lines = RowGrouper.group(reads.mapNotNull { it?.line })
+            val lines = if (axis == null) RowGrouper.group(reads.mapNotNull { it?.line })
+            else rowsIn(image, boxes.zip(reads.map { it?.line }), boxes)
             if (axis == null || score(reads) >= UPRIGHT_SCORE) return lines
             val sample = TextAxis.sample(boxes, 0f)
             val flipped = trial(image, boxes, sample, 180f)
@@ -111,27 +115,221 @@ class PpOcrEngine(
         val view = chosen.view
         val fits = boxes.map { TextAxis.fit(it, axis) }
         val crossed = TextAxis.Fit.CROSS in fits
-        val turned = ArrayList<Pair<Box, OcrLine>>()
-        val level = ArrayList<OcrLine>()
+        // 读不出字的也留着框：它可能是字和水印连成的一块（见 rowsIn）
+        val turned = ArrayList<Pair<Box, OcrLine?>>()
+        val level = ArrayList<Pair<Box, OcrLine?>>()
         boxes.forEachIndexed { i, box ->
             val onCanvas = upright(view, box)
             val canvasRead = { if (i in chosen.reads) chosen.reads[i] else read(view, onCanvas) }
             val sourceRead = { if (inSource != null) inSource[i] else read(image, box) }
             when (fits[i]) {
-                TextAxis.Fit.ALONG -> canvasRead()?.line?.let { turned += onCanvas to it }
-                TextAxis.Fit.CROSS, TextAxis.Fit.OTHER -> sourceRead()?.line?.let { level += it }
+                TextAxis.Fit.ALONG -> turned += onCanvas to canvasRead()?.line
+                TextAxis.Fit.CROSS, TextAxis.Fit.OTHER -> level += box to sourceRead()?.line
                 TextAxis.Fit.SQUARE -> if (!crossed) canvasRead()?.line?.let { turned += onCanvas to it } else {
                     val c = canvasRead()
                     val s = sourceRead()
-                    if (s != null && s.confidence > (c?.confidence ?: -1f)) s.line?.let { level += it }
+                    if (s != null && s.confidence > (c?.confidence ?: -1f)) s.line?.let { level += box to it }
                     else c?.line?.let { turned += onCanvas to it }
                 }
             }
         }
-        val ordered = turned.sortedWith(compareBy(readingOrder) { it.first }).map { it.second }
-        return RowGrouper.group(ordered).map { line ->
+        val ordered = turned.sortedWith(compareBy(readingOrder) { it.first })
+        return rowsIn(view, ordered, boxes.map { upright(view, it) }).map { line ->
             line.copy(box = line.box.map(view::toSource), charBoxes = line.charBoxes.map { it?.map(view::toSource) })
-        } + RowGrouper.group(level)
+        } + rowsIn(image, level, boxes)
+    }
+
+    /**
+     * 一个画面（原图，或转正了的画布）上读的行拼成排。没有斜框的照常拼（RowGrouper）。
+     *
+     * 页上有斜框（水印）时：横平的行另外拼，压着斜框的那几排横着重读（[underTilted]）；斜框读出来的行另拼，
+     * 不和横平的串成一行（以前「民 族」「18 日」串进了水印那一行）。转正了读的页上，原图上读的那些（水印比证件上的字还长时，
+     * 证件反倒在原图上读）也这样拼一遍。
+     *
+     * 横平的框斜了 [LEVEL_SLACK] 度以上的也当斜框：那是字和水印连成的一块。中文水印斜二十几度时，
+     * 「浙江省杭州市西湖区文三路」和压着它的「仅供办理银行开户使用」连成了一个斜 9° 的框，什么都读不出来。
+     *
+     * @param read 在 [view] 上读的框和读出来的行（读不出的为 null）；[all] 页上所有的框，都在 [view] 上。
+     */
+    private fun rowsIn(view: Pixels, read: List<Pair<Box, OcrLine?>>, all: List<Box>): List<OcrLine> {
+        if (all.none { TextAxis.fit(it, 0f) == TextAxis.Fit.OTHER }) return RowGrouper.group(read.mapNotNull { it.second })
+        val (level, rest) = read.partition { (box, _) -> isLevel(box) }
+        val tilted = all.filter { TextAxis.fit(it, 0f) != TextAxis.Fit.CROSS && !isLevel(it) }
+        val rows = RowGrouper.group(underTilted(view, level.mapNotNull { it.second }, tilted))
+        return (rows + RowGrouper.group(rest.mapNotNull { it.second })).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
+    }
+
+    /** 横平的一行字或一两个字的方框：上沿偏离横平不过 [LEVEL_SLACK] 度。竖排的一列不算。 */
+    private fun isLevel(box: Box): Boolean =
+        TextAxis.fit(box, 0f).let { it == TextAxis.Fit.ALONG || it == TextAxis.Fit.SQUARE } && abs(skew(box)) <= LEVEL_SLACK
+
+    /** 框的上沿偏离横平几度，折到 (−45, 45]：方框哪条边算上沿说不准。 */
+    private fun skew(b: Box): Double {
+        var a = Math.toDegrees(atan2((b.tr.y - b.tl.y).toDouble(), (b.tr.x - b.tl.x).toDouble())) % 90
+        if (a > 45) a -= 90
+        if (a <= -45) a += 90
+        return a
+    }
+
+    /**
+     * 斜着压在字上的水印（证件复印件上的「仅供办理银行开户使用」）。DB 把水印和它压住的字连成一块，框是斜的，
+     * 压住的字跟着水印读成了字母：合成卡上「出生 1993 年 7 月 18 日」只剩「生」「1993 年」「18 日」，名字成了「林知夏OUNTOF」。
+     * 识别器隔着浅色的水印照样读得出横着的字，所以斜框穿过的一排横平的字，横着切出来重读一遍：
+     * - 斜框盖住了这一排两段之间的空当（「1993 年」和「18 日」之间的「7 月」），整排重读；
+     * - 斜框盖住了这一排的两头（离两头不过 [RowGrouper.REACH] 个字高），往外接着读，接到墨色深过水印的字为止（[inkedTo]）：
+     *   「姓 名」右边的「林知夏」接上，再往右只有水印的字母，不接；
+     * 同一排上被水印隔开的两截（「住 址」和「文三路」），接着读接到了一起，并成一截读。
+     * 重读的留住了原先读出的字（[keeps]），才换掉那几段。没有斜框的页一个框都不多读。
+     *
+     * @param level 横平的行，[tilted] 斜着的框，都在 [view] 上。
+     */
+    private fun underTilted(view: Pixels, level: List<OcrLine>, tilted: List<Box>): List<OcrLine> {
+        if (tilted.isEmpty()) return level
+        val strips = ArrayList<Strip>()
+        RowGrouper.rows(level).map { stripOf(view, it, tilted) }.sortedBy { it.left }.forEach { s ->
+            val i = strips.indexOfFirst { o -> (o.reread || s.reread) && o.touches(s) }
+            if (i < 0) strips += s else strips[i] = strips[i] + s
+        }
+        return strips.flatMap { s ->
+            if (!s.reread) return@flatMap s.segments
+            val reread = read(view, Box(Pt(s.left, s.top), Pt(s.right, s.top), Pt(s.right, s.bottom), Pt(s.left, s.bottom)))?.line
+            if (reread != null && keeps(reread.text, s.segments.sortedBy { it.box.minX }.joinToString("") { it.text })) listOf(reread)
+            else s.segments
+        }
+    }
+
+    /** 一排字（[segments]）要横着重读的那一截：[left]..[right] × [top]..[bottom]。[reread] 为 false 的不用重读。 */
+    private class Strip(
+        val segments: List<OcrLine>, val left: Float, val right: Float, val top: Float, val bottom: Float, val h: Float,
+        val reread: Boolean,
+    ) {
+        /** 同一排（竖直方向重叠过半），左右挨着（空当不到一个字高）。 */
+        fun touches(o: Strip): Boolean =
+            min(bottom, o.bottom) - max(top, o.top) >= 0.5f * min(bottom - top, o.bottom - o.top) &&
+                max(left, o.left) - min(right, o.right) <= max(h, o.h)
+
+        operator fun plus(o: Strip) = Strip(
+            segments + o.segments, min(left, o.left), max(right, o.right), min(top, o.top), max(bottom, o.bottom), max(h, o.h), true,
+        )
+    }
+
+    /** 斜框穿过的一排字往两头接、看中间的空当（见 [underTilted]）。 */
+    private fun stripOf(view: Pixels, row: List<OcrLine>, tilted: List<Box>): Strip {
+        val segments = row.sortedBy { it.box.minX }
+        val top = segments.minOf { it.box.minY }
+        val bottom = segments.maxOf { it.box.maxY }
+        val h = segments.maxOf { it.box.height }
+        val first = segments.first().box.minX
+        val last = segments.maxOf { it.box.maxX }
+        val unchanged = Strip(segments, first, last, top, bottom, h, reread = false)
+        val spans = tilted.mapNotNull { spanIn(it, top, bottom) }
+            .filter { (l, r) -> r >= first - RowGrouper.REACH * h && l <= last + RowGrouper.REACH * h }
+        if (spans.isEmpty()) return unchanged
+        val ink = Ink.of(view, segments.map { it.box }) ?: return unchanged
+        val left = spans.filter { it.first < first }.minOfOrNull { it.first }
+            ?.let { inkedTo(view, ink, top, bottom, h, first, it) } ?: first
+        val right = spans.filter { it.second > last }.maxOfOrNull { it.second }
+            ?.let { inkedTo(view, ink, top, bottom, h, last, it) } ?: last
+        val gapCovered = segments.zipWithNext().any { (a, b) ->
+            b.box.minX - a.box.maxX >= 0.5f * h && spans.any { (l, r) -> l < b.box.minX && r > a.box.maxX } &&
+                inked(view, ink, top, bottom, a.box.maxX, b.box.minX)
+        }
+        return Strip(segments, left, right, top, bottom, h, reread = left < first || right > last || gapCovered)
+    }
+
+    /**
+     * 一排字的墨色：这几段框里最深的那一小撮像素（[Ink.text]）和大多数像素（[Ink.paper]）的亮度。
+     * 浅色的水印亮度在两者之间偏纸那一边。墨和纸差不到 [MIN_CONTRAST] 的看不出，为 null。
+     */
+    private class Ink(val text: Float, val paper: Float) {
+
+        /** 比这个暗的是字的墨：从字往纸走四成。灰色的中文水印比浅色的英文水印深，正中间还挡不住它。 */
+        val threshold: Float get() = text + 0.4f * (paper - text)
+
+        companion object {
+            fun of(view: Pixels, boxes: List<Box>): Ink? {
+                val values = ArrayList<Float>()
+                boxes.forEach { b ->
+                    var y = b.minY
+                    while (y < b.maxY) {
+                        var x = b.minX
+                        while (x < b.maxX) { values += view.sample(x, y).luma; x += 2f }
+                        y += 2f
+                    }
+                }
+                if (values.size < 16) return null
+                values.sort()
+                val ink = Ink(values[values.size / 50], values[values.size / 2])
+                return ink.takeIf { it.paper - it.text >= MIN_CONTRAST }
+            }
+
+            /** 字的墨和纸至少差这么多亮度（0..255），才分得出水印。 */
+            const val MIN_CONTRAST = 60f
+        }
+    }
+
+    /**
+     * 从 [from]（一排字的一头）往 [to] 一列列看，接到最后一列有字的墨的地方（再加一点边）：墨色见 [Ink]，
+     * 中间空着不到一个字高的照接（字与字、字段名与值之间的空当）。
+     */
+    private fun inkedTo(view: Pixels, ink: Ink, top: Float, bottom: Float, h: Float, from: Float, to: Float): Float {
+        val step = if (to > from) 1f else -1f
+        var reached = from
+        var x = from
+        while ((to - x) * step > 0 && abs(x - reached) <= h) {
+            if (inkedColumn(view, ink, top, bottom, x)) reached = x
+            x += step
+        }
+        return if (reached == from) from else reached + step * 0.2f * h
+    }
+
+    /** [x0]..[x1] 之间有一列有字的墨。 */
+    private fun inked(view: Pixels, ink: Ink, top: Float, bottom: Float, x0: Float, x1: Float): Boolean {
+        var x = x0
+        while (x <= x1) {
+            if (inkedColumn(view, ink, top, bottom, x)) return true
+            x += 1f
+        }
+        return false
+    }
+
+    /** 第 [x] 列在这一排中间那一截高里有比 [Ink.threshold] 暗的像素。上下两成不看：上下行的笔画会伸进来。 */
+    private fun inkedColumn(view: Pixels, ink: Ink, top: Float, bottom: Float, x: Float): Boolean {
+        var y = top + 0.2f * (bottom - top)
+        while (y <= bottom - 0.2f * (bottom - top)) {
+            if (view.sample(x, y).luma < ink.threshold) return true
+            y += 1f
+        }
+        return false
+    }
+
+    /** [box] 落在 [top]..[bottom] 这条横带里的那一截，左右的 x；不相交时为 null。 */
+    private fun spanIn(box: Box, top: Float, bottom: Float): Pair<Float, Float>? {
+        val xs = ArrayList<Float>()
+        val corners = box.corners()
+        corners.forEachIndexed { i, p ->
+            if (p.y in top..bottom) xs += p.x
+            val q = corners[(i + 1) % corners.size]
+            listOf(top, bottom).forEach { y ->
+                if ((p.y - y) * (q.y - y) < 0) xs += p.x + (q.x - p.x) * (y - p.y) / (q.y - p.y)
+            }
+        }
+        return if (xs.isEmpty()) null else xs.min() to xs.max()
+    }
+
+    /**
+     * 重读出来的 [text] 留住了原先读出的 [before]：去掉空格后不比它短，它的字按次序至少有 [KEEP] 在里面。
+     * 不要求一个不差：压着水印的单字原先常读错，重读时读对了（「出」读成的「山」）。
+     */
+    private fun keeps(text: String, before: String): Boolean {
+        val a = before.filterNot { it == ' ' }
+        val b = text.filterNot { it == ' ' }
+        if (b.length < a.length) return false
+        val d = Array(a.length + 1) { IntArray(b.length + 1) }
+        for (i in a.indices) for (j in b.indices) {
+            d[i + 1][j + 1] = if (a[i] == b[j]) d[i][j] + 1 else max(d[i][j + 1], d[i + 1][j])
+        }
+        return d[a.length][b.length] >= KEEP * a.length
     }
 
     /** 按框长加权的平均置信度，丢掉的行（不到 [DROP_SCORE]）也算：要比的就是读得有多磕绊。 */
@@ -205,7 +403,7 @@ class PpOcrEngine(
             input[i] = (c.b / 255f - 0.5f) / 0.5f
             input[plane + i] = (c.g / 255f - 0.5f) / 0.5f
             input[2 * plane + i] = (c.r / 255f - 0.5f) / 0.5f
-            gray[i] = (0.299f * c.r + 0.587f * c.g + 0.114f * c.b) / 255f
+            gray[i] = c.luma / 255f
         }
 
         val (result, steps) = run(rec, input, longArrayOf(1, 3, REC_HEIGHT.toLong(), w.toLong())) { buf, shape ->
@@ -280,6 +478,15 @@ class PpOcrEngine(
         /** 换到不是默认的那个方向，置信度得高出这么多：两边差不多时不折腾。 */
         private const val MARGIN = 0.1f
 
+        /**
+         * 页上有斜框时，顺着走向的框斜过这么多度就不是一行字（[levelRows]）。横平的字框差一两度，
+         * 字和水印连成的一块斜九度上下。
+         */
+        private const val LEVEL_SLACK = 6.0
+
+        /** 重读一排字时，原先读出的字至少要留住这么多（[keeps]）。 */
+        private const val KEEP = 0.8f
+
         /** 字典文件：一行一个字，UTF-8。 */
         fun parseDict(text: String): List<String> = text.split('\n').map { it.trimEnd('\r') }.let {
             if (it.lastOrNull()?.isEmpty() == true) it.dropLast(1) else it
@@ -297,36 +504,62 @@ class PpOcrEngine(
  * 两段算同一行：竖直方向重叠超过较矮那段高度的一半，且水平间距不超过行高的 3 倍
  * （再远多半是左右两栏，拼起来会让「名字在电话前面」这类判断串栏）。
  *
- * 另有两条是拍的证件照上补的（护照样张上十来行被串成了一行）：
+ * 另有三条是拍的证件照上补的（护照样张上十来行被串成了一行）：
  * - 字高差一倍以上的不拼：斜着压在版面上的水印「SPECIMEN」，检测框高一百多像素，竖直范围里的每一行都和它重叠过半；
+ * - 走向差 [MAX_TURN] 度以上的不拼：斜着平铺的一行行小字水印和证件上的字一样高，从一排字中间穿过去，
+ *   外接框照样重叠过半（合成卡上「民 族」「18 日」被串进了水印那一行）。一两个字的方框看不出走向，不管；
  * - 左右并排才拼，上下叠着的不拼：证件上字段名下面紧贴着值，框常常上下咬住一截，重叠能过半。
  */
 object RowGrouper {
 
-    fun group(lines: List<OcrLine>): List<OcrLine> {
+    fun group(lines: List<OcrLine>): List<OcrLine> =
+        rows(lines).map(::join).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
+
+    /** 分好的排，每排里是拼之前的那几段。 */
+    fun rows(lines: List<OcrLine>): List<List<OcrLine>> {
         val rows = ArrayList<MutableList<OcrLine>>()
         for (line in lines.sortedBy { it.box.minX }) {
             val row = rows.firstOrNull { r -> r.any { sameRow(it, line) } && near(r.maxOf { it.box.maxX }, line) }
             if (row != null) row += line else rows += mutableListOf(line)
         }
-        return rows.map(::join).sortedWith(compareBy<OcrLine> { it.box.minY }.thenBy { it.box.minX })
+        return rows
     }
 
     private fun sameRow(a: OcrLine, b: OcrLine): Boolean {
         val lower = min(a.box.height, b.box.height)
         if (max(a.box.height, b.box.height) > MAX_HEIGHT_RATIO * lower) return false
+        if (turned(a.box, b.box)) return false
         val overlap = min(a.box.maxY, b.box.maxY) - max(a.box.minY, b.box.minY)
         if (overlap < 0.5f * min(a.box.maxY - a.box.minY, b.box.maxY - b.box.minY)) return false
         val sideBySide = min(a.box.maxX, b.box.maxX) - max(a.box.minX, b.box.minX)
         return sideBySide <= 0.5f * lower
     }
 
+    /** 两个都看得出走向（长边过短边 [ELONGATED] 倍）的框，走向差 [MAX_TURN] 度以上。 */
+    private fun turned(a: Box, b: Box): Boolean {
+        if (a.width < ELONGATED * a.height || b.width < ELONGATED * b.height) return false
+        val d = abs(direction(a) - direction(b)) % 360
+        return min(d, 360 - d) > MAX_TURN
+    }
+
+    /** 框的阅读方向（tl→tr），度。 */
+    private fun direction(b: Box): Double = Math.toDegrees(atan2((b.tr.y - b.tl.y).toDouble(), (b.tr.x - b.tl.x).toDouble()))
+
     /** 同一排的两段，字高最多差这么多倍。 */
     private const val MAX_HEIGHT_RATIO = 2f
 
+    /** 同一排的两段，走向最多差这么多度：拍照的透视让同一排差出几度，水印一般斜二三十度以上。 */
+    private const val MAX_TURN = 15.0
+
+    /** 长边过短边这么多倍才看得出走向，同 TextAxis。 */
+    private const val ELONGATED = 1.3f
+
+    /** 同一排的两段最远隔几个字高。 */
+    const val REACH = 3f
+
     private fun near(rowRight: Float, line: OcrLine): Boolean {
         val h = line.box.maxY - line.box.minY
-        return line.box.minX - rowRight <= 3f * h
+        return line.box.minX - rowRight <= REACH * h
     }
 
     private fun join(row: List<OcrLine>): OcrLine {

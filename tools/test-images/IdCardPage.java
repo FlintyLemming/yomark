@@ -8,7 +8,9 @@
 //   公民身份号码用等宽字、字距拉开；
 // - id-card-back.jpg：国徽面，签发机关、有效期限；
 // - id-card-photo.jpg：人像面放在皮纹桌面上拍的样子，顺时针转了 90° 再歪 4°，压缩得狠一点。
-//   用户反馈的两张都是这样竖着拍的：0.15.0 把一列列字串成一行，姓名、出生、号码一处都没遮上。
+//   用户反馈的两张都是这样竖着拍的：0.15.0 把一列列字串成一行，姓名、出生、号码一处都没遮上；
+// - id-card-watermark-cn.jpg：人像面上斜着平铺灰色的「仅供办理银行开户使用 他用无效」，复印件常见的样子。
+//   水印和压住的字被检测成一块：住址第一行、出生日期读丢了。
 //
 // 内容全是编的：号码按 GB 11643 算出校验码，地址是随手写的门牌，照片是灰色剪影（单测不跑人脸）。
 // 字体用黑体（Windows 上是 SimHei）；图已经提交，单测不依赖字体。
@@ -45,7 +47,27 @@ public class IdCardPage {
         write(front, new File(dir, "id-card-front.jpg"), 0.88f);
         write(back(), new File(dir, "id-card-back.jpg"), 0.88f);
         write(photo(front), new File(dir, "id-card-photo.jpg"), 0.72f);
+        write(watermark(front, "仅供办理银行开户使用 他用无效", -25), new File(dir, "id-card-watermark-cn.jpg"), 0.88f);
         System.out.println(ID);
+    }
+
+    /** 斜着平铺一行半透明的灰字，[deg] 是倾角（负的往右上斜）。 */
+    static BufferedImage watermark(BufferedImage card, String s, double deg) {
+        BufferedImage img = new BufferedImage(W, H, BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = img.createGraphics();
+        hints(g);
+        g.drawImage(card, 0, 0, null);
+        g.setFont(font(Font.PLAIN, 32));
+        g.setColor(new Color(120, 120, 120, 140));
+        for (int y = -H; y < 2 * H; y += 130) for (int x = -W; x < 2 * W; x += 540) {
+            AffineTransform t = g.getTransform();
+            g.translate(x + y / 2, y);
+            g.rotate(Math.toRadians(deg));
+            g.drawString(s, 0, 0);
+            g.setTransform(t);
+        }
+        g.dispose();
+        return img;
     }
 
     static BufferedImage front() {

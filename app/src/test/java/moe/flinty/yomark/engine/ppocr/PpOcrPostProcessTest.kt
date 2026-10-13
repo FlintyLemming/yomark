@@ -153,6 +153,18 @@ class PpOcrPostProcessTest {
         assertThat(rows.map { it.text }).containsExactly("SPECIMEN", "Nationality", "UNITED STATES").inOrder()
     }
 
+    /**
+     * 合成卡上斜着平铺的一行水印「BANKAC」和证件上的字一样高，斜着从「民 族」左边穿过去，外接框和它重叠过半、左右也挨着。
+     * 以前「民 族」被串进了水印那一行。一个字的方框看不出走向，照拼。
+     */
+    @Test fun `a tilted watermark line does not take level text into its row`() {
+        val watermark = OcrLine("BANKAC", 0.99f, Box(Pt(82f, 216f), Pt(263f, 94f), Pt(296f, 140f), Pt(115f, 263f)), List(6) { null })
+        val level = line("民 族", 293f, 160f, h = 41f)
+        assertThat(RowGrouper.group(listOf(watermark, level)).map { it.text }).containsExactly("BANKAC", "民 族")
+        val glyph = line("女", 240f, 160f, h = 41f)
+        assertThat(RowGrouper.group(listOf(glyph, level)).map { it.text }).containsExactly("女 民 族")
+    }
+
     /** 证件上字段名下面紧贴着值，框上下咬住一截（重叠过半），但它们是上下叠着的，不是同一排。 */
     @Test fun `a label above its value stays apart even when the boxes overlap`() {
         val label = line("Date of birth", 300f, 265f, h = 23f)

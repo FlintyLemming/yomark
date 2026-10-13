@@ -8,7 +8,10 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** 一个像素的颜色，三个通道都是 0..255。 */
-internal class Color(val r: Float, val g: Float, val b: Float)
+internal class Color(val r: Float, val g: Float, val b: Float) {
+    /** 亮度（BT.601），0..255。 */
+    val luma: Float get() = 0.299f * r + 0.587f * g + 0.114f * b
+}
 
 /**
  * 识别器眼里的一张图：按浮点坐标取色，整数坐标落在像素中心上。

@@ -76,15 +76,21 @@ class MixedPageOcrTest {
     /**
      * 斜着平铺的水印比证件上的字长，页面仍按横平的读：名字、号码、地址照样认得出。
      * 以前整页转到水印的角度上读，名字那一行没了，号码读成了三段。
+     *
+     * 水印压住的字横着重读出来（PpOcrEngine.underTilted），水印的字母不再串进证件的行里：
+     * 以前「出」「7 月」「女」「汉」跟着水印读成了字母，「民 族」「18 日」串进了水印那一行，出生日期遮不上。
      */
     @Test fun `a long diagonal watermark does not tilt the card`() {
         val lines = read("watermark") { TestPages.res("/ppocr/id-card-watermark.jpg") }
         assertThat(ReadingFrame.of(lines.map { it.quad }).isUpright).isTrue()
-        assertThat(lines.map { compact(it.text) }.filter { "330106199307180423" in it }).hasSize(1)
+        assertThat(lines.map { compact(it.text) }).containsAtLeast(
+            "姓名林知夏", "性别女民族汉", "出生1993年7月18日", "住址浙江省杭州市西湖区文三路", "88号6幢2单元501室",
+            "公民身份号码330106199307180423",
+        )
         val found = found(lines)
-        assertThat(found.filter { it.first == SensitiveKind.PERSON_NAME }.map { it.second }.single { "林知夏" in it }).isNotEmpty()
-        assertThat(found.filter { it.first == SensitiveKind.LONG_NUMBER }.map { it.second }.single { "330106199307180423" in it }).isNotEmpty()
-        assertThat(found).contains(SensitiveKind.POSTAL_ADDRESS to "号6幢2单元501室")
+        assertThat(found.filter { it.first == SensitiveKind.PERSON_NAME }.map { it.second }.any { "林知夏" in it }).isTrue()
+        assertThat(found.filter { it.first == SensitiveKind.ID_NUMBER }.map { it.second }.single { "330106199307180423" in it }).isNotEmpty()
+        assertThat(found).contains(SensitiveKind.POSTAL_ADDRESS to "88号6幢2单元501室")
     }
 
     /**
