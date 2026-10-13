@@ -34,6 +34,12 @@ data class Candidate(
      * 同一条规则里误报率高出一截的认法，命中要靠页面上的旁证坐实，没有旁证又被设置留下来的只圈出（见 NeedsAnchor）。
      */
     val enabledByDefault: Boolean = true,
+    /**
+     * 这一处的字朝哪个方向读（度，同 ReadingFrame.degrees）；null 是跟着整页（人脸、条码）。
+     * 截图里一张转过的证件照、车牌照：合并时只在同一个方向的候选之间、按这个方向量「同一行」「挨着」（CandidateMerger），
+     * 按整页的方向量，证件上上下两行地址、照片上摞着的几块牌子会拼成一大块。
+     */
+    val readingDegrees: Float? = null,
 )
 
 data class AnalysisResult(val lines: List<TextLine>, val candidates: List<Candidate>)

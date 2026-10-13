@@ -13,7 +13,8 @@ sourceSets {
                 "OcrDump.kt", "RuleProto.kt", "OcrBench.kt", "EnRules.kt", "EnProto.kt", "PpOcrEngineX.kt",
                 "moe/flinty/yomark/engine/ppocr/CtcDecoder.kt", "moe/flinty/yomark/engine/ppocr/DbPostProcess.kt",
                 "moe/flinty/yomark/engine/ppocr/OcrTypes.kt", "moe/flinty/yomark/engine/ppocr/PpOcrEngine.kt",
-                "moe/flinty/yomark/engine/ppocr/WordGaps.kt",
+                "moe/flinty/yomark/engine/ppocr/WordGaps.kt", "moe/flinty/yomark/engine/ppocr/Pixels.kt",
+                "moe/flinty/yomark/engine/ppocr/TextAxis.kt",
                 "moe/flinty/yomark/engine/genai/SemanticPrompt.kt",
                 "moe/flinty/yomark/core/model/Sensitivity.kt",
                 // 规则原型要对照出厂规则表
@@ -25,6 +26,9 @@ sourceSets {
                 "moe/flinty/yomark/rules/EnglishAddressShape.kt", "moe/flinty/yomark/rules/EnglishNames.kt",
                 "moe/flinty/yomark/rules/EnglishLists.kt", "moe/flinty/yomark/rules/Page.kt",
                 "moe/flinty/yomark/rules/StackedField.kt", "moe/flinty/yomark/rules/Mrz.kt", "moe/flinty/yomark/rules/Dates.kt",
+                "moe/flinty/yomark/rules/IdNumbers.kt", "moe/flinty/yomark/rules/Vin.kt",
+                "moe/flinty/yomark/rules/FollowingLines.kt", "moe/flinty/yomark/rules/ChineseIdCard.kt",
+                "moe/flinty/yomark/rules/DiplomaName.kt", "moe/flinty/yomark/rules/HanNames.kt",
                 "moe/flinty/yomark/rules/LicensePlate.kt",
                 "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )

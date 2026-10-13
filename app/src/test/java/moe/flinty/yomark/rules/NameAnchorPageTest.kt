@@ -1,13 +1,10 @@
 package moe.flinty.yomark.rules
 
-import android.graphics.RectF
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.test.runTest
-import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind
-import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,14 +22,7 @@ import androidx.test.core.app.ApplicationProvider
 @RunWith(RobolectricTestRunner::class)
 class NameAnchorPageTest {
 
-    /** 像 PP-OCR 那样每个字一个 element：字宽 20px、字高 20px，行距 40px，从左边 40px 起。 */
-    private fun page(vararg texts: String): List<TextLine> = texts.mapIndexed { row, text ->
-        val top = 100f + row * 40f
-        val els = text.mapIndexed { i, c ->
-            TextElement(Quad.fromRect(RectF(40f + i * 20f, top, 60f + i * 20f, top + 20f)), c.toString(), i..i)
-        }
-        TextLine(Quad.fromRect(RectF(40f, top, 40f + text.length * 20f, top + 20f)), text, 0.95f, els)
-    }
+    private fun page(vararg texts: String) = textLines(*texts)
 
     private suspend fun names(
         lines: List<TextLine>,
@@ -42,13 +32,7 @@ class NameAnchorPageTest {
         RuleClassifier(DefaultRuleSet.rules, keepUnanchored = keepUnanchored, anchors = anchors).classify(lines)
             .filter { it.kind == SensitiveKind.PERSON_NAME }
 
-    private fun Candidate.text(lines: List<TextLine>): String {
-        val b = quad.bounds()
-        val line = lines.single { it.quad.bounds().top == b.top }
-        val first = ((b.left - 40f) / 20f).toInt()
-        val last = ((b.right - 40f) / 20f).toInt() - 1
-        return line.text.substring(first, last + 1)
-    }
+    private fun Candidate.text(lines: List<TextLine>): String = textIn(lines)
 
     /** 那张截图：一个人名都不该有。逐行过滤挡掉大半，剩下的「单月」附近没有旁证。 */
     @Test fun `the product spec page from the bug report has no names`() = runTest {

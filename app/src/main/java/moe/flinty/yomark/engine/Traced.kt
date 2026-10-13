@@ -42,6 +42,14 @@ private class TracedRegionDetector(private val inner: RegionDetector) : RegionDe
             "${formatDuration(ms)} · ${found.size} 处" to found.map { describeCandidate(it) }
         }
     }
+
+    override suspend fun detect(image: SourceImage, quarterTurns: Int): List<Candidate> {
+        val trace = currentTrace() ?: return inner.detect(image, quarterTurns)
+        val title = "${SensitiveKindLabels.debugName(inner.kind)} · ${inner.id} · 转回 ${quarterTurns * 90}°"
+        return trace.step(TraceStage.REGION, title, { inner.detect(image, quarterTurns) }) { found, ms ->
+            "${formatDuration(ms)} · ${found.size} 处" to found.map { describeCandidate(it) }
+        }
+    }
 }
 
 private class TracedClassifier(private val inner: SensitivityClassifier) : SensitivityClassifier by inner {

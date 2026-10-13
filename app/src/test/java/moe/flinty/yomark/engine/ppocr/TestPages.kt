@@ -1,0 +1,97 @@
+package moe.flinty.yomark.engine.ppocr
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Rect
+
+/**
+ * 拿测试资源里现成的图拼出来的页面，不画字（Robolectric 里没有中文字体）：
+ * 字全是从物流页、身份证上剪下来的像素，每次拼出来一模一样。
+ */
+internal object TestPages {
+
+    fun res(name: String): Bitmap {
+        val bytes = TestPages::class.java.getResourceAsStream(name)!!.readBytes()
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size).copy(Bitmap.Config.ARGB_8888, true)
+    }
+
+    /**
+     * 正着的表单上贴着一张顺时针转了 [cardDegrees]（90 的整数倍）的身份证人像面：上面两行剪自物流页
+     * （「送至 长江路88号阳光新村5幢302室」「王小明 86-139****5678 号码保护中」），证件上的字比这两行长，整页的走向跟着证件。
+     */
+    fun formWithCard(cardDegrees: Int): Bitmap = withCard(cardDegrees, Rect(0, 650, 1080, 820), 300)
+
+    /**
+     * 一整页正着的物流页下面贴着同一张转过的身份证：横着的字比证件上的多得多，整页的走向跟着物流页，
+     * 同聊天截图里发了一张转过的证件照。
+     */
+    fun screenshotWithCard(cardDegrees: Int): Bitmap = withCard(cardDegrees, Rect(0, 0, 1080, 1500), 1540)
+
+    /**
+     * 一整页正着的物流页下面贴着一张缩到 [scale]、顺时针转了 [photoDegrees] 度的车的照片（plate-photo.jpg），左沿在 [left]：
+     * 同聊天截图里发了一张拍歪了的车的照片，照片上的字少，不单分一组。
+     */
+    fun screenshotWithPlatePhoto(photoDegrees: Float, scale: Float, left: Float): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val photo = res("/ppocr/plate-photo.jpg")
+        val small = Bitmap.createScaledBitmap(photo, (photo.width * scale).toInt(), (photo.height * scale).toInt(), true)
+        val turned = Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(photoDegrees) }, true)
+        val out = Bitmap.createBitmap(1080, 1520 + turned.height + 40, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(page, Rect(0, 0, 1080, 1500), Rect(0, 0, 1080, 1500), null)
+            drawBitmap(turned, left, 1520f, null)
+        }
+        return out
+    }
+
+    /**
+     * 物流页的上面 1080 像素（不缩，整页不到 2048 高，app 不减半）下面居中贴一张缩到 [scale]、顺时针转了 [degrees] 度的
+     * 测试图 [res]：同聊天截图里发了一张拍歪了的证件照，证件上的字比截图上的少，整页按截图的方向认。
+     */
+    fun screenshotWith(res: String, degrees: Float, scale: Float): Bitmap {
+        val turned = turned(res, degrees, scale)
+        return screenshotWith(1080, Pasted(turned, (1080 - turned.width) / 2f, 1100f))
+    }
+
+    /** 贴在页上的一张图 [bitmap]，左上角在 ([left], [top])。 */
+    class Pasted(val bitmap: Bitmap, val left: Float, val top: Float)
+
+    /** 测试图 [res] 缩到 [scale]、顺时针转 [degrees] 度。 */
+    fun turned(res: String, degrees: Float, scale: Float): Bitmap {
+        val doc = res("/ppocr/$res")
+        val small = Bitmap.createScaledBitmap(doc, (doc.width * scale).toInt(), (doc.height * scale).toInt(), true)
+        return Bitmap.createBitmap(small, 0, 0, small.width, small.height, Matrix().apply { postRotate(degrees) }, true)
+    }
+
+    /** 物流页的上面 [pageHeight] 像素，下面贴着几张图 [photos]（坐标是整页上的）：页宽 1080，贴得更宽的跟着放宽，下沿留 40。 */
+    fun screenshotWith(pageHeight: Int, vararg photos: Pasted): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val width = maxOf(1080, photos.maxOf { (it.left + it.bitmap.width).toInt() })
+        val height = photos.maxOf { (it.top + it.bitmap.height).toInt() } + 40
+        val out = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(page, Rect(0, 0, 1080, pageHeight), Rect(0, 0, 1080, pageHeight), null)
+            photos.forEach { drawBitmap(it.bitmap, it.left, it.top, null) }
+        }
+        return out
+    }
+
+    /** 物流页上剪下 [from] 那一块贴在页顶，下面 [cardTop] 处居中贴一张顺时针转了 [cardDegrees] 的身份证人像面。 */
+    private fun withCard(cardDegrees: Int, from: Rect, cardTop: Int): Bitmap {
+        val page = res("/ppocr/logistics-page.png")
+        val front = res("/ppocr/id-card-front.jpg")
+        val card = Bitmap.createBitmap(front, 0, 0, front.width, front.height, Matrix().apply { postRotate(cardDegrees.toFloat()) }, true)
+        val out = Bitmap.createBitmap(1080, cardTop + card.height + 100, Bitmap.Config.ARGB_8888)
+        Canvas(out).apply {
+            drawColor(Color.WHITE)
+            drawBitmap(page, from, Rect(0, 20, 1080, 20 + from.height()), null)
+            drawBitmap(card, (1080 - card.width) / 2f, cardTop.toFloat(), null)
+        }
+        return out
+    }
+}

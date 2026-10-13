@@ -40,6 +40,17 @@ class MrzTest {
             .forEach { assertThat(mrz(it)).containsExactly(it) }
     }
 
+    /**
+     * 中国护照第一行的「<」全读成了「K」：形状对得上护照第一行（P、类型、国家码，四十几个字符）、末尾一串 K，成串的 K 才当填充符，
+     * 名字照样读得出来。只有字母、一个填充符都没有的普通文字不算。
+     */
+    @Test fun `fillers read as k on the passport name line`() {
+        val line = "POCHNZHANGKKSAN" + "K".repeat(29)
+        assertThat(mrz(line)).containsExactly(line)
+        assertThat(Mrz.read(listOf(Mrz.findIn(line)))!!.names).containsExactly("ZHANG", "SAN")
+        assertThat(mrz("PLEASE KEEP THIS BOOKING REFERENCE KKKKKK")).isEmpty()
+    }
+
     @Test fun `ordinary text is not a machine readable zone`() {
         assertThat(mrz("UNITED STATES DEPARTMENT OF STATE")).isEmpty()
         assertThat(mrz("<< BACK TO SHOPPING CART AND CONTINUE")).isEmpty()
@@ -93,6 +104,99 @@ class MrzTest {
     @Test fun `no machine readable zone, nothing to echo`() {
         val p = page(Row("E00007730", 40f, 0f), Row("TRAVELER", 40f, 30f))
         MrzEcho.What.entries.forEach { assertThat(MrzEcho(it, 1f).texts(p)).isEmpty() }
+    }
+
+    // ---------- 大陆的通行证 ----------
+
+    /** 往来港澳通行证卡正面底下的一行：百度 OCR 样张的「C00000000」，四位校验位都对得上。往来台湾通行证是 CD。 */
+    private val exitPermit = "CSC000000004<2404200<8108038<6"
+
+    @Test fun `the one line of an exit-entry permit card`() {
+        listOf(exitPermit, "CSCA12345672<3306150<9503124<6", "CDL123456781<3001019<9001011<8")
+            .forEach { assertThat(mrz(it)).containsExactly(it) }
+        // OCR 把「<」读成 K、く、≪，在中间补空格，照样认
+        assertThat(mrz("CSC000000004K2404200K8108038K6")).hasSize(1)
+        assertThat(mrz("CSC000000004く2404200く8108038く6")).hasSize(1)
+        assertThat(mrz("CSC000000004≪2404200<8108038≪6")).hasSize(1)
+        assertThat(mrz("CSC00000000 4<2404200<810 8038<6")).hasSize(1)
+        // 校验位只剩一位对得上的不认
+        assertThat(mrz("CSC000000004<2404201<8108039<6")).isEmpty()
+    }
+
+    /** OCR 漏了一两个「<」，那一行只剩 29、28 个字符：补回去再看。 */
+    @Test fun `an exit-entry permit line with a filler dropped`() {
+        listOf(
+            "CSC000000004 2404200<8108038<6", "CSC000000004<2404200 8108038<6", "CSC000000004<2404200<81080386",
+            "CSC0000000042404200 8108038<6",
+        ).forEach { assertThat(mrz(it)).containsExactly(it) }
+        val p = page(Row("C00000000", 300f, 0f), Row("CSC000000004 2404200<8108038<6", 40f, 150f))
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("C00000000")
+        // 漏了的补回去校验位还是对不上的不认
+        assertThat(mrz("CSC000000004 2404201<8108039<6")).isEmpty()
+    }
+
+    /**
+     * 卡右上角没有字段名的号码、别处印着的生日，拿那一行对出来。
+     * 那一行有效期在前、生日在后：当护照第二行读会把有效期「240420」当成生日，「2024.04.20」不该被认成生日。
+     */
+    @Test fun `the permit number and birth date printed elsewhere on the card`() {
+        val p = page(
+            Row("往来港澳通行证", 40f, 0f),
+            Row("C00000000", 300f, 0f),
+            Row("姓名 证件样本", 40f, 30f),
+            Row("出生日期 1981.08.03", 40f, 60f),
+            Row("有效期限 2014.04.21-2024.04.20", 40f, 90f),
+            Row(exitPermit, 40f, 150f),
+        )
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("C00000000")
+        assertThat(MrzEcho(MrzEcho.What.BIRTH_DATE, 1f).texts(p)).containsExactly("1981.08.03")
+    }
+
+    private val idNumber = DefaultRuleSet.rules.first { it.id == "idnumber" }
+
+    /** 通行证的机读码和号码归证件号码，不归护照；护照的照旧归护照。 */
+    @Test fun `a permit's machine readable zone and number are id numbers`() {
+        val p = page(Row("往来港澳通行证", 40f, 0f), Row("C00000000", 300f, 0f), Row(exitPermit, 40f, 150f))
+        assertThat(idNumber.findOnPage(p).map { p.text(it) }).containsExactly(exitPermit, "C00000000")
+        assertThat(passport.findOnPage(p)).isEmpty()
+        assertThat(idNumber.findOnPage(specimen)).isEmpty()
+        assertThat(MrzLines(1f, MrzDocument.PERMIT).findIn(exitPermit)).hasSize(1)
+        assertThat(MrzLines(1f, MrzDocument.PASSPORT).findIn(exitPermit)).isEmpty()
+        assertThat(MrzLines(1f, MrzDocument.PERMIT).findIn(line2)).isEmpty()
+    }
+
+    /** 回乡证背面三行：第一行认得出是通行证，另外两行单看分不出，同一页上的一起归证件号码。 */
+    @Test fun `the other lines on the back of a mainland travel permit go with it`() {
+        val back = page(
+            Row("CRH1234567830003001019M9001011", 40f, 0f),
+            Row("CHAN<<TAI<MAN<<<<<<<<<<<<<<<<<", 40f, 60f),
+        )
+        assertThat(idNumber.findOnPage(back).map { back.text(it) })
+            .containsExactly("CRH1234567830003001019M9001011", "CHAN<<TAI<MAN<<<<<<<<<<<<<<<<<")
+        assertThat(passport.findOnPage(back)).isEmpty()
+    }
+
+    /** 回乡证（CR）、台胞证（CT）背面三行的第一行，整行没有成串的填充符。号码旁边粘着换证次数也算。 */
+    @Test fun `the first line of a mainland travel permit`() {
+        val hk = "CRH1234567830003001019M9001011"
+        val tw = "CT12345678<80133001019F9001011"
+        listOf(hk, tw).forEach { assertThat(mrz(it)).containsExactly(it) }
+        val p = page(Row("证件号码 H1234567800", 40f, 0f), Row("出生日期 1990.01.01", 40f, 30f), Row(hk, 40f, 90f))
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("H1234567800")
+        assertThat(MrzEcho(MrzEcho.What.BIRTH_DATE, 1f).texts(p)).containsExactly("1990.01.01")
+        val t = page(Row("12345678", 40f, 0f), Row(tw, 40f, 90f))
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(t)).containsExactly("12345678")
+    }
+
+    /** 中国护照第二行可选数据区是 GBK 编码的姓名（张三 = NFMFMIPN），照旧按护照认，号码照旧对得出来。 */
+    @Test fun `a chinese passport still reads`() {
+        val l1 = "POCHNZHANG<<SAN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+        val l2 = "E123456782CHN9001011M3001019NFMFMIPN<<<<A988"
+        listOf(l1, l2).forEach { assertThat(mrz(it)).containsExactly(it) }
+        val p = page(Row("E12345678", 40f, 0f), Row("ZHANG, SAN", 40f, 30f), Row("01 JAN 1990", 40f, 60f), Row(l1, 40f, 120f), Row(l2, 40f, 150f))
+        assertThat(MrzEcho(MrzEcho.What.DOCUMENT_NUMBER, 1f).texts(p)).containsExactly("E12345678")
+        assertThat(MrzEcho(MrzEcho.What.BIRTH_DATE, 1f).texts(p)).containsExactly("01 JAN 1990")
+        assertThat(MrzEcho(MrzEcho.What.NAME, 1f).texts(p)).containsExactly("ZHANG, SAN")
     }
 
     /** 按出厂规则表：护照一类认出两行机读码和资料页上的号码。 */

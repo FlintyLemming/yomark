@@ -35,6 +35,20 @@ class FaceCandidateTest {
         assertThat(box.top - r.top).isGreaterThan(box.left - r.left)
     }
 
+    /**
+     * 竖着拍的页（顺时针转了 90°）：转正的图上认出的脸映射回原图，发际线那一侧多留的余量跟着转到原图上头顶朝的那边（右边）。
+     * 原图 600×1000，转正的图 1000×600；转正的图上的 (u, v) 是原图上的 (600 − v, u)。
+     */
+    @Test fun `a face found upright maps back onto the original with the hairline side kept`() {
+        val c = FaceCandidates.fromUpright(0, null, box, imageWidth = 600, imageHeight = 1000, turns = 1, masked = true)
+        val r = c.quad.bounds()
+        val face = RectF(380f, 100f, 500f, 200f)
+        assertThat(r.contains(face)).isTrue()
+        assertThat(r.right - face.right).isGreaterThan(face.left - r.left)
+        assertThat(r.right).isAtMost(600f)
+        assertThat(c.id).endsWith("-turn1")
+    }
+
     @Test fun `the box never leaves the image`() {
         val r = FaceCandidates.from(0, null, RectF(0f, 0f, 100f, 100f), 100, 100, masked = true).quad.bounds()
         assertThat(r.left).isAtLeast(0f)

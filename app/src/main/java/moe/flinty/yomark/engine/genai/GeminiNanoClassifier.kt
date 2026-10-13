@@ -67,6 +67,8 @@ class GeminiNanoClassifier(
                     "（置信度不到 ${RuleClassifier.MIN_LINE_CONFIDENCE}、不到两个字母或汉字的行不送）",
             )
         )
+        // 合并时同规则的候选一样按各自的阅读方向量：截图里转过的证件照上两行地址不拼成一块
+        val directions by lazy { RuleClassifier.readingDegrees(lines) }
         return chunks.flatMapIndexed { n, chunk ->
             val started = trace?.now() ?: 0L
             val reply = try {
@@ -87,6 +89,7 @@ class GeminiNanoClassifier(
                     source = DetectorSource.LLM,
                     confidence = CONFIDENCE,
                     enabledByDefault = false,
+                    readingDegrees = directions[f.lineIndex],
                 )
             }
         }

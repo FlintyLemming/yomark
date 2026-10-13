@@ -2,6 +2,7 @@ package moe.flinty.yomark.engine
 
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.geometry.ReadingFrame
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import kotlin.math.abs
@@ -14,16 +15,20 @@ import kotlin.math.min
  * 1. IoU > 0.6 的候选按 source 优先级去重（RULE > ENTITY_MODEL > LLM）；
  * 2. 同一 kind 且水平间距小于行高 0.5 倍的相邻候选合并；
  * 3. 按面积降序输出，让 UI 先渲染大块。
+ *
+ * 「水平」「行高」按页面的阅读方向算（[ReadingFrame]）：竖着拍的页上一行字在图上是竖的，
+ * 按图上的横竖算，上下两行地址会被当成同一行拼成一大块。候选自己带着方向的（Candidate.readingDegrees：
+ * 截图里一张转过的证件照、车牌照上的）按它自己的方向量，也只和同一个方向的合并。
  */
 class CandidateMerger(
     private val iouThreshold: Float = 0.6f,
     private val gapRatio: Float = 0.5f,
 ) {
 
-    fun merge(candidates: List<Candidate>): List<Candidate> {
+    fun merge(candidates: List<Candidate>, frame: ReadingFrame = ReadingFrame.UPRIGHT): List<Candidate> {
         if (candidates.isEmpty()) return emptyList()
         val deduped = dedupe(candidates)
-        val joined = joinAdjacent(deduped)
+        val joined = joinAdjacent(deduped, frame)
         return joined.sortedByDescending { it.quad.area() }
     }
 
@@ -62,7 +67,7 @@ class CandidateMerger(
      */
     private fun comparable(a: Candidate, b: Candidate): Boolean = a.kind == b.kind
 
-    private fun joinAdjacent(input: List<Candidate>): List<Candidate> {
+    private fun joinAdjacent(input: List<Candidate>, frame: ReadingFrame): List<Candidate> {
         val remaining = input.toMutableList()
         val out = ArrayList<Candidate>()
         while (remaining.isNotEmpty()) {
@@ -73,8 +78,8 @@ class CandidateMerger(
                 val it = remaining.iterator()
                 while (it.hasNext()) {
                     val other = it.next()
-                    if (canJoin(current, other)) {
-                        current = join(current, other)
+                    if (canJoin(current, other, frame)) {
+                        current = join(current, other, frame)
                         it.remove()
                         merged = true
                     }
@@ -85,11 +90,13 @@ class CandidateMerger(
         return out
     }
 
-    private fun canJoin(a: Candidate, b: Candidate): Boolean {
+    private fun canJoin(a: Candidate, b: Candidate, page: ReadingFrame): Boolean {
         if (a.kind != b.kind) return false
         if (a.source in REGION_SOURCES || b.source in REGION_SOURCES) return false  // 人脸/条码不参与合并
-        val ra = a.quad.bounds()
-        val rb = b.quad.bounds()
+        // 方向不同的只在叠在一起时合并：斜着的水印那一行里又读出一遍的名字，和证件上那个是同一处
+        val frame = shared(a, b, page) ?: return a.quad.iou(b.quad) > 0f
+        val ra = frame.bounds(a.quad)
+        val rb = frame.bounds(b.quad)
         val lineHeight = max(ra.height(), rb.height())
         // 同一行：垂直中心相差不超过行高的一半
         if (abs(ra.centerY() - rb.centerY()) > lineHeight * 0.5f) return false
@@ -97,16 +104,27 @@ class CandidateMerger(
         return gap < lineHeight * gapRatio
     }
 
-    private fun join(a: Candidate, b: Candidate): Candidate {
-        val r = RectF(a.quad.bounds()).apply { union(b.quad.bounds()) }
+    /** 两个框在阅读方向上的外接框（方向不同的按整页的）；正着的页就是图上的外接矩形。 */
+    private fun join(a: Candidate, b: Candidate, page: ReadingFrame): Candidate {
+        val frame = shared(a, b, page) ?: page
+        val r = RectF(frame.bounds(a.quad)).apply { union(frame.bounds(b.quad)) }
         return a.copy(
             id = "${a.id}+${b.id}",
-            quad = Quad.fromRect(r),
+            quad = if (frame.isUpright) Quad.fromRect(r) else frame.toImage(r),
             confidence = max(a.confidence, b.confidence),
             // 取「或」：合并绝不把默认打码的降级成仅圈出
             enabledByDefault = a.enabledByDefault || b.enabledByDefault,
         )
     }
+
+    /** 两个候选同一个方向时按哪个方向量：自己带着方向的按它的，没带的按整页的。方向不同为 null。 */
+    private fun shared(a: Candidate, b: Candidate, page: ReadingFrame): ReadingFrame? {
+        val frame = frameOf(a, page)
+        return frame.takeIf { it.angleTo(frameOf(b, page)) <= SAME_DIRECTION }
+    }
+
+    private fun frameOf(c: Candidate, page: ReadingFrame): ReadingFrame =
+        c.readingDegrees?.takeIf { it != page.degrees }?.let { ReadingFrame.at(it) } ?: page
 
     private fun priority(source: DetectorSource): Int = when (source) {
         DetectorSource.RULE, DetectorSource.FACE, DetectorSource.BARCODE, DetectorSource.MANUAL -> 0
@@ -116,5 +134,8 @@ class CandidateMerger(
 
     private companion object {
         val REGION_SOURCES = setOf(DetectorSource.FACE, DetectorSource.BARCODE)
+
+        /** 两个候选的方向差不过这么多度，算同一个方向（同 RuleClassifier 里一行算不算转过的口径）。 */
+        const val SAME_DIRECTION = 5f
     }
 }

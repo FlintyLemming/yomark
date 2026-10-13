@@ -28,6 +28,16 @@ enum class SensitiveKind {
     // ORG_NAME 至今没有产出方。
     POSTAL_ADDRESS, PERSON_NAME, ORG_NAME,
 
+    /**
+     * 证件号码：身份证、通行证、驾驶证、社保卡上的号码，港台、外国的身份证号，通行证上的机读码。
+     * 有校验位、形状够特别、页上写着是哪儿的证件或者字段名指明了的才认，误报少，出厂打码。
+     * 护照号和护照、身份证的机读码另算一类（PASSPORT）。
+     */
+    ID_NUMBER,
+
+    /** 车架号（车辆识别代号，VIN）和发动机号。车架号有校验位，出厂打码。 */
+    VIN,
+
     FACE, BARCODE, MANUAL,
 }
 

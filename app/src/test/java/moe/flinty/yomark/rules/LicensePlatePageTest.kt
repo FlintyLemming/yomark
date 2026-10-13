@@ -1,6 +1,7 @@
 package moe.flinty.yomark.rules
 
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import org.junit.Test
 
 /**
@@ -54,5 +55,43 @@ class LicensePlatePageTest {
 
         val de = page(Row(100f, 20f, Segment("Kennzeichen", 40f, 172f)), Row(128f, 24f, Segment("M AB 1234", 40f, 170f)))
         assertThat(found(de)).containsExactly(listOf("M AB 1234") to false)
+    }
+
+    /**
+     * 照片转过来读，欧盟蓝条的国别字母粘在了号码上：法国的「PAB-123-CD」去掉它照样打码；它是一块牌子，不是「附近的字」，
+     * 下面那块德国的牌子（「BB MW 1234」，D 读成了 B）照样圈出。以前两块都丢了。
+     */
+    @Test fun `a band letter glued onto the plate`() {
+        val p = page(Row(100f, 64f, Segment("PAB-123-CD", 480f, 741f)), Row(250f, 66f, Segment("BB MW 1234", 204f, 468f)))
+        assertThat(found(p)).containsExactly(listOf("AB-123-CD") to false, listOf("BB MW 1234") to true)
+        mapOf("PAB-123-CD" to "AB-123-CD", "FAB-123-CD" to "AB-123-CD", "DAB12 CDE" to "AB12 CDE").forEach { (text, plate) ->
+            assertWithMessage(text).that(found(page(Row(100f, 64f, Segment(text, 480f, 741f))))).containsExactly(listOf(plate) to false)
+        }
+    }
+
+    /**
+     * 去掉头一个字母像法国牌的型号、代码，截图里、规格表里的一行：以前国别字母那一条在每一页的每一行上都认，这些全被打了码。
+     * 粘着国别字母的牌要孤零零一行才认（上下挨着标题、说明的不是），带颜色代号的（「BLK」）不认。
+     */
+    @Test fun `a product code is not a plate with a band letter`() {
+        listOf(
+            "HDX-500-WH", "MSR-150-BK", "LFC-100-BK", "ABC-123-XY", "BLK-100-WH", "BUS 123 AB", "SIA 321 SQ", "DHL 123 DE",
+            "DHL-123-AB", "EMS 123 CN", "AMG 450 GT", "VIP 888 CN", "PSN 123 HK", "AXA 123 DE", "ABS 123 AB",
+        ).forEach { code ->
+            val p = page(
+                Row(100f, 20f, Segment("Product details", 40f, 220f)),
+                Row(128f, 20f, Segment(code, 40f, 172f)),
+                Row(156f, 20f, Segment("In stock, ships tomorrow", 40f, 330f)),
+            )
+            assertWithMessage(code).that(found(p)).isEmpty()
+        }
+        val spec = page(
+            Row(100f, 20f, Segment("型号", 40f, 80f)),
+            Row(140f, 20f, Segment("MSR-150-BK", 40f, 172f)),
+            Row(180f, 20f, Segment("颜色", 40f, 80f)),
+            Row(220f, 20f, Segment("黑色", 40f, 80f)),
+        )
+        assertThat(found(spec)).isEmpty()
+        assertThat(found(page(Row(100f, 64f, Segment("BLK-100-WH", 480f, 741f))))).isEmpty()
     }
 }

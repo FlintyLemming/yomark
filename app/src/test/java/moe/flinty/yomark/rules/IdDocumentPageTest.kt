@@ -1,0 +1,581 @@
+package moe.flinty.yomark.rules
+
+import com.google.common.truth.Truth.assertThat
+import org.junit.Test
+
+/**
+ * 证件页上的姓名、住址、出生日期，按出厂规则表跑：身份证（合成卡和用户拍的那张的读法）、驾驶证、行驶证、户口簿、
+ * 营业执照、出生医学证明、毕业证、学生证、中国护照、往来港澳通行证、台湾身份证。号码见 IdNumberPageTest、VinRuleTest。
+ * 同一套认法放到聊天、订单、设置页上不该认出什么，见 IdRulesOnOrdinaryTextTest；转过来的页见 RotatedPageRuleTest。
+ *
+ * 内容全是编的。用户那张照片只照抄 OCR 读坏的样子（「名」前丢了「姓」、「性新女民 族汉」、年份里夹空格、
+ * 号码的头一位粘在「码」上），名字、号码、生日都换了。
+ */
+class IdDocumentPageTest {
+
+    /** 一类在这一页上认出的；要旁证的猜测（从名单猜的人名）由 RuleClassifier 再定，这里不算。 */
+    private fun found(id: String, page: Page): List<String> =
+        DefaultRuleSet.rules.first { it.id == id }.findOnPage(page).filter { !it.match.needsAnchor }.map { page.text(it) }
+
+    // ---------- 居民身份证人像面 ----------
+
+    private val idCardRows = IdDocumentRows.idCard
+    private val idCard = page(*idCardRows.toTypedArray())
+
+    @Test fun `the synthetic id card`() {
+        assertThat(found("name", idCard)).containsExactly("林知夏")
+        assertThat(found("birthdate", idCard)).containsExactly("1993 年 7 月 18 日")
+        assertThat(found("address", idCard)).containsExactly("浙江省杭州市西湖区文三路", "88号6幢2单元501 室")
+    }
+
+    /** 用户拍的那张的读法（见 IdDocumentRows.idPhoto）。0.15.0 上只认出了住址。 */
+    private val idPhotoRows = IdDocumentRows.idPhoto
+    private val idPhoto = page(*idPhotoRows.toTypedArray())
+
+    @Test fun `the mangled labels of a photographed id card`() {
+        assertThat(found("name", idPhoto)).containsExactly("宋语桐")
+        assertThat(found("birthdate", idPhoto)).containsExactly("201 2 年4 月17日")
+        assertThat(found("address", idPhoto)).containsExactly("浙江省杭州市上城区解放路", "128号")
+    }
+
+    /** 「出生」整个读丢了，只剩日期：拿号码里的生日对出来。 */
+    @Test fun `the birth date from the id number when its label is gone`() {
+        val p = page(
+            Row(84f, 34f, Segment("姓名", 70f, 147f), Segment("宋语桐", 180f, 282f)),
+            Row(238f, 30f, Segment("2012年4月17日", 180f, 400f)),
+            Row(510f, 36f, Segment("公民身份号码", 70f, 260f), Segment("330102201204174527", 330f, 900f)),
+        )
+        assertThat(found("birthdate", p)).containsExactly("2012年4月17日")
+    }
+
+    /** 「住址」读成了「佳址」：出生和号码之间、在值那一栏的就是住址。 */
+    @Test fun `an address whose label was misread`() {
+        val p = page(
+            Row(160f, 30f, Segment("性别女民族汉", 70f, 440f)),
+            Row(238f, 30f, Segment("出生", 70f, 147f), Segment("2012年4月17日", 180f, 400f), glued = true),
+            Row(316f, 30f, Segment("佳址", 70f, 147f), Segment("浙江省杭州市上城区解放路", 180f, 560f), glued = true),
+            Row(510f, 36f, Segment("公民身份号码", 70f, 260f), Segment("330102201204174527", 330f, 900f)),
+        )
+        assertThat(found("address", p)).containsExactly("浙江省杭州市上城区解放路")
+    }
+
+    /** 「姓名」读成了「娃名」：字段名那一栏的字按值那一栏去掉，不按字面。 */
+    @Test fun `a misread name label is dropped by its column`() {
+        val p = page(
+            Row(84f, 36f, Segment("娃名", 70f, 147f), Segment("林知夏", 180f, 288f)),
+            *idCardRows.drop(1).toTypedArray(),
+        )
+        assertThat(found("name", p)).containsExactly("林知夏")
+    }
+
+    /** 一页上拍了两张人像面：第二张的字段名也读坏了，照样各认各的。 */
+    @Test fun `two id card fronts on one page`() {
+        val second = idPhotoRows.map { r -> Row(r.y + 700f, r.h, *r.segments, glued = r.glued) }
+        val p = page(*idCardRows.toTypedArray(), *second.toTypedArray())
+        assertThat(found("name", p)).containsExactly("林知夏", "宋语桐")
+        assertThat(found("address", p))
+            .containsExactly("浙江省杭州市西湖区文三路", "88号6幢2单元501 室", "浙江省杭州市上城区解放路", "128号")
+    }
+
+    /** 住址第二行以「民族」「车辆」打头：那是路名（民族大道、车辆段），不是下一个字段。 */
+    @Test fun `an address line that starts like a field name`() {
+        val p = page(
+            Row(266f, 39f, Segment("住址", 34f, 91f), Segment("Address", 91f, 160f)),
+            Row(270f, 32f, Segment("广西南宁市青秀区", 380f, 636f)),
+            Row(318f, 31f, Segment("民族大道136号", 379f, 600f)),
+            Row(566f, 39f, Segment("住址", 34f, 91f), Segment("Address", 91f, 160f)),
+            Row(570f, 32f, Segment("北京市丰台区", 380f, 572f)),
+            Row(618f, 31f, Segment("车辆段宿舍3号楼", 379f, 627f)),
+        )
+        assertThat(found("address", p)).containsExactly("广西南宁市青秀区", "民族大道136号", "北京市丰台区", "车辆段宿舍3号楼")
+    }
+
+    /** 号码那一行不是住址的下半截，也不是名字。 */
+    @Test fun `the id number row is not part of the address`() {
+        assertThat(found("address", idCard)).doesNotContain("330106199307180423")
+        assertThat(found("name", idPhoto)).doesNotContain("公民")
+    }
+
+    // ---------- 驾驶证、行驶证 ----------
+
+    /** 驾驶证正页上真 OCR 读出来的样子（见 IdDocumentRows.drivingLicence）。 */
+    private val drivingLicence = page(*IdDocumentRows.drivingLicence.toTypedArray())
+
+    @Test fun `a driving licence with bilingual labels and values in their own column`() {
+        assertThat(found("name", drivingLicence)).containsExactly("周 以宁")
+        assertThat(found("address", drivingLicence)).containsExactly("江苏省南京市玄武区北京东路", "41号3栋2单元602室")
+        assertThat(found("birthdate", drivingLicence)).containsExactly("1986-02-14")
+    }
+
+    /** 字段名和值在同一行（字段名短、值离得近）：译名跳过去。 */
+    @Test fun `a driving licence row read as one line`() {
+        val p = page(
+            Row(180f, 26f, Segment("姓名 Name", 60f, 200f), Segment("周以宁", 230f, 308f), Segment("性别 Sex", 420f, 530f), Segment("女", 560f, 586f)),
+            Row(230f, 26f, Segment("住址 Address", 60f, 210f), Segment("江苏省南京市玄武区北京东路", 230f, 568f)),
+            Row(270f, 26f, Segment("41号3栋2单元602室", 230f, 450f)),
+            Row(320f, 26f, Segment("出生日期 Date of Birth", 60f, 220f), Segment("1986-02-14", 230f, 400f)),
+        )
+        assertThat(found("name", p)).containsExactly("周以宁")
+        assertThat(found("address", p)).containsExactly("江苏省南京市玄武区北京东路", "41号3栋2单元602室")
+        assertThat(found("birthdate", p)).containsExactly("1986-02-14")
+    }
+
+    /** 英文小字读错了一个字母（「Narne」「Adress」「Date of Brith」）：照样认出是译名，跳过去接右边的值。 */
+    @Test fun `a misread english sub-label`() {
+        val p = page(
+            Row(203f, 45f, Segment("周以宁", 375f, 475f)),
+            Row(206f, 38f, Segment("姓名", 33f, 93f), Segment("Narne", 93f, 150f)),
+            Row(266f, 39f, Segment("住址", 34f, 91f), Segment("Adress", 91f, 156f)),
+            Row(270f, 32f, Segment("江苏省南京市玄武区北京东路", 380f, 776f)),
+            Row(318f, 31f, Segment("41号3栋2单元602室", 379f, 642f)),
+            Row(378f, 35f, Segment("出生日期", 39f, 143f), Segment("Date of Brith", 143f, 237f)),
+            Row(379f, 33f, Segment("1986-02-14", 379f, 538f)),
+        )
+        assertThat(found("name", p)).containsExactly("周以宁")
+        assertThat(found("address", p)).containsExactly("江苏省南京市玄武区北京东路", "41号3栋2单元602室")
+        assertThat(found("birthdate", p)).containsExactly("1986-02-14")
+    }
+
+    /** 英文小字自己成了一段：「姓名」|「Name」|「周以宁」。 */
+    @Test fun `the english sub-label as its own box`() {
+        val p = page(
+            Row(203f, 45f, Segment("周以宁", 375f, 475f)),
+            Row(206f, 38f, Segment("姓名", 33f, 93f)),
+            Row(212f, 26f, Segment("Name", 96f, 146f)),
+            Row(266f, 39f, Segment("住址", 34f, 91f)),
+            Row(272f, 26f, Segment("Address", 94f, 160f)),
+            Row(270f, 32f, Segment("江苏省南京市玄武区北京东路", 380f, 776f)),
+            Row(318f, 31f, Segment("41号3栋2单元602室", 379f, 642f)),
+        )
+        assertThat(found("name", p)).containsExactly("周以宁")
+        assertThat(found("address", p)).containsExactly("江苏省南京市玄武区北京东路", "41号3栋2单元602室")
+    }
+
+    /** 酒店入住登记表这样的双语表单，没填的格子里是提示语。 */
+    @Test fun `a prompt in an empty form field is not a value`() {
+        val p = page(
+            Row(300f, 36f, Segment("姓名 Name", 60f, 220f)),
+            Row(300f, 36f, Segment("请输入", 400f, 508f)),
+            Row(540f, 36f, Segment("地址 Address", 60f, 260f)),
+            Row(540f, 36f, Segment("请填写详细地址", 400f, 652f)),
+        )
+        assertThat(found("name", p)).isEmpty()
+        assertThat(found("address", p)).isEmpty()
+    }
+
+    /** 表头一样的一排：单单一个「姓名」，右边隔得老远的是下一格的表头，不是值。 */
+    @Test fun `a bare label does not take the next cell on its row`() {
+        val p = page(
+            Row(100f, 30f, Segment("姓名", 60f, 120f)),
+            Row(100f, 30f, Segment("学号", 300f, 360f)),
+            Row(100f, 30f, Segment("成绩", 540f, 600f)),
+        )
+        assertThat(found("name", p)).isEmpty()
+    }
+
+    @Test fun `a vehicle licence`() {
+        val p = page(*IdDocumentRows.vehicleLicence.toTypedArray())
+        assertThat(found("name", p)).containsExactly("沈墨白")
+        assertThat(found("address", p)).containsExactly("浙江省杭州市拱墅区湖墅南路", "186号2幢1101室")
+        assertThat(found("vin", p)).containsExactly("LFV2A21K6D4123456")
+    }
+
+    // ---------- 户口簿、营业执照、出生医学证明 ----------
+
+    /** 常住人口登记卡：一行两个字段，长字段名「本市（县）其他住址」「何时由何地迁来本市（县）」。 */
+    @Test fun `a household register page`() {
+        val p = page(
+            Row(
+                100f, 24f, Segment("姓名", 40f, 88f), Segment("张三", 120f, 168f), Segment("户主或与户主关系", 400f, 592f),
+                Segment("户主", 620f, 668f),
+            ),
+            Row(140f, 24f, Segment("曾用名", 40f, 112f), Segment("张小三", 120f, 192f), Segment("性别", 400f, 448f), Segment("男", 620f, 644f)),
+            Row(180f, 24f, Segment("出生地", 40f, 112f), Segment("江苏省南京市", 120f, 264f), Segment("民族", 400f, 448f), Segment("汉", 620f, 644f)),
+            Row(
+                220f, 24f, Segment("籍贯", 40f, 88f), Segment("江苏省南京市", 120f, 264f), Segment("出生日期", 400f, 496f),
+                Segment("1990年01月01日", 620f, 800f),
+            ),
+            Row(260f, 24f, Segment("本市（县）其他住址", 40f, 256f), Segment("南京市鼓楼区中山北路8号", 280f, 560f)),
+            Row(
+                300f, 24f, Segment("宗教信仰", 40f, 136f), Segment("无", 160f, 184f), Segment("公民身份号码", 400f, 544f),
+                Segment("320106199001011238", 560f, 800f),
+            ),
+            Row(340f, 24f, Segment("何时由何地迁来本市（县）", 40f, 328f), Segment("2010年09月由江苏省苏州市迁来", 340f, 680f)),
+        )
+        assertThat(found("name", p)).containsExactly("张三", "张小三")
+        assertThat(found("address", p))
+            .containsExactly("江苏省南京市", "南京市鼓楼区中山北路8号", "2010年09月由江苏省苏州市迁来")
+        assertThat(found("birthdate", p)).containsExactly("1990年01月01日")
+    }
+
+    /** 营业执照：两端对齐的「住　　　所」在右边一栏，折行的下一行对着值；左边一栏的经营范围不算。 */
+    @Test fun `a business licence`() {
+        val p = page(
+            Row(
+                200f, 26f, Segment("名　　　称", 60f, 190f), Segment("杭州某某科技有限公司", 220f, 480f),
+                Segment("注册资本", 560f, 664f), Segment("壹佰万元整", 700f, 830f),
+            ),
+            Row(
+                250f, 26f, Segment("法定代表人", 60f, 190f), Segment("陈一鸣", 220f, 298f), Segment("成立日期", 560f, 664f),
+                Segment("2020年05月18日", 700f, 880f),
+            ),
+            Row(300f, 26f, Segment("经营范围", 60f, 164f), Segment("技术开发、技术服务", 220f, 460f)),
+            Row(300f, 26f, Segment("住　　　所", 560f, 690f), Segment("浙江省杭州市西湖区三墩镇", 720f, 1032f)),
+            Row(340f, 26f, Segment("软件开发；信息咨询", 220f, 460f)),
+            Row(340f, 26f, Segment("西园八路3号1幢301室", 720f, 960f)),
+        )
+        assertThat(found("name", p)).containsExactly("陈一鸣")
+        assertThat(found("address", p)).containsExactly("浙江省杭州市西湖区三墩镇", "西园八路3号1幢301室")
+        assertThat(found("birthdate", p)).isEmpty()
+    }
+
+    @Test fun `a birth certificate`() {
+        val p = page(
+            Row(
+                100f, 24f, Segment("新生儿姓名 Name", 40f, 230f), Segment("林小满", 260f, 332f), Segment("性别 Sex", 500f, 600f),
+                Segment("女", 620f, 644f),
+            ),
+            Row(150f, 24f, Segment("出生时间 Date of Birth", 40f, 230f), Segment("2020年06月19日17时00分", 260f, 560f)),
+            Row(200f, 24f, Segment("出生地点 Place of Birth", 40f, 230f), Segment("山东省 青岛市 黄岛区", 260f, 520f)),
+            Row(300f, 24f, Segment("母亲姓名 Name", 40f, 230f), Segment("李四", 260f, 308f), Segment("年龄 Age", 400f, 500f), Segment("28", 520f, 548f)),
+            Row(350f, 24f, Segment("父亲姓名 Name", 40f, 230f), Segment("林大海", 260f, 332f)),
+        )
+        assertThat(found("name", p)).containsExactly("林小满", "李四", "林大海")
+        assertThat(found("birthdate", p)).containsExactly("2020年06月19日17时00分")
+        assertThat(found("address", p)).containsExactly("山东省 青岛市 黄岛区")
+    }
+
+    /** 出生医学证明上预印着「省」「市」「县（区）」，填的字夹在中间，一段一段接到底。 */
+    @Test fun `a birth place between preprinted units`() {
+        val p = page(Row("出生地点 Place of Birth 山东 省 青岛 市 黄岛 县（区）", 40f, 200f, 24f))
+        assertThat(found("address", p)).containsExactly("山东 省 青岛 市 黄岛 县（区）")
+    }
+
+    // ---------- 学生证、工作证、简历 ----------
+
+    /** 只写到月的出生年月。 */
+    @Test fun `a year and month of birth`() {
+        val p = page(
+            Row("姓名 张三", 60f, 100f, 30f),
+            Row("出生年月 2002.03", 60f, 150f, 30f),
+            Row("出生年月：1990年01月", 60f, 200f, 30f),
+            Row("出生日期 1993-07", 60f, 250f, 30f),
+            Row("学号 2020123456", 60f, 300f, 30f),
+        )
+        assertThat(found("birthdate", p)).containsExactly("2002.03", "1990年01月", "1993-07")
+    }
+
+    // ---------- 通行证 ----------
+
+    /** 往来港澳通行证：「姓名 李晓明」下面一行和名字左对齐的拼音。 */
+    @Test fun `the pinyin under a name on a travel permit`() {
+        val p = page(*IdDocumentRows.travelPermit.toTypedArray())
+        assertThat(found("name", p)).containsExactly("李晓明", "LI, XIAOMING")
+    }
+
+    /** 拼音只认整行大写的名字：名字下面的「OK」「Thanks a lot」是聊天。 */
+    @Test fun `latin text under a name is not pinyin`() {
+        val p = page(
+            Row(200f, 30f, Segment("姓名", 60f, 120f), Segment("张三", 136f, 196f)),
+            Row(236f, 26f, Segment("OK", 136f, 170f)),
+            Row(320f, 30f, Segment("姓名", 60f, 120f), Segment("李四", 136f, 196f)),
+            Row(356f, 26f, Segment("Thanks a lot", 136f, 280f)),
+        )
+        assertThat(found("name", p)).containsExactly("张三", "李四")
+    }
+
+    // ---------- 毕业证、学位证 ----------
+
+    @Test fun `names and birth dates in the sentences of a diploma`() {
+        val p = page(
+            Row("学生 张三，性别 男，一九九八年三月五日生，于二〇一六年九月至", 60f, 300f, 30f),
+            Row("二〇二〇年六月在本校计算机科学与技术专业四年制本科学习，", 60f, 340f, 30f),
+            Row("李四，女，一九九九年十二月二十一日生。在本校", 60f, 500f, 30f),
+        )
+        assertThat(found("name", p)).containsExactly("张三", "李四")
+        assertThat(found("birthdate", p)).containsExactly("一九九八年三月五日", "一九九九年十二月二十一日")
+    }
+
+    /** 学位证的一句在「男，」后面折了行。 */
+    @Test fun `a degree sentence broken after the sex`() {
+        val p = page(Row("王小明，男，", 60f, 300f, 30f), Row("2000年1月1日生。", 60f, 340f, 30f))
+        assertThat(found("name", p)).containsExactly("王小明")
+        assertThat(found("birthdate", p)).containsExactly("2000年1月1日")
+    }
+
+    // ---------- 护照 ----------
+
+    /** 中国护照资料页（见 IdDocumentRows.chinesePassport）。 */
+    @Test fun `a chinese passport data page`() {
+        val p = page(*IdDocumentRows.chinesePassport.toTypedArray())
+        assertThat(found("name", p)).containsExactly("周以宁", "ZHOU, YINING")
+        assertThat(found("birthdate", p)).containsExactly("14 FEB 1986")
+        assertThat(found("address", p)).containsExactly("江苏/JIANGSU")
+        assertThat(found("passport", p)).containsExactly("E12345678")
+    }
+
+    /** 中国护照上「姓名/Name」的斜杠读成了「1」，或者读丢了。 */
+    @Test fun `a chinese passport label whose slash was misread`() {
+        listOf("姓名1Name", "姓名Name").forEach { label ->
+            val p = page(
+                Row(130f, 14f, Segment(label, 300f, 370f)),
+                Row(148f, 22f, Segment("周以宁", 300f, 366f)),
+                Row(174f, 22f, Segment("ZHOU, YINING", 300f, 480f)),
+                Row(256f, 14f, Segment("出生日期1Date of birth", 300f, 450f)),
+                Row(274f, 22f, Segment("14 FEB 1986", 300f, 450f)),
+            )
+            assertThat(found("name", p)).containsExactly("周以宁", "ZHOU, YINING")
+            assertThat(found("birthdate", p)).containsExactly("14 FEB 1986")
+        }
+    }
+
+    // ---------- 台湾身份证 ----------
+
+    @Test fun `a taiwan id card with a roc date`() {
+        val p = page(
+            Row(100f, 24f, Segment("姓名", 40f, 88f), Segment("陳小華", 120f, 192f)),
+            Row(150f, 24f, Segment("出生年月日", 40f, 160f), Segment("民國79年1月1日", 180f, 360f)),
+        )
+        assertThat(found("name", p)).containsExactly("陳小華")
+        assertThat(found("birthdate", p)).containsExactly("民國79年1月1日")
+    }
+
+    // ---------- 不该认的 ----------
+
+    /** 住址下面一行和字段名左对齐：那是下一个字段（「公民身份号码」）、或者聊天里下一句话。 */
+    @Test fun `a line under the label is not the rest of the address`() {
+        val p = page(
+            Row(100f, 30f, Segment("住址", 70f, 130f), Segment("浙江省杭州市西湖区文三路", 180f, 560f)),
+            Row(148f, 30f, Segment("记得带身份证原件过来", 70f, 370f)),
+        )
+        assertThat(found("address", p)).containsExactly("浙江省杭州市西湖区文三路")
+    }
+
+    /** 表格里字段名、值各成一行：「入住时间」右边那个「10月12日14:00后」对着地址的值，也不是地址。 */
+    @Test fun `a value beside the next label is not the rest of the address`() {
+        val p = page(
+            Row(760f, 40f, Segment("酒店地址 南京市鼓楼区汉中路2号", 60f, 700f)),
+            Row(830f, 40f, Segment("入住时间", 60f, 220f)),
+            Row(830f, 40f, Segment("10月12日14:00后", 220f, 520f)),
+        )
+        assertThat(found("address", p)).containsExactly("南京市鼓楼区汉中路2号")
+    }
+
+    /** 聊天里提到身份证、有一行以「名」打头：认不成人像面，什么都不补。 */
+    @Test fun `a chat about id cards is not an id card`() {
+        val p = page(
+            Row("名额已满，下次早点", 190f, 980f, 38f),
+            Row("公民身份证号码要填吗", 190f, 1050f, 38f),
+            Row("性别那栏填女", 190f, 1120f, 38f),
+            Row("出生日期写身份证上的", 190f, 1190f, 38f),
+        )
+        assertThat(found("name", p)).isEmpty()
+        assertThat(found("address", p)).isEmpty()
+        assertThat(found("birthdate", p)).isEmpty()
+    }
+
+    /** 群聊里的「所有人」、条文里的「经营者」「法定代表人」不是字段名。 */
+    @Test fun `common words that are also labels`() {
+        val p = page(
+            Row("@所有人 明天下午三点开会", 190f, 350f, 38f),
+            Row("所有人都到齐了吗", 190f, 420f, 38f),
+            Row("法定代表人签字的那份合同放哪了", 190f, 490f, 38f),
+            Row("经营者应当依法纳税", 190f, 560f, 38f),
+            Row("监护人陪同未成年人入场", 190f, 630f, 38f),
+            Row("好的，男，女都可以", 190f, 700f, 38f),
+            Row("学生会主席 李四，性别不限", 190f, 770f, 38f),
+        )
+        assertThat(found("name", p)).isEmpty()
+    }
+
+    /** 办件编号碰巧过得了身份证号的三道关（省份、日期、校验码）：它里面的日期不是谁的生日，旁边的受理日期不遮。 */
+    @Test fun `the date inside an order number is not a birth date`() {
+        val p = page(Row("办件编号 330106202610110019", 60f, 100f), Row("受理日期 2026-10-11", 60f, 140f))
+        assertThat(found("birthdate", p)).isEmpty()
+        assertThat(found("address", p) + found("name", p)).isEmpty()
+    }
+
+    @Test fun `a date followed by a word starting with sheng is not a birth date`() {
+        val p = page(Row("新规2026年9月3日生效", 60f, 100f), Row("本品2026年8月1日生产", 60f, 140f))
+        assertThat(found("birthdate", p)).isEmpty()
+    }
+
+    // ---------- 第二轮评审：漏遮的 ----------
+
+    /** 一行一页。 */
+    private fun lines(vararg texts: String) = page(*texts.mapIndexed { i, t -> Row(t, 60f, 100f + 60f * i, 34f) }.toTypedArray())
+
+    /** OCR 在名字中间补的空格隔得不匀，后半截只有一个字：「王小 明」原先只遮了「王小」。 */
+    @Test fun `a name split unevenly with the short half last`() {
+        assertThat(found("name", lines("姓名 王小 明", "姓名 Name 周以 宁 性别 Sex 女", "氏名 山田 太郎", "收货人 张三 已签收")))
+            .containsExactly("王小 明", "周以 宁", "山田 太郎", "张三")
+    }
+
+    /** 少数民族名的间隔点读成了「-」「。」。 */
+    @Test fun `a dotted name whose dot was misread`() {
+        assertThat(found("name", lines("姓名 阿依古丽-买买提", "姓名 阿依古丽。买买提")))
+            .containsExactly("阿依古丽-买买提", "阿依古丽。买买提")
+    }
+
+    /** 出生日期在右边一栏、页上没有对得上的身份证号：出生医学证明、12123 电子驾照（证号打了星）、学信网报告。 */
+    @Test fun `a birth date in the next column`() {
+        val p = page(
+            Row("出生时间", 48f, 300f, 34f), Row("2020年06月19日17时00分", 360f, 300f, 34f), Row("Date of Birth", 48f, 340f, 20f),
+            Row("证号", 48f, 420f, 34f), Row("3201**********123X", 360f, 420f, 34f),
+            Row("出生日期", 48f, 500f, 34f), Row("1993-07-18", 360f, 500f, 34f),
+        )
+        assertThat(found("birthdate", p)).containsExactly("2020年06月19日17时00分", "1993-07-18")
+    }
+
+    /** 港澳台居民居住证没有民族：「性新女」单独一行，姓名照样认得出（字段名读坏了的，同用户那张身份证）。 */
+    @Test fun `a residence permit with mangled labels`() {
+        val p = page(
+            Row(84f, 34f, Segment("名", 120f, 147f), Segment("陈嘉欣", 180f, 282f), glued = true),
+            Row(160f, 30f, Segment("性新", 70f, 147f), Segment("女", 180f, 211f), glued = true),
+            Row(238f, 30f, Segment("出生", 70f, 147f), Segment("1994年8月23日", 180f, 400f), glued = true),
+            Row(510f, 36f, Segment("公民 身份号 码8 100 00199408230021", 70f, 900f)),
+        )
+        assertThat(found("name", p)).containsExactly("陈嘉欣")
+        assertThat(found("birthdate", p)).containsExactly("1994年8月23日")
+    }
+
+    /** 户口簿上一行连着读：「户主姓名」前面粘着上一个值「家庭户」。四个字以上的字段名前面挨着汉字也认。 */
+    @Test fun `a long label glued to the value before it`() {
+        assertThat(found("name", lines("户别家庭户户主姓名张三", "户别 家庭户户主姓名 李四"))).containsExactly("张三", "李四")
+        assertThat(found("address", lines("请输入详细地址以便配送", "修改收货地址"))).isEmpty()
+    }
+
+    /** 字距拉开的「经 营 者」「持 证 人」逐字切开了，原串上它和名字之间还隔着空格；分店执照上的「负责人」。 */
+    @Test fun `spread labels and the manager of a branch`() {
+        assertThat(found("name", lines("经 营 者 李建国", "持 证 人 张三", "负责人 王五", "负责人：赵六")))
+            .containsExactly("李建国", "张三", "王五", "赵六")
+        assertThat(found("name", lines("所 有 人 都 到 了", "负责人 都不在"))).isEmpty()
+    }
+
+    /** 学信网报告的在线验证码：凭它查得到整份报告。 */
+    @Test fun `the online verification code of a chsi report`() {
+        val p = page(Row("在线验证码", 48f, 300f, 34f), Row("A1B2C3D4E5F6G7H8", 360f, 300f, 34f))
+        assertThat(found("idnumber", p)).containsExactly("A1B2C3D4E5F6G7H8")
+    }
+
+    /** 澳门身份证上的葡文译名：「姓名 / Nome」后面是名字，「Data de nascimento」后面是生日。 */
+    @Test fun `portuguese sub-labels on a macau id`() {
+        val p = lines("姓名 / Nome 陳大文", "出生日期 / Data de nascimento 01-01-1980")
+        assertThat(found("name", p)).containsExactly("陳大文")
+        assertThat(found("birthdate", p)).containsExactly("01-01-1980")
+    }
+
+    /** 香港身份证号不是爱尔兰的邮编；新加坡身份证背面的「SINGAPORE 560123」是地址。 */
+    @Test fun `hong kong ids and singapore postcodes`() {
+        assertThat(found("address", lines("C668668(9)", "A123456(3)"))).isEmpty()
+        assertThat(found("address", lines("SINGAPORE 560123"))).containsExactly("SINGAPORE 560123")
+    }
+
+    /** 结婚证字号：「字」读丢了，连字符读成长横。台湾居留证上的护照号码。 */
+    @Test fun `marriage certificate numbers and a traditional passport label`() {
+        assertThat(found("idnumber", lines("结婚证号 J320102-2015-001234", "结婚证字号 L110105—2020—000123")))
+            .containsExactly("J320102-2015-001234", "L110105—2020—000123")
+        val arc = page(
+            Row("護照號碼 C2345678", 48f, 200f, 34f),
+            Row("護照號碼 Passport No.", 48f, 300f, 34f), Row("C7654321", 360f, 300f, 34f),
+        )
+        assertThat(found("passport", arc)).containsExactly("C2345678", "C7654321")
+    }
+
+    /** 驾驶证上「出生日期」那一栏往下，拍斜了接到的是「初次领证日期」那一行：它的日期不是生日。 */
+    @Test fun `the issue date under the birth date label`() {
+        val p = page(
+            Row("出生日期 Date of Birth", 39f, 378f, 35f),
+            Row("初次领证日期 Date of First Issue 2008-05-20", 39f, 425f, 34f),
+        )
+        assertThat(found("birthdate", p)).isEmpty()
+    }
+
+    /** 驾驶证上的「住址 Address」不是英文表单上单独一行的「Address」：下面一栏是别的字段名，不是地址。 */
+    @Test fun `a bilingual label is not an english header`() {
+        val p = page(
+            Row("住址 Address", 34f, 266f, 39f),
+            Row("出生 日期 Date of Bith", 39f, 318f, 35f),
+            Row("准驾车型 Class", 36f, 370f, 39f),
+        )
+        assertThat(found("address", p)).isEmpty()
+    }
+
+    /**
+     * 照片糊了，英文小字读错了两三个字母（「姓 名 tame」「住址 Adsess」）：它是读错的译名，不是名字、地址，
+     * 值在右边一栏。
+     */
+    @Test fun `a badly misread english sub-label`() {
+        val p = page(
+            Row(203f, 45f, Segment("周以宁", 375f, 475f)),
+            Row(206f, 38f, Segment("姓 名", 33f, 93f), Segment("tame", 100f, 150f)),
+            Row(266f, 39f, Segment("住址", 34f, 91f), Segment("Adsess", 95f, 156f)),
+            Row(270f, 32f, Segment("江苏省南京市玄武区北京东路", 380f, 776f)),
+        )
+        assertThat(found("name", p)).containsExactly("周以宁")
+        assertThat(found("address", p)).containsExactly("江苏省南京市玄武区北京东路")
+    }
+
+    /** 斜着压过来的水印和「住址 Address」在同一排，框又高又大，比真正的值离得近：要和字一样高的那一段。 */
+    @Test fun `a watermark beside a label`() {
+        val p = page(
+            Row(266f, 39f, Segment("住址", 34f, 91f), Segment("Address", 91f, 160f)),
+            Row(150f, 300f, Segment("供办理 房屋租08-5-0", 283f, 862f)),
+            Row(270f, 32f, Segment("江苏省南京市玄武区北京东路", 380f, 776f)),
+        )
+        assertThat(found("address", p)).containsExactly("江苏省南京市玄武区北京东路")
+    }
+
+    /** 香港身份证上没有字段名的中文名、英文名、电码：页上有带校验位的号码和卡名才认，单独一行的字段名不算。 */
+    @Test fun `the names on a hong kong id card`() {
+        val card = page(
+            Row("香港永久性居民身份證", 60f, 40f, 24f),
+            Row("HONG KONG PERMANENT IDENTITY CARD", 60f, 70f, 16f),
+            Row("陳大文", 60f, 120f, 30f),
+            Row("CHAN, Tai Man", 60f, 160f, 24f),
+            Row("7115 1129 2429", 60f, 200f, 24f),
+            Row("簽發日期", 60f, 240f, 18f),
+            Row("C668668(9)", 60f, 380f, 30f),
+        )
+        assertThat(found("name", card)).containsExactly("陳大文", "CHAN, Tai Man", "7115 1129 2429")
+        // 没有卡名：聊天里发的一个号码
+        assertThat(found("name", lines("陳大文", "C668668(9)"))).isEmpty()
+    }
+
+    /** 卡面上字号小的「VALID THRU」另成一段，有效期在它右边。 */
+    @Test fun `a card expiry beside a small label`() {
+        val yy = "%02d".format((java.time.LocalDate.now().year + 2) % 100)
+        val p = page(
+            Row("4111 1111 1111 1111", 60f, 200f, 44f),
+            Row("VALID THRU", 60f, 286f, 10f),
+            Row("12/$yy", 160f, 280f, 24f),
+        )
+        assertThat(found("card", p)).containsExactly("4111 1111 1111 1111", "12/$yy")
+    }
+
+    /** 户口簿「何时由何地迁来」折成了两行，接不上值：按值的样子认。 */
+    @Test fun `where a household moved from`() {
+        val p = page(
+            Row("何时由何地", 60f, 300f, 30f),
+            Row("迁来本址", 60f, 334f, 30f),
+            Row("2010年09月由江苏省南京市玄武区迁来", 300f, 316f, 30f),
+        )
+        assertThat(found("address", p)).containsExactly("2010年09月由江苏省南京市玄武区迁来")
+    }
+
+    /** 台湾居留证上「護照號碼」和号码隔着一栏；发动机号中间补了空格。 */
+    @Test fun `numbers one column to the right`() {
+        val arc = page(Row("護照號碼", 40f, 240f, 22f), Row("C2345678", 200f, 240f, 22f))
+        assertThat(found("passport", arc)).containsExactly("C2345678")
+        assertThat(found("vin", lines("发动机号码 Engine No. 4G15S 12345"))).containsExactly("4G15S 12345")
+    }
+
+    /** 毕业证正文：「于」前面的生日折到了下一行。 */
+    @Test fun `a birth date wrapped onto the next line`() {
+        val p = page(
+            Row("学生王小明，性别男，一九九八年三", 60f, 300f, 34f),
+            Row("月五日生，于二〇一六年九月至二〇二〇年", 60f, 344f, 34f),
+        )
+        assertThat(found("birthdate", p)).containsExactly("一九九八年三", "月五日")
+    }
+}

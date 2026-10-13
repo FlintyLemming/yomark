@@ -1,6 +1,7 @@
 package moe.flinty.yomark.engine
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import android.graphics.RectF
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.geometry.Quad
@@ -84,6 +85,29 @@ class TracedTest {
         assertThat(sections[2].title).isEqualTo("判定 · rule")
         assertThat(sections[2].lines.single()).contains("「1234」")
         assertThat(sections[2].lines.single()).endsWith("rule-phone-0-3-0")
+    }
+
+    /** 竖着拍的页上人脸在转正的图上再看一遍：调试信息里单独一节，标出转了多少度。 */
+    @Test fun theUprightLookIsRecordedWithItsTurn() = runTest {
+        val upright = object : RegionDetector {
+            override val id = "faces"
+            override val kind = SensitiveKind.FACE
+            override val needsUpright = true
+            override suspend fun detect(image: SourceImage) = emptyList<Candidate>()
+            override suspend fun detect(image: SourceImage, quarterTurns: Int) = listOf(
+                Candidate("face-0-0-turn1", Quad.fromRect(RectF(100f, 20f, 150f, 80f)), SensitiveKind.FACE, DetectorSource.FACE, 0.9f)
+            )
+        }
+        // 阅读方向朝下的一行
+        val down = TextLine(Quad(PointF(60f, 0f), PointF(60f, 60f), PointF(50f, 60f), PointF(50f, 0f)), "电话：1234", 0.97f, emptyList())
+        val log = TraceLog()
+        val recorder = log.start("识别")
+        val result = withContext(recorder) {
+            RedactionEngine(Recognizer { listOf(down) }.traced(), listOf(upright.traced()), emptyList(), CandidateMerger()).analyze(image)
+        }
+        assertThat(result.candidates.map { it.id }).containsExactly("face-0-0-turn1")
+        val regions = log.runs.value.single().sections.filter { it.stage == TraceStage.REGION }
+        assertThat(regions.map { it.title }).containsExactly("人脸 · faces", "人脸 · faces · 转回 90°")
     }
 
     /** 引擎把识别器的异常吞掉、降级成空结果：调试信息里要看得见吞掉的是什么。 */

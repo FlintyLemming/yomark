@@ -128,10 +128,13 @@ class StackedField(
         /**
          * 证件上的字段名：英文的那一份，护照上它在最前或斜杠之间（「Surname/Nom/Apellidos」「Name/Surname/Nom (1)」
          * 「姓/Surname」）。在一行里任何地方都认，前后不能紧挨字母。
+         *
+         * 中国护照、永居证上是「中文/English」（「出生日期/Date of birth」「护照号/Passport No.」）：前面的中文算进字段名，
+         * 这一栏从中文的左沿起——值和中文左对齐，只从英文那里量，值的头一个字就落在栏外了。
          */
         fun document(words: List<String>): (String) -> List<IntRange> {
             val pattern = keys(words)
-            return { text -> compactFind(text, pattern) }
+            return { text -> compactFind(text, pattern).map { withChinese(text, it) } }
         }
 
         /** 表单上单独占一行的字段名：整行就是它（可带冒号）。 */
@@ -146,6 +149,13 @@ class StackedField(
             "surname", "surnames", "last name", "family name", "given name", "given names", "first name", "first names",
             "forename", "forenames", "middle name", "middle names", "full name", "legal name", "name of holder", "holder's name",
         )
+
+        /**
+         * 中国护照、永居证的姓名栏：「姓名/Name」下面两行，汉字名、拼音「ZHANG, SAN」。
+         * 只认连着中文的写法：单独一个「Name」在表单上什么都可能领着。斜杠常被读成 1、l、I、竖线，或者读丢了
+         * （「姓名1Name」「姓名Name」）。
+         */
+        val CHINESE_NAME_LABELS = listOf("/", "1", "l", "i", "|", "").flatMap { listOf("姓名${it}name", "name${it}姓名") }
 
         /** 证件号的字段名。 */
         val DOCUMENT_NUMBER_LABELS = listOf(
@@ -169,10 +179,11 @@ class StackedField(
 
         /**
          * 表单上单独一行的地址字段名（调研原型的 addressHeader）：「Shipping Address」「Deliver to」「Pickup」，
-         * 网约车上后面可带时间「Pickup 9:41 AM」。
+         * 网约车上后面可带时间「Pickup 9:41 AM」。前面可以有图标、符号，不能有字：驾驶证上的「住址 Address」
+         * 是中文字段名带着译名，下面一栏是别的字段名，不是地址。
          */
         val ADDRESS_HEADER = Regex(
-            """(?i)^\W*(?:shipping|billing|delivery|mailing|home|work|pickup|return|business|postal|residential|registered|""" +
+            """(?i)^[^\p{L}\p{N}]*(?:shipping|billing|delivery|mailing|home|work|pickup|return|business|postal|residential|registered|""" +
                 """street|property|service|installation|correspondence|permanent|current)?\s*(?:address|ship to|deliver to|""" +
                 """delivering to|pickup|dropoff|drop-off|postage address|address line 1|address line 2)\b[^A-Za-z0-9]*""" +
                 """(?:\d{1,2}:\d{2}\s*[AP]M)?\s*$"""
@@ -180,13 +191,32 @@ class StackedField(
 
         /** 表单上单独一行的人名字段名（调研原型的 nameHeader）。 */
         val NAME_HEADER = Regex(
-            """(?i)^\W*(?:full name|name|first name|last name|guest name|recipient|guest|passenger|cardholder|""" +
+            """(?i)^[^\p{L}\p{N}]*(?:full name|name|first name|last name|guest name|recipient|guest|passenger|cardholder|""" +
                 """account holder|contact|customer)\s*:?\s*$"""
         )
 
-        private val ALL_DOCUMENT = keys(NAME_LABELS + DOCUMENT_NUMBER_LABELS + BIRTH_DATE_LABELS + BIRTH_PLACE_LABELS + OTHER_LABELS)
+        private val ALL_DOCUMENT = keys(
+            NAME_LABELS + CHINESE_NAME_LABELS + DOCUMENT_NUMBER_LABELS + BIRTH_DATE_LABELS + BIRTH_PLACE_LABELS + OTHER_LABELS
+        )
 
-        private fun documentLabels(text: String) = compactFind(text, ALL_DOCUMENT)
+        private fun documentLabels(text: String) = compactFind(text, ALL_DOCUMENT).map { withChinese(text, it) }
+
+        /**
+         * 「出生日期/Date of birth」：英文字段名前面隔着斜杠的一段汉字，并进字段名。
+         * 斜杠读成了 1、l、I、竖线（「出生日期1Date of birth」），或者读丢了（「出生日期Date of birth」），一样。
+         */
+        private fun withChinese(text: String, label: IntRange): IntRange {
+            var k = label.first - 1
+            while (k >= 0 && text[k] == ' ') k--
+            if (k >= 0 && text[k] in "/／|｜1lI") {
+                var s = k - 1
+                while (s >= 0 && text[s] == ' ') s--
+                if (s >= 0 && text[s].isHan()) k = s
+            }
+            var start = -1
+            while (k >= 0 && text[k].isHan()) start = k--
+            return if (start >= 0) start..label.last else label
+        }
 
         /** 这一行是字段名，不是值。表单上的字段名常以冒号、必填的星号结尾（「City, State, ZIP *」）。 */
         internal fun isLabelLine(text: String): Boolean =
@@ -197,16 +227,24 @@ class StackedField(
         private fun keys(words: List<String>) =
             Regex(words.map { it.replace(" ", "") }.distinct().sortedByDescending { it.length }.joinToString("|") { Regex.escape(it) })
 
-        /** 在去掉空格、转了小写的行里找，映射回原串；前后紧挨字母的不算（「Typeface」里没有「Type」）。 */
+        /** 字母，汉字除外：中文字段名后面直接跟着英文（「出生日期Date of birth」）照样认。 */
+        private fun Char.isNonHanLetter() = isLetter() && !isHan()
+
+        /**
+         * 在去掉空格、转了小写的行里找，映射回原串；前后紧挨字母的不算（「Typeface」里没有「Type」）。
+         * 全角斜杠当半角：「姓名／Name」。
+         */
         private fun compactFind(text: String, pattern: Regex): List<IntRange> {
             val origin = text.indices.filter { !text[it].isWhitespace() }
-            val compact = String(CharArray(origin.size) { text[origin[it]].lowercaseChar().let { c -> if (c == '’') '\'' else c } })
+            val compact = String(CharArray(origin.size) {
+                when (val c = text[origin[it]].lowercaseChar()) { '’' -> '\''; '／' -> '/'; else -> c }
+            })
             return pattern.findAll(compact).mapNotNull { m ->
                 val first = origin[m.range.first]
                 val last = origin[m.range.last]
                 val before = text.getOrNull(first - 1)
                 val after = text.getOrNull(last + 1)
-                if (before?.isLetter() == true || after?.isLetter() == true) null else first..last
+                if (before?.isNonHanLetter() == true || after?.isNonHanLetter() == true) null else first..last
             }.toList()
         }
     }

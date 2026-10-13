@@ -214,7 +214,7 @@ class PersonNameRecognizer(
         private const val MIN_ROLE_FREQUENCY = 10
         private const val MIN_SURNAME_FREQUENCY = 100
 
-        private val COMPOUND_SURNAMES = setOf(
+        internal val COMPOUND_SURNAMES = setOf(
             "欧阳", "司马", "上官", "诸葛", "东方", "皇甫", "司徒", "夏侯", "慕容", "令狐", "公孙", "长孙",
             "宇文", "尉迟", "独孤", "南宫", "西门", "端木", "轩辕", "呼延", "百里", "亓官", "澹台", "万俟",
         )
@@ -262,6 +262,30 @@ class PersonNameRecognizer(
          * 词典直接从 jar 里读（预编译好的 .bin），不用拷文件、不写缓存。
          */
         private val segmenter: Segment by lazy { HanLP.newSegment().enableOffset(true) }
+
+        /**
+         * 字段名后面那两三个字像不像名字的开头：头一个字作过姓（人名词典里，「覃」「佘」这样少见的也算；复姓直接算），
+         * 也不是「明天」「马上」「何时」这样打头的时间词、副词、代词——「所有人 明天见」「所有人 马上到」「车主 何时到」是群聊。
+         * 字段名本身也是常用词（「所有人」「监护人」）时拿它把名字和一句话分开，见 DefaultRuleSet。
+         */
+        internal fun startsLikeName(name: String): Boolean {
+            if (COMPOUND_SURNAMES.any { name.startsWith(it) }) return true
+            val asSurname = PersonDictionary.dictionary.get(name.take(1))?.getFrequency(NR.B) ?: 0
+            if (asSurname <= 0) return false
+            val first = segmenter.seg(name).firstOrNull() ?: return false
+            val n = first.nature.toString()
+            return first.word.length < 2 || n.startsWith("nr") || n.firstOrNull() !in listOf('t', 'd', 'r')
+        }
+
+        /**
+         * 整个是词典里的一个寻常词，不是人名（词性不是 nr）：「福利」「余额」「平台」「车险」「保养」。
+         * 「车主 福利」「所有人 平台」是界面上并排的两个词。也是名字的「高峰」「江河」照样是寻常词，见 DefaultRuleSet 用它的地方。
+         */
+        internal fun isOrdinaryWord(name: String): Boolean {
+            if (name.length < 2) return false
+            val terms = segmenter.seg(name)
+            return terms.size == 1 && !terms.single().nature.toString().startsWith("nr")
+        }
 
         /**
          * 提前把词典读进内存。第一次分词要加载近 30 MB 的词典（桌面 JVM 上约 0.7 秒），
