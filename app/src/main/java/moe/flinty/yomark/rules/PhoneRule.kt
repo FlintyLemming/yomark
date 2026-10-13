@@ -22,7 +22,12 @@ import java.util.Locale
  * 另认一种 libphonenumber 认不了的：**打了星的手机号**，见 MASKED_MOBILE。
  */
 class PhoneRule(
-    private val defaultRegion: String = Locale.getDefault().country.ifBlank { "US" },
+    /**
+     * 不带国家码的号码按哪几个地区认，前面的先认，两个地区认出的叠在一处时留前面的。
+     * 出厂是系统地区再加上中国大陆：只按系统地区认，系统设成英文（美国）的手机上「138-0013-8000」
+     * 被当成美国号码判无效，同一张截图换到这样的手机上，大陆的号码一个都认不出。
+     */
+    private val regions: List<String> = listOf(Locale.getDefault().country.ifBlank { "US" }, "CN").distinct(),
 ) : Rule {
 
     override val id = "phone"
@@ -38,13 +43,17 @@ class PhoneRule(
     private val util: PhoneNumberUtil by lazy { PhoneNumberUtil.getInstance() }
 
     override fun findIn(text: String): List<RuleMatch> {
-        val numbers = util.findNumbers(text, defaultRegion, PhoneNumberUtil.Leniency.VALID, Long.MAX_VALUE)
-            .asSequence()
-            .filter { util.isValidNumber(it.number()) }
-            // 带 + 的不会是订单号，提示词管不着它
-            .filter { it.rawString().trimStart().startsWith("+") || !precededByHint(text, it.start()) }
-            .map { RuleMatch(it.start() until it.end(), CONFIDENCE) }
-            .toList()
+        val numbers = ArrayList<RuleMatch>()
+        regions.forEach { region ->
+            util.findNumbers(text, region, PhoneNumberUtil.Leniency.VALID, Long.MAX_VALUE)
+                .filter { util.isValidNumber(it.number()) }
+                // 带 + 的不会是订单号，提示词管不着它
+                .filter { it.rawString().trimStart().startsWith("+") || !precededByHint(text, it.start()) }
+                .map { it.start() until it.end() }
+                .filter { r -> numbers.none { it.range.overlaps(r) } }
+                .forEach { numbers += RuleMatch(it, CONFIDENCE) }
+        }
+        numbers.sortBy { it.range.first }
         val masked = MASKED_MOBILE.findAll(text)
             .filter { looksLikeMaskedMobile(it.value) }
             .map { RuleMatch(it.range, MASKED_CONFIDENCE) }

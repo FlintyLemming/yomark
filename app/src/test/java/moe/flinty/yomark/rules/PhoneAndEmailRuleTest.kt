@@ -3,13 +3,14 @@ package moe.flinty.yomark.rules
 import moe.flinty.yomark.core.model.SensitiveKind
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import java.util.Locale
 
 class PhoneAndEmailRuleTest {
 
     private fun matched(rule: Rule, text: String): List<String> =
         rule.findIn(text).map { text.substring(it.range.first, it.range.last + 1) }
 
-    private val phone = PhoneRule(defaultRegion = "US")
+    private val phone = PhoneRule(listOf("US"))
     private val email = DefaultRuleSet.rules.first { it.id == "email" }
 
     // ---------- 电话 ----------
@@ -33,6 +34,27 @@ class PhoneAndEmailRuleTest {
     @Test fun `phone keeps an international number even on an order line`() {
         // 带 + 的号码不会是订单号
         assertThat(matched(phone, "Order 123, call +14155552671")).isNotEmpty()
+    }
+
+    /** 系统设成英文（美国）的手机上，不带 +86 的大陆号码以前全被当成美国号码判无效。 */
+    @Test fun `phone finds mainland numbers whatever the system region`() {
+        val system = Locale.getDefault()
+        Locale.setDefault(Locale.US)
+        val rule = try {
+            PhoneRule()
+        } finally {
+            Locale.setDefault(system)
+        }
+        assertThat(matched(rule, "Phone 138-0013-8000")).containsExactly("138-0013-8000")
+        assertThat(matched(rule, "电话 13800138000")).containsExactly("13800138000")
+        assertThat(matched(rule, "Tel 021-6234 5678")).containsExactly("021-6234 5678")
+        assertThat(matched(rule, "call (415) 555-2671")).containsExactly("(415) 555-2671")
+    }
+
+    /** 两个地区都认得出的号码只出一次，按在行里的先后出。 */
+    @Test fun `phone reports each number once, in line order`() {
+        val rule = PhoneRule(listOf("US", "CN"))
+        assertThat(matched(rule, "138 0013 8000 or +1 415 555 2671")).containsExactly("138 0013 8000", "+1 415 555 2671").inOrder()
     }
 
     /**
