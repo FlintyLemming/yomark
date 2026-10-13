@@ -252,7 +252,7 @@
     <string name="face_accurate">Accurate</string>
     <string name="barcode_strict">Strict</string>
     <string name="barcode_loose">Loose</string>
-    <string name="barcode_strict_summary">Only codes that decode</string>
+    <string name="barcode_strict_summary">Only codes that decode, and similar codes right beside them</string>
     <string name="barcode_loose_summary">Also outlines likely codes that don\'t decode; may be wrong</string>
     <string name="barcode_footer">QR codes and barcodes.</string>
 
