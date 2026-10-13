@@ -31,7 +31,7 @@ package moe.flinty.yomark.rules
  * @param valid 值还要过的一道：生日要是日历上有的一天。
  * @param spacedValue [spaced] 里的字段名领着的值还要过的一道，收下视图上的整行和值的区间。
  * @param bareRow 字段名没带英文译名，也接同一排右边那一段（见 [findOnPage]）：值的形状够严的才这样（证件号码要五位以上数字），
- *   表头的下一格、「去设置 >」都对不上。
+ *   表头的下一格、「去设置 >」都对不上。英文字段名也这样接：卡面上字号小的「VALID THRU」另成一段，「12/28」在它右边。
  */
 class LabeledField(
     labels: List<String>,
@@ -48,26 +48,42 @@ class LabeledField(
     /**
      * 长标签排在前面，`收货地址` 才不会被 `地址` 抢先匹配掉半截。
      *
-     * 前面的否定后顾是为了挡住词中词：汉字侧是「用户名」里的「户名」，
-     * 拉丁侧是「IP地址」「MAC地址」里的「地址」和「Username」里的「Name」——
-     * 这些都是界面文案，不是邮寄地址或姓名字段。紧邻字母、数字、汉字时
-     * 多半不是一个独立字段名。「@所有人」是群聊里的提醒，也挡掉。
-     *
-     * 代价是「寄件人姓名 张三」这种标签叠标签的写法会被一起挡掉，
-     * **少认一处好过错涂一处**。
+     * 前面紧挨着字母、数字、汉字的多半不是一个独立字段名，是词中词：汉字侧是「用户名」里的「户名」，
+     * 拉丁侧是「IP地址」「MAC地址」里的「地址」和「Username」里的「Name」——这些都是界面文案，
+     * 不是邮寄地址或姓名字段。「@所有人」是群聊里的提醒，也挡掉。前面紧挨着汉字的见 [standsAlone]。
      */
     private val label = Regex(
-        "(?<![\\u4e00-\\u9fa5A-Za-z0-9@])(?" + (if (ignoreCase) "i" else "") + ":" + alternatives(labels + spaced) + ")"
+        "(?<![A-Za-z0-9@])(?" + (if (ignoreCase) "i" else "") + ":" + alternatives(labels + spaced) + ")"
     )
 
     private val spacedKeys = spaced.map { key(it, ignoreCase) }.toSet()
 
     private fun isSpaced(l: MatchResult) = spacedKeys.isNotEmpty() && key(l.value, ignoreCase) in spacedKeys
 
+    /**
+     * 前面紧挨着汉字的字段名一般不认（「用户名」「凭证 号」）。四个字以上的照认：户口簿上「户别家庭户户主姓名张三」
+     * 整行连着读，「户主姓名」前面是上一个值；「公民」读丢了一个字的「民 身 份 号 码」。
+     * 也是常用词的（[spaced] 里的）不在此列，前面是「请输入」「修改」这类的是提示语。
+     */
+    private fun standsAlone(text: String, l: MatchResult): Boolean {
+        if (text.getOrNull(l.range.first - 1)?.isHan() != true) return true
+        if (isSpaced(l) || l.value.count { it.isHan() } < 4) return false
+        return !PROMPT_BEFORE.containsMatchIn(text.substring(maxOf(0, l.range.first - 4), l.range.first))
+    }
+
+    /** [text] 里从 [from] 起的第一个字段名。 */
+    private fun labelFrom(text: String, from: Int): MatchResult? {
+        var l = label.find(text, from)
+        while (l != null && !standsAlone(text, l)) l = label.find(text, l.range.first + 1)
+        return l
+    }
+
+    private fun labelAt(text: String, at: Int): MatchResult? = label.matchAt(text, at)?.takeIf { standsAlone(text, it) }
+
     override fun findIn(text: String): List<RuleMatch> {
         val view = HanView.of(text)
         return labelsIn(view.text)
-            .mapNotNull { (l, a) -> valueAfter(view.text, l, a) }
+            .mapNotNull { (l, a) -> valueAfter(view.text, l, a, a.gap || gapInSource(text, view, l, a)) }
             .map { RuleMatch(view.toSource(it), confidence) }
     }
 
@@ -79,7 +95,7 @@ class LabeledField(
         val out = ArrayList<Pair<MatchResult, After>>()
         var from = 0
         while (from < text.length) {
-            val l = label.find(text, from) ?: break
+            val l = labelFrom(text, from) ?: break
             val a = after(text, l.range.last + 1)
             out += l to a
             from = a.end
@@ -87,12 +103,25 @@ class LabeledField(
         return out
     }
 
-    /** 字段名 [l] 后面的值。 */
-    private fun valueAfter(text: String, l: MatchResult, a: After): IntRange? {
-        if (isSpaced(l) && !a.gap) return null
+    /** 字段名 [l] 后面的值。[gap]：字段名和值之间隔着东西。 */
+    private fun valueAfter(text: String, l: MatchResult, a: After, gap: Boolean = a.gap): IntRange? {
+        if (isSpaced(l) && !gap) return null
         // 「Name/姓名 张三」：斜杠后面又是一个字段名，值归它（接着就认到它）
-        if (label.matchAt(text, a.end) != null) return null
+        if (labelAt(text, a.end) != null) return null
         return valueAt(text, a.end, isSpaced(l))
+    }
+
+    /**
+     * 逐字切开的行在视图上去掉了空格，字段名和值之间真有的间隙也一起去掉了：字距拉开的「经 营 者 李建国」
+     * 拼成了「经营者李建国」。原串上字段名后面隔着空格、值的头一段不止一个字的，还算隔开了；
+     * 「所 有 人 都 到 了」值的头一段是单个字，分不出来，不算。
+     */
+    private fun gapInSource(text: String, view: HanView, l: MatchResult, a: After): Boolean {
+        if (view.text.length == text.length || a.end >= view.text.length) return false
+        val labelEnd = view.toSource(l.range.last..l.range.last).last
+        val valueStart = view.toSource(a.end..a.end).first
+        if (text.substring(labelEnd + 1, valueStart).none { it.isWhitespace() }) return false
+        return text.substring(valueStart).takeWhile { !it.isWhitespace() }.length >= 2
     }
 
     /**
@@ -109,9 +138,17 @@ class LabeledField(
     /** 字段名之后：跳过的译名、分隔符停在 [end]；[translated] 跳过了译名；[gap] 字段名和值之间隔着东西。 */
     private class After(val end: Int, val translated: Boolean, val gap: Boolean)
 
+    /**
+     * 斜杠、竖线后面的那个词自己又跟着冒号、斜杠、竖线，它也是字段名：「签收人/签收时间：」「收件人/Consignee：李四」
+     * 「姓名 | 学号 | 成绩」。值在它的冒号后面；后面又是斜杠、竖线的是一排表头，没有值。
+     */
     private fun after(text: String, from: Int): After {
         val (p, n) = Translations.skip(text, from)
-        val end = SEPARATOR.matchAt(text, p)?.range?.let { it.last + 1 } ?: p
+        val separator = SEPARATOR.matchAt(text, p)
+        var end = separator?.range?.let { it.last + 1 } ?: p
+        if (separator != null && separator.value.any { it in "/／|｜" }) {
+            SECOND_LABEL.matchAt(text, end)?.let { m -> end = if (m.groups[1] != null) m.range.last + 1 else text.length }
+        }
         return After(end, n > 0, end > from)
     }
 
@@ -126,15 +163,20 @@ class LabeledField(
      *
      * 右边那一段从它的头一个字起要像值；以别的字段名打头的（[nextField]），或者本身就是一个中英文字段名的
      * （空着没填的双语表单：「姓名 Name」右边是「房号 Room No.」），不是值。
+     *
+     * 照片糊了、英文小字读错了两三个字母（「姓 名 tame」「住址 Adsess」「出生日期 Dat of Bith」）：逐行认会把它当成值。
+     * 字段名后面只剩几个带小写字母的短英文词、右边一栏又接得上值的，它是读错的译名，遮右边那个，不遮它。
      */
     override fun findOnPage(page: Page): List<PageMatch> {
         val out = page.texts.indices.flatMap { i -> findIn(page.texts[i]).map { PageMatch(i, it) } }.toMutableList()
         page.texts.forEachIndexed { i, text ->
             val view = HanView.of(text)
             val (l, a) = labelsIn(view.text).lastOrNull() ?: return@forEachIndexed
-            if (l.value.none { it.isHan() }) return@forEachIndexed
-            if (view.text.substring(a.end).isNotBlank()) return@forEachIndexed
-            val translated = a.translated || translatedBefore(view.text, l.range.first)
+            if (l.value.none { it.isHan() } && !bareRow) return@forEachIndexed
+            val tail = view.text.substring(a.end)
+            val misread = tail.isNotBlank() && !a.translated && MISREAD_TRANSLATION.matches(tail.trim())
+            if (tail.isNotBlank() && !misread) return@forEachIndexed
+            val translated = a.translated || misread || translatedBefore(view.text, l.range.first)
             val h = page.box(i, view.toSource(l.range)).height
             if (h <= 0f) return@forEachIndexed
             // 从这一段（字段名连同译名）的右沿量起
@@ -154,21 +196,31 @@ class LabeledField(
                 } else start = SEPARATOR.matchAt(v.text, end)?.range?.let { it.last + 1 } ?: end
             }
             val rest = v.text.substring(start)
-            if (nextField(rest) || isBilingualLabel(rest.trim()) || label.matchAt(v.text, start) != null) return@forEachIndexed
-            valueAt(v.text, start, isSpaced(l))?.let { out += PageMatch(j, RuleMatch(v.toSource(it), confidence)) }
+            if (nextField(rest) || isBilingualLabel(rest.trim()) || labelAt(v.text, start) != null) return@forEachIndexed
+            val value = valueAt(v.text, start, isSpaced(l)) ?: return@forEachIndexed
+            if (misread) {
+                val wrong = view.toSource(a.end + tail.indexOfFirst { !it.isWhitespace() }..view.text.indexOfLast { !it.isWhitespace() })
+                out.removeAll { it.line == i && it.match.range.overlaps(wrong) }
+            }
+            out += PageMatch(j, RuleMatch(v.toSource(value), confidence))
         }
         return out
     }
 
-    /** 同一排、在 [near] 右边最近的一段（第 [i] 段自己除外）。OCR 的框常常咬住一截，看中线在不在它右边。 */
-    private fun rightOf(page: Page, i: Int, near: Bounds, h: Float): Int? =
-        page.texts.indices.filter { it != i && page.texts[it].isNotBlank() }
+    /**
+     * 同一排、在 [near] 右边最近的一段（第 [i] 段自己除外）。OCR 的框常常咬住一截，看中线在不在它右边。
+     * 比字高出一大截的是斜着压过来的水印（框是斜着的一大块，外接框也跟着高），有和字一样高的就不要它。
+     */
+    private fun rightOf(page: Page, i: Int, near: Bounds, h: Float): Int? {
+        val beside = page.texts.indices.filter { it != i && page.texts[it].isNotBlank() }
             .map { it to page.box(it) }
             .filter { (_, b) ->
                 minOf(b.bottom, near.bottom) - maxOf(b.top, near.top) >= 0.5f * minOf(b.height, near.height) &&
                     b.centerX > near.right && b.left - near.right <= ROW_REACH * h
             }
-            .minByOrNull { (_, b) -> b.left }?.first
+        val rowHigh = beside.filter { (_, b) -> b.height <= TALL * h }
+        return rowHigh.ifEmpty { beside }.minByOrNull { (_, b) -> b.left }?.first
+    }
 
     /** 「Name/姓名」：字段名前面这一段整个是译名。 */
     private fun translatedBefore(text: String, labelStart: Int): Boolean {
@@ -180,7 +232,7 @@ class LabeledField(
 
     /**
      * 证件上跟在中文字段名后面的英文译名：驾驶证、行驶证（含 2008 版的「Birthday」「M&F」「Valid From」）、
-     * 永居证、出生医学证明、护照资料页。只跳这些，值本身也可能是拉丁字母。
+     * 永居证、出生医学证明、护照资料页，澳门身份证上的葡文。只跳这些，值本身也可能是拉丁字母。
      *
      * OCR 常读错一个字母（「Adress」「Date of Brith」「Valid Periad」），「m」常读成「rn」（「Narne」）：
      * 七个字母以上的译名差一个字母（多、少、换一个、相邻两个对调）也算；短的只认「rn」，「Nana」「Bob」是名字。
@@ -198,6 +250,8 @@ class LabeledField(
             "Register Date", "ID No.", "Card No.", "Passport No.", "Holder", "Legal Representative", "Domicile",
             // 驾驶证「证号」的译名（翻译件、部分卡面）
             "No.",
+            // 澳门身份证的葡文
+            "Nome", "Data de Nascimento", "Sexo", "Morada",
         )
 
         /**
@@ -310,11 +364,31 @@ class LabeledField(
         /** 同一排右边那一段最远隔几个字高还算这个字段的值。 */
         private const val ROW_REACH = 10f
 
-        /** 表单上空着的格子、可点的一行里的字：「请输入」「去设置」「修改 >」。 */
-        private val PROMPT = Regex("请|点击|选择|输入|填写|未填|未设置|暂无|去设置|去填写|去添加|修改|编辑|添加|查看")
+        /** 紧挨在长字段名前面、说明那是一句提示的字：「请输入详细地址」「修改收货地址」。 */
+        private val PROMPT_BEFORE = Regex("输入|填写|修改|编辑|添加|选择|设置|新增|管理|更新|确认")
+
+        /** 同一排右边那一段比字段名高过这么多倍，多半是水印（见 [rightOf]）。 */
+        private const val TALL = 2.5f
+
+        /**
+         * 表单上空着的格子、可点的一行里的字：「请输入」「去设置」「修改 >」，繁体的「請填寫」，英文界面的「Edit address」「Change」。
+         */
+        private val PROMPT = Regex(
+            "请|請|点击|點擊|选择|選擇|输入|輸入|填写|填寫|未填|未设置|未設置|暂无|暫無|去设置|去填写|去添加|修改|编辑|編輯|添加|新增|查看|" +
+                "(?i:edit|change|add|select|enter|tap|click|please)(?![A-Za-z])"
+        )
 
         /** 字段名和值之间：冒号、等号，表格的竖线、斜杠，前后的空格。 */
         private val SEPARATOR = Regex("[ 　]*[：:＝=/／|｜]?[ 　]*")
+
+        /** 斜杠、竖线后面的又一个字段名（见 [after]）：一个词（英文至多三个词），后面是冒号（第 1 组）或者又一道斜杠、竖线。 */
+        private val SECOND_LABEL = Regex("""[^\s：:／/|｜]{1,12}(?: [A-Za-z]{1,12}){0,2}[ 　]*(?:([：:])[ 　]*|[／/|｜])""")
+
+        /**
+         * 读错了的英文译名：一到四个词，每个词头一个字母以后都是小写（「tame」「Adsess」「Dat of Bith」），至少一个词三个字母以上。
+         * 全大写的是拼音名。
+         */
+        private val MISREAD_TRANSLATION = Regex("""(?=.*[A-Za-z][a-z]{2})[A-Za-z][a-z]{0,11}(?: [A-Za-z][a-z]{0,11}){0,3}""")
 
         /** 几个汉字，可隔斜杠，后面一串英文。 */
         private val HAN_THEN_LATIN = Regex("""[\u4e00-\u9fa5][\u4e00-\u9fa5 　]{0,9}[/／|｜]?[ 　]*([A-Za-z][A-Za-z&.' ]*)""")

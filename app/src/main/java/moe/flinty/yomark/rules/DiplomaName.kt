@@ -33,7 +33,7 @@ class DiplomaName(private val confidence: Float) : PageFinder {
     }
 
     private companion object {
-        const val NAME = """([\u4e00-\u9fa5]{1,8}(?: ?[·•・.．‧] ?[\u4e00-\u9fa5]{1,8}){1,3}|[\u4e00-\u9fa5]{2,4})"""
+        const val NAME = """(${HanNames.DOTTED}|[\u4e00-\u9fa5]{2,4})"""
 
         val STUDENT = Regex("""(?<![\u4e00-\u9fa5])学生 *$NAME *[，,] *性 *别""")
 
@@ -43,6 +43,6 @@ class DiplomaName(private val confidence: Float) : PageFinder {
         val BORN = Regex("""^\s*${Dates.CHINESE_DAY}${BornOn.SHENG}""")
 
         /** 句子里的字：名字里不会有。 */
-        val NOT_A_NAME = Regex("""[的了是都也和与或在我你他她它们这那]""")
+        val NOT_A_NAME = Regex("[${HanNames.SENTENCE_CHARS}]")
     }
 }

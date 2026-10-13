@@ -112,6 +112,17 @@ object Checksums {
         return table[sum % 11] == raw[8]
     }
 
+    // ---------- 韩国居民登录号：前十二位加权 mod 11（2020 年 10 月以前发的号码才有）----------
+    /** 十三位数字（连字符、空格先去掉）。 */
+    fun rrnValid(raw: String): Boolean {
+        val d = raw.filter { it.isDigit() }.map { it - '0' }
+        if (d.size != 13) return false
+        val sum = (0 until 12).sumOf { d[it] * RRN_WEIGHTS[it] }
+        return (11 - sum % 11) % 10 == d[12]
+    }
+
+    private val RRN_WEIGHTS = intArrayOf(2, 3, 4, 5, 6, 7, 8, 9, 2, 3, 4, 5)
+
     // ---------- 巴西 CPF：两位 mod 11 校验位，全同的号码不算 ----------
     fun cpfValid(raw: String): Boolean {
         val d = raw.filter { it.isDigit() }.map { it - '0' }

@@ -119,3 +119,27 @@ class CompositeRule(
 }
 
 internal fun IntRange.overlaps(other: IntRange): Boolean = first <= other.last && other.first <= last
+
+/** 正则找形状，[valid] 再验一道。 */
+internal fun regexFinder(pattern: Regex, confidence: Float, valid: (MatchResult) -> Boolean = { true }) = Finder { text ->
+    pattern.findAll(text).filter(valid).map { RuleMatch(it.range, confidence) }.toList()
+}
+
+/**
+ * [finder] 的命中再验一道：[fit] 收下整行和命中的区间，给回留下的那一段（可以截短），null 是不要。
+ * [finder] 看整页的（LabeledField 接同一排右边那一段），照样看整页，命中在哪一行就拿哪一行验。
+ */
+internal class Checked(
+    private val finder: Finder,
+    private val fit: (text: String, range: IntRange) -> IntRange?,
+) : PageFinder {
+
+    override fun findIn(text: String): List<RuleMatch> = finder.findIn(text).mapNotNull { it.fitted(text) }
+
+    override fun findOnPage(page: Page): List<PageMatch> =
+        if (finder is PageFinder) {
+            finder.findOnPage(page).mapNotNull { m -> m.match.fitted(page.texts[m.line])?.let { m.copy(match = it) } }
+        } else page.texts.indices.flatMap { i -> findIn(page.texts[i]).map { PageMatch(i, it) } }
+
+    private fun RuleMatch.fitted(text: String): RuleMatch? = fit(text, range)?.let { copy(range = it) }
+}

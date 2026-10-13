@@ -1,5 +1,7 @@
 package moe.flinty.yomark.rules
 
+import java.time.LocalDate
+
 /**
  * 日期的写法。日期时间（DateTimeRule）、出生日期、机读码对照共用一套。
  *
@@ -126,7 +128,7 @@ internal object Dates {
 
     /**
      * 带「年」「月」的写法：按「年」「月」「日」切开读，不数数字——「201 2 年」里 OCR 补的空格先去掉，
-     * 后面带的「17时00分」不算进来。纪年换算：民国 +1911，昭和 +1925，平成 +1988，令和 +2018。
+     * 后面带的「17时00分」不算进来。纪年换算：民国 +1911，明治 +1867，大正 +1911，昭和 +1925，平成 +1988，令和 +2018。
      */
     private fun chinese(value: String): Triple<Int, Int, Int>? {
         val s = value.filterNot { it.isWhitespace() }
@@ -181,6 +183,9 @@ internal object Dates {
  * 「生」后面紧跟着别的汉字的多半是另一个词：「2026年9月3日生效」「生产」「生病」不算；「生于」「生人」算。
  * 跑在 HanView 上：ML Kit 逐字切开的「自 2026 年 9 月 3 日 生 效」拼回来才看得出是「生效」。
  * 「生」在行尾的，看折下去的那一行：「本协议自2026年9月3日生」下面是「效。」，也不算。
+ * 政策条文里的「2025年1月1日出生的宝宝」说的是一批人，不是谁的生日；一百一十年前的「鲁迅，1881年9月25日生于」是史料。
+ * 毕业证正文一句话折了行，日期断在两行之间（「一九九八年三」/「月五日生，于……」），或者「生」在下一行：
+ * 把这一行和折下去的那一行接起来再认，两行各遮各的那一截。
  */
 class BornOn(private val confidence: Float) : PageFinder {
 
@@ -189,14 +194,40 @@ class BornOn(private val confidence: Float) : PageFinder {
     override fun findOnPage(page: Page): List<PageMatch> = page.texts.indices.flatMap { i ->
         find(page.texts[i])
             .filterNot { (_, atEnd) -> atEnd && wordGoesOn(page, i) }
-            .map { (r, _) -> PageMatch(i, RuleMatch(r, confidence)) }
+            .map { (r, _) -> PageMatch(i, RuleMatch(r, confidence)) } + acrossWrap(page, i)
+    }.distinct()
+
+    /** 第 [i] 行接上它折下去的那一行才认得出的日期：断在两行之间的，或者「生」在下一行的。 */
+    private fun acrossWrap(page: Page, i: Int): List<PageMatch> {
+        val j = page.wrapOf(i) ?: return emptyList()
+        val first = HanView.of(page.texts[i])
+        val second = HanView.of(page.texts[j])
+        val head = first.text.trimEnd()
+        val skipped = second.text.length - second.text.trimStart().length
+        val joined = head + second.text.trimStart()
+        return matches(joined).filter { it.last >= head.length - 1 && it.first < head.length }.flatMap { m ->
+            val out = ArrayList<PageMatch>()
+            out += PageMatch(i, RuleMatch(first.toSource(m.first..minOf(m.last, head.length - 1)), confidence))
+            if (m.last >= head.length) {
+                val r = (skipped..m.last - head.length + skipped)
+                out += PageMatch(j, RuleMatch(second.toSource(r), confidence))
+            }
+            out
+        }
+    }
+
+    /** 一串字里后面跟着「生」的日期，太早的不要。 */
+    private fun matches(text: String): List<IntRange> {
+        val oldest = LocalDate.now().year - MAX_AGE
+        return PATTERN.findAll(text).filter { m -> Dates.readings(m.value).any { (y, _, _) -> y >= oldest } }.map { it.range }.toList()
     }
 
     /** 一行里的日期：（原串上的区间, 后面的「生」在不在行尾）。 */
     private fun find(text: String): List<Pair<IntRange, Boolean>> {
         val view = HanView.of(text)
+        val oldest = LocalDate.now().year - MAX_AGE
         return PATTERN.findAll(view.text)
-            .filter { Dates.readings(it.value).isNotEmpty() }
+            .filter { m -> Dates.readings(m.value).any { (y, _, _) -> y >= oldest } }
             .map { m ->
                 val rest = view.text.substring(m.range.last + 1)
                 val sheng = LEADING_SHENG.find(rest)!!.range.last + 1
@@ -213,8 +244,14 @@ class BornOn(private val confidence: Float) : PageFinder {
     }
 
     internal companion object {
-        /** 日期后面的「生」「出生」；「生效」「生产」不算。 */
-        const val SHENG = """ *(?:出生|生(?![\u4e00-\u9fa5])|生[于於的人])"""
+        /** 「出生的」后面跟着它们，说的是一批人：「2025年1月1日出生的宝宝可享受育儿补贴」。 */
+        private const val A_GROUP = "宝宝|孩子|婴儿|婴幼儿|新生儿|儿童|小孩|子女|人口|人群|群体"
+
+        /** 日期后面的「生」「出生」；「生效」「生产」「出生的宝宝」不算。 */
+        const val SHENG = """ *(?:出生(?!的(?:$A_GROUP))|生(?![\u4e00-\u9fa5])|生的(?!$A_GROUP)|生[于於人])"""
+
+        /** 早过这么多年的是史料，不是在世的人的生日。 */
+        private const val MAX_AGE = 110
 
         private val PATTERN = Regex("""(?<![\d:.])${Dates.CHINESE_DAY}(?=$SHENG)""")
 

@@ -114,19 +114,21 @@ private val BRACKETED = Regex("""[(（\[【].*[)）\]】]""")
 
 /**
  * 住址的一截：有门牌、楼栋、地名用字（「88号6幢2单元501 室」「民族大道136号」「车辆段宿舍3号楼」「128号」）。
- * 「10号线」「3号口」的「号」不算；带着「距」「步行」「预计」「送达」的是到那儿的路、送货的时间，不是地址。
+ * 「10号线」「3号口」的「号」不算；带着「距」「步行」「预计」「送达」的是到那儿的路、送货的时间，
+ * 带着「包邮」「次日达」「自提」的是商家的配送说明（收货地址下面的「杭州市内次日达」「门店自提点：张江路店」），不是地址。
  */
 internal fun hasAddressPiece(text: String): Boolean = ADDRESS_PIECE.containsMatchIn(text) && !DIRECTIONS.containsMatchIn(text)
 
 private val ADDRESS_PIECE =
     Regex("""号(?![线口门站])|[省市区县镇乡村路街巷弄楼栋幢室院苑园庄屯组座寓舍厦队坊里湾]|大道|胡同|单元|小区|新村|花园|公寓|家园|大厦|社区|广场""")
 
-private val DIRECTIONS = Regex("""距|步行|驾车|公里|分钟|预计|送达""")
+private val DIRECTIONS = Regex("""距|步行|驾车|公里|分钟|预计|送达|包邮|次日达|当日达|隔日达|发货|自提|配送|运费""")
 
 /**
  * 通行证上名字下面一行的拼音：往来港澳通行证、往来台湾通行证、港澳台居民居住证上「姓名 张三」，
- * 下面一行和名字左对齐的是「ZHANG,SAN」。从 [field] 认出的汉字名往下看紧挨着的一行，整行是 [ROMANISED_NAME] 才遮：
- * 「OK」「Thanks a lot」、下一个字段都不算。
+ * 下面一行和名字左对齐的是「ZHANG,SAN」。从 [field] 认出的汉字名往下看紧挨着的一行，整行是 [ROMANISED_NAME]、
+ * 每个词都拼得成音节（[SYLLABLES]）才遮：「OK」「Thanks a lot」、下一个字段都不算，
+ * 名片、订单上名字下面的「SALES MANAGER」「VIP MEMBER」也不算。
  */
 class PinyinBelow(private val field: PageFinder, private val confidence: Float) : PageFinder {
 
@@ -146,12 +148,24 @@ class PinyinBelow(private val field: PageFinder, private val confidence: Float) 
                     if (below && abs(page.box(j, s..s).left - name.left) <= ALIGN * h) j to r else null
                 }
                 .minByOrNull { (j, r) -> page.box(j, r).top } ?: return@mapNotNull null
-            PageMatch(j, RuleMatch(r, confidence)).takeIf { ROMANISED_NAME.matches(page.texts[j].substring(r)) }
+            val line = page.texts[j].substring(r)
+            PageMatch(j, RuleMatch(r, confidence))
+                .takeIf { ROMANISED_NAME.matches(line) && WORD.findAll(line).all { SYLLABLES.matches(it.value) } }
         }
 
     private companion object {
         /** 拼音的左沿离名字的左沿最多几个字高。 */
         const val ALIGN = 1.5f
+
+        val WORD = Regex("""[A-Za-z]+""")
+
+        /**
+         * 一个词拼得成一串音节：声母（可无）、一到三个元音、收尾的鼻音或塞音。拼音之外也收港台的拼法
+         * （「CHEUNG」「KWOK」「TSANG」「HSU」）和吕、女的「LV」「LYU」「NV」。「SALES」「MANAGER」「VIP」「MEMBER」拼不成。
+         */
+        val SYLLABLES = Regex(
+            """(?i)(?:(?:zh|ch|sh|ts|tz|hs|kw|gw|ng|[bpmfdtnlgkhjqxrzcsyw])?[aeiou]{1,3}(?:ng|n|m|k|t|p|h)?|[ln](?:v|yu)(?:e|an|n)?|er)+"""
+        )
     }
 }
 

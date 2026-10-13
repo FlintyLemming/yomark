@@ -38,12 +38,7 @@ class RotatedPageRuleTest {
      * 每个框的四个角按阅读方向排（左上、右上、右下、左下），转过去仍是这个顺序，同 PP-OCR 映射回原图的框。
      */
     private fun page(degrees: Double): List<TextLine> {
-        val r = Math.toRadians(degrees)
-        fun turn(x: Float, y: Float): PointF {
-            val dx = x - 500f
-            val dy = y - 500f
-            return PointF((500 + dx * cos(r) - dy * sin(r)).toFloat(), (500 + dx * sin(r) + dy * cos(r)).toFloat())
-        }
+        val turn = turning(degrees)
         fun quad(l: Float, t: Float, rt: Float, b: Float) = Quad(turn(l, t), turn(rt, t), turn(rt, b), turn(l, b))
         return rows.mapIndexed { row, text ->
             val top = 100f + row * 40f
@@ -74,23 +69,16 @@ class RotatedPageRuleTest {
 
     // ---------- 证件：按版面认的几种（IdDocumentRows） ----------
 
-    /**
-     * [rows] 整页绕 (500, 500) 顺时针转 [degrees] 度：每个字一个 element，框的四个角按阅读方向排，同 [page]。
-     * 一排里分开的几段在这里仍是一行（同 PP-OCR 的 RowGrouper）。
-     */
-    private fun turned(rows: List<Row>, degrees: Double): List<TextLine> {
+    /** [rows] 整页绕 (500, 500) 顺时针转 [degrees] 度，同 [page]。 */
+    private fun turned(rows: List<Row>, degrees: Double): List<TextLine> = rows.textLines(turning(degrees))
+
+    /** 绕 (500, 500) 顺时针转 [degrees] 度。 */
+    private fun turning(degrees: Double): (Float, Float) -> PointF {
         val r = Math.toRadians(degrees)
-        fun turn(x: Float, y: Float): PointF {
+        return { x, y ->
             val dx = x - 500f
             val dy = y - 500f
-            return PointF((500 + dx * cos(r) - dy * sin(r)).toFloat(), (500 + dx * sin(r) + dy * cos(r)).toFloat())
-        }
-        fun quad(b: Bounds) = Quad(turn(b.left, b.top), turn(b.right, b.top), turn(b.right, b.bottom), turn(b.left, b.bottom))
-        return rows.map { row ->
-            val boxes = row.boxes()
-            val els = boxes.mapIndexedNotNull { i, b -> b?.let { TextElement(quad(it), row.text[i].toString(), i..i) } }
-            val all = boxes.filterNotNull()
-            TextLine(quad(Bounds(all.minOf { it.left }, row.y, all.maxOf { it.right }, row.y + row.h)), row.text, 0.95f, els)
+            PointF((500 + dx * cos(r) - dy * sin(r)).toFloat(), (500 + dx * sin(r) + dy * cos(r)).toFloat())
         }
     }
 

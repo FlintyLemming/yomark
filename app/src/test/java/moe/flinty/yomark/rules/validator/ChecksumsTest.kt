@@ -105,6 +105,12 @@ class ChecksumsTest {
         assertThat(Checksums.nricValid("S1234568D")).isFalse()
     }
 
+    @Test fun `korean resident registration number`() {
+        listOf("800101-1234560", "900101-2345670", "850315-1123457").forEach { assertThat(Checksums.rrnValid(it)).isTrue() }
+        assertThat(Checksums.rrnValid("800101-1234561")).isFalse()
+        assertThat(Checksums.rrnValid("800101-123456")).isFalse()
+    }
+
     @Test fun `brazil cpf`() {
         listOf("529.982.247-25", "111.444.777-35", "123.456.789-09", "012.345.678-90").forEach { assertThat(Checksums.cpfValid(it)).isTrue() }
         assertThat(Checksums.cpfValid("529.982.247-26")).isFalse()

@@ -32,30 +32,37 @@ internal object Vins {
     /** 发动机号的字段名，「发动机号码 Engine No.」的英文同样当译名跳过。 */
     val ENGINE_LABELS: List<String> = listOf("发动机号码", "发动机号", "电动机号码", "电动机号", "Engine No.", "Engine Number")
 
-    /** 发动机号没有统一格式（「CSS123456」「4G15S12345」），只在字段名后面认：五到二十个字母数字或连字符、至少三位数字。 */
+    /**
+     * 发动机号没有统一格式（「CSS123456」「4G15S12345」），只在字段名后面认：五到二十个字母数字或连字符、至少三位数字。
+     * 型号和流水号之间 OCR 常补一个空格（「4G15S 12345」），后面那段全是数字的一起算。
+     */
     fun engine(confidence: Float): Finder =
         Checked(LabeledField(ENGINE_LABELS, ENGINE, confidence, ignoreCase = true, bareRow = true)) { text, r ->
             r.takeIf { text.substring(r).count { it.isDigit() } >= 3 }
         }
 
-    private val ENGINE = Regex("""[A-Z0-9](?:-?[A-Z0-9]){4,19}(?![A-Za-z0-9\-])""")
+    private val ENGINE = Regex("""[A-Z0-9](?:-?[A-Z0-9]){4,19}(?: \d{4,8})?(?![A-Za-z0-9\-])""")
 
     /**
      * 没有字段名也认的车架号：17 位，第九位是校验位（国标强制，国内的车都有）。OCR 读成的 O、Q 当 0，I 当 1。
      * 只靠校验位的话，随手一串 17 位字母数字三十几个里就有一个过得去，所以再卡几处 VIN 自己的规矩：
-     * 至少两个字母（纯数字的另有长数字串管），第十位是年份码、不会是 0、U、Z，最后四位是数字。
-     * 跟在「订单号」这类提示词后面的不算：「DD」加十四位时间戳再加一位的订单号，十几个里就有一个过得了这几道关。
+     * 至少两个字母（纯数字的另有长数字串管），第十位是年份码、不会是 0、U、Z，最后四位是数字；
+     * 前三位（厂商代码）后面还有字母：车型代码（LFW「ADRJF」…）、2010 年以后的年份码、工厂代码。
+     * 单据号是字母前缀加一串数字（「DD202610131530014」「CK202610130000003」），十几个里就有一个过得了校验位，
+     * 过不了这一关。跟在「订单号」这类提示词后面、右边一栏的也不算（[NotAfterOrderHint]）。
+     * 前面紧挨着「VIN」的照认：行驶证上「车辆识别代号VINLFWADRJF011002346」读成了一串。
      */
-    val STANDALONE: Finder = notAfterOrderHint(
+    val STANDALONE: Finder = NotAfterOrderHint(
         Finder { text ->
             SHAPE.findAll(text).filter { m ->
                 val v = m.value.map { when (it) { 'O', 'Q' -> '0'; 'I' -> '1'; else -> it } }.joinToString("")
-                v.count { it.isLetter() } >= 2 && v[9] !in "0UZ" && v.takeLast(4).all { it.isDigit() } && Checksums.vinValid(v)
+                v.count { it.isLetter() } >= 2 && v.drop(3).any { it.isLetter() } && v[9] !in "0UZ" &&
+                    v.takeLast(4).all { it.isDigit() } && Checksums.vinValid(v)
             }.map { RuleMatch(it.range, CONFIDENCE) }.toList()
         }
     )
 
-    private val SHAPE = Regex("""(?<![A-Za-z0-9])[A-Z0-9]{17}(?![A-Za-z0-9])""")
+    private val SHAPE = Regex("""(?:(?<![A-Za-z0-9])|(?<=VIN))[A-Z0-9]{17}(?![A-Za-z0-9])""")
 
     private const val CONFIDENCE = 0.9f
 }

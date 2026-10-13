@@ -2,6 +2,7 @@ package moe.flinty.yomark.rules
 
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.rules.validator.Checksums
 import org.junit.Test
 
 /**
@@ -31,12 +32,30 @@ class VinRuleTest {
         assertThat(vins("VIN LFWADRJF5110023AB")).containsExactly("LFWADRJF5110023AB")
     }
 
-    /** 「DD」加时间戳再加一位的订单号碰巧过得了校验：跟在「订单号」后面的不算，跟在车架号字段名后面的照认。 */
-    @Test fun `an order number that happens to pass the check digit`() {
-        assertThat(vins("DD202507091718170")).containsExactly("DD202507091718170")
-        assertThat(vins("订单号 DD202507091718170")).isEmpty()
-        assertThat(vins("Order DD202507091718170")).isEmpty()
+    /**
+     * 「DD」加时间戳再加一位的订单号碰巧过得了校验：字母只在前面两位，不是车架号；跟在车架号字段名后面的照认。
+     * 前三位后面有字母的，跟在「订单号」「出库单」「关联单据」后面的也不算。
+     */
+    @Test fun `order numbers that happen to pass the check digit`() {
+        listOf("DD202507091718170", "DD202610131530014", "WX202610130000001", "TK202610130000003", "CK202610130000003")
+            .forEach { assertThat(Checksums.vinValid(it)).isTrue(); assertThat(vins(it)).isEmpty() }
         assertThat(vins("车架号 DD202507091718170")).containsExactly("DD202507091718170")
+        assertThat(vins("订单号 LFWADRJF011002346")).isEmpty()
+        assertThat(vins("出库单 LFWADRJF011002346 帮忙审批一下")).isEmpty()
+        assertThat(vins("关联单据 LFWADRJF011002346")).isEmpty()
+        assertThat(vins("LFWADRJF011002346")).containsExactly("LFWADRJF011002346")
+    }
+
+    /** 老式奔驰的车型代码全是数字（「WDD2040071A123456」），后面的工厂代码是字母，照认。 */
+    @Test fun `a vin whose model code is all digits`() {
+        assertThat(Checksums.vinValid("WDD2040071A123456")).isTrue()
+        assertThat(vins("WDD2040071A123456")).containsExactly("WDD2040071A123456")
+    }
+
+    /** 行驶证上中英文字段名和号码读成了一串：「车辆识别代号VINLFWADRJF011002346」。 */
+    @Test fun `a vin glued to its label`() {
+        assertThat(vins("车辆识别代号VINLFWADRJF011002346")).containsExactly("LFWADRJF011002346")
+        assertThat(vins("VINLFWADRJF011002346")).containsExactly("LFWADRJF011002346")
     }
 
     /** 字段名后面的 17 位不验校验位，打了星的、中间补了空格的也收；行驶证上中英文字段名连在一起。 */

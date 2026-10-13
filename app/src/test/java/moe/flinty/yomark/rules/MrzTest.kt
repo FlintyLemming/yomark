@@ -40,6 +40,17 @@ class MrzTest {
             .forEach { assertThat(mrz(it)).containsExactly(it) }
     }
 
+    /**
+     * 中国护照第一行的「<」全读成了「K」：形状对得上护照第一行（P、类型、国家码，四十几个字符）、末尾一串 K，成串的 K 才当填充符，
+     * 名字照样读得出来。只有字母、一个填充符都没有的普通文字不算。
+     */
+    @Test fun `fillers read as k on the passport name line`() {
+        val line = "POCHNZHANGKKSAN" + "K".repeat(29)
+        assertThat(mrz(line)).containsExactly(line)
+        assertThat(Mrz.read(listOf(Mrz.findIn(line)))!!.names).containsExactly("ZHANG", "SAN")
+        assertThat(mrz("PLEASE KEEP THIS BOOKING REFERENCE KKKKKK")).isEmpty()
+    }
+
     @Test fun `ordinary text is not a machine readable zone`() {
         assertThat(mrz("UNITED STATES DEPARTMENT OF STATE")).isEmpty()
         assertThat(mrz("<< BACK TO SHOPPING CART AND CONTINUE")).isEmpty()

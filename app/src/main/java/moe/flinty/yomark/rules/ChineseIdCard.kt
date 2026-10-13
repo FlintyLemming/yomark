@@ -7,11 +7,12 @@ import kotlin.math.abs
  * 户口簿、app 里的个人资料页。号码（[IdNumbers.residents]：OCR 在中间补的空格也认，「码3 301 0220…」）
  * 的省份、生日、校验码都对得上，页上读出来是同一天的就是生日，写成什么样都行：
  * 「1993 年 7 月 18 日」「1993-07-18」「1993.07.18」「19930718」。年份要四位，两位年对不出是哪个世纪。
+ * 前面写着「受理」「下单」这类事情的日期不是生日：撞上了号码里的生日也只是巧合。
  */
 class IdBirthEcho(private val confidence: Float) : PageFinder {
 
     override fun findOnPage(page: Page): List<PageMatch> {
-        val ids = page.texts.map { IdNumbers.residents(it) }
+        val ids = IdNumbers.residents(page)
         val births = ids.flatten()
             .mapNotNull { id -> ResidentIdNumber.birthDate(id.number)?.let { Triple(it.year, it.monthValue, it.dayOfMonth) } }
             .toSet()
@@ -19,11 +20,15 @@ class IdBirthEcho(private val confidence: Float) : PageFinder {
         val out = ArrayList<PageMatch>()
         page.texts.forEachIndexed { i, text ->
             Dates.findAllLenient(text)
-                .filter { r -> ids[i].none { it.range.overlaps(r) } }
+                .filter { r -> ids[i].none { it.range.overlaps(r) } && !EVENT.containsMatchIn(text.substring(0, r.first)) }
                 .filter { r -> Dates.readings(text.substring(r)).any { it in births } }
                 .forEach { out += PageMatch(i, RuleMatch(it, confidence)) }
         }
         return out
+    }
+
+    private companion object {
+        val EVENT = Regex("受理|办理|下单|创建|支付|付款|申请|提交|交易|发货|签收|预约|办结")
     }
 }
 
@@ -97,7 +102,8 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
         }
 
         /**
-         * 第 [j] 行在值那一栏的头一个字：字段名那一栏里的字（「住址」「娃名」，读坏了也一样）跳过去，至多三个。
+         * 第 [j] 行在值那一栏的头一个字：字段名那一栏里的字（「住址」「娃名」，读坏了也一样）跳过去，至多 [LABEL_CHARS] 个：
+         * 压着水印的卡上，水印的字常粘在字段名前面（「用无姓 名 林知夏」）。
          * 中心在栏的左沿往左半个字高以内就算进了这一栏。字段名的末一个字压在栏边上、后面隔着空格的
          * （「佳址 江苏省…」的「址」）也跳过去。
          */
@@ -108,7 +114,7 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
             if (t[first] in LABEL_TAILS && t.getOrNull(first + 1)?.isWhitespace() == true) {
                 first = chars.firstOrNull { it > first } ?: return null
             }
-            return first.takeIf { chars.count { it < first } <= 3 }
+            return first.takeIf { chars.count { it < first } <= LABEL_CHARS }
         }
 
         /** 第 [j] 行去掉字段名的残字后，整行只剩一个名字。 */
@@ -133,7 +139,8 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
             fun all(page: Page): List<Card> {
                 val compact = page.texts.map { t -> t.filterNot { it.isWhitespace() } }
                 val labelled = compact.indices.filter { idLabel(compact[it]) && compact[it].count(Char::isDigit) >= 15 }
-                val valid = page.texts.indices.filter { IdNumbers.residents(page.texts[it]).isNotEmpty() }
+                val residents = IdNumbers.residents(page)
+                val valid = page.texts.indices.filter { residents[it].isNotEmpty() }
                 return (labelled + valid).distinct().mapNotNull { idRow ->
                     val idBox = page.box(idRow)
                     // 号码那一行上面、一张卡的高度以内，离它最近的性别民族、出生两行
@@ -141,7 +148,8 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
                         .filter { it != idRow && match(compact[it]) }
                         .filter { val b = page.box(it); b.centerY < idBox.top && idBox.top - b.bottom <= CARD_HEIGHT * idBox.height }
                         .maxByOrNull { page.box(it).bottom }
-                    val sex = above { SEX_ROW.containsMatchIn(it) }
+                    // 港澳台居民居住证没有民族：号码前面写着「公民身份号码」的，单独一行「性别 女」也算
+                    val sex = above { SEX_ROW.containsMatchIn(it) } ?: if (idRow in labelled) above { SEX_ONLY.matches(it) } else null
                     val birth = above { BIRTH_ROW.containsMatchIn(it) }
                     if (sex == null && !(idRow in labelled && birth != null)) return@mapNotNull null
                     // 次序：性别民族在出生上面
@@ -171,14 +179,20 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
              * 「性别女民族汉」「性新女民族汉」「别女民族」算；「性别 男」单独一行不算。
              */
             private val SEX_ROW = Regex("""[性别].{0,3}[男女].{0,4}[民族]""")
+
+            /** 只有性别的一行（去掉空格后）：「性别女」「性新女」。 */
+            private val SEX_ONLY = Regex("""[性别].{0,3}[男女]""")
             private val BIRTH_ROW = Regex("""^(?:出生|出|生)\d""")
             private val SEX_VALUE = Regex("""[男女](?=\s*(?:民|$))""")
             private val NAME_LABEL = Regex("""^\s*(?:姓\s*名|姓|名)[：:]?""")
             private val NAME = Regex(
-                """[\u4e00-\u9fa5]{1,8}(?: ?[·•・.．‧] ?[\u4e00-\u9fa5]{1,8}){1,3}|[\u4e00-\u9fa5](?: [\u4e00-\u9fa5]){1,5}(?![\u4e00-\u9fa5])|""" +
+                """${HanNames.DOTTED}|[\u4e00-\u9fa5](?: [\u4e00-\u9fa5]){1,5}(?![\u4e00-\u9fa5])|""" +
                     """[\u4e00-\u9fa5]{1,2} [\u4e00-\u9fa5]{1,2}(?![\u4e00-\u9fa5])|[\u4e00-\u9fa5]{2,6}"""
             )
             private val NOT_A_NAME = Regex("""性别|民族|出生|住址|公民|身份|号码""")
+
+            /** 字段名那一栏里至多几个字：「姓名」两个，读坏了、粘上水印的字再多几个。 */
+            const val LABEL_CHARS = 5
 
             /** 「姓名」「住址」的末一个字。 */
             private const val LABEL_TAILS = "名址"
@@ -195,5 +209,37 @@ class IdCardFront(private val what: What, private val confidence: Float) : PageF
             /** 性别民族、出生两行离号码那一行最多几个字高：一张卡的高度。 */
             const val CARD_HEIGHT = 16f
         }
+    }
+}
+
+/**
+ * 香港身份证正面：中文名、英文名、中文名的电码都没有字段名（「陳大文」「C\u4e00-\u9fa5, Tai Man」「7115 1129 2429」），
+ * 字段名后面认、从名单猜都够不着。页上有带括号校验位的香港身份证号（IdNumbers.HKID），又有「身份證」「IDENTITY CARD」
+ * 这行卡名，才按卡面认：卡名和号码之间单独成行的两到四个汉字、「姓, 名」写法的英文名、四个数字一组的电码。
+ * 「簽發日期」「性別」这些单独成行的字段名不算名字。
+ */
+class HongKongIdCard(private val confidence: Float) : PageFinder {
+
+    override fun findOnPage(page: Page): List<PageMatch> {
+        val number = page.texts.indices.firstOrNull { IdNumbers.HKID.findIn(page.texts[it]).isNotEmpty() } ?: return emptyList()
+        val header = page.texts.indices.firstOrNull { HEADER.containsMatchIn(page.texts[it]) } ?: return emptyList()
+        val top = page.box(header).bottom
+        val bottom = page.box(number).top
+        return page.texts.indices.filter { it != header && it != number && page.box(it).centerY in top..bottom }.mapNotNull { j ->
+            val t = page.texts[j]
+            val s = t.indexOfFirst { !it.isWhitespace() }.takeIf { it >= 0 } ?: return@mapNotNull null
+            val r = s..t.indexOfLast { !it.isWhitespace() }
+            val v = t.substring(r)
+            val name = (HAN_NAME.matches(v) && !LABEL.containsMatchIn(v)) || ENGLISH_NAME.matches(v) || CODES.matches(v)
+            PageMatch(j, RuleMatch(r, confidence)).takeIf { name }
+        }
+    }
+
+    private companion object {
+        val HEADER = Regex("身份證|身份证|IDENTITY CARD", RegexOption.IGNORE_CASE)
+        val HAN_NAME = Regex("""[\u4e00-\u9fa5]{2,4}""")
+        val LABEL = Regex("日期|性別|性别|號碼|号码|出生|簽發|签发|身份|居民")
+        val ENGLISH_NAME = Regex("""[A-Z][A-Z'\-]+, ?[A-Z][A-Za-z'\-]+(?: [A-Z][A-Za-z'\-]+){0,3}""")
+        val CODES = Regex("""\d{4}(?: \d{4}){1,3}""")
     }
 }

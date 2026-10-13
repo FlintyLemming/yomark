@@ -49,8 +49,9 @@ class IdNumberRuleTest {
         assertThat(matched("身份 号码 330106199307180424")).containsExactly("330106199307180424")
         assertThat(matched("身份证号码 :330106199307180424")).containsExactly("330106199307180424")
         assertThat(matched("证件号码 ： H12345678")).containsExactly("H12345678")
-        // 字段名前面紧挨着汉字的照旧不认
+        // 字段名前面紧挨着汉字的照旧不认；四个字以上的照认：「公」读丢了的「民 身 份 号 码」
         assertThat(matched("凭证 号 12345678")).isEmpty()
+        assertThat(matched("民 身 份 号 码 33010 07180423")).containsExactly("33010 07180423")
     }
 
     /** 字段名后面的值不吞下一段：空格后面是日期、手机号的那段不是号码的一部分。 */
@@ -104,7 +105,7 @@ class IdNumberRuleTest {
         assertThat(matched("社会保障卡号 A01234567")).containsExactly("A01234567")
         assertThat(matched("结婚证字号 J320102-2015-001234")).containsExactly("J320102-2015-001234")
         assertThat(matched("学号 2020123456")).containsExactly("2020123456")
-        assertThat(matched("户号 1234567890")).containsExactly("1234567890")
+        assertThat(matched("户别 家庭户 户号 1234567890")).containsExactly("1234567890")
         assertThat(matched("毕业证书编号 103351202605001234")).containsExactly("103351202605001234")
     }
 
@@ -149,9 +150,13 @@ class IdNumberRuleTest {
         assertThat(matched("National ID No. 12345678")).containsExactly("12345678")
         // 台湾公司的统一编号八位数字，个人的是一个字母打头
         assertThat(matched("統一編號：12345675")).isEmpty()
-        // 产品认证证书的编号
+        // 产品认证证书的编号；个人证书上还写着姓名
         assertThat(matched("证书编号 CQC2021010101234567")).isEmpty()
-        assertThat(matched("证书编号 1234567890123")).containsExactly("1234567890123")
+        assertThat(matched("姓名 张三 证书编号 1234567890123")).containsExactly("1234567890123")
+        assertThat(matched("证书编号 1234567890123")).isEmpty()
+        assertThat(matched("产品名称 电水壶 姓名 张三 证书编号 2020010703372854")).isEmpty()
+        // 电费的户号
+        assertThat(matched("户号 3301234567 你自己在网上交也行")).isEmpty()
     }
 
     /** 澳门身份证的字段名只是「編號」：后面要是七位加括号里一位的样子。 */
@@ -182,19 +187,28 @@ class IdNumberRuleTest {
 
     @Test fun `taiwan ids and resident certificates`() {
         listOf("A123456789", "B120667503", "A800000014", "F812345676", "AA12345675", "FC12345674")
-            .forEach { assertThat(matched("號碼 $it")).containsExactly(it) }
-        assertThat(matched("A123456788")).isEmpty()
-        assertThat(matched("A323456789")).isEmpty()                 // 第二位不是 1、2、8、9、A–D
+            .forEach { assertThat(matched("身分證 號碼 $it")).containsExactly(it) }
+        // 民國紀年、台胞证背面的机读码也说明是台湾的证件
+        assertThat(matched("民國79年1月1日 A123456789")).containsExactly("A123456789")
+        assertThat(matched("A123456789 CT12345678<80133001019F9001011")).contains("A123456789")
+        assertThat(matched("身分證 A123456788")).isEmpty()
+        assertThat(matched("身分證 A323456789")).isEmpty()          // 第二位不是 1、2、8、9、A–D
     }
 
-    /** 12306 的订单号也是一个字母加九位数字，「E100000005」碰巧过得了台湾身份证的校验；跟在「订单号」后面的不算。 */
-    @Test fun `letter led numbers after an order hint`() {
-        assertThat(matched("E100000005")).containsExactly("E100000005")
-        assertThat(matched("订单号：E100000005")).isEmpty()
-        assertThat(matched("取票号 E212345673")).isEmpty()
-        assertThat(matched("Order S1234567D")).isEmpty()
-        assertThat(matched("货号 S1234567D")).isEmpty()
-        assertThat(matched("型号 AB12345678CD")).isEmpty()
+    /**
+     * 12306 的订单号也是一个字母加九位数字，「E100000005」碰巧过得了台湾身份证的校验：页上要写着是台湾的证件，
+     * 跟在「订单号」后面的也不算。新加坡、日本的同样。
+     */
+    @Test fun `letter led numbers need a cue and no order hint`() {
+        assertThat(matched("E100000005")).isEmpty()
+        assertThat(matched("台湾居民 E100000005")).containsExactly("E100000005")
+        assertThat(matched("台湾 订单号：E100000005")).isEmpty()
+        assertThat(matched("台湾 取票号 E212345673")).isEmpty()
+        assertThat(matched("S1234567D")).isEmpty()
+        assertThat(matched("Singapore Order S1234567D")).isEmpty()
+        assertThat(matched("新加坡 货号 S1234567D")).isEmpty()
+        assertThat(matched("AB12345678CD")).isEmpty()
+        assertThat(matched("在留 型号 AB12345678CD")).isEmpty()
     }
 
     /**
@@ -207,7 +221,8 @@ class IdNumberRuleTest {
         assertThat(matched("受理号：110105202609300125")).isEmpty()
         assertThat(matched("订单联系人身份证 330106199307180423")).containsExactly("330106199307180423")
         assertThat(matched("证件编号 330106199307180423")).containsExactly("330106199307180423")
-        assertThat(matched("261012-1234567")).hasSize(1)
+        assertThat(matched("261012-1234567")).isEmpty()
+        assertThat(matched("주민등록번호 261012-1234567")).hasSize(1)
         assertThat(matched("订单号 261012-1234567")).isEmpty()
         assertThat(matched("单号：250101-3123456")).isEmpty()
         assertThat(matched("流水号 241231-1000001")).isEmpty()
@@ -215,26 +230,35 @@ class IdNumberRuleTest {
     }
 
     @Test fun `singapore nric and fin`() {
-        listOf("S1234567D", "T1234567J", "F1234567N", "G1234567X", "M1234567K").forEach { assertThat(matched(it)).containsExactly(it) }
-        assertThat(matched("M1234567B")).isEmpty()                  // ICA 新闻稿里的示意号码，校验位不对
+        listOf("S1234567D", "T1234567J", "F1234567N", "G1234567X", "M1234567K")
+            .forEach { assertThat(matched("SINGAPORE $it")).containsExactly(it) }
+        assertThat(matched("SINGAPORE M1234567B")).isEmpty()        // ICA 新闻稿里的示意号码，校验位不对
     }
 
     @Test fun `korean resident registration numbers`() {
-        assertThat(matched("800101-1234560")).containsExactly("800101-1234560")
+        assertThat(matched("KOREA 800101-1234560")).containsExactly("800101-1234560")
         assertThat(matched("주민등록번호 900101 - 2345670")).containsExactly("900101 - 2345670")
-        assertThat(matched("801301-1234560")).isEmpty()             // 13 月
-        assertThat(matched("8001011234560")).isEmpty()              // 没有连字符
-        assertThat(matched("800101-9234560")).isEmpty()             // 第七位只有 1–8
+        assertThat(matched("주민등록번호 850315一1123457")).containsExactly("850315一1123457")  // 连字符读成了「一」
+        // 校验位对得上的不要提示词（韩文 OCR 读不出来）；2020 年以后发的没有校验位，要页上写着是韩国的
+        assertThat(matched("800101-1234560")).containsExactly("800101-1234560")
+        assertThat(matched("800101-1234567")).isEmpty()
+        assertThat(matched("KOREA 800101-1234567")).containsExactly("800101-1234567")
+        assertThat(matched("KOREA 801301-1234560")).isEmpty()       // 13 月
+        assertThat(matched("KOREA 8001011234560")).isEmpty()        // 没有连字符
+        assertThat(matched("KOREA 800101-9234560")).isEmpty()       // 第七位只有 1–8
     }
 
     @Test fun `malaysian mykad numbers`() {
-        assertThat(matched("900101-14-5677")).containsExactly("900101-14-5677")
-        assertThat(matched("900101-00-5677")).isEmpty()             // 00 不是出生地代码
-        assertThat(matched("900141-14-5677")).isEmpty()
+        assertThat(matched("MyKad 900101-14-5677")).containsExactly("900101-14-5677")
+        assertThat(matched("MyKad 900101一14一5677")).containsExactly("900101一14一5677")
+        assertThat(matched("900101-14-5677")).isEmpty()
+        assertThat(matched("MyKad 900101-00-5677")).isEmpty()       // 00 不是出生地代码
+        assertThat(matched("MyKad 900141-14-5677")).isEmpty()
     }
 
     @Test fun `japanese residence cards and brazilian cpf`() {
         assertThat(matched("番号 AB12345678CD")).containsExactly("AB12345678CD")
+        assertThat(matched("AB12345678CD")).isEmpty()
         assertThat(matched("CPF: 529.982.247-25")).containsExactly("529.982.247-25")
         assertThat(matched("529.982.247-25")).containsExactly("529.982.247-25")
         assertThat(matched("529.982.247-26")).isEmpty()
@@ -253,17 +277,20 @@ class IdNumberRuleTest {
 
     private fun cardMatched(text: String) = card.findIn(text).map { text.substring(it.range) }
 
+    /** 卡面上的一行：有效期要页上有卡，这一行带上卡组织的名字。 */
+    private fun onCard(text: String) = cardMatched("UnionPay $text")
+
     /** 卡面上的年份写成两位：今年往后两年，测试不随年份过期。 */
     private val yy = "%02d".format((LocalDate.now().year + 2) % 100)
 
     @Test fun `card security codes and expiry dates after their labels`() {
         assertThat(cardMatched("CVV2: 123")).containsExactly("123")
         assertThat(cardMatched("安全码 4321")).containsExactly("4321")
-        assertThat(cardMatched("VALID THRU 12/$yy")).containsExactly("12/$yy")
-        assertThat(cardMatched("GOOD THRU 09/20$yy")).containsExactly("09/20$yy")
-        assertThat(cardMatched("EXPIRES END 03 / $yy")).containsExactly("03 / $yy")
-        assertThat(cardMatched("EXP DATE 03/$yy")).containsExactly("03/$yy")
-        assertThat(cardMatched("VALID FROM/THRU 01/20 - 01/$yy")).containsExactly("01/20 - 01/$yy")
+        assertThat(onCard("VALID THRU 12/$yy")).containsExactly("12/$yy")
+        assertThat(onCard("GOOD THRU 09/20$yy")).containsExactly("09/20$yy")
+        assertThat(onCard("EXPIRES END 03 / $yy")).containsExactly("03 / $yy")
+        assertThat(onCard("EXP DATE 03/$yy")).containsExactly("03/$yy")
+        assertThat(onCard("VALID FROM/THRU 01/20 - 01/$yy")).containsExactly("01/20 - 01/$yy")
     }
 
     /**
@@ -276,14 +303,17 @@ class IdNumberRuleTest {
         assertThat(cardMatched("有效期 2026/12/31")).isEmpty()
         assertThat(cardMatched("有效期至 06/$yy")).isEmpty()
         assertThat(cardMatched("Expiry Date: 09/20$yy")).isEmpty()
-        assertThat(cardMatched("Offer valid thru 12/$yy.")).isEmpty()
-        assertThat(cardMatched("VALID THRU 08/20")).isEmpty()
-        assertThat(cardMatched("VALID THRU 12/99")).isEmpty()
-        assertThat(cardMatched("VALID THRU 10/12-10/$yy")).isEmpty()
+        assertThat(onCard("Offer valid thru 12/$yy.")).isEmpty()
+        assertThat(onCard("VALID THRU 08/20")).isEmpty()
+        assertThat(onCard("VALID THRU 12/99")).isEmpty()
+        assertThat(onCard("VALID THRU 10/12-10/$yy")).isEmpty()
         assertThat(cardMatched("Expiry 10/14/2030")).isEmpty()
         assertThat(cardMatched("CVV 12")).isEmpty()
         assertThat(cardMatched("cvv 123")).isEmpty()
         assertThat(cardMatched("CID 1234")).isEmpty()
         assertThat(cardMatched("Experience 10/20")).isEmpty()
+        // 优惠券上的「VALID THRU」：页上没有卡
+        assertThat(cardMatched("VALID THRU 12/$yy")).isEmpty()
+        assertThat(cardMatched("GOOD THRU 11/$yy")).isEmpty()
     }
 }

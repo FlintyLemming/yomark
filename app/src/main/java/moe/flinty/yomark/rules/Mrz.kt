@@ -31,9 +31,26 @@ internal object Mrz {
             origin[sb.length] = i
             sb.append(if (c in FILLER_LOOKALIKES) '<' else c)
         }
-        return RUN.findAll(sb).filter { isMrz(it.value) }
-            .map { Line(origin[it.range.first]..origin[it.range.last], it.value) }.toList()
+        return RUN.findAll(sb).mapNotNull { m ->
+            val chars = m.value.takeIf { isMrz(it) } ?: kFilled(m.value)?.takeIf { isMrz(it) } ?: return@mapNotNull null
+            Line(origin[m.range.first]..origin[m.range.last], chars)
+        }.toList()
     }
+
+    /**
+     * 护照第一行的「<」全读成了「K」：「POCHNZHANGKKSANKKKK…」。第二行有数字、有校验位，读成什么都认得出；
+     * 第一行只有字母，一个填充符都没有就认不出来了，可它拼着名字。形状对得上护照第一行（「P」、类型、三位国家码，
+     * 四十几个字符），末尾一串五个以上的「K」，才把成串的「K」当填充符。
+     */
+    private fun kFilled(s: String): String? {
+        if (s.length !in 40..46 || !TD3_LINE1_HEAD.matches(s.take(5)) || !s.endsWith("KKKKK")) return null
+        return s.substring(0, 1) + s[1].let { if (it == 'K') '<' else it } +
+            s.substring(2).replace(K_RUN) { "<".repeat(it.value.length) }
+    }
+
+    private val TD3_LINE1_HEAD = Regex("""P[A-Z<][A-Z]{3}""")
+
+    private val K_RUN = Regex("""K{2,}""")
 
     private fun isMrz(s: String): Boolean =
         (s.length >= MIN_FILLED && "<<" in s && s.count { it == '<' } >= 3) ||

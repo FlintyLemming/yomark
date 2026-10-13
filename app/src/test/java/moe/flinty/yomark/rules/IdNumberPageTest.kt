@@ -1,18 +1,15 @@
 package moe.flinty.yomark.rules
 
-import android.graphics.RectF
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
-import moe.flinty.yomark.core.geometry.Quad
-import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKind.ID_NUMBER
 import moe.flinty.yomark.core.model.SensitiveKind.LONG_NUMBER
 import moe.flinty.yomark.core.model.SensitiveKind.PAYMENT_CARD
 import moe.flinty.yomark.core.model.SensitiveKind.PHONE
 import moe.flinty.yomark.core.model.SensitiveKind.VIN
-import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
+import moe.flinty.yomark.debug.textUnder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -27,39 +24,25 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class IdNumberPageTest {
 
-    /** 每个字一个 element（PP-OCR）：字宽 20px、字高 20px，行距 40px。 */
-    private fun page(vararg texts: String): List<TextLine> = texts.mapIndexed { row, text ->
-        val top = 100f + row * 40f
-        val els = text.indices.filter { text[it] != ' ' }.map { i ->
-            TextElement(Quad.fromRect(RectF(40f + i * 20f, top, 60f + i * 20f, top + 20f)), text[i].toString(), i..i)
-        }
-        TextLine(Quad.fromRect(RectF(40f, top, 40f + text.length * 20f, top + 20f)), text, 0.95f, els)
-    }
-
-    private fun Candidate.text(lines: List<TextLine>): String {
-        val b = quad.bounds()
-        val line = lines.single { it.quad.bounds().top == b.top }
-        val first = ((b.left - 40f) / 20f).toInt()
-        val last = ((b.right - 40f) / 20f).toInt() - 1
-        return line.text.substring(first, last + 1)
-    }
+    private fun page(vararg texts: String) = textLines(*texts)
 
     private suspend fun found(lines: List<TextLine>): List<Triple<SensitiveKind, String, Boolean>> =
-        RuleClassifier(DefaultRuleSet.rules).classify(lines).map { Triple(it.kind, it.text(lines), it.enabledByDefault) }
+        RuleClassifier(DefaultRuleSet.rules).classify(lines).map { Triple(it.kind, it.textIn(lines), it.enabledByDefault) }
 
     private val numberKinds = setOf(ID_NUMBER, PAYMENT_CARD, LONG_NUMBER, PHONE, VIN)
 
     @Test fun `the synthetic id card front`() = runTest {
-        val lines = page(
-            "姓 名 林知夏",
-            "性 别 女 民 族 漢",
-            "出 生 1993 年 7 月 18 日",
-            "住 址 浙江省杭州市西湖区文三路",
-            "88号6幢2单元501 室",
-            "公民身份号码 330106199307180423",
-        )
-        assertThat(found(lines).filter { it.first in numberKinds })
-            .containsExactly(Triple(ID_NUMBER, "330106199307180423", true))
+        val lines = IdDocumentRows.idCard.textLines()
+        assertThat(
+            RuleClassifier(DefaultRuleSet.rules).classify(lines).filter { it.kind in numberKinds }
+                .map { Triple(it.kind, textUnder(it.quad, lines), it.enabledByDefault) }
+        ).containsExactly(Triple(ID_NUMBER, "330106199307180423", true))
+    }
+
+    /** 台湾证件上的全角数字：整页看时换成半角再认，框照旧在原来那几个字上。 */
+    @Test fun `full width digits`() = runTest {
+        val lines = page("出生 民國７９年１月１日")
+        assertThat(found(lines)).contains(Triple(SensitiveKind.BIRTH_DATE, "民國７９年１月１日", true))
     }
 
     /** 字段名被拆开、号码第一位粘在「码」上、中间补了空格：框从第一位到最后一位，空格一起框进去。 */

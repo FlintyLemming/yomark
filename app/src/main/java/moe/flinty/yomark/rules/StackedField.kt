@@ -179,10 +179,11 @@ class StackedField(
 
         /**
          * 表单上单独一行的地址字段名（调研原型的 addressHeader）：「Shipping Address」「Deliver to」「Pickup」，
-         * 网约车上后面可带时间「Pickup 9:41 AM」。
+         * 网约车上后面可带时间「Pickup 9:41 AM」。前面可以有图标、符号，不能有字：驾驶证上的「住址 Address」
+         * 是中文字段名带着译名，下面一栏是别的字段名，不是地址。
          */
         val ADDRESS_HEADER = Regex(
-            """(?i)^\W*(?:shipping|billing|delivery|mailing|home|work|pickup|return|business|postal|residential|registered|""" +
+            """(?i)^[^\p{L}\p{N}]*(?:shipping|billing|delivery|mailing|home|work|pickup|return|business|postal|residential|registered|""" +
                 """street|property|service|installation|correspondence|permanent|current)?\s*(?:address|ship to|deliver to|""" +
                 """delivering to|pickup|dropoff|drop-off|postage address|address line 1|address line 2)\b[^A-Za-z0-9]*""" +
                 """(?:\d{1,2}:\d{2}\s*[AP]M)?\s*$"""
@@ -190,7 +191,7 @@ class StackedField(
 
         /** 表单上单独一行的人名字段名（调研原型的 nameHeader）。 */
         val NAME_HEADER = Regex(
-            """(?i)^\W*(?:full name|name|first name|last name|guest name|recipient|guest|passenger|cardholder|""" +
+            """(?i)^[^\p{L}\p{N}]*(?:full name|name|first name|last name|guest name|recipient|guest|passenger|cardholder|""" +
                 """account holder|contact|customer)\s*:?\s*$"""
         )
 

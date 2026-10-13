@@ -8,8 +8,13 @@ import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.engine.SensitivityClassifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import moe.flinty.yomark.core.geometry.Quad
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 判定层的规则实现（spec §4.3）。
@@ -54,15 +59,24 @@ class RuleClassifier(
      */
     override suspend fun classify(lines: List<TextLine>): List<Candidate> = withContext(Dispatchers.Default) {
         val kept = lines.indices.filter { lines[it].confidence >= minLineConfidence }
-        // 规则按「下面 = +y」认版面：竖着、倒着拍的页先转到阅读方向上再取框（正着的页原样）。候选的 quad 仍是图上的
+        // 按行排回去，同一行里按规则表的先后：与逐行跑规则时的出法一样
+        orientationGroups(lines, kept).flatMap { classifyGroup(lines, it) }.sortedBy { it.first }.map { it.second }
+    }
+
+    /**
+     * 一页上的一组行（[kept]，lines 的下标）当一页认。规则按「下面 = +y」认版面：竖着、倒着拍的页先转到阅读方向上再取框
+     * （正着的页原样）。候选的 quad 仍是图上的。给回（行号, 候选）。
+     */
+    private fun classifyGroup(lines: List<TextLine>, kept: List<Int>): List<Pair<Int, Candidate>> {
         val frame = ReadingFrame.of(kept.map { lines[it].quad })
-        val page = Page(kept.map { lines[it].text }) { i, range -> frame.bounds(lines[kept[i]].quadForRange(range)).toBounds() }
+        // 全角数字（台湾证件上的「民國７９年１月１日」）逐字换成半角：下标不变，规则不用各认一遍
+        val page = Page(kept.map { halfWidthDigits(lines[it].text) }) { i, range -> frame.bounds(lines[kept[i]].quadForRange(range)).toBounds() }
         // 单条规则出错不能拖垮整次判定
         val found = rules.map { rule -> runCatching { rule.findOnPage(page) }.getOrElse { emptyList() } }
 
         val out = ArrayList<Pair<Int, Candidate>>()
         // 旁证只在有猜测要核对时才找：大多数页面上一个猜出来的人名都没有
-        val anchorsOnPage by lazy { findAnchors(lines, frame) }
+        val anchorsOnPage by lazy { findAnchors(lines, kept, frame) }
         rules.forEachIndexed { r, rule ->
             found[r].forEachIndexed { n, (pageLine, m) ->
                 if (yields(rule, pageLine, m.range, found)) return@forEachIndexed
@@ -83,8 +97,33 @@ class RuleClassifier(
                 )
             }
         }
-        // 按行排回去，同一行里按规则表的先后：与逐行跑规则时的出法一样
-        out.sortedBy { it.first }.map { it.second }
+        return out
+    }
+
+    /**
+     * 一页上走向不同的几组字各当一页认：聊天截图里一张转了九十度、倒着放的证件照，聊天的字横着，证件的字竖着、倒着，
+     * 整页只有一个阅读方向的话，证件上「下一行」「右边一栏」全对不上。行的阅读方向（quad 的 p0→p1）离哪个直角不到
+     * [QUARTER] 度就归哪个直角；最长的那组之外，至少 [GROUP_LINES] 行、占总长 [GROUP_SHARE] 的才单独成组，
+     * 斜着的水印、零星几行竖排的字归最长的那组。只有一组就是整页，同以前一样。
+     */
+    private fun orientationGroups(lines: List<TextLine>, kept: List<Int>): List<List<Int>> {
+        val length = kept.associateWith { lines[it].quad.let { q -> hypot(q.p1.x - q.p0.x, q.p1.y - q.p0.y).toDouble() } }
+        val quarter = kept.associateWith { quarterOf(lines[it].quad) }
+        val total = length.values.sum()
+        val byQuarter = kept.filter { quarter[it] != null }.groupBy { quarter[it]!! }
+        val main = byQuarter.maxByOrNull { (_, group) -> group.sumOf { length.getValue(it) } }?.key ?: return listOf(kept)
+        val apart = byQuarter.filter { (q, group) ->
+            q != main && group.size >= GROUP_LINES && group.sumOf { length.getValue(it) } >= GROUP_SHARE * total
+        }.keys
+        if (apart.isEmpty()) return listOf(kept)
+        return listOf(kept.filter { quarter[it] !in apart }) + apart.map { q -> kept.filter { quarter[it] == q } }
+    }
+
+    /** 一行的阅读方向离哪个直角不到 [QUARTER] 度：0 朝右、1 朝下、2 朝左、3 朝上；都差得远（斜着的）为 null。 */
+    private fun quarterOf(q: Quad): Int? {
+        val d = Math.toDegrees(atan2((q.p1.y - q.p0.y).toDouble(), (q.p1.x - q.p0.x).toDouble()))
+        val k = (d / 90).roundToInt()
+        return if (abs(d - k * 90) <= QUARTER) Math.floorMod(k, 4) else null
     }
 
     /** [rule] 在第 [line] 行 [range] 上的命中，要不要让给同一处的另一类（Rule.yieldsTo）。 */
@@ -95,8 +134,13 @@ class RuleClassifier(
 
     private fun RectF.toBounds() = Bounds(left, top, right, bottom)
 
-    private fun findAnchors(lines: List<TextLine>, frame: ReadingFrame): List<FoundAnchor> = lines.flatMapIndexed { lineIndex, line ->
-        if (line.confidence < minLineConfidence) return@flatMapIndexed emptyList()
+    private fun halfWidthDigits(text: String): String =
+        if (text.none { it in '０'..'９' }) text else String(CharArray(text.length) { i ->
+            text[i].let { c -> if (c in '０'..'９') '0' + (c - '０') else c }
+        })
+
+    private fun findAnchors(lines: List<TextLine>, kept: List<Int>, frame: ReadingFrame): List<FoundAnchor> = kept.flatMap { lineIndex ->
+        val line = lines[lineIndex]
         anchors.flatMap { anchor ->
             // 单条旁证出错，当它没找到
             runCatching { anchor.finder.findIn(line.text) }.getOrElse { emptyList() }
@@ -160,5 +204,12 @@ class RuleClassifier(
 
         /** 上下两行水平方向最多错开几个字高还算对齐。 */
         private const val COLUMN_GAP = 2f
+
+        /** 阅读方向离直角这么多度以内算那个直角（见 orientationGroups）。 */
+        private const val QUARTER = 25.0
+
+        /** 走向不同的一组至少这么多行、占总长这么多，才单独当一页认。 */
+        private const val GROUP_LINES = 3
+        private const val GROUP_SHARE = 0.15
     }
 }

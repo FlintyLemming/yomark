@@ -67,9 +67,9 @@ class EnglishAddressShape(private val confidence: Float) : Finder {
                 Regex("""\b(?:(?:AB|BC|MB|NB|NL|NS|NT|NU|ON|PE|QC|SK|YT)\s+)?[ABCEGHJ-NPRSTVXY]\d[ABCEGHJ-NPRSTV-Z]\s?\d[ABCEGHJ-NPRSTV-Z]\d\b"""),
                 // 澳大利亚：郊区 + 州 + 四位邮编
                 Regex("""\b[A-Z][A-Za-z'-]*(?:\s+[A-Z][A-Za-z'-]*){0,3}\s+(?:NSW|VIC|QLD|SA|WA|TAS|NT|ACT)\s+\d{4}\b"""),
-                // 爱尔兰 Eircode、新加坡
-                Regex("""\b[AC-FHKNPRTV-Y]\d{2}\s?[AC-FHKNPRTV-Y0-9]{4}\b"""),
-                Regex("""\bSingapore\s+\d{6}\b"""),
+                // 爱尔兰 Eircode（后面跟着括号的是香港身份证号「C668668(9)」）、新加坡（证件上全大写）
+                Regex("""\b[AC-FHKNPRTV-Y]\d{2}\s?[AC-FHKNPRTV-Y0-9]{4}\b(?!\s?[(（])"""),
+                Regex("""\b(?:Singapore|SINGAPORE)\s+\d{6}\b"""),
                 // 拼音地址的区县以上
                 Regex(
                     """\b[A-Z][a-z]+\s(?:District|County|New Area)\b(?:,\s*[A-Z][a-z]+(?:\s(?:City|Province))?){0,3}(?:,?\s*\d{6})?"""

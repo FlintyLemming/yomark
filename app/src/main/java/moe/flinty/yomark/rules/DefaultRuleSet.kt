@@ -32,6 +32,7 @@ object DefaultRuleSet {
      * 中文的「有效期」「有效期至」不认：优惠券上的「有效期至 06/30」是月/日，和卡的月/年分不开，到处都是。
      * 有效期只认「月/年」，年份在去年到十二年后之间，后面不接连字符（「10/12-10/19」是一段日期）：
      * 身份证背面的「有效期限 2015.08.20-2035.08.20」不是卡。「VALID FROM/THRU」后面是起止两个，一起遮。
+     * 优惠券上也印「VALID THRU 12/26」：有效期还要页上有卡（Luhn 对得上的卡号、打了星的卡号，或者 VISA、银联、信用卡这类字）。
      *
      * 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn；身份证号也是，十个里有一个，
      * 同一处让给护照和证件号码，不在身份证号上标「银行卡号」。
@@ -54,13 +55,22 @@ object DefaultRuleSet {
         yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER),
     )
 
-    /** 字段名后面卡的有效期，最后那个年份在去年到十二年后之间。 */
-    private fun cardExpiry(labels: List<String>, value: String) =
-        Checked(LabeledField(labels, Regex("""$value(?![\d/\-])"""), confidence = 0.8f)) { text, r ->
+    /** 字段名后面卡的有效期，最后那个年份在去年到十二年后之间；页上要有卡。 */
+    private fun cardExpiry(labels: List<String>, value: String) = OnPageWith(
+        Checked(LabeledField(labels, Regex("""$value(?![\d/\-])"""), confidence = 0.8f, bareRow = true)) { text, r ->
             val year = 2000 + text.substring(r).takeLast(2).toInt()
             val now = LocalDate.now().year
             r.takeIf { year in now - 1..now + 12 }
-        }
+        },
+        cue = { text -> CARD_WORDS.containsMatchIn(text) || CARD_NUMBER.findAll(text).any { Checksums.luhn(it.value.filter(Char::isDigit)) } },
+    )
+
+    /** 卡上、刷卡小票上的字，和打了星的卡号「6222 **** 1234」。 */
+    private val CARD_WORDS = Regex(
+        cue("VISA", "Visa", "MASTERCARD", "Mastercard", "UnionPay", "AMERICAN EXPRESS", "AMEX", "JCB", "DISCOVER", "CARD NO",
+            "CARDHOLDER", "DEBIT", "CREDIT", "银联", "信用卡", "借记卡", "储蓄卡", "银行卡", "卡号").pattern +
+            """|\d{4} ?[*＊•●]{4}|[*＊•●]{4} ?\d{4}"""
+    )
 
     private val IBAN = RegexRule(
         id = "iban",
@@ -122,11 +132,13 @@ object DefaultRuleSet {
         LabeledField(
             labels = listOf(
                 "Passport No.", "Passport No", "Passport Number", "Passport #", "Document No.", "Document No",
-                "Document Number", "护照号码", "护照号",
+                "Document Number", "护照号码", "护照号", "護照號碼", "護照號",
             ),
             value = Regex("""$DOCUMENT_NUMBER(?![A-Za-z0-9])"""),
             confidence = 0.8f,
             ignoreCase = true,
+            // 台湾居留证上「護照號碼」和号码隔着一栏
+            bareRow = true,
         ),
         StackedField(
             StackedField.document(StackedField.DOCUMENT_NUMBER_LABELS),
@@ -145,9 +157,9 @@ object DefaultRuleSet {
      * 字段名（「公民身份号码」「证号」「档案编号」「ID No.」……见 IdNumbers.labeled）后面的不验校验位：
      * 字段名已经说明了是证件号，OCR 认错一两位照样该遮；同姓名、住址一样认法（LabeledField），字段名读散了、
      * 带着英文译名（「证件号码/Card No.」）、号码在右边一栏的都认。没有字段名的要有校验位或者形状够特别：
-     * 大陆身份证（省份、生日、校验码，OCR 补的空格也认，见 ResidentIdNumber）、带括号的香港身份证、台湾身分证与居留证、
-     * 新加坡 NRIC，韩国居民登录号、马来西亚 MyKad（生日对得上），日本在留卡，带点的巴西 CPF；
-     * 跟在「订单号」「编号」这类提示词后面的不算（单据号常是同一个形状，见 notAfterOrderHint）。
+     * 大陆身份证（省份、生日、校验码，OCR 补的空格也认，见 ResidentIdNumber）、带括号的香港身份证、带点的巴西 CPF；
+     * 台湾身分证与居留证、新加坡 NRIC，韩国居民登录号、马来西亚 MyKad（生日对得上），日本在留卡，页上还要写着是哪儿的证件。
+     * 前面、左边一栏、正上方写着「订单号」「编号」这类提示词的不算（单据号常是同一个形状，见 NotAfterOrderHint）。
      * 一代身份证、澳门身份证、日本个人番号、各种通行证号没有校验位或太像别的号码，只在字段名后面认。
      *
      * 真机漏检补的：身份证正面的号码原先只圈成「长数字串」，过了 Luhn 的还标成「银行卡号」，末位是 X 的什么都不是；
@@ -164,6 +176,7 @@ object DefaultRuleSet {
         IdNumbers.HKID,
         IdNumbers.TAIWAN,
         IdNumbers.NRIC,
+        IdNumbers.KOREA_RRN_CHECKED,
         IdNumbers.KOREA_RRN,
         IdNumbers.MYKAD,
         IdNumbers.ZAIRYU,
@@ -205,8 +218,12 @@ object DefaultRuleSet {
     /** 物流轨迹里「签收人：」后面常见的非人名：「本人」「菜鸟驿站」「门卫」。 */
     private const val NOT_A_NAME_VALUE = "本人|他人|家人|同事|邻居|门卫|保安|前台|物业|收发室|快递柜|驿站|代收"
 
-    /** 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。 */
-    private const val NEXT_FIELD = "电话|手机|性别|性別|民族|出生|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名"
+    /**
+     * 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。
+     * 表头里跟在「姓名」后面的「学号 姓名 班级 备注」也是它们，不是名字。
+     */
+    private const val NEXT_FIELD =
+        "电话|手机|性别|性別|民族|出生|年龄|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名|学号|工号|班级|部门|职位|职务|备注|成绩"
 
     /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
     private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""
@@ -224,19 +241,22 @@ object DefaultRuleSet {
     /**
      * 姓名。值遇数字即停——同一行的电话归 PhoneRule 管，两条规则各出各的候选。
      *
-     * 六个分支对应六种排版：带间隔点的少数民族名（「阿依古丽·买买提」，点常被读成「•」「.」，两边还会多出空格）、复姓后面隔着空格的名
-     * （「欧阳 娜娜」）、连写的汉字名、字距拉开后被空格隔开的名（隔得不匀的「周 以宁」也算）、
+     * 六个分支对应六种排版：带间隔点的少数民族名（「阿依古丽·买买提」，点常被读成「•」「.」「-」「。」，两边还会多出空格）、
+     * 复姓后面隔着空格的名（「欧阳 娜娜」）、连写的汉字名、字距拉开后被空格隔开的名（隔得不匀的「周 以宁」也算）、
      * 证件上「姓, 名」的拼音（「ZHANG, SAN」「SMITH,JOHN」，姓全大写）、拉丁名。
      * 连写分支在拆字分支前面，`张三 性别 男` 才会只取到 `张三`；它还会在下一个字段名前停下，
      * 逐字切分的行拼回来成了「张三手机」「张三户主或与户主关系」时，不把后面的也吞进去。
+     * 空格隔得不匀、后半截在后面的（「王小 明」「周以 宁 性别 Sex 女」「山田 太郎」）连写分支带上后半截：
+     * 后半截一两个字，后面是行尾、下一个字段或者性别；「收货人 张三 已签收」不带。
      *
      * 值里含 NOT_A_NAME_VALUE 的词、或者紧跟着它们，整个值作废，而不是停在它们前面——
      * 否则「菜鸟驿站」会剩下「菜鸟」两个字被当成名字。
      */
     private val NAME_VALUE = Regex(
-        """$DOTTED_NAME_CHAR{1,8}(?:(?: ?[·•・‧] ?|[.．])$DOTTED_NAME_CHAR{1,8}){1,3}(?!$NOT_A_NAME_VALUE)""" +
+        """$DOTTED_NAME_CHAR{1,8}(?:(?:${HanNames.SPACED_DOT}|${HanNames.DOT})$DOTTED_NAME_CHAR{1,8}){1,3}(?!$NOT_A_NAME_VALUE)""" +
             """|$COMPOUND_SURNAME_SPACED""" +
-            """|$NAME_CHAR{2,6}(?!$NOT_A_NAME_VALUE)""" +
+            """|$NAME_CHAR{2,6}(?: $NAME_CHAR{1,2}(?=[ ]*$|[ ]+(?:$NEXT_FIELD|[男女](?![\u4e00-\u9fa5])|Sex|SEX|Gender)))?""" +
+            """(?!$NOT_A_NAME_VALUE)""" +
             """|$NAME_CHAR{1,2}(?: $NAME_CHAR{1,2}){1,4}""" +
             """|[A-Z][A-Z'\-]* ?, ?[A-Z][A-Za-z.'\-]*(?:[ ][A-Z][A-Za-z.'\-]*){0,2}""" +
             """|[A-Za-z][A-Za-z.'\-]*(?:[ ][A-Za-z][A-Za-z.'\-]*){0,2}"""
@@ -258,10 +278,7 @@ object DefaultRuleSet {
      * 值还要像个名字（[nameAfterCommonWord]），也不当旁证。
      */
     private val COMMON_WORD_NAME_LABELS =
-        listOf("所有人", "持证人", "法定代表人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名")
-
-    /** 句子里的字，名字里几乎没有。 */
-    private const val SENTENCE_CHARS = "的了是都也与或在我你他她它们这那吗呢吧啊呀哦嘛哈很没不就还要会"
+        listOf("所有人", "持证人", "法定代表人", "负责人", "经营者", "投资人", "执行事务合伙人", "监护人", "曾用名")
 
     /**
      * 也是常用词的字段名后面的值。隔着空格、冒号的照样可能是一句话（「所有人：今晚八点开会，别迟到」
@@ -280,10 +297,10 @@ object DefaultRuleSet {
         }
         val v = line.substring(r)
         if (v.none { it.isHan() }) return ROMANISED_NAME.matches(v)
-        if (v.any { it in "·•・.．‧" }) return true
+        if (v.any { it in HanNames.DOT_CHARS }) return true
         val name = v.filterNot { it.isWhitespace() }
         val max = if (PersonNameRecognizer.COMPOUND_SURNAMES.any { name.startsWith(it) }) 4 else 3
-        return name.length in 2..max && name.drop(1).none { it in SENTENCE_CHARS } && PersonNameRecognizer.startsLikeName(name)
+        return name.length in 2..max && name.drop(1).none { it in HanNames.SENTENCE_CHARS } && PersonNameRecognizer.startsLikeName(name)
     }
 
     /** 人名字段名领着的值：「姓名 张三」。下面一行的拼音由 [PinyinBelow] 从它往下接。 */
@@ -317,7 +334,8 @@ object DefaultRuleSet {
      * 「Sarah Johnson <…@…>」），与字段名同一档；[EnglishNameGuess] 按名单从字面猜「Emily Carter」，
      * 与 HanLP 同一档，要旁证。调研与评测见 docs/english-recognition-research.md。
      *
-     * 证件上的（2026-10，用户反馈身份证遮不全）：身份证人像面上字段名读坏了的那一行（[IdCardFront]），
+     * 证件上的（2026-10，用户反馈身份证遮不全）：身份证人像面上字段名读坏了的那一行（[IdCardFront]），香港身份证上没有字段名的
+     * 中文名、英文名和电码（[HongKongIdCard]），
      * 毕业证、学位证正文里的「张三，男，……生」（[DiplomaName]），通行证上名字下面一行的拼音（[PinyinBelow]）。
      */
     private val NAME = CompositeRule(
@@ -342,6 +360,7 @@ object DefaultRuleSet {
         StackedField(StackedField.header(StackedField.NAME_HEADER), ::formNameIn, confidence = 0.7f),
         MrzEcho(MrzEcho.What.NAME, confidence = 0.8f),
         IdCardFront(IdCardFront.What.NAME, confidence = 0.8f),
+        HongKongIdCard(confidence = 0.8f),
         DiplomaName(confidence = 0.8f),
         NeedsAnchor(PersonNameRecognizer(confidence = 0.6f, titles = PERSON_TITLES)),
         NeedsAnchor(EnglishNameGuess(confidence = 0.6f)),
@@ -357,7 +376,7 @@ object DefaultRuleSet {
         cell.indices.takeIf { DOCUMENT_NAME.matches(cell) && !cell.first().isLowerCase() }
 
     /** 汉字名：两到八个字，可带间隔点，字间可隔空格。 */
-    private val HAN_NAME = Regex("""[\u4e00-\u9fa5](?: ?(?:[·•・.．‧] ?)?[\u4e00-\u9fa5]){1,7}""")
+    private val HAN_NAME = Regex("""[\u4e00-\u9fa5](?: ?(?:${HanNames.ANY_DOT} ?)?[\u4e00-\u9fa5]){1,7}""")
 
     /**
      * 「姓名/Name」下面的：汉字名、[ROMANISED_NAME] 的拼音（「ZHOU, YINING」），或者同一行先汉字后拼音。
@@ -399,10 +418,14 @@ object DefaultRuleSet {
     /**
      * 也是常用词的地址字段名：营业执照（「住　　所」两端对齐）、户口簿、居住证，日本的在留卡、驾照。
      * 合同条文里的「住所地人民法院」、聊天里的「居住地在北京」「户籍所在地在哪里呀」也是它们，
-     * 后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），值也不能以「是」「在」「不」这类字打头（[notASentence]）。
+     * 后面要隔着空格、冒号或英文译名才算（LabeledField 的 spaced），值也不能以「是」「在」「不」这类字打头（[notASentence]），
+     * 还要有省市区县、路、号或者数字（[PLACE]）：「住所：详见附件一」「营业场所：一楼大厅」「住所：公司宿舍，离地铁近」不是地址。
      */
     private val SPACED_ADDRESS_LABELS =
         listOf("住所", "经营场所", "主要经营场所", "营业场所", "户籍所在地", "现居住地", "居住地", "住居地")
+
+    /** 地址里一定有的：行政区划、路街、门牌号，或者数字。 */
+    private val PLACE = Regex("""[省市区县州旗镇乡村路街道巷弄号]|\d""")
 
     /**
      * 句子接在字段名后面的头一个字：「出生地 不重要」「居住地 在北京」。地名不以它们打头；
@@ -419,7 +442,7 @@ object DefaultRuleSet {
         confidence = 0.8f,
         spaced = SPACED_ADDRESS_LABELS,
         nextField = ::startsWithField,
-        spacedValue = ::notASentence,
+        spacedValue = { line, r -> notASentence(line, r) && PLACE.containsMatchIn(line.substring(r)) },
     )
 
     /**
@@ -428,8 +451,8 @@ object DefaultRuleSet {
      * 住址折行时，以它们打头的一行是下一个字段（见 FollowingLines）。
      */
     private val OTHER_FIELDS = IdNumbers.LABELS + Vins.LABELS + Vins.ENGINE_LABELS + listOf(
-        "身份证", "号码", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期",
-        "准驾车型", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆类型", "车辆", "号牌",
+        "身份证", "号码", "户号", "性别", "民族", "国籍", "籍贯", "签发机关", "签发日期", "有效期限", "有效期",
+        "准驾车型", "初次领证日期", "初次领证", "发证", "注册日期", "使用性质", "品牌型号", "车辆类型", "车辆", "号牌",
         "户别", "宗教", "文化程度", "婚姻", "兵役", "服务处所", "职业", "身高", "血型", "登记日期", "承办人",
         "经营范围", "成立日期", "注册资本", "类型", "名称", "营业期限", "电话", "手机", "邮编", "邮政编码", "备注",
     )
@@ -438,7 +461,8 @@ object DefaultRuleSet {
      * 出生地：户口簿、出生医学证明、护照上常常只写一个省（「江苏」），比住址短。
      * 出生医学证明上省市县之间隔着空格，表上还印着「省」「市」「县（区）」（「山东 省 青岛 市 黄岛 县（区）」），
      * 一段一段接，到下一个字段名为止，至多八段。
-     * 「出生地是哪儿来着」「出生地呢？」是聊天：字段名后面要隔着空格、冒号或英文译名（同 [SPACED_ADDRESS_LABELS]）。
+     * 「出生地是哪儿来着」「出生地呢？」是聊天：字段名后面要隔着空格、冒号或英文译名（同 [SPACED_ADDRESS_LABELS]）；
+     * 带着逗号问号的、「保密」「不详」这种也不是。
      */
     private val BIRTH_PLACE_FIELD = LabeledField(
         labels = emptyList(),
@@ -446,8 +470,21 @@ object DefaultRuleSet {
         confidence = 0.8f,
         spaced = listOf("出生地点", "出生地"),
         nextField = ::startsWithField,
-        spacedValue = ::notASentence,
+        spacedValue = { line, r ->
+            val v = line.substring(r)
+            notASentence(line, r) && !SENTENCE_PUNCTUATION.containsMatchIn(v) && !NOT_A_PLACE.matches(v)
+        },
     )
+
+    private val SENTENCE_PUNCTUATION = Regex("[，,。？?！!…]")
+
+    private val NOT_A_PLACE = Regex("保密|不详|未知|无|暂无|略|[-—]+")
+
+    /**
+     * 户口簿「何时由何地迁来本市（县）」那一栏的值：「2010年09月由江苏省南京市玄武区迁来」。字段名长，常折成两行
+     * （「何时由何地」/「迁来本址」），字段名接不上值，按值自己的样子认：年月、「由」、地方、「迁来」。
+     */
+    private val MOVED_FROM = Regex("""(?:18|19|20)\d{2} *年 *\d{1,2} *月(?: *\d{1,2} *日)? *由 *[\u4e00-\u9fa5].{1,38}?迁来""")
 
     /**
      * 地址 = 字段名后面的值 + 长得像门牌的串。
@@ -464,6 +501,7 @@ object DefaultRuleSet {
         enabledByDefault = true,
         ADDRESS_FIELD,
         FollowingLines(ADDRESS_FIELD, ::startsWithField, confidence = 0.8f),
+        regexFinder(MOVED_FROM, 0.8f),
         BIRTH_PLACE_FIELD,
         IdCardFront(IdCardFront.What.ADDRESS, confidence = 0.8f),
         StackedField(StackedField.document(StackedField.BIRTH_PLACE_LABELS), ::placeIn, confidence = 0.8f),
@@ -548,11 +586,13 @@ object DefaultRuleSet {
             ignoreCase = true,
             nextField = ::startsWithField,
             valid = { v -> !v.all(Char::isDigit) || Dates.readings(v).any { (y, m, d) -> Dates.isRealDate(y, m, d) } },
+            // 日期的形状够严：出生医学证明的「出生时间」、12123 电子驾照的「出生日期」，值都在右边一栏
+            bareRow = true,
         ),
         LabeledField(labels = listOf("出生年月", "出生日期"), value = Regex(YEAR_MONTH), confidence = 0.8f),
         StackedField(
             StackedField.document(StackedField.BIRTH_DATE_LABELS),
-            value = Dates::findLenient,
+            value = ::birthDateIn,
             confidence = 0.8f,
             sameLine = true,
         ),
@@ -560,6 +600,18 @@ object DefaultRuleSet {
         IdBirthEcho(confidence = 0.9f),
         BornOn(confidence = 0.8f),
     )
+
+    /**
+     * 「Date of birth」下面那一格里的日期。日期前面是另一个中英文字段名的不算：驾驶证上「出生日期」那一栏往下，
+     * 拍斜了接到的是「初次领证日期 Date of First Issue 2008-05-20」。只有汉字的不算字段名：水印压着时生日常和水印的字
+     * 读成一串（「务 使用 8-02-14」），那还是生日。
+     */
+    private fun birthDateIn(cell: String): IntRange? = Dates.findLenient(cell)?.takeUnless { r ->
+        BILINGUAL_LABEL.containsMatchIn(cell.substring(0, r.first))
+    }
+
+    /** 汉字后面跟着带小写字母的英文词：「签发日期 Date of Issue」。 */
+    private val BILINGUAL_LABEL = Regex("""[\u4e00-\u9fa5][ 　/／|｜]*[A-Z]?[a-z]""")
 
     /**
      * 住址折行时，以字段名（OTHER_FIELDS，姓名、地址、出生日期的字段名，英文译名）打头的一行是下一个字段，
@@ -730,11 +782,6 @@ object DefaultRuleSet {
     /** 票种：滴滴出票页那一行就是「沐晨冉 成人」。 */
     private val TICKET_TYPES = listOf("成人票", "儿童票", "学生票", "婴儿票", "成人", "儿童", "学生", "婴儿")
 
-    /** 正则找形状，[valid] 再验一道。 */
-    private fun shape(pattern: Regex, valid: (String) -> Boolean = { true }) = Finder { text ->
-        pattern.findAll(text).filter { valid(it.value) }.map { RuleMatch(it.range, 1f) }.toList()
-    }
-
     /**
      * 人名的旁证表。从字面猜出的人名（NeedsAnchor）要有其中一处才算数，见 NameAnchor、RuleClassifier。
      * **加一种旁证就是在这里加一行**，再到 NameAnchorPageTest 的例子表里配一个例子。
@@ -746,13 +793,14 @@ object DefaultRuleSet {
         NameAnchor(R.string.anchor_phone, NameAnchor.Reach.NEARBY, PHONE),
         NameAnchor(R.string.anchor_email, NameAnchor.Reach.NEARBY, EMAIL),
         NameAnchor(R.string.anchor_address, NameAnchor.Reach.NEARBY, ADDRESS),
-        NameAnchor(R.string.anchor_id, NameAnchor.Reach.NEARBY, IdNumbers.RESIDENT),
-        NameAnchor(R.string.anchor_masked_number, NameAnchor.Reach.NEARBY, shape(MASKED_NUMBER)),
+        // 香港身份证上的英文名「CHAN, Tai Man」从名单里猜，旁证是下面那个带括号校验位的号码
+        NameAnchor(R.string.anchor_id, NameAnchor.Reach.NEARBY, Finder { t -> IdNumbers.RESIDENT.findIn(t) + IdNumbers.HKID.findIn(t) }),
+        NameAnchor(R.string.anchor_masked_number, NameAnchor.Reach.NEARBY, regexFinder(MASKED_NUMBER, 1f)),
         NameAnchor(
             R.string.anchor_field, NameAnchor.Reach.NEARBY,
             Words(NAME_LABELS + PERSON_FIELDS, boundedBefore = true),
         ),
         NameAnchor(R.string.anchor_ticket, NameAnchor.Reach.NEARBY, Words(TICKET_TYPES, boundedBefore = true, boundedAfter = true)),
-        NameAnchor(R.string.anchor_english_field, NameAnchor.Reach.NEARBY, shape(ENGLISH_PERSON_FIELDS)),
+        NameAnchor(R.string.anchor_english_field, NameAnchor.Reach.NEARBY, regexFinder(ENGLISH_PERSON_FIELDS, 1f)),
     )
 }
