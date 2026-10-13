@@ -7,7 +7,7 @@ import moe.flinty.yomark.R
 import java.time.LocalDate
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。19 条：14 条默认打码、5 条仅圈出。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。20 条：15 条默认打码、5 条仅圈出。
  * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
@@ -508,6 +508,8 @@ object DefaultRuleSet {
         StackedField(StackedField.header(StackedField.ADDRESS_HEADER), ::addressLineIn, confidence = 0.7f, maxLines = 4),
         AddressShape(confidence = 0.7f),
         EnglishAddressShape(confidence = 0.7f),
+        // 车牌像英文地址的尾巴：「苏A12345D」像爱尔兰邮编，「B SA 1234」像澳洲的州加邮编
+        yieldsTo = setOf(SensitiveKind.LICENSE_PLATE),
     )
 
     /** 出生地：护照上是「WASHINGTON, D.C., U.S.A.」「广东 GUANGDONG」。有字母、没有邮箱，八个词以内，整段遮。 */
@@ -635,6 +637,26 @@ object DefaultRuleSet {
 
     private fun startsWithField(line: String): Boolean = FIELD_START.containsMatchIn(line)
 
+    /**
+     * 车牌（真机漏检：车的照片上的「苏B·1LE22」，OCR 读成「苏B·ILE22」，没有一条规则认）。写法与分档见 [Plates]。
+     *
+     * 字段名后面的、写法独特的（中国大陆、日本、英国……）打码，上下两行的牌子拼起来认；
+     * 德国、西班牙这些写法不够独特的，照片上孤零零一行时只圈出（[LonePlate]）：车的照片上没有字段名，
+     * 牌子自己成一行、周围没有别的字；一句话里、一张截图里的多半不是车牌。
+     */
+    private val PLATE = CompositeRule(
+        id = "plate",
+        kind = SensitiveKind.LICENSE_PLATE,
+        enabledByDefault = true,
+        PlateLabel(confidence = 0.8f),
+        StackedField(StackedField.header(Plates.HEADER), Plates::valueIn, confidence = 0.8f),
+        PlateShapes(confidence = 0.9f),
+        TwoRowPlate(confidence = 0.85f),
+        LonePlate(confidence = 0.6f),
+        // 机读码、IBAN 里的一段字母数字碰巧像车牌
+        yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.IBAN),
+    )
+
     // ---------- 仅圈出：误报率高，靠导出拦截兜底（spec §6 / §7.4） ----------
 
     private val URL_PATTERN = Regex(
@@ -748,7 +770,7 @@ object DefaultRuleSet {
 
     val rules: List<Rule> = listOf(
         CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, ID_NUMBER, VIN, API_KEY,
-        NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE,
+        NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE, PLATE,
         URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
     )
 

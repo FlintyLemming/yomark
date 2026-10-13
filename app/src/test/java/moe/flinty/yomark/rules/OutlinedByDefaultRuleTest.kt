@@ -78,10 +78,11 @@ class OutlinedByDefaultRuleTest {
     // 滴滴出票页实测漏检补的「从字面认人名」不单独成条，并在 name 里（见 PersonNameRecognizer）
     //   + 护照样张实测漏检补的 birthdate（出生日期）
     //   + 身份证照片实测漏检补的 idnumber（证件号码），和同一批加的 vin（车架号）
-    @Test fun `the rule set has the eleven spec rules plus the eight field-added ones`() {
+    //   + 车的照片实测漏检补的 plate（车牌）
+    @Test fun `the rule set has the eleven spec rules plus the nine field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
             "card", "iban", "ssn", "mac", "email", "phone", "passport", "idnumber", "vin", "apikey",
-            "name", "address", "pickup", "birthdate", "url", "ip", "tracking", "longnum", "datetime",
+            "name", "address", "pickup", "birthdate", "plate", "url", "ip", "tracking", "longnum", "datetime",
         )
     }
 
@@ -90,10 +91,11 @@ class OutlinedByDefaultRuleTest {
      * 几乎必然是地址，「Date of birth」下面那个日期就是生日，符合 §6「按误报率划线」。
      * name 里从字面认出的那部分例外，要旁证才算，见 PersonNameRecognizerTest、NameAnchorPageTest。
      * idnumber / vin 也在这一侧：没有字段名的只认有校验位、形状够特别的，见 IdNumberRuleTest、VinRuleTest。
+     * plate 同理：字段名后面的、写法独特的打码，写法不够独特的单独成行时只圈出，见 LicensePlateRuleTest。
      */
-    @Test fun `exactly fourteen rules are masked by default and five are outlined`() {
+    @Test fun `exactly fifteen rules are masked by default and five are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
-        assertThat(masked).hasSize(14)
+        assertThat(masked).hasSize(15)
         assertThat(outlined.map { it.id })
             .containsExactly("url", "ip", "tracking", "longnum", "datetime")
     }

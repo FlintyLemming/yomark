@@ -80,6 +80,7 @@
     <string name="kind_datetime">日期时间</string>
     <string name="kind_birth_date">出生日期</string>
     <string name="kind_pickup">取件码</string>
+    <string name="kind_plate">车牌</string>
     <string name="kind_address">地址</string>
     <string name="kind_name">人名</string>
     <string name="kind_org">机构名</string>
@@ -237,6 +238,7 @@
     <string name="rule_desc_name">「收货人」「姓名/Name」「Surname」「Ship to」这类字段后面或下面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，通行证上名字下面的拼音，身份证、香港身份证、毕业证上没有字段名的名字。没有字段名时从字面猜，要有旁证才算。</string>
     <string name="rule_desc_address">「收货地址」「住址」「送至」这类字段后面的内容和它折到下面的几行，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，证件上的出生地，身份证上字段名没读出来的住址。</string>
     <string name="rule_desc_pickup">「取件码」「取货码」这类字段后面的码。</string>
+    <string name="rule_desc_plate">写法独特的车牌（中国大陆、日本、英国、法国、意大利、俄罗斯、印度、巴西等）和「车牌号」「License plate」这类字段后面的车牌，上下两行的也认。德国、西班牙等其他写法的只圈出，而且只在周围没有别的字时才认，比如照片上的车。</string>
     <string name="rule_desc_url">只遮路径和参数，域名保留。</string>
     <string name="rule_desc_ip">IPv4 和 IPv6 地址。前面写着 v 或 version 的版本号不算。</string>
     <string name="rule_desc_tracking">UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈。</string>

@@ -29,6 +29,7 @@ sourceSets {
                 "moe/flinty/yomark/rules/IdNumbers.kt", "moe/flinty/yomark/rules/Vin.kt",
                 "moe/flinty/yomark/rules/FollowingLines.kt", "moe/flinty/yomark/rules/ChineseIdCard.kt",
                 "moe/flinty/yomark/rules/DiplomaName.kt", "moe/flinty/yomark/rules/HanNames.kt",
+                "moe/flinty/yomark/rules/LicensePlate.kt",
                 "moe/flinty/yomark/rules/validator/Checksums.kt", "moe/flinty/yomark/rules/validator/KnownTlds.kt",
             )
         }

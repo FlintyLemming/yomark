@@ -39,8 +39,25 @@ internal fun Page.wrapOf(line: Int): Int? {
         .minByOrNull { (_, b) -> b.top }?.first
 }
 
-/** 一页上的一处：第 [line] 行（Page.texts 的下标）上的 [match]。 */
-data class PageMatch(val line: Int, val match: RuleMatch)
+/**
+ * 一页上的一处：第 [line] 行（Page.texts 的下标）上的 [match]。
+ *
+ * @param also 同一处落在别的行上的部分：上下两行的车牌，上一行「苏B」、下一行「12345」。
+ *   几段合成一个框、出一个候选：分成两块码，放过一块牌就得点两次，导出前还会说「2 个车牌」。
+ */
+data class PageMatch(val line: Int, val match: RuleMatch, val also: List<Span> = emptyList()) {
+
+    /** 这一处占的每一段：[line] 上的那段在前。 */
+    val spans: List<Span> get() = listOf(Span(line, match.range)) + also
+
+    /** 和 [other] 有没有哪一段落在同一行、区间重叠。 */
+    fun overlaps(other: PageMatch): Boolean =
+        if (also.isEmpty() && other.also.isEmpty()) line == other.line && match.range.overlaps(other.match.range)
+        else spans.any { a -> other.spans.any { b -> a.line == b.line && a.range.overlaps(b.range) } }
+}
+
+/** 第 [line] 行上的 [range]。 */
+data class Span(val line: Int, val range: IntRange)
 
 /**
  * 看整页的认法。逐行的 Finder 看不到的两种：值不在字段名同一行、而在它下面（护照资料页、表单，见 StackedField）；

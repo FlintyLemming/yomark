@@ -20,10 +20,10 @@ object RuleCatalog {
 
     /**
      * 设置页「文字」上的排法。规则表是按出厂分层排的（有校验位的在前），设置页上按截图里常见的程度排：
-     * 人名、电话、地址、取件码打头，IBAN、社保号这些海外的格式排到最后。只是显示顺序，不改识别。
+     * 人名、电话、地址、取件码打头，车牌跟在后面，IBAN、社保号这些海外的格式排到最后。只是显示顺序，不改识别。
      */
     val inSettingsOrder: List<Rule> = listOf(
-        "name", "phone", "address", "pickup", "idnumber", "card", "tracking", "email", "datetime",
+        "name", "phone", "address", "pickup", "idnumber", "plate", "card", "tracking", "email", "datetime",
         "url", "longnum", "birthdate", "passport", "vin", "apikey", "ip", "mac", "iban", "ssn",
     ).map { id -> all.first { it.id == id } }
 
@@ -72,6 +72,7 @@ object RuleCatalog {
         "name" to R.string.rule_desc_name,
         "address" to R.string.rule_desc_address,
         "pickup" to R.string.rule_desc_pickup,
+        "plate" to R.string.rule_desc_plate,
         "url" to R.string.rule_desc_url,
         "ip" to R.string.rule_desc_ip,
         "tracking" to R.string.rule_desc_tracking,

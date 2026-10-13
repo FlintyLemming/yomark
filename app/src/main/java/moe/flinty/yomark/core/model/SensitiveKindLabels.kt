@@ -24,6 +24,7 @@ object SensitiveKindLabels {
         SensitiveKind.DATETIME -> R.string.kind_datetime
         SensitiveKind.BIRTH_DATE -> R.string.kind_birth_date
         SensitiveKind.PICKUP_CODE -> R.string.kind_pickup
+        SensitiveKind.LICENSE_PLATE -> R.string.kind_plate
         SensitiveKind.POSTAL_ADDRESS -> R.string.kind_address
         SensitiveKind.PERSON_NAME -> R.string.kind_name
         SensitiveKind.ORG_NAME -> R.string.kind_org
@@ -67,6 +68,7 @@ object SensitiveKindLabels {
         SensitiveKind.DATETIME -> "日期时间"
         SensitiveKind.BIRTH_DATE -> "出生日期"
         SensitiveKind.PICKUP_CODE -> "取件码"
+        SensitiveKind.LICENSE_PLATE -> "车牌"
         SensitiveKind.POSTAL_ADDRESS -> "地址"
         SensitiveKind.PERSON_NAME -> "人名"
         SensitiveKind.ORG_NAME -> "机构名"

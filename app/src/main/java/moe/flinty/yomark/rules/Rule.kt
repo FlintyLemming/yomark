@@ -5,8 +5,16 @@ import moe.flinty.yomark.core.model.SensitiveKind
 /**
  * @param needsAnchor 这一处只是猜测：要页面上附近有电话、证件号、地址或「收货人」这类字段才算数。
  *   见 [NeedsAnchor]。
+ * @param outlineOnly 这一处只圈不打码，不管这一类设的是打码还是仅圈出：误报率高出一截、又找不到旁证可要的认法，
+ *   比如照片上孤零零一行的德国车牌（LonePlate）。这一类设成「关闭」时它也跟着关；
+ *   同一处别的类型认出了东西，它让开（RuleClassifier）。
  */
-data class RuleMatch(val range: IntRange, val confidence: Float, val needsAnchor: Boolean = false)
+data class RuleMatch(
+    val range: IntRange,
+    val confidence: Float,
+    val needsAnchor: Boolean = false,
+    val outlineOnly: Boolean = false,
+)
 
 /** 一种认法：只管在一行里找出区间。类型与初始状态由外面的规则决定。 */
 fun interface Finder {
@@ -110,9 +118,7 @@ class CompositeRule(
             else page.texts.indices.flatMap { i ->
                 runCatching { f.findIn(page.texts[i]) }.getOrElse { emptyList() }.map { PageMatch(i, it) }
             }
-            found.forEach { m ->
-                if (out.none { it.line == m.line && it.match.range.overlaps(m.match.range) }) out += m
-            }
+            found.forEach { m -> if (out.none { it.overlaps(m) }) out += m }
         }
         return out
     }

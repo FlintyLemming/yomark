@@ -80,6 +80,7 @@
     <string name="kind_datetime">Date &amp; time</string>
     <string name="kind_birth_date">Date of birth</string>
     <string name="kind_pickup">Pickup code</string>
+    <string name="kind_plate">License plate</string>
     <string name="kind_address">Address</string>
     <string name="kind_name">Name</string>
     <string name="kind_org">Organization</string>
@@ -237,6 +238,7 @@
     <string name="rule_desc_name">Names after or under fields like “Recipient”, “姓名/Name”, “Surname” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, the pinyin under a name on travel permits, and unlabelled names on Chinese and Hong Kong ID cards and diplomas. Without a field name they are guessed and need evidence.</string>
     <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to” and the lines it wraps onto; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs; addresses on Chinese ID cards whose field names didn\'t scan.</string>
     <string name="rule_desc_pickup">Codes after fields like “Pickup code”.</string>
+    <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more) and plates after fields like “License plate”, two-row plates included. Other formats, such as German or Spanish, are only outlined, and only when nothing else is written around them, as on a car in a photo.</string>
     <string name="rule_desc_url">Only the path and query are masked; the domain stays.</string>
     <string name="rule_desc_ip">IPv4 and IPv6. Version numbers after “v” or “version” don\'t count.</string>
     <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives.</string>
