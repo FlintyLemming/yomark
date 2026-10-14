@@ -7,21 +7,6 @@
     android:viewportWidth="1536"
     android:viewportHeight="1536">
     <group android:translateX="256" android:translateY="256">
-        <!-- 截图 -->
-        <path android:pathData="M296 156H728A64 64 0 0 1 792 220V804A64 64 0 0 1 728 868H296A64 64 0 0 1 232 804V220A64 64 0 0 1 296 156Z">
-            <aapt:attr name="android:fillColor">
-                <gradient android:type="linear" android:startX="0" android:startY="156" android:endX="0" android:endY="868">
-                    <item android:offset="0" android:color="#FFFFFFFF" />
-                    <item android:offset="0.993" android:color="#FFFFFFFF" />
-                    <item android:offset="1" android:color="#FFDDE3EB" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <path android:fillColor="#FFBAC3CF" android:pathData="M318 220H482A22 22 0 0 1 504 242V242A22 22 0 0 1 482 264H318A22 22 0 0 1 296 242V242A22 22 0 0 1 318 220Z" />
-        <!-- 琥珀虚线框和类型标签：识别到了，等你确认 -->
-        <path android:fillColor="#FFFFB300" android:pathData="M290 580V530a10 10 0 0 1 10 -10H388a10 10 0 0 1 10 10V566H316A14 14 0 0 0 302 580Z" />
-        <path android:strokeColor="#FFFFB300" android:strokeWidth="12" android:pathData="M296 597.5V580A20 20 0 0 1 316 560H404M645 560H660A20 20 0 0 1 680 580V597.5M680 614.5V632A20 20 0 0 1 660 652H645M331 652H316A20 20 0 0 1 296 632V614.5M421 560h27.8M465.8 560h27.8M510.6 560h27.8M555.4 560h27.8M600.2 560h27.8M348 652h32.5M397.5 652h32.5M447 652h32.5M496.5 652h32.5M546 652h32.5M595.5 652h32.5" />
-        <path android:fillColor="#FFD3D9E2" android:pathData="M348 584H628A22 22 0 0 1 650 606V606A22 22 0 0 1 628 628H348A22 22 0 0 1 326 606V606A22 22 0 0 1 348 584ZM318 708H674A22 22 0 0 1 696 730V730A22 22 0 0 1 674 752H318A22 22 0 0 1 296 730V730A22 22 0 0 1 318 708ZM318 788H542A22 22 0 0 1 564 810V810A22 22 0 0 1 542 832H318A22 22 0 0 1 296 810V810A22 22 0 0 1 318 788Z" />
         <!-- 天蓝胶带：已经打上的码 -->
         <group android:rotation="-7" android:pivotX="512" android:pivotY="378">
             <group android:translateY="4">

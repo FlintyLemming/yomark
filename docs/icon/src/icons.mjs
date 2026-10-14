@@ -3,8 +3,8 @@
 //   node docs/icon/src/icons.mjs
 //
 //   docs/icon/icon.svg                                 母版，1024×1024 满版方形，带投影
-//   app/src/main/res/drawable/ic_launcher_background.xml   自适应图标的底板
-//   app/src/main/res/drawable/ic_launcher_foreground.xml   自适应图标的前景：截图和胶带
+//   app/src/main/res/drawable/ic_launcher_background.xml   自适应图标的背景层：底板和截图
+//   app/src/main/res/drawable/ic_launcher_foreground.xml   自适应图标的前景层：只有胶带
 //   app/src/main/res/drawable/ic_launcher_monochrome.xml   Android 13 起的主题图标：单色剪影
 //   docs/icon/icon-monochrome.svg                      上面那个剪影的预览，只给人看
 //   site/favicon.svg                                    官网的网页图标和品牌标，圆角方形
@@ -155,7 +155,8 @@ const tapeGroup = {
   ],
 };
 const background = { d: 'M-256 -256H1280V1280H-256Z', fill: { from: [0, 0], to: [0, 1024], stops: [[0, BG[0]], [1, BG[1]]] } };
-const foreground = [paper, ...lines.slice(0, 1), ...flagged, ...lines.slice(1), tapeGroup];
+const screenshot = [paper, ...lines.slice(0, 1), ...flagged, ...lines.slice(1)];
+const foreground = [...screenshot, tapeGroup];
 
 // 主题图标：系统只看形状、自己上色，所以截图挖掉几行字和虚线框，胶带两边各让出一道缝，整体缩小一点。
 // 虚线框比彩色版粗一点（16 对 12），缩到桌面图标那么小还看得出一段一段
@@ -284,8 +285,9 @@ const page = { d: 'M0 0H1024V1024H0Z', fill: background.fill };
 write('docs/icon/icon.svg', toSvg([page, ...foreground]));
 // 网页图标：圆角方形（圆角 25%，同原来的 favicon），太小了看不出投影，不带
 write('site/favicon.svg', toSvg([page, ...foreground], { shadows: false, clip: rrPath(0, 0, 1024, 1024, 256) }));
-write('app/src/main/res/drawable/ic_launcher_background.xml', toVector([background]));
-write('app/src/main/res/drawable/ic_launcher_foreground.xml', toVector(foreground));
+// 自适应图标只有前后两层，截图放进底板那层，前景只留胶带：启动器的视差和回桌面的动画里胶带单独动，像是贴上去的
+write('app/src/main/res/drawable/ic_launcher_background.xml', toVector([background, ...screenshot]));
+write('app/src/main/res/drawable/ic_launcher_foreground.xml', toVector([tapeGroup]));
 write('app/src/main/res/drawable/ic_launcher_monochrome.xml', toVector(monochrome));
 // 主题图标的预览，只给人看，不进应用
 write('docs/icon/icon-monochrome.svg', toSvg([{ d: 'M0 0H1024V1024H0Z', fill: '#2B2E3A' }, ...monochrome]));
