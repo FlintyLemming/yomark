@@ -501,13 +501,17 @@ internal object TextInk {
         }
     }
 
-    private fun quantize(c: Int) = (c shr 19 and 31 shl 10) or (c shr 11 and 31 shl 5) or (c shr 3 and 31)
-
-    private fun color(k: Int) = ((k shr 10 and 31) * 8 + 4 shl 16) or ((k shr 5 and 31) * 8 + 4 shl 8) or ((k and 31) * 8 + 4)
-
-    private fun diff(a: Int, b: Int) =
-        abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF)) + abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF)) + abs((a and 0xFF) - (b and 0xFF))
 }
+
+/** 每通道量化到 8 级一档，拼成一个 15 位的键。 */
+private fun quantize(c: Int) = (c shr 19 and 31 shl 10) or (c shr 11 and 31 shl 5) or (c shr 3 and 31)
+
+/** 量化的键 → 那一档中间的颜色。 */
+private fun color(k: Int) = ((k shr 10 and 31) * 8 + 4 shl 16) or ((k shr 5 and 31) * 8 + 4 shl 8) or ((k and 31) * 8 + 4)
+
+/** 两个颜色三个通道差的和。 */
+private fun diff(a: Int, b: Int) =
+    abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF)) + abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF)) + abs((a and 0xFF) - (b and 0xFF))
 
 /** 底部导航栏：「微信 通讯录 发现 我」「Chats Calls Settings」。会话列表、通讯录页有，聊天页没有。 */
 internal object TabBar {
@@ -524,9 +528,7 @@ internal object TabBar {
 
 /** 粗化的像素网格：宽不超过 [WORK] 个格。截图缩到这个尺度上找头像就够了，也快。 */
 internal class Grid private constructor(val w: Int, val h: Int, val step: Int, private val rgb: IntArray) {
-    fun r(x: Int, y: Int) = (rgb[y * w + x] shr 16) and 0xFF
-    fun g(x: Int, y: Int) = (rgb[y * w + x] shr 8) and 0xFF
-    fun b(x: Int, y: Int) = rgb[y * w + x] and 0xFF
+    fun rgbAt(x: Int, y: Int) = rgb[y * w + x]
 
     /** 网格坐标 → 原图坐标。 */
     fun toImage(x0: Int, y0: Int, x1: Int, y1: Int) = Box(x0 * step.toFloat(), y0 * step.toFloat(), x1 * step.toFloat(), y1 * step.toFloat())
@@ -550,11 +552,12 @@ internal class Grid private constructor(val w: Int, val h: Int, val step: Int, p
 /**
  * 头像：贴着屏幕边、大小像头像、近正方形或圆的色块。
  *
- * 1. 左右两条「沟」（各占屏宽 13%）里，按 40 格高一段取屏幕最边上的颜色当底色（壁纸变化慢，也成立）；
- * 2. 和底色差得多的格先开运算（去掉壁纸涂鸦那种细线），再闭运算、填洞，连成块，
- *    留下近正方形、填充率高、宽在屏宽 4.5%–13% 的块；
- * 3. 块要贴边（离屏幕边不超过屏宽 6%）、整个落在沟里，而且要有另一块大小相近、离边一样远（左右镜像也算）的作伴，
- *    单独一块的多半是图片消息、表情；
+ * 1. 左右两条「沟」（各占屏宽 20%）里，按 40 格高一段取这一边屏幕最边上的颜色当底色（壁纸变化慢，也成立；
+ *    左右分开取：Telegram 的渐变壁纸斜着变色，屏幕左右两边差得比头像和底色还多）；
+ * 2. 和底色差得多的格里，平缓过渡过来的渐变壁纸去掉（[unmarkDrift]），再开运算（去掉壁纸涂鸦那种细线）、闭运算、填洞，连成块，
+ *    留下近正方形、填充率高、宽在屏宽 4.5%–13% 的块；被粗涂鸦和气泡连成一大块的，拆开再看（[SPLIT]）；
+ * 3. 块要贴边（离屏幕边不超过屏宽 6%，另一边不过屏宽 15%：微信的头像到 12.9%），
+ *    而且要有另一块大小相近、离边一样远（左右镜像也算）的作伴，单独一块的多半是图片消息、表情；
  * 4. 头像列找到以后，在列里再找一遍形状不规整的：和底色几乎一样的灰白默认头像只剩中间一个人像剪影，
  *    按列里头像的大小补成一个框。
  */
@@ -606,7 +609,9 @@ internal object Avatars {
         return ChatLine(Box(left, top, right, bottom), line.text.substring(first, last), chars?.subList(first, last))
     }
 
-    private const val GUTTER = 0.13f
+    private const val GUTTER = 0.2f
+    /** 头像离屏幕边远的那一侧最多到这里。贴边的气泡、图片消息被沟截断，截出来的块一直伸到沟的内侧边界，比这远。 */
+    private const val REACH = 0.15f
     private const val EDGE = 0.06f
     private const val MIN_SIZE = 0.045f
     private const val MAX_SIZE = 0.13f
@@ -618,9 +623,9 @@ internal object Avatars {
         val bottom = g.fromImage(z.bottomTop).coerceIn(top, g.h)
         val gut = (GUTTER * g.w).toInt()
         val edge = EDGE * g.w
-        // 碰到沟内侧边界的块是被沟截断的大东西（贴边的气泡、图片消息），不是头像：头像整个落在沟里
-        val left = components(g, 0, gut, top, bottom).filter { it.avatarShaped(g) && it.x0 < edge && it.x1 < gut - 1 }
-        val right = components(g, g.w - gut, g.w, top, bottom).filter { it.avatarShaped(g) && it.x1 > g.w - edge && it.x0 > g.w - gut + 1 }
+        val reach = REACH * g.w
+        val left = components(g, 0, gut, top, bottom, split = true).filter { it.avatarShaped(g) && it.x0 < edge && it.x1 <= reach }
+        val right = components(g, g.w - gut, g.w, top, bottom, split = true).filter { it.avatarShaped(g) && it.x1 > g.w - edge && it.x0 >= g.w - reach }
         val all = left + right
         val tol = 0.02f * g.w
         fun anchor(b: Blob) = if (b.x0 < edge) b.x0.toFloat() else (g.w - b.x1).toFloat()
@@ -672,6 +677,8 @@ internal object Avatars {
         val width get() = x1 - x0
         val height get() = y1 - y0
 
+        fun overlaps(o: Blob) = x0 < o.x1 && o.x0 < x1 && y0 < o.y1 && o.y0 < y1
+
         /** 大小像头像（屏宽 4.5%–13%）、近正方形、填充率高（圆是 0.79）。 */
         fun avatarShaped(g: Grid): Boolean {
             if (width < MIN_SIZE * g.w || width > MAX_SIZE * g.w) return false
@@ -680,35 +687,88 @@ internal object Avatars {
         }
     }
 
-    /** 区域里和底色不同的连通块（开运算去细线、闭运算补缝、填洞之后）。 */
-    private fun components(g: Grid, x0: Int, x1: Int, y0: Int, y1: Int): List<Blob> {
+    /**
+     * 区域里和底色不同的连通块（开运算去细线、闭运算补缝、填洞之后）。
+     * [split] 时再加上大块里拆出来的像头像的芯（见 [SPLIT]）。
+     *
+     * 先去掉渐变壁纸（[unmarkDrift]）找一遍；真去掉了什么的话，不去再找一遍，只补像头像、又没和前一遍的头像重叠的块：
+     * 头像自己也可能是渐变的，一头和底色差不多（Messenger 顶栏那种橙色渐变到近白的），去渐变时从那一头被吃掉半边。
+     */
+    private fun components(g: Grid, x0: Int, x1: Int, y0: Int, y1: Int, split: Boolean = false): List<Blob> {
         val bw = x1 - x0
         val bh = y1 - y0
         if (bw <= 2 || bh <= 2) return emptyList()
-        var mask = BooleanArray(bw * bh)
+        val dist = IntArray(bw * bh)
+        val raw = ink(g, x0, x1, y0, y1, dist)
+        val drifted = raw.copyOf()
+        val cleared = unmarkDrift(g, x0, y0, bw, bh, drifted, dist)
+        val found = blobs(g, x0, y0, bw, bh, clean(drifted, bw, bh), split)
+        if (!cleared) return found
+        val shaped = found.filter { it.avatarShaped(g) }
+        return found + blobs(g, x0, y0, bw, bh, clean(raw, bw, bh), split).filter { p -> p.avatarShaped(g) && shaped.none { it.overlaps(p) } }
+    }
+
+    /** 区域里和这一段底色差过 [INK] 的格（按行存），和每格跟底色的差（填进 [dist]）。 */
+    private fun ink(g: Grid, x0: Int, x1: Int, y0: Int, y1: Int, dist: IntArray): BooleanArray {
+        val bw = x1 - x0
+        val bh = y1 - y0
+        val mask = BooleanArray(bw * bh)
         var band = 0
         while (band < bh) {
             val end = min(bh, band + BAND)
-            val bg = edgeColor(g, y0 + band, y0 + end)
+            val bg = edgeColor(g, x0, x1, y0 + band, y0 + end)
             for (y in band until end) for (x in 0 until bw) {
-                val gx = x0 + x
-                val gy = y0 + y
-                val d = abs(g.r(gx, gy) - (bg shr 16 and 0xFF)) + abs(g.g(gx, gy) - (bg shr 8 and 0xFF)) + abs(g.b(gx, gy) - (bg and 0xFF))
+                val d = diff(g.rgbAt(x0 + x, y0 + y), bg)
+                dist[y * bw + x] = d
                 mask[y * bw + x] = d > INK
             }
             band = end
         }
-        mask = dilate(erode(mask, bw, bh), bw, bh)                                       // 开：去掉一两格宽的细线
-        mask = erode(erode(dilate(dilate(mask, bw, bh), bw, bh), bw, bh), bw, bh)        // 闭：补上头像边上的缺口
-        fillHoles(mask, bw, bh)
+        return mask
+    }
+
+    /** 开运算去掉一两格宽的细线，闭运算补上头像边上的缺口，再填洞。 */
+    private fun clean(m: BooleanArray, bw: Int, bh: Int): BooleanArray {
+        val opened = dilate(erode(m, bw, bh), bw, bh)
+        val closed = erode(erode(dilate(dilate(opened, bw, bh), bw, bh), bw, bh), bw, bh)
+        fillHoles(closed, bw, bh)
+        return closed
+    }
+
+    /** [mask]（区域左上角在网格的 [x0], [y0]）里的块；[split] 时加上拆出来的芯。 */
+    private fun blobs(g: Grid, x0: Int, y0: Int, bw: Int, bh: Int, mask: BooleanArray, split: Boolean): List<Blob> {
+        val whole = label(mask, bw, bh, IntArray(bw * bh), x0, y0)
+        if (!split) return whole
+        val shaped = whole.filter { it.avatarShaped(g) }
+        var core = mask
+        repeat(SPLIT) { core = erode(core, bw, bh) }
+        val ids = IntArray(bw * bh)
+        val depth = IntArray(bw * bh) { -1 }
+        val queue = IntArray(bw * bh)
+        // 芯每边比长回去的块小 SPLIT 格：芯就大小不对的不用长了
+        val cores = label(core, bw, bh, ids, x0, y0).withIndex()
+            .filter { (_, c) -> c.width + 2 * SPLIT >= MIN_SIZE * g.w && c.width <= MAX_SIZE * g.w && c.height <= MAX_SIZE * g.w }
+            .map { (k, c) -> regrow(k + 1, c, ids, mask, bw, bh, x0, y0, depth, queue) }
+            .filter { c -> c.avatarShaped(g) && shaped.none { it.overlaps(c) } }
+        return whole + cores
+    }
+
+    /**
+     * 拆大块。Telegram 的涂鸦线条粗，开运算去不掉，搭在头像和旁边的气泡之间，连成一个不像头像的大块：
+     * 整片往里腐蚀这么多圈，宽不过两倍这么多格的搭桥断开，剩下的芯各自在原来的块里长回去，再看像不像头像。
+     */
+    private const val SPLIT = 3
+
+    /** 连通块（四邻接），按找到的先后编号 1、2、3……写进 [ids]（不在块里的是 0）。框是网格坐标（区域左上角在 [x0], [y0]）。 */
+    private fun label(mask: BooleanArray, bw: Int, bh: Int, ids: IntArray, x0: Int, y0: Int): List<Blob> {
         val out = ArrayList<Blob>()
-        val seen = BooleanArray(bw * bh)
         val stack = IntArray(bw * bh)
         for (start in mask.indices) {
-            if (!mask[start] || seen[start]) continue
+            if (!mask[start] || ids[start] != 0) continue
+            val id = out.size + 1
             var sp = 0
             stack[sp++] = start
-            seen[start] = true
+            ids[start] = id
             var minX = bw; var minY = bh; var maxX = -1; var maxY = -1; var count = 0
             while (sp > 0) {
                 val i = stack[--sp]
@@ -719,9 +779,10 @@ internal object Avatars {
                 if (x > maxX) maxX = x
                 if (y < minY) minY = y
                 if (y > maxY) maxY = y
-                for (n in intArrayOf(if (x > 0) i - 1 else -1, if (x < bw - 1) i + 1 else -1, if (y > 0) i - bw else -1, if (y < bh - 1) i + bw else -1)) {
-                    if (n >= 0 && mask[n] && !seen[n]) { seen[n] = true; stack[sp++] = n }
-                }
+                if (x > 0 && mask[i - 1] && ids[i - 1] == 0) { ids[i - 1] = id; stack[sp++] = i - 1 }
+                if (x < bw - 1 && mask[i + 1] && ids[i + 1] == 0) { ids[i + 1] = id; stack[sp++] = i + 1 }
+                if (y > 0 && mask[i - bw] && ids[i - bw] == 0) { ids[i - bw] = id; stack[sp++] = i - bw }
+                if (y < bh - 1 && mask[i + bw] && ids[i + bw] == 0) { ids[i + bw] = id; stack[sp++] = i + bw }
             }
             out += Blob(x0 + minX, y0 + minY, x0 + maxX + 1, y0 + maxY + 1, count)
         }
@@ -729,19 +790,141 @@ internal object Avatars {
     }
 
     /**
-     * 一段的底色：取屏幕最左、最右两条窄边（各 1.5% 屏宽）里最常见的颜色（每通道量化到 8 级一档）。
-     * 不在整条沟里取：沟一共才屏宽 13%，纯色头像就占了大半，取出来的「底色」成了头像的颜色。
-     * 头像离屏幕边总留着一道缝（屏宽 2% 上下），两条窄边上就是底色或壁纸。
+     * 编号 [id] 的芯（框是 [core]）在 [mask] 里往外长回 [SPLIT] 圈（八邻接），长成的块。
+     * [depth]（全是 -1）和 [queue] 是借用的，用完 depth 还原。
      */
-    private fun edgeColor(g: Grid, y0: Int, y1: Int): Int {
+    private fun regrow(
+        id: Int, core: Blob, ids: IntArray, mask: BooleanArray, bw: Int, bh: Int, x0: Int, y0: Int, depth: IntArray, queue: IntArray,
+    ): Blob {
+        var head = 0
+        var tail = 0
+        for (y in core.y0 - y0 until core.y1 - y0) for (x in core.x0 - x0 until core.x1 - x0) {
+            val i = y * bw + x
+            if (ids[i] == id) { depth[i] = 0; queue[tail++] = i }
+        }
+        var minX = bw; var minY = bh; var maxX = -1; var maxY = -1
+        while (head < tail) {
+            val i = queue[head++]
+            val x = i % bw
+            val y = i / bw
+            if (x < minX) minX = x
+            if (x > maxX) maxX = x
+            if (y < minY) minY = y
+            if (y > maxY) maxY = y
+            if (depth[i] == SPLIT) continue
+            for (dy in -1..1) for (dx in -1..1) {
+                val nx = x + dx
+                val ny = y + dy
+                if (nx !in 0 until bw || ny !in 0 until bh) continue
+                val n = ny * bw + nx
+                if (mask[n] && depth[n] < 0) { depth[n] = depth[i] + 1; queue[tail++] = n }
+            }
+        }
+        for (k in 0 until tail) depth[queue[k]] = -1
+        return Blob(x0 + minX, y0 + minY, x0 + maxX + 1, y0 + maxY + 1, tail)
+    }
+
+    /**
+     * 相邻两格颜色差（三个通道差的和）不过这么多算平缓过渡：渐变壁纸一格只变零点几，加上压缩的噪点也就几个数；
+     * 头像、气泡、涂鸦的边一下子差几十。
+     */
+    private const val STEP = 15
+
+    /** 渐变壁纸和边上取的底色最多差这么多：再远的是东西，不当壁纸。 */
+    private const val DRIFT = 90
+
+    /**
+     * 渐变的壁纸离屏幕边远了，颜色和边上取的底色就差过 [INK]（Telegram 的壁纸斜着渐变，隔屏宽一成就差出这么多），
+     * 一片片算成「字」，连成和头像粘在一起的大块。从这一片外框上的底色出发，一格格平缓过渡（相邻差不过 [STEP]）
+     * 走得到的都是壁纸，从 [mask] 里去掉。头像、气泡的边都是一下子变色的，走不进去；本身渐变、一头和底色差不多的头像拦不住，见 [components]。
+     * 涂鸦的细线（开运算会去掉的）跨过去：线圈起来的那片壁纸也渐变了，跨不过去就留在里面，填洞以后成了一大块。
+     * 跨过线以后拿线外的颜色比。去掉了格就返回 true。
+     */
+    private fun unmarkDrift(g: Grid, x0: Int, y0: Int, bw: Int, bh: Int, mask: BooleanArray, dist: IntArray): Boolean {
+        val opened = dilate(erode(mask, bw, bh), bw, bh)
+        val reached = BooleanArray(bw * bh)
+        val ref = IntArray(bw * bh)                                      // 走到这一格时拿来比的颜色：细线上是线外的颜色
+        val stack = IntArray(bw * bh)
+        var sp = 0
+        var cleared = false
+        fun rgb(i: Int) = g.rgbAt(x0 + i % bw, y0 + i / bw)
+        fun seed(i: Int) {
+            if (!mask[i] && !reached[i]) { reached[i] = true; ref[i] = rgb(i); stack[sp++] = i }
+        }
+        fun visit(n: Int, c: Int) {
+            if (reached[n]) return
+            if (mask[n] && !opened[n]) {
+                reached[n] = true
+                ref[n] = c
+                stack[sp++] = n
+                return
+            }
+            if (dist[n] > DRIFT) return
+            val o = rgb(n)
+            if (diff(c, o) > STEP) return
+            reached[n] = true
+            ref[n] = o
+            if (mask[n]) { mask[n] = false; cleared = true }
+            stack[sp++] = n
+        }
+        for (x in 0 until bw) { seed(x); seed((bh - 1) * bw + x) }
+        for (y in 0 until bh) { seed(y * bw); seed(y * bw + bw - 1) }
+        while (sp > 0) {
+            val i = stack[--sp]
+            val x = i % bw
+            val c = ref[i]
+            if (x > 0) visit(i - 1, c)
+            if (x < bw - 1) visit(i + 1, c)
+            if (i >= bw) visit(i - bw, c)
+            if (i + bw < bw * bh) visit(i + bw, c)
+        }
+        return cleared
+    }
+
+    /**
+     * 一段的底色：取屏幕最边上一条窄边（1.5% 屏宽）里最常见的颜色（每通道量化到 8 级一档）。
+     * 不在整条沟里取：纯色头像占了沟的一大半，取出来的「底色」成了头像的颜色。
+     * 头像离屏幕边总留着一道缝（Telegram 的最窄，屏宽 1.3%，至多擦着窄边），窄边上大半是底色或壁纸。
+     * 只取 [x0, x1) 这一片所在的那一边：斜着的渐变壁纸左右两边颜色不一样；横跨两边的（顶栏）两边都取。
+     */
+    private fun edgeColor(g: Grid, x0: Int, x1: Int, y0: Int, y1: Int): Int {
         val edge = max(2, (0.015f * g.w).toInt())
+        val xs: Iterable<Int> = when {
+            x1 <= g.w / 2 -> 0 until edge
+            x0 >= g.w / 2 -> rightStrip(g, y0, y1, edge)
+            else -> (0 until edge) + rightStrip(g, y0, y1, edge)
+        }
+        return mode(g, xs, y0, y1)?.let { color(it.key) } ?: 0
+    }
+
+    /** 最边上这么宽的一道看是不是滚动条（微信的滚动条约屏宽 1%）。 */
+    private const val BAR = 0.012f
+
+    /**
+     * 右边的窄边。滑动着截的图右边上有一道滚动条（微信的是屏宽 1% 宽的灰条），把窄边占了大半，取出来的「底色」是滚动条的颜色：
+     * 最边上 [BAR] 这一道里最常见的颜色和往里挨着的一条不一样、往里那条大半是同一种颜色时，取往里那一条。
+     * 不要求最边上那道整个是滚动条：滚动条可能比这道窄一格，滑块的一头也只盖住这一段的一部分。
+     * 左边不挪：没有滚动条，Telegram 的头像离左边只有屏宽 1.3%。
+     */
+    private fun rightStrip(g: Grid, y0: Int, y1: Int, edge: Int): IntRange {
+        val bar = max(1, (BAR * g.w).toInt())
+        val outer = mode(g, g.w - bar until g.w, y0, y1)
+        val inner = mode(g, g.w - bar - edge until g.w - bar, y0, y1)
+        val scrollbar = outer != null && inner != null && outer.key != inner.key && inner.share >= 0.6f
+        return if (scrollbar) g.w - bar - edge until g.w - bar else g.w - edge until g.w
+    }
+
+    private class Mode(val key: Int, val share: Float)
+
+    /** 这几列里最常见的颜色（[quantize] 过的）和它占的比例。 */
+    private fun mode(g: Grid, xs: Iterable<Int>, y0: Int, y1: Int): Mode? {
         val counts = HashMap<Int, Int>()
-        for (y in y0 until y1) for (x in (0 until edge) + (g.w - edge until g.w)) {
-            val key = (g.r(x, y) shr 3 shl 10) or (g.g(x, y) shr 3 shl 5) or (g.b(x, y) shr 3)
+        for (y in y0 until y1) for (x in xs) {
+            val key = quantize(g.rgbAt(x, y))
             counts[key] = (counts[key] ?: 0) + 1
         }
-        val k = counts.maxByOrNull { it.value }?.key ?: return 0
-        return ((k shr 10 and 31) * 8 + 4 shl 16) or ((k shr 5 and 31) * 8 + 4 shl 8) or ((k and 31) * 8 + 4)
+        val top = counts.maxByOrNull { it.value } ?: return null
+        return Mode(top.key, top.value.toFloat() / counts.values.sum())
     }
 
     private fun dilate(m: BooleanArray, w: Int, h: Int): BooleanArray = morph(m, w, h, true)
@@ -789,11 +972,12 @@ internal object Avatars {
 }
 
 /**
- * 发言者的昵称。三处：
+ * 发言者的昵称。几处：
  * 1. 消息上方一行小字（微信、QQ、钉钉、飞书、LINE、iMessage、Messenger 的群聊；WhatsApp、Telegram 写在气泡里第一行，
  *    在 OCR 行上看是一样的）：下面紧跟一行字号更大、左缘对齐的消息；
  * 2. 「名字 + 时间」的消息头（Discord、Slack）；
- * 3. 系统消息里的名字：「"张三" 撤回了一条消息」「Rob joined」。
+ * 3. 系统消息里的名字：「"张三" 撤回了一条消息」「Rob joined」；
+ * 4. 被引用、被转发的人：微信消息下面的引用「方小禾：[图片]」，Telegram 的「转发自」。
  */
 internal object Names {
 
@@ -803,7 +987,17 @@ internal object Names {
     private const val SMALLER = 0.88f
     private const val SMALLER_THAN_TYPICAL = 0.95f
 
-    private val NOT_NAME = Regex("[，。！？!?；;…]|[：:]$|\\d{3,}")
+    /** 句子的标点；冒号结尾的是「地址：」这种标签。 */
+    private val SENTENCE = Regex("[，。！？!?；;…]|[：:]$")
+
+    /** 再加上三位以上的数字（金额、单号、电话）。 */
+    private val NOT_NAME = Regex("${SENTENCE.pattern}|\\d{3,}")
+
+    /**
+     * 放宽时名字可以这么长：彩色名字后面常跟着灰色的头衔、助力数，OCR 读成一行（「名字 + 头衔」三十来个字）；
+     * 转发来源的频道名也常比人名长。
+     */
+    private const val LONG = 40
 
     /**
      * 这一页消息的字高：取上四分位。群聊里昵称、时间这些小字可能和消息差不多一样多，中位数会落到它们中间；
@@ -812,22 +1006,35 @@ internal object Names {
     private fun typicalHeight(lines: List<ChatLine>): Float =
         lines.map { it.box.height }.sorted().let { if (it.isEmpty()) 0f else it[it.size * 3 / 4] }
 
-    /** 像个名字：不长、有字母或汉字（「+1」「38"」这种短消息、语音时长不是）、不是句子、不是时间。 */
-    private fun plausible(text: String) =
-        text.length <= MAX_LEN && text.any { it.isLetter() } && !NOT_NAME.containsMatchIn(text) && !ChatLayout.TIME.containsMatchIn(text)
+    /**
+     * 像个名字：不长（不过 [maxLen]）、有字母或汉字（「+1」「38"」这种短消息、语音时长不是）、不是句子、不是时间、不是「转发自」；
+     * [digits] 时可以带三位以上的数字（用户名、频道名常带）。
+     */
+    private fun plausible(text: String, maxLen: Int = MAX_LEN, digits: Boolean = false) =
+        text.length <= maxLen && text.any { it.isLetter() } && !(if (digits) SENTENCE else NOT_NAME).containsMatchIn(text) &&
+            !ChatLayout.TIME.containsMatchIn(text) && !FORWARDED.containsMatchIn(text)
 
     fun find(z: Zones, avatars: List<Box>, chroma: (Box) -> Int = { 0 }): List<ChatText> {
         val out = ArrayList<ChatText>()
-        out += aboveMessages(z, avatars)
+        val colored = colored(z, chroma)
+        // 彩色名字底下紧跟的一行小字是这个人说的话（引用回复里被引用的那句），不是下一个昵称
+        fun saidBy(n: ChatText) = colored.any { c -> directlyAbove(c.box, n.box, z.w) }
+        out += aboveMessages(z, avatars).filterNot { saidBy(it) }
         // 同一列的小字只按上面认出的那些推：彩色昵称和消息一样大，拿它们推会把引用里的小字也算进来
-        val small = sameColumn(z, out)
-        out += colored(z, chroma).filter { c -> out.none { it.box == c.box } }
+        val small = sameColumn(z, out).filterNot { saidBy(it) }
+        out += colored.filter { c -> out.none { it.box == c.box } }
         out += small.filter { c -> out.none { it.box == c.box } }
         out.replaceAll { joinRight(z, it) }
         out += headerRows(z).filter { r -> out.none { it.box == r.box } }
+        out += forwarded(z, chroma).filter { r -> out.none { it.box == r.box } }
+        out += quoted(z).filterNot { saidBy(it) }
         out += inSystemMessages(z)
         return out
     }
+
+    /** [upper] 是 [lower] 紧挨着的上一行：左缘对齐，中间空当不到大半个字高。 */
+    private fun directlyAbove(upper: Box, lower: Box, w: Float) =
+        upper.bottom <= lower.top + 0.3f * lower.height && lower.top - upper.bottom < 0.8f * lower.height && abs(upper.left - lower.left) < 0.03f * w
 
     /**
      * 昵称右边同一行上紧挨着的一截也是它的：OCR 偶尔把一个名字检测成两段（「Ana S」「Souza」），
@@ -854,12 +1061,15 @@ internal object Names {
             if (!plausible(text)) return@mapNotNull null
             // 只认靠左的：自己的消息上方不写名字。靠左 = 左缘在屏宽 35% 以内，且右缘没到靠右那一列
             if (l.box.left > 0.35f * z.w) return@mapNotNull null
-            val below = body.filter {
+            // 下面的消息左缘对齐。微信的名字和气泡左缘对齐，字在气泡里缩进一点（屏宽 2.6% 上下）：对齐的找不到，再往右多放一点找
+            fun below(right: Float) = body.filter {
                 it !== l && it.box.top >= l.box.bottom - 0.2f * l.box.height &&
                     it.box.top - l.box.bottom < 2.2f * l.box.height &&
-                    abs(it.box.left - l.box.left) < 0.03f * z.w
+                    it.box.left - l.box.left > -0.03f * z.w && it.box.left - l.box.left < right * z.w
             }.minByOrNull { it.box.top }
-            if (below != null) {
+            val below = below(0.03f) ?: below(0.045f)
+            // 下面那行比名字还小得多（不到六成）的，是图片消息里截图上的字，当作下面没有字
+            if (below != null && below.box.height >= 0.6f * l.box.height) {
                 // 和这页消息的字高也比一比：下面那行要是网址、邮箱这种全是字母的，OCR 的框比同字号的汉字高一截
                 if (l.box.height > SMALLER * below.box.height || l.box.height > SMALLER_THAN_TYPICAL * typical) return@mapNotNull null
             } else {
@@ -890,9 +1100,12 @@ internal object Names {
      * 彩色的昵称：Telegram、WhatsApp 这类把名字写在气泡第一行，字号和消息一样，按颜色区分（每人一种颜色）；
      * 引用回复里被引用的人名也是这样。靠左、像个名字、字是彩色的，下面紧跟着（左缘差不到 5% 屏宽）一行不是彩色的字。
      * 彩色的网址、话题标签不算。
+     * 一段开头的（上面紧挨着没有别的字：气泡第一行的发送人、引用里的人名）放宽：名字后面可能跟着头衔、助力数（OCR 读成一行），
+     * 用户名常带数字，长度、数字都放宽，整行都遮。消息中间的彩色字（链接、文档标题）照常认，不放宽。
+     * 居中的也算：引用里带缩略图的那行往右挪了，宽了，可能正好落在屏幕正中。
      */
     private fun colored(z: Zones, chroma: (Box) -> Int): List<ChatText> {
-        val body = z.body.filter { !z.isCentered(it) && it.box.left <= 0.35f * z.w }
+        val body = z.body.filter { it.box.left <= 0.35f * z.w }
         val hue = HashMap<ChatLine, Int>()
         fun of(l: ChatLine) = hue.getOrPut(l) { chroma(l.box) }
         fun next(l: ChatLine) = body.filter {
@@ -901,8 +1114,11 @@ internal object Names {
         }.minByOrNull { it.box.top }
         return body.mapNotNull { l ->
             val text = l.text.trim()
-            // 单个字母的（图片里的大字、表情上的字）不算
-            if (text.count { !it.isWhitespace() } < 2 || !plausible(text) || LINK.containsMatchIn(text) || PINNED.containsMatchIn(text)) return@mapNotNull null
+            val opens = z.body.none { it !== l && directlyAbove(it.box, l.box, z.w) }
+            // 单个字的（图片里的大字、表情上的字）不算
+            if (text.count { !it.isWhitespace() } < 2 || !plausible(text, if (opens) LONG else MAX_LEN, digits = opens) ||
+                LINK.containsMatchIn(text) || PINNED.containsMatchIn(text)
+            ) return@mapNotNull null
             if (of(l) < COLORED) return@mapNotNull null
             // 往下找第一行不是彩色的字：名字下面可能先是引用里被引用的人名（也是彩色的）
             var below = next(l)
@@ -939,6 +1155,54 @@ internal object Names {
                 lefts.any { abs(it - l.box.left) < 0.01f * z.w } && abs(l.box.height - height) < 0.2f * height
         }.map { ChatText(it.box, it.text.trim()) }
     }
+
+    /**
+     * Telegram 转发来的消息：气泡里（发送人的彩色名字下面）彩色的「转发自」后面，或者紧接着的下一行（也是彩色的），
+     * 是原发送人、频道的名字。打字打出来的「转发自……」是黑字白字，不算。
+     */
+    private val FORWARDED = Regex("^(?:转发自|轉發自|Forwarded from)\\s*[:：]?\\s*", RegexOption.IGNORE_CASE)
+
+    private fun forwarded(z: Zones, chroma: (Box) -> Int): List<ChatText> = z.body.mapNotNull { l ->
+        val text = l.text.trim()
+        val m = FORWARDED.find(text) ?: return@mapNotNull null
+        if (chroma(l.box) < COLORED) return@mapNotNull null
+        val rest = text.substring(m.range.last + 1)
+        if (rest.isNotEmpty()) {
+            return@mapNotNull if (plausible(rest, LONG, digits = true)) ChatText(TextSpan.boxOf(l, text.length - rest.length, rest.length, text), rest) else null
+        }
+        val next = z.body.filter { it !== l && directlyAbove(l.box, it.box, z.w) }.minByOrNull { it.box.top } ?: return@mapNotNull null
+        val name = next.text.trim()
+        if (plausible(name, LONG, digits = true) && chroma(next.box) >= COLORED) ChatText(next.box, name) else null
+    }
+
+    /**
+     * 微信的引用：消息下面一块灰底的小字「方小禾：[图片]」「方小禾：今晚加班吗」，冒号前是被引用的人。
+     * 只认比这页消息小一号的（引用的字比消息小），「地址：长江路88号」这种消息不算；常见的标签词、网址也不算。
+     */
+    private fun quoted(z: Zones): List<ChatText> {
+        val body = z.body.filter { !z.isCentered(it) }
+        val typical = typicalHeight(body)
+        return body.mapNotNull { l ->
+            if (l.box.height >= SMALLER * typical) return@mapNotNull null
+            val text = l.text.trim()
+            val m = QUOTE.find(text) ?: return@mapNotNull null
+            val name = m.groupValues[1].trim()
+            // 「今天 09:12」的冒号是时间里的，「https://」的是网址里的
+            val after = text.substring(m.range.last + 1).trimStart()
+            if (after.startsWith("//") || name.lastOrNull()?.isDigit() == true && after.firstOrNull()?.isDigit() == true) return@mapNotNull null
+            if (!plausible(name) || LINK.containsMatchIn(name) || LABELS.any { it.equals(name, ignoreCase = true) }) return@mapNotNull null
+            ChatText(TextSpan.boxOf(l, text.indexOf(name), name.length, text), name)
+        }
+    }
+
+    private val QUOTE = Regex("^([^:：]{1,$MAX_LEN}?)\\s*[:：]")
+
+    private val LABELS = setOf(
+        "地址", "电话", "手机", "时间", "日期", "备注", "回复", "原因", "金额", "账号", "微信号", "邮箱", "姓名", "来源", "链接", "密码", "价格",
+        "大小", "作者", "时长", "文件", "数量", "单号", "订单号", "状态", "说明", "提示", "注意",
+        "Re", "To", "From", "Tel", "Phone", "Email", "Note", "Address", "Size", "Author", "Update", "Edit", "Fwd", "ETA", "PS", "Q", "A",
+        "Total", "Status", "Tip", "Warning",
+    )
 
     /** 「名字 + 时间」的消息头：同一行里名字后面紧跟一个时间（或 OCR 把两者读成一行），下面是消息正文。 */
     fun headerRows(z: Zones): List<ChatText> {
