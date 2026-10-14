@@ -11,7 +11,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -210,6 +209,7 @@ fun EditorToolbar(
         val groupParts = HashMap<ToolGroup, Measurable>()
         val circleParts = HashMap<Slot, Measurable>()
         val toolParts = ArrayList<Measurable>()
+        var picked = -1
         var pillPart: Measurable? = null
         var backPart: Measurable? = null
         var dividerPart: Measurable? = null
@@ -219,6 +219,10 @@ fun EditorToolbar(
             Slot.BACK -> backPart = m
             Slot.DIVIDER -> dividerPart = m
             Slot.TOOL -> toolParts += m
+            Slot.PICKED -> {
+                picked = toolParts.size
+                toolParts += m
+            }
             Slot.AI, Slot.COMPARE -> circleParts[id as Slot] = m
         }
 
@@ -247,7 +251,7 @@ fun EditorToolbar(
         circles.fold(shutRight + gap) { x, slot -> circleX[slot] = x; x + circle + gap }
         val circlePlaceables = circleParts.mapValues { (_, m) -> m.measure(Constraints.fixed(circle, circle)) }
 
-        // 展开：胶囊撑满这一行，最左边只有返回箭头，分隔线后面的工具平分剩下的
+        // 展开：胶囊撑满这一行，最左边只有返回箭头，分隔线后面的工具按名字长短分剩下的（见 toolWidths）
         val openLeft = margin
         val openRight = width - margin
         val backX = openLeft + inset
@@ -258,8 +262,19 @@ fun EditorToolbar(
         val dividerGap = DIVIDER_GAP.roundToPx()
         val divider = dividerPart?.measure(Constraints())
         val toolsStart = backX + backWidth + dividerGap * 2 + (divider?.width ?: 0)
-        val toolWidth = if (toolParts.isEmpty()) 0 else ((openRight - inset - toolsStart) / toolParts.size).coerceAtLeast(0)
-        val tools = toolParts.map { it.measure(Constraints.fixedWidth(toolWidth)) }
+        val toolsRoom = (openRight - inset - toolsStart).coerceAtLeast(0)
+        val toolWidths = toolWidths(
+            natural = toolParts.map { it.maxIntrinsicWidth(rowMin) },
+            room = toolsRoom,
+            picked = picked,
+            chevron = chevronRoom,
+            bare = (TOOL_PAD_QUIET * 2 + GLYPH_BOX).roundToPx(),
+        )
+        // 每一格和胶囊一样高：整格都能点，小胶囊在格子正中
+        val tools = toolParts.mapIndexed { i, m ->
+            m.measure(Constraints(minWidth = toolWidths[i], maxWidth = toolWidths[i], minHeight = rowMin))
+        }
+        val toolX = toolWidths.runningFold(toolsStart) { x, w -> x + w }
 
         val height = max(rowMin, (groups.values + tools + circlePlaceables.values + listOfNotNull(back)).maxOf { it.height })
         // 胶囊有多宽跟着动画走：每一帧重新量它（它自己画边和投影，见 floatingSurface）。
@@ -306,7 +321,7 @@ fun EditorToolbar(
             tools.forEachIndexed { i, tool ->
                 val start = TOOL_IN_START + i * stagger
                 val t = span(p, start, start + TOOL_IN)
-                val x = toolsStart + shift + i * toolWidth - ((1f - t) * slide).roundToInt()
+                val x = toolX[i] + shift - ((1f - t) * slide).roundToInt()
                 tool.placeWithLayer(x, tool.centerY()) {
                     alpha = t
                     shape = Reveal((left - x).toFloat(), (right - x).toFloat())
@@ -322,10 +337,41 @@ private class LastOpen {
     var group: ToolGroup? = null
 }
 
-private enum class Slot { PILL, AI, COMPARE, BACK, DIVIDER, TOOL }
+/** [TOOL] 是展开后的一项工具，选中的那一项是 [PICKED]（分宽度时它的名字留到最后，见 [toolWidths]）。 */
+private enum class Slot { PILL, AI, COMPARE, BACK, DIVIDER, TOOL, PICKED }
 
 /** [p] 落在 [start]～[end] 这一段的哪儿，0～1。 */
 internal fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
+
+/**
+ * 展开后各项工具的宽：[natural] 是各项本来要多宽，[room] 是分隔线右边一共有多宽，[picked] 是选中的那一项（没有是 -1）。
+ * 放得下时各按本来的宽，多出来的平分：小胶囊在各自格子的正中，几项之间的空一样大。
+ *
+ * 放不下时（窄屏、字调大了、英文的长名字）选中的名字最要紧，一定写全；其次是没选中的名字，从短的起能写几个写几个，
+ * 写不下的只留小样子（[bare] 宽，见 [NameOrNothing]），不截断成「Water…」；最后还有地方，选中的名字后面才画小箭头（[chevron]）。
+ * 都只剩小样子还放不下，才截断选中的名字（见 [LabelAndChevron]）。
+ *
+ * 每一项按给它的宽自己定画什么：格子够它本来的宽就画全，不够就照上面的顺序少画，所以这里分出来的和它们画出来的对得上。
+ */
+internal fun toolWidths(natural: List<Int>, room: Int, picked: Int, chevron: Int, bare: Int): List<Int> {
+    if (natural.isEmpty()) return emptyList()
+    if (natural.sum() <= room) return spread(natural, room)
+    val want = natural.indices.mapTo(ArrayList()) { if (it == picked) natural[it] - chevron else bare }
+    for (i in natural.indices.filter { it != picked }.sortedBy { natural[it] }) {
+        if (want.sum() - bare + natural[i] > room) break
+        want[i] = natural[i]
+    }
+    if (picked in want.indices && want.sum() + chevron <= room) want[picked] += chevron
+    val over = want.sum() - room
+    if (over > 0 && picked in want.indices) want[picked] = (want[picked] - over).coerceAtLeast(bare)
+    return spread(want, room)
+}
+
+/** 多出来的地方平分给每一项。 */
+private fun spread(want: List<Int>, room: Int): List<Int> {
+    val extra = (room - want.sum()).coerceAtLeast(0) / want.size
+    return want.map { it + extra }
+}
 
 /** 一项工具上胶囊盖住的那一截：从 [left] 到 [right]，按这一项自己的坐标。 */
 private class Reveal(private val left: Float, private val right: Float) : Shape {
@@ -357,13 +403,8 @@ private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn:
         role = Role.Button,
         on = purposeOn,
         stateText = if (purposeOn) stringResource(R.string.tool_on) else null,
-    ) {
-        Icon(
-            PurposeWatermarkIcon,
-            contentDescription = null,
-            modifier = Modifier.size(GLYPH_ICON),
-            tint = if (purposeOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+    ) { ink ->
+        Icon(PurposeWatermarkIcon, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = ink)
     }
 }
 
@@ -375,8 +416,8 @@ private fun StyleItem(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
         onClick = { actions.onStyleClick(style) },
         selected = selected,
         panelOpen = if (selected) model.panelOpen else null,
-    ) {
-        StyleGlyph(style, model.look.options, model.nearColors)
+    ) { ink ->
+        StyleGlyph(style, model.look.options, model.nearColors, ink = ink)
     }
 }
 
@@ -485,6 +526,24 @@ private fun LabelAndChevron(modifier: Modifier = Modifier, content: @Composable 
         layout(width, max(text.height, arrow.height)) {
             text.place(0, (max(text.height, arrow.height) - text.height) / 2)
             if (withChevron) arrow.place(width - arrow.width, (max(text.height, arrow.height) - arrow.height) / 2)
+        }
+    }
+}
+
+/**
+ * 没选中的一项的名字，连着它和小样子之间的空：给的地方写得下就写全，写不下整个不画，这一项只剩小样子——
+ * 截成「Water…」难认，只有小样子的倒和作者给的悬浮底栏截图一个样子。
+ * 不画时名字照样摆着、只是透明：读屏还念得到，点的还是整格。
+ */
+@Composable
+private fun NameOrNothing(modifier: Modifier = Modifier, name: @Composable () -> Unit) {
+    Layout(name, modifier) { measurables, constraints ->
+        val gap = TOOL_GLYPH_GAP.roundToPx()
+        val text = measurables.single().measure(Constraints())
+        // 量本来多宽时（宽度不限）总写得下
+        val fits = !constraints.hasBoundedWidth || gap + text.width <= constraints.maxWidth
+        layout(if (fits) gap + text.width else 0, text.height) {
+            if (fits) text.place(gap, 0) else text.placeWithLayer(0, 0) { alpha = 0f }
         }
     }
 }
@@ -646,11 +705,18 @@ private fun rememberHintPosition(): PopupPositionProvider {
 }
 
 /**
- * 展开后的一项工具，和原先样式栏上的一项一个样子：上面是小样子，下面是名字，选中的垫一颗小胶囊。
- * 按下去的水波只在小胶囊里，和导航栏一样：整项一样大的水波会碰到胶囊的上下沿。
+ * 展开后的一项工具：左边是小样子，右边是名字，排成一行，和收着时胶囊里的一组一个排法。
+ * 原先小样子叠在名字上面，胶囊压到 48 dp 之后两样都得缩一号，挤（2026-10-14）。并排之后名字和收着时一样大。
  *
- * @param panelOpen 选中的样式名字后面的小箭头：再点一下弹出调节面板（开着时朝下）。null 不画
- * @param enabled 还没做好的（画笔）灰掉、点不动
+ * 选中的垫一颗深一点的小胶囊：主题色 20% 叠在胶囊的底色上，小样子、名字、小箭头着主题色（照作者给的悬浮底栏截图）。
+ * 没选中的不垫底，左右只留一点空，地方让给选中的那一颗。
+ *
+ * 整格都能点（和胶囊一样高），按下去的水波只在小胶囊里：整格一样大的水波会碰到胶囊的上下沿。
+ * 这一格多宽由 EditorToolbar 按名字长短分（见 [toolWidths]）。地方不够时选中的先去掉小箭头、实在不行再截断名字
+ * （见 [LabelAndChevron]），没选中的写不全就只留小样子（见 [NameOrNothing]）。
+ *
+ * @param panelOpen 选中的样式名字后面的小箭头：再点一下长出调节面板（开着时朝下）。null 不画
+ * @param enabled 点不动的灰掉
  * @param on 开着的开关（水印）：名字着主题色
  * @param stateText 读屏念的状态，如水印的「已开启」
  */
@@ -665,7 +731,7 @@ private fun ToolItem(
     role: Role = Role.RadioButton,
     on: Boolean = false,
     stateText: String? = null,
-    glyph: @Composable () -> Unit,
+    glyph: @Composable (ink: Color) -> Unit,
 ) {
     val colors = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
@@ -674,42 +740,44 @@ private fun ToolItem(
     } else {
         Modifier.clickable(interactionSource = interaction, indication = null, enabled = enabled, role = role, onClick = onClick)
     }
-    Column(
+    val ink = if (on || selected) colors.primary else colors.onSurfaceVariant
+    Box(
         modifier
-            .layoutId(Slot.TOOL)
+            .layoutId(if (selected) Slot.PICKED else Slot.TOOL)
             .then(press)
             .semantics { if (stateText != null) stateDescription = stateText }
-            .padding(vertical = TOOL_PAD)
             .alpha(if (enabled) 1f else DISABLED_ALPHA),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
+        Row(
             Modifier
-                .size(INDICATOR_WIDTH, INDICATOR_HEIGHT)
+                .height(TOOL_CHIP_HEIGHT)
                 .clip(CircleShape)
-                .background(if (selected) colors.secondaryContainer else Color.Transparent)
-                .indication(interaction, LocalIndication.current),
-            contentAlignment = Alignment.Center,
-        ) { glyph() }
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                label,
-                style = MaterialTheme.typography.labelSmall,
-                color = when {
-                    on -> colors.primary
-                    selected -> colors.onSurface
-                    else -> colors.onSurfaceVariant
-                },
-                maxLines = 1,
-            )
+                .background(if (selected) colors.primary.copy(alpha = SELECTED_TINT) else Color.Transparent)
+                .indication(interaction, LocalIndication.current)
+                .padding(
+                    start = if (selected) TOOL_PAD_START else TOOL_PAD_QUIET,
+                    end = if (selected) TOOL_PAD_END else TOOL_PAD_QUIET,
+                ),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(Modifier.size(GLYPH_BOX), contentAlignment = Alignment.Center) { glyph(ink) }
+            val name = @Composable {
+                Text(label, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
             if (panelOpen != null) {
-                Icon(
-                    if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                    contentDescription = null,
-                    modifier = Modifier.size(12.dp),
-                    tint = colors.onSurfaceVariant,
-                )
+                Spacer(Modifier.width(TOOL_GLYPH_GAP))
+                LabelAndChevron(Modifier.weight(1f, fill = false)) {
+                    name()
+                    Icon(
+                        if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
+                        contentDescription = null,
+                        modifier = Modifier.size(CHEVRON),
+                        tint = ink,
+                    )
+                }
+            } else {
+                NameOrNothing(Modifier.weight(1f, fill = false), name)
             }
         }
     }
@@ -742,7 +810,7 @@ private val GAP = 8.dp
 
 /**
  * 胶囊的高，也是这一行最矮的高度。原先 64，比批量时上面那一条胶片条（40）厚出一大截，压到 48：
- * 展开后的工具小样子、名字都缩一号，刚好放得下（见 [ToolItem]）。
+ * 展开后的工具小样子和名字并排成一行（见 [ToolItem]），和收着时的两组一样。
  */
 internal val TOOL_ROW_HEIGHT = 48.dp
 
@@ -766,11 +834,18 @@ private val CIRCLE_ICON = 24.dp
 private val DIVIDER_GAP = 6.dp
 private val DIVIDER_HEIGHT = 32.dp
 private val SLIDE = 24.dp
-private val INDICATOR_WIDTH = 48.dp
-private val INDICATOR_HEIGHT = 24.dp
 
-/** 展开后一项工具上下留的空：3 + 小样子 24 + 2 + 一行小字 16 + 3，正好是胶囊的 48。 */
-private val TOOL_PAD = 3.dp
+/** 展开后一项工具的小胶囊：高 32，上下各留 8 dp 的胶囊底色，和截图上的比例差不多。 */
+private val TOOL_CHIP_HEIGHT = 32.dp
+
+/** 选中的小胶囊：小样子左边、名字右边（含小箭头）留的空。没选中的不垫底，两边只留 [TOOL_PAD_QUIET]。 */
+private val TOOL_PAD_START = 12.dp
+private val TOOL_PAD_END = 14.dp
+private val TOOL_PAD_QUIET = 6.dp
+private val TOOL_GLYPH_GAP = 8.dp
+
+/** 选中的小胶囊是主题色叠这么浓。 */
+private const val SELECTED_TINT = 0.2f
 private val GLYPH_ICON = 20.dp
 private val HINT_SPACING = 8.dp
 

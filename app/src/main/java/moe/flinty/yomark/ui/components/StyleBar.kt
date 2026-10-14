@@ -42,6 +42,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -98,11 +99,18 @@ interface StyleBarActions {
  * 跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
  *
  * @param nearColors 色块开着近似色时，小样子画的是图上取到的这几种颜色（见 [NearSolidGlyph]）
+ * @param ink 马赛克、模糊没有自己的颜色，跟着旁边的字走：底栏上选中的那一项是主题色；不给就是平常的灰
  */
 @Composable
-internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, nearColors: List<Int> = emptyList(), scale: Float = 1f) {
+internal fun StyleGlyph(
+    style: MaskStyle,
+    options: MaskOptions,
+    nearColors: List<Int> = emptyList(),
+    scale: Float = 1f,
+    ink: Color = Color.Unspecified,
+) {
     val outline = MaterialTheme.colorScheme.outlineVariant
-    val ink = MaterialTheme.colorScheme.onSurfaceVariant
+    val tone = ink.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
     when (style) {
         MaskStyle.SOLID -> if (options.solidNear) NearSolidGlyph(nearColors, scale) else Box(
             Modifier
@@ -110,8 +118,8 @@ internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, nearColors: List
                 .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
                 .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
         )
-        MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
-        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
+        MaskStyle.PIXELATE -> MosaicGlyph(tone, 18.dp * scale)
+        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = tone)
         MaskStyle.MARKER -> if (options.markerShape == StrokeShape.FREEHAND) {
             Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.markerColor))
         } else Box(

@@ -30,6 +30,7 @@ import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
@@ -43,6 +44,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * 手机底栏的工具那一行：收着时胶囊里「打码」「编辑」两组，旁边 AI、按住对比两颗圆钮；点一组胶囊撑满这一行，
@@ -50,6 +52,8 @@ import org.robolectric.annotation.Config
  * 换样式、弹面板由 ViewModel 管（见 EditorViewModelTest），这里只看这一行发出什么。
  */
 @RunWith(RobolectricTestRunner::class)
+// 真的量字：窄屏上名字写不写得下要按真的字宽算
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "zh-rCN-w412dp-h915dp-xxhdpi")
 class EditorToolbarTest {
 
@@ -137,6 +141,39 @@ class EditorToolbarTest {
             compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertThat(layouts.single().isLineEllipsized(0)).isFalse()
         }
+    }
+
+    /** 展开后每一项是小样子和名字并排的一行：名字在小样子右边，和胶囊的中线对齐，选中的还带着小箭头。 */
+    @Test fun anUnfoldedToolPutsItsGlyphBesideItsName() {
+        show(initial = ToolGroup.REDACT)
+        for (name in listOf("色块", "马赛克", "模糊")) {
+            val slot = compose.onNodeWithText(name).getUnclippedBoundsInRoot()
+            val text = compose.onNodeWithText(name, useUnmergedTree = true).getUnclippedBoundsInRoot()
+            // 左边让出小胶囊的边和 24 dp 的小样子
+            assertThat((text.left - slot.left).value).isAtLeast(8f + 24f)
+            assertThat(((text.top + text.bottom) / 2 - (slot.top + slot.bottom) / 2).value).isWithin(1.5f).of(0f)
+        }
+        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(48f)
+    }
+
+    /**
+     * 窄屏、英文的长名字：哪个名字都不截断。选中的 Marker 写全，短的 Pen 也写全，
+     * 写不下的 Watermark 只剩小样子（名字是透明的，伸出格子外，读屏还念得到）。
+     */
+    @Config(qualifiers = "en-rUS-w360dp-h740dp-xxhdpi")
+    @Test fun onANarrowScreenTheChosenToolKeepsItsNameAndLongNamesStepAside() {
+        look = MaskLook(MaskStyle.MARKER)
+        show(initial = ToolGroup.EDIT)
+        listOf("Marker", "Pen", "Watermark").forEach { name ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+        }
+        fun overhang(name: String) = compose.onNodeWithText(name, useUnmergedTree = true).getUnclippedBoundsInRoot().right -
+            compose.onNodeWithText(name).getUnclippedBoundsInRoot().right
+        assertThat(overhang("Marker").value).isLessThan(0f)
+        assertThat(overhang("Pen").value).isLessThan(0f)
+        assertThat(overhang("Watermark").value).isGreaterThan(0f)
     }
 
     /**
