@@ -151,6 +151,8 @@
     <string name="blur_heavy">重</string>
 
     <!-- purpose watermark panel -->
+    <string name="collapse_purpose_panel">收起水印面板</string>
+    <string name="purpose_text">文字</string>
     <string name="purpose_placeholder">如：仅供办理签证使用</string>
     <string name="angle">角度</string>
     <string name="opacity">不透明度</string>

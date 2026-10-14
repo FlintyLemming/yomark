@@ -99,7 +99,6 @@ import kotlinx.coroutines.launch
 import moe.flinty.yomark.R
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
-import moe.flinty.yomark.render.MaskSafety
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
 import kotlin.math.max
@@ -116,9 +115,8 @@ enum class ToolGroup(@StringRes val label: Int) {
     EDIT(R.string.tool_group_edit);
 
     companion object {
-        /** 样式归哪一组：只做标记、盖不住的马克笔归「编辑」，其余归「打码」。 */
-        fun of(style: MaskStyle): ToolGroup =
-            if (MaskStyleInfo.safety(style) == MaskSafety.ANNOTATION_ONLY) EDIT else REDACT
+        /** 样式归哪一组：只做标记、盖不住的马克笔、画笔归「编辑」，其余归「打码」（见 MaskStyle.redacts）。 */
+        fun of(style: MaskStyle): ToolGroup = if (style.redacts) REDACT else EDIT
     }
 }
 
@@ -132,6 +130,7 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 那儿只留这一个箭头，地方都给右边一个个展开的工具。点返回（或系统返回键，见 EditorScreen）收回来。
  *
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种，胶囊往上长成调节面板（见 EditorBottomBar）。
+ * 「编辑」里的水印点一下就长出用途水印的面板，开着时选中的是它，再点一下收起。
  * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
  * 胶囊的底子不在这里画，底栏画：面板就是它往上长出来的，长出来、缩回去都得是同一块，一圈边、一层投影。
@@ -143,6 +142,8 @@ enum class ToolGroup(@StringRes val label: Int) {
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
+ * @param purposeOn 设了用途水印：水印着主题色
+ * @param purposeOpen 用途水印的面板开着：选中的是水印，不是当前的样式
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
  */
@@ -155,6 +156,7 @@ fun EditorToolbar(
     purposeOn: Boolean,
     onPurpose: () -> Unit,
     modifier: Modifier = Modifier,
+    purposeOpen: Boolean = false,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
     compare: MutableInteractionSource? = null,
@@ -201,8 +203,8 @@ fun EditorToolbar(
                     color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 when (shown) {
-                    ToolGroup.REDACT -> RedactTools(styleBar, styleActions)
-                    ToolGroup.EDIT -> EditTools(styleBar, styleActions, purposeOn, onPurpose)
+                    ToolGroup.REDACT -> RedactTools(styleBar, styleActions, purposeOpen)
+                    ToolGroup.EDIT -> EditTools(styleBar, styleActions, purposeOn, purposeOpen, onPurpose)
                 }
             }
             if (collapsedRow) {
@@ -403,22 +405,26 @@ private class Reveal(private val left: Float, private val right: Float) : Shape 
 private val REDACT_STYLES = MaskStyleInfo.ORDER.filter { ToolGroup.of(it) == ToolGroup.REDACT }
 
 @Composable
-private fun RedactTools(model: StyleBarModel, actions: StyleBarActions) {
-    REDACT_STYLES.forEach { style -> StyleItem(style, model, actions) }
+private fun RedactTools(model: StyleBarModel, actions: StyleBarActions, purposeOpen: Boolean) {
+    REDACT_STYLES.forEach { style -> StyleItem(style, model, actions, purposeOpen) }
 }
 
 /**
  * 编辑：马克笔、画笔是样式，和打码的几种一样是画笔（EditorUiState.brush）：都能拉框，也都能照手画（见 StrokeShape）；
- * 水印是用途水印，点开它的调节面板（顶替底栏），开着时着主题色。
+ * 水印是用途水印，设了就着主题色。点它和点了再点马克笔、画笔一样，胶囊长出它的调节面板（见 EditorBottomBar），
+ * 不用先点一下选中：它不是一种样式，没有「换成它」这一步。面板开着时选中的是它，名字后面的小箭头朝下，再点一下收起。
  */
 @Composable
-private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn: Boolean, onPurpose: () -> Unit) {
-    StyleItem(MaskStyle.MARKER, model, actions)
-    StyleItem(MaskStyle.PEN, model, actions)
+private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn: Boolean, purposeOpen: Boolean, onPurpose: () -> Unit) {
+    StyleItem(MaskStyle.MARKER, model, actions, purposeOpen)
+    StyleItem(MaskStyle.PEN, model, actions, purposeOpen)
     ToolItem(
         label = stringResource(R.string.tool_watermark),
         onClick = onPurpose,
         role = Role.Button,
+        selected = purposeOpen,
+        // 选中就是面板开着：小箭头露出来时总是朝下
+        panelOpen = true,
         on = purposeOn,
         stateText = if (purposeOn) stringResource(R.string.tool_on) else null,
     ) { ink ->
@@ -426,9 +432,10 @@ private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn:
     }
 }
 
+/** 一种样式。用途水印的面板开着时选中的是水印，样式都不算选中。 */
 @Composable
-private fun StyleItem(style: MaskStyle, model: StyleBarModel, actions: StyleBarActions) {
-    val selected = style == model.look.style
+private fun StyleItem(style: MaskStyle, model: StyleBarModel, actions: StyleBarActions, purposeOpen: Boolean) {
+    val selected = style == model.look.style && !purposeOpen
     ToolItem(
         label = stringResource(MaskStyleInfo.label(style)),
         onClick = { actions.onStyleClick(style) },
@@ -777,7 +784,7 @@ private fun rememberHintPosition(): PopupPositionProvider {
  * 换走的那一项倒过来，小箭头一下就淡没了。小样子和名字的颜色、粗细跟着换，起步快。
  * 两项一个撑开一个收窄，加起来一样宽，旁边几项跟着一点点挪（各格的宽按名字分）。
  *
- * @param panelOpen 样式名字后面的小箭头：再点一下长出调节面板（开着时朝下）。只有选中时露出来；null 是没有小箭头的（水印）
+ * @param panelOpen 名字后面的小箭头：再点一下长出调节面板（开着时朝下）。只有选中时露出来；null 是没有小箭头的
  * @param enabled 点不动的灰掉
  * @param on 开着的开关（水印）：名字着主题色
  * @param stateText 读屏念的状态，如水印的「已开启」

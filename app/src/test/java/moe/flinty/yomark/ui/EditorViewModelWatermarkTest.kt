@@ -3,6 +3,7 @@ package moe.flinty.yomark.ui
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
 import androidx.core.net.toUri
@@ -12,6 +13,7 @@ import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.data.isolatedSettingsStore
@@ -206,6 +208,74 @@ class EditorViewModelWatermarkTest {
         assertThat(vm.state.value.purposeSheetVisible).isFalse()
         vm.showPurposeSheet()
         assertThat(vm.state.value.purposeText).isEqualTo("仅供办理签证使用")
+    }
+
+    /** 水印的面板和样式的调节面板是同一块地方，一次只开一个：开这一个，另一个就收起。 */
+    @Test
+    fun `the watermark panel and the style panel take turns`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(whiteUri("turns.png")); advanceUntilIdle()
+        vm.onStyleChipClick(vm.state.value.barLook.style)      // 再点一下当前的样式，长出它的面板
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+
+        vm.togglePurposeSheet()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+
+        // 水印的面板开着时点马克笔：换成马克笔，面板也换成马克笔的，不用再点一下
+        vm.onStyleChipClick(MaskStyle.MARKER)
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.MARKER)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+
+        // 点的正是当前的样式也一样是换过去，不是收起
+        vm.togglePurposeSheet()
+        vm.onStyleChipClick(MaskStyle.MARKER)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+
+        // 水印也是点一下开、再点一下收
+        vm.togglePurposeSheet()
+        vm.togglePurposeSheet()
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        assertThat(vm.state.value.purposeText).isNotEmpty()      // 收起不是移除
+    }
+
+    /** 吸管给水印取色：取原图上那一处的颜色，打码的样子不动；取完吸管收起，面板还开着。 */
+    @Test
+    fun `the eyedropper picks the watermark colour off the image`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(whiteUri("pick.png")); advanceUntilIdle()
+        vm.showPurposeSheet()
+        val brush = vm.state.value.brush
+        vm.startColorPick(ColorTarget.PURPOSE)
+        vm.onTap(PointF(300f, 300f))
+        assertThat(vm.state.value.purposeStyle.color).isEqualTo(Color.WHITE)
+        assertThat(vm.state.value.brush).isEqualTo(brush)
+        assertThat(vm.state.value.colorPick).isNull()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+    }
+
+    /** 等着取色时挑了色板上的颜色、收起了面板、移除了水印，吸管都跟着收起，下一下点图照常算数。 */
+    @Test
+    fun `the watermark eyedropper stops when the watermark moves on`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(whiteUri("stop.png")); advanceUntilIdle()
+        vm.showPurposeSheet()
+        vm.startColorPick(ColorTarget.PURPOSE)
+        vm.setPurposeStyle(vm.state.value.purposeStyle.copy(color = PurposeWatermarkStyle.PALETTE[3]))
+        assertThat(vm.state.value.colorPick).isNull()
+
+        vm.startColorPick(ColorTarget.PURPOSE)
+        vm.dismissPurposeSheet()
+        assertThat(vm.state.value.colorPick).isNull()
+
+        vm.showPurposeSheet()
+        vm.startColorPick(ColorTarget.PURPOSE)
+        vm.removePurposeWatermark()
+        assertThat(vm.state.value.colorPick).isNull()
+        assertThat(vm.state.value.purposeStyle.color).isEqualTo(PurposeWatermarkStyle.PALETTE[3])
     }
 
     @Test

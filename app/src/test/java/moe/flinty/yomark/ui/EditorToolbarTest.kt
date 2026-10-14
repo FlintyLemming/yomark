@@ -72,6 +72,7 @@ class EditorToolbarTest {
     private val compare = MutableInteractionSource()
     private val compareEvents = mutableListOf<Interaction>()
     private val opened = mutableListOf<ToolGroup?>()
+    private var purposeOpen by mutableStateOf(false)
     private var purposeClicks = 0
     private var aiClicks = 0
 
@@ -90,6 +91,7 @@ class EditorToolbarTest {
                         styleBar = StyleBarModel(look),
                         styleActions = actions,
                         purposeOn = purposeOn,
+                        purposeOpen = purposeOpen,
                         onPurpose = { purposeClicks++ },
                         aiReview = ai,
                         onAiReview = { aiClicks++ },
@@ -160,13 +162,14 @@ class EditorToolbarTest {
     /** 选中的名字加粗，照作者给的悬浮底栏截图；没选中的不加粗。 */
     @Test fun thePickedToolsNameIsBold() {
         show(initial = ToolGroup.REDACT)
-        fun weight(name: String): FontWeight? {
-            val layouts = mutableListOf<TextLayoutResult>()
-            compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-            return layouts.single().layoutInput.style.fontWeight
-        }
         assertThat(weight("色块")).isEqualTo(FontWeight.Bold)
         assertThat(weight("马赛克")).isNotEqualTo(FontWeight.Bold)
+    }
+
+    private fun weight(name: String): FontWeight? {
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        return layouts.single().layoutInput.style.fontWeight
     }
 
     /** 换选中的那一项不是一下跳过去（照 GNav）：半路上新选中的那一格正在撑开，换走的那一格正在收窄。 */
@@ -356,5 +359,29 @@ class EditorToolbarTest {
     @Test fun theWatermarkSaysWhenItIsOn() {
         show(purposeOn = true, initial = ToolGroup.EDIT)
         compose.onNodeWithText("水印").assert(stateIs("已开启"))
+    }
+
+    /** 用途水印的面板开着时选中的是水印，用着的马克笔不算选中；面板收起，选中的回到马克笔。 */
+    @Test fun theWatermarkIsPickedWhileItsPanelIsOpen() {
+        look = MaskLook(MaskStyle.MARKER)
+        purposeOpen = true
+        show(initial = ToolGroup.EDIT)
+        assertThat(weight("水印")).isEqualTo(FontWeight.Bold)
+        assertThat(weight("马克笔")).isNotEqualTo(FontWeight.Bold)
+        listOf("马克笔", "画笔").forEach { compose.onNodeWithText(it).assertIsNotSelected() }
+
+        purposeOpen = false
+        compose.onNodeWithText("马克笔").assertIsSelected()
+        assertThat(weight("水印")).isNotEqualTo(FontWeight.Bold)
+    }
+
+    /** 窄屏、英文：面板开着时 Watermark 是选中的那一项，名字写全，不再只剩小样子。 */
+    @Config(qualifiers = "en-rUS-w360dp-h740dp-xxhdpi")
+    @Test fun onANarrowScreenTheOpenWatermarkKeepsItsName() {
+        look = MaskLook(MaskStyle.MARKER)
+        purposeOpen = true
+        show(initial = ToolGroup.EDIT)
+        val name = compose.onNodeWithText("Watermark", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat(name.right).isLessThan(compose.onNodeWithText("Watermark").getUnclippedBoundsInRoot().right)
     }
 }

@@ -17,8 +17,11 @@ enum class MaskState { MASKED, OUTLINED }
 enum class MaskStyle {
     SOLID, PIXELATE, BLUR, MARKER, PEN;
 
-    /** 盖住内容的三种。马克笔、画笔是画上去的标注，不算。 */
-    val redacts: Boolean get() = this == SOLID || this == PIXELATE || this == BLUR
+    /**
+     * 拿来打码的：色块、马赛克、模糊，底栏的「打码」。马克笔、画笔只在图上做标记（「编辑」），
+     * 识别出来直接打的码、点了打码的虚线框、导出前的「全部打码」都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
+     */
+    val redacts: Boolean get() = this != MARKER && this != PEN
 }
 
 /**
@@ -108,17 +111,20 @@ data class MaskOptions(
         else -> 0f
     } * shortSide / 2f
 
-    /** 只把 [style] 用到的几项放回出厂值，别的样式调好的不动。面板上的「恢复默认」。 */
-    fun resetFor(style: MaskStyle): MaskOptions {
-        val factory = MaskOptions()
-        return when (style) {
-            MaskStyle.SOLID -> copy(solidColor = factory.solidColor, solidNear = factory.solidNear)
-            MaskStyle.PIXELATE -> copy(pixelBlockDivisor = factory.pixelBlockDivisor)
-            MaskStyle.BLUR -> copy(blurRadiusRatio = factory.blurRadiusRatio)
-            MaskStyle.MARKER -> copy(markerColor = factory.markerColor, markerShape = factory.markerShape, markerWidth = factory.markerWidth)
-            MaskStyle.PEN -> copy(penColor = factory.penColor, penShape = factory.penShape, penWidth = factory.penWidth)
-        }
+    /**
+     * 把 [from] 里 [style] 用到的几项换进来，别的样式的不动。
+     * 编辑器的画笔从选中的框那儿接改动时用它：框带着的是它画上时的一整份，别的样式那几项可能早就过时了。
+     */
+    fun withParamsOf(style: MaskStyle, from: MaskOptions): MaskOptions = when (style) {
+        MaskStyle.SOLID -> copy(solidColor = from.solidColor, solidNear = from.solidNear)
+        MaskStyle.PIXELATE -> copy(pixelBlockDivisor = from.pixelBlockDivisor)
+        MaskStyle.BLUR -> copy(blurRadiusRatio = from.blurRadiusRatio)
+        MaskStyle.MARKER -> copy(markerColor = from.markerColor, markerShape = from.markerShape, markerWidth = from.markerWidth)
+        MaskStyle.PEN -> copy(penColor = from.penColor, penShape = from.penShape, penWidth = from.penWidth)
     }
+
+    /** 只把 [style] 用到的几项放回出厂值，别的样式调好的不动。面板上的「恢复默认」。 */
+    fun resetFor(style: MaskStyle): MaskOptions = withParamsOf(style, MaskOptions())
 
     fun isDefaultFor(style: MaskStyle): Boolean = resetFor(style) == this
 
@@ -175,8 +181,8 @@ data class MaskOptions(
  * 一块码长什么样：样式加它的参数。
  *
  * 每块码各自记着自己的（2026-10-07 修订，spec §7.5）：换样式不再把整张图的码一起换掉，
- * 而是从下一次打码起生效。编辑器手里那一份叫「画笔」（EditorUiState.brush），
- * 新画的框、点了打码的虚线框都用它。
+ * 而是从下一次打码起生效。编辑器手里那一份叫「画笔」（EditorUiState.brush），新画的框、手画的线用它；
+ * 点了打码的虚线框、识别出来直接打码的用「打码」里上次选的那一种（EditorUiState.maskLook）。
  */
 @Parcelize
 data class MaskLook(
@@ -194,7 +200,7 @@ data class MaskItem(
     val source: DetectorSource,
     val state: MaskState,
     /**
-     * 这块码打上时用的样子。圈出的项也带着一份，但不画；它再被打上码时换成当时的画笔，
+     * 这块码打上时用的样子。圈出的项也带着一份，但不画；它再被打上码时换成当时「打码」里的样式，
      * 而不是沿用上一次的——用户换了样式再点虚线框，要的就是新样式。
      */
     val look: MaskLook = MaskLook(),
@@ -213,7 +219,7 @@ data class MaskPlan(
     val pendingCount: Int get() = items.count { it.state == MaskState.OUTLINED }
 
     /**
-     * 点一下：已打码的退回圈出；圈出的打上码，样子用 [look]（编辑器当下的画笔）。
+     * 点一下：已打码的退回圈出；圈出的打上码，样子用 [look]（编辑器「打码」里眼下的样式）。
      * 退回圈出时 look 原样留着，反正不画。
      */
     fun toggle(id: String, look: MaskLook): MaskPlan = copy(

@@ -151,6 +151,8 @@
     <string name="blur_heavy">Heavy</string>
 
     <!-- purpose watermark panel -->
+    <string name="collapse_purpose_panel">Collapse watermark panel</string>
+    <string name="purpose_text">Text</string>
     <string name="purpose_placeholder">e.g. For visa application only</string>
     <string name="angle">Angle</string>
     <string name="opacity">Opacity</string>

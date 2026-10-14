@@ -71,6 +71,22 @@ class SettingsStoreTest {
         assertThat(store.maskOptions.first().solidColor).isEqualTo(0xFF000000.toInt())
     }
 
+    /**
+     * 记的是「打码」里上次选的样式。之前的版本记的是画笔停在哪一种，停在马克笔、画笔上的读回来是色块：
+     * 打码的样式只从「打码」里来，马克笔、画笔调好的参数照旧在。
+     */
+    @Test
+    fun `a brush left on the marker or the pen comes back as solid with their params kept`() = runTest {
+        val store = store()
+        val tuned = MaskOptions(penColor = 0xFF1E88E5.toInt(), markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f))
+        store.setMaskOptions(tuned)
+        for (style in listOf(MaskStyle.MARKER, MaskStyle.PEN)) {
+            store.writeRawStyleForTest(style.name)
+            assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.SOLID)
+        }
+        assertThat(store.maskOptions.first()).isEqualTo(tuned)
+    }
+
     /** 表情去掉了：旧安装里上次用的是表情，读回来是色块。 */
     @Test
     fun `a brush left on the removed emoji style comes back as solid`() = runTest {
@@ -103,10 +119,10 @@ class SettingsStoreTest {
     @Test
     fun `resetting settings leaves the editor's brush alone`() = runTest {
         val store = store()
-        store.setLastStyle(MaskStyle.MARKER)
+        store.setLastStyle(MaskStyle.BLUR)
         store.setMaskOptions(MaskOptions(pixelBlockDivisor = 4))
         store.resetSettings()
-        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.MARKER)
+        assertThat(store.lastStyle.first()).isEqualTo(MaskStyle.BLUR)
         assertThat(store.maskOptions.first().pixelBlockDivisor).isEqualTo(4)
     }
 

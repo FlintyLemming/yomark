@@ -454,12 +454,122 @@ class EditorViewModelTest {
         assertThat(vm.state.value.plan.items).isEmpty()
     }
 
+    /** 同一组里换样式，选中的框照旧跟着换；换成的那一种用画笔里调好的参数，不是框画上时的老样子。 */
+    @Test
+    fun `switching within a group restyles the selected box with the brush's params`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(box(10f, 10f, 90f, 90f))                            // 色块，记着出厂的颗粒
+        vm.clearSelection()
+        vm.setStyle(MaskStyle.PIXELATE)
+        val mosaic = vm.state.value.barLook
+        vm.editLook(mosaic.copy(options = mosaic.options.copy(pixelBlockDivisor = 3)))
+
+        vm.onTap(PointF(50f, 50f))                                         // 选中那个色块
+        vm.setStyle(MaskStyle.PIXELATE)
+        val item = vm.state.value.plan.items.single()
+        assertThat(item.look.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(item.look.options.pixelBlockDivisor).isEqualTo(3)
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+    }
+
+    // ---------- 马克笔、画笔不拿来打码，打码用「打码」里上次选的样式（2026-10-14） ----------
+
+    @Test
+    fun `with the marker or the pen in hand a dashed box is masked in the last redact style`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(
+            vm.state.value.plan
+                .add(rule("a", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED))
+                .add(rule("b", 120f, 10f, 200f, 90f).copy(state = MaskState.OUTLINED))
+        )
+        vm.setStyle(MaskStyle.BLUR)
+        vm.setStyle(MaskStyle.MARKER)
+        vm.onTap(PointF(50f, 50f))
+        vm.setStyle(MaskStyle.PEN)
+        vm.onTap(PointF(160f, 50f))
+
+        assertThat(vm.state.value.plan.pendingCount).isEqualTo(0)
+        assertThat(vm.looks()).containsExactly(MaskStyle.BLUR, MaskStyle.BLUR)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PEN)        // 手里还是画笔
+    }
+
+    @Test
+    fun `mask all at export uses the last redact style, not the pen`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(vm.state.value.plan.add(rule("p", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED)))
+        vm.setStyle(MaskStyle.PIXELATE)
+        vm.setStyle(MaskStyle.PEN)
+        vm.requestExport(); advanceUntilIdle()
+
+        vm.confirmMaskAllAndExport(); advanceUntilIdle()
+        assertThat(vm.looks()).containsExactly(MaskStyle.PIXELATE)
+        assertThat(sink.writes).isEqualTo(1)
+    }
+
+    /** 马克笔不往打码的框上用：选着一个色块框换成马克笔，框不变、选中收起，之后画的才是马克笔。 */
+    @Test
+    fun `picking the marker leaves the selected mask box alone`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(box(10f, 10f, 90f, 90f))                            // 画完就是选中的
+        vm.setStyle(MaskStyle.MARKER)
+
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID)
+        assertThat(vm.state.value.selectedManualId).isNull()
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.MARKER)
+        vm.onManualBox(box(120f, 120f, 200f, 200f))
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.MARKER).inOrder()
+    }
+
+    /** 反过来也一样：选着画笔画的一道线换成色块，线还是线，不会变成一块码。 */
+    @Test
+    fun `picking a redact style leaves the selected pen stroke alone`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        vm.onInk(listOf(PointF(20f, 30f), PointF(60f, 40f), PointF(80f, 30f)))
+        vm.setStyle(MaskStyle.SOLID)
+
+        assertThat(vm.looks()).containsExactly(MaskStyle.PEN)
+        assertThat(vm.state.value.selectedManualId).isNull()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.SOLID)
+    }
+
+    /** 选中一道老的画笔线改它的颜色：画笔只接画笔的那几项，线里记着的老色块颜色不会顶掉「打码」里后来选的颜色。 */
+    @Test
+    fun `editing an old stroke does not bring back the mask colour it was drawn with`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        vm.onInk(listOf(PointF(20f, 30f), PointF(60f, 40f)))               // 这一道线记着出厂的天蓝色块
+        vm.clearSelection()
+        vm.setStyle(MaskStyle.SOLID)
+        val solid = vm.state.value.barLook
+        vm.editLook(solid.copy(options = solid.options.copy(solidColor = Color.RED)))
+
+        vm.onTap(PointF(40f, 35f))
+        val stroke = vm.state.value.barLook
+        assertThat(stroke.style).isEqualTo(MaskStyle.PEN)
+        vm.editLook(stroke.copy(options = stroke.options.copy(penColor = Color.BLACK)))
+
+        assertThat(vm.state.value.plan.items.single().look.options.penColor).isEqualTo(Color.BLACK)
+        assertThat(vm.state.value.maskLook.style).isEqualTo(MaskStyle.SOLID)
+        assertThat(vm.state.value.maskLook.options.solidColor).isEqualTo(Color.RED)
+    }
+
     @Test
     fun `reset puts back only the current style's params`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PIXELATE)
+        val mosaic = vm.state.value.barLook
+        vm.editLook(mosaic.copy(options = mosaic.options.copy(pixelBlockDivisor = 4)))
+        vm.setStyle(MaskStyle.SOLID)
         val bar = vm.state.value.barLook
-        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.BLACK, pixelBlockDivisor = 4)))
+        vm.editLook(bar.copy(options = bar.options.copy(solidColor = Color.BLACK)))
         vm.resetLookOptions()
         assertThat(vm.state.value.brush.options.solidColor).isEqualTo(MaskOptions.SKY_BLUE)
         assertThat(vm.state.value.brush.options.pixelBlockDivisor).isEqualTo(4)
@@ -499,9 +609,12 @@ class EditorViewModelTest {
     fun `the brush is remembered across image changes and sessions`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri("brush-1.jpg")); advanceUntilIdle()
+        vm.setStyle(MaskStyle.BLUR)
+        val blur = vm.state.value.barLook
+        vm.editLook(blur.copy(options = blur.options.copy(blurRadiusRatio = 0.28f)))
         vm.setStyle(MaskStyle.PIXELATE)
         val bar = vm.state.value.barLook
-        vm.editLook(bar.copy(options = bar.options.copy(pixelBlockDivisor = 4, blurRadiusRatio = 0.2f)))
+        vm.editLook(bar.copy(options = bar.options.copy(pixelBlockDivisor = 4)))
         advanceUntilIdle()                                                 // 落盘有去抖
 
         vm.onImageChosen(sampleUri("brush-2.jpg")); advanceUntilIdle()
@@ -518,7 +631,32 @@ class EditorViewModelTest {
         )
         advanceUntilIdle()
         assertThat(next.state.value.brush.style).isEqualTo(MaskStyle.PIXELATE)
-        assertThat(next.state.value.brush.options.blurRadiusRatio).isEqualTo(0.2f)
+        assertThat(next.state.value.brush.options.blurRadiusRatio).isEqualTo(0.28f)
+    }
+
+    /** 下次打开编辑器先是「打码」里上次选的样式，哪怕上次最后拿的是画笔；画笔调好的颜色照样记着。 */
+    @Test
+    fun `a new session starts on the last redact style even if the pen was in hand`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri("pen-1.jpg")); advanceUntilIdle()
+        vm.setStyle(MaskStyle.BLUR)
+        vm.setStyle(MaskStyle.PEN)
+        val pen = vm.state.value.barLook
+        vm.editLook(pen.copy(options = pen.options.copy(penColor = Color.BLACK)))
+        advanceUntilIdle()                                                 // 落盘有去抖
+
+        val next = EditorViewModel(
+            intake = ImageIntake(context),
+            exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
+            engineProvider = { emptyEngine() },
+            settings = settings,
+            savedState = SavedStateHandle(),
+            ioDispatcher = dispatcher,
+        )
+        advanceUntilIdle()
+        assertThat(next.state.value.brush.style).isEqualTo(MaskStyle.BLUR)
+        assertThat(next.state.value.maskLook.style).isEqualTo(MaskStyle.BLUR)
+        assertThat(next.state.value.brush.options.penColor).isEqualTo(Color.BLACK)
     }
 
     private fun twoToneUri(name: String): Uri {

@@ -143,9 +143,10 @@ class PlayScreenshots {
         }
     }
 
-    /** 选图、等识别完、等落码那一遍光走完。 */
-    private fun open(vararg samples: Uri): EditorViewModel {
+    /** 选图、等识别完、等落码那一遍光走完。[before] 在选图之前做，比如先在「打码」里挑好样式。 */
+    private fun open(vararg samples: Uri, before: (EditorViewModel) -> Unit = {}): EditorViewModel {
         val vm = editor()
+        compose.runOnUiThread { before(vm) }
         if (samples.size == 1) vm.onImageChosen(samples.single()) else vm.onImagesChosen(samples.toList())
         waitFor(vm) { it.image != null && !it.analyzing && it.plan.items.isNotEmpty() }
         println("识别结果：" + vm.state.value.plan.items.joinToString { "${it.kind}/${it.state}" })
@@ -237,15 +238,11 @@ class PlayScreenshots {
     }
 
     /**
-     * 换成马赛克（整张图的码一起换），再把调节面板收起来：面板开着时盖住下半截、压着暗幕，看不清码了。
+     * 选图之前先在「打码」里换成马赛克：识别出来直接打的码用的就是它。只换不点开调节面板，
+     * 面板开着时盖住下半截、压着暗幕，看不清码了。
      */
     @Test fun styles() {
-        val vm = open(sample("/play/chat-page.png"))
-        compose.runOnUiThread {
-            vm.onStyleChipClick(MaskStyle.PIXELATE)
-            vm.dismissStylePanel()
-        }
-        advance(1_000)
+        open(sample("/play/chat-page.png")) { it.onStyleChipClick(MaskStyle.PIXELATE) }
         shoot("styles")
     }
 
@@ -266,7 +263,7 @@ class PlayScreenshots {
         shoot("reminder")
     }
 
-    /** 用途水印：整张图铺一行字。调节面板点「完成」收起。 */
+    /** 用途水印：整张图铺一行字。调节面板收起后拍。 */
     @Test fun purpose() {
         val vm = open(sample("/readme/order-page.png"))
         compose.runOnUiThread {

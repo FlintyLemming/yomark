@@ -36,6 +36,14 @@ class MaskStyleInfoTest {
         assertThat(MaskStyleInfo.safety(MaskStyle.MARKER)).isEqualTo(MaskSafety.ANNOTATION_ONLY)
     }
 
+    /** 只做标记的（马克笔、画笔）不拿来打码：识别出来的、点了打码的虚线框都不会用它们。 */
+    @Test fun `every style but the annotation ones redacts`() {
+        MaskStyle.entries.forEach {
+            assertThat(it.redacts).isEqualTo(MaskStyleInfo.safety(it) != MaskSafety.ANNOTATION_ONLY)
+        }
+        assertThat(MaskStyle.entries.filterNot { it.redacts }).containsExactly(MaskStyle.MARKER, MaskStyle.PEN)
+    }
+
     @Test fun `the style bar offers every style once, the irreversible one first`() {
         assertThat(MaskStyleInfo.ORDER).containsExactlyElementsIn(MaskStyle.entries)
         assertThat(MaskStyleInfo.safety(MaskStyleInfo.ORDER.first())).isEqualTo(MaskSafety.IRREVERSIBLE)

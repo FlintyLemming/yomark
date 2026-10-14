@@ -1,6 +1,6 @@
 [versions]
-agp = "8.11.1"
-kotlin = "2.2.0"
+agp = "9.4.1"
+kotlin = "2.2.21"
 coreKtx = "1.16.0"
 lifecycle = "2.9.1"
 activityCompose = "1.10.1"
@@ -67,5 +67,5 @@ androidx-test-espresso-core = { module = "androidx.test.espresso:espresso-core",
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }

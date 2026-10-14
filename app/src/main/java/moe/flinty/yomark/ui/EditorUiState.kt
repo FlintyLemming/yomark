@@ -5,6 +5,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
+import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.batch.BatchSession
@@ -63,10 +64,15 @@ data class EditorUiState(
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
     /**
-     * 画笔：下一次打码用的样式和参数（spec §7.5 修订）。新画的框、点了打码的虚线框、识别出来直接打码的都用它，
-     * 已经打好的码不跟着变。偏好项，记在 SettingsStore 里，也活过每一次 EditorUiState 重建。
+     * 画笔：样式栏上选着的样式和各样式调好的参数（spec §7.5 修订）。新画的框、手画的线用它，已经打好的码不跟着变。
+     * 偏好项，参数记在 SettingsStore 里，也活过每一次 EditorUiState 重建。
      */
     val brush: MaskLook = MaskLook(),
+    /**
+     * 「打码」里上次选的样式（色块、马赛克、模糊之一）。画笔换成马克笔、画笔时它不动，见 [maskLook]。
+     * SettingsStore 只记它，下次打开编辑器时画笔就是它。
+     */
+    val maskStyle: MaskStyle = MaskStyle.SOLID,
     /** 样式栏下面的调节面板开着。点样式栏上的一项就弹出来，再点一下当前那项收起。 */
     val stylePanelOpen: Boolean = false,
     /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
@@ -78,7 +84,7 @@ data class EditorUiState(
     val purposeText: String? = null,
     /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
     val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
-    /** 用途水印调节面板开着：它顶替底栏，画布留在上面实时预览。 */
+    /** 用途水印调节面板开着：和样式的调节面板在同一个地方（手机上是底栏长出来的那一块），一次只开一个，图上实时预览。 */
     val purposeSheetVisible: Boolean = false,
     /**
      * 批量会话：相册一次分享多张（ACTION_SEND_MULTIPLE），或首页 Picker 里选了多张。单张时为 null，底栏也就没有胶片条。
@@ -106,6 +112,12 @@ data class EditorUiState(
      * 只是选中、什么也没改，画笔不动——取消选中后样式栏回到画笔。
      */
     val barLook: MaskLook get() = selectedItem?.look ?: brush
+
+    /**
+     * 打码用的样子：识别出来直接打的码、点了打码的虚线框、导出前的「全部打码」都用它。
+     * 样式是「打码」里上次选的那一种，参数是画笔里调好的；马克笔、画笔只做标记，不拿来打码（2026-10-14）。
+     */
+    val maskLook: MaskLook get() = MaskLook(maskStyle, brush.options)
 
     /**
      * 连同画布上这张的编辑在内的批量会话。切图的那一下画布是空的（[image] 为 null，下一张还在载入），

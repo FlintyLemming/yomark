@@ -138,7 +138,7 @@ fun EditorTopBar(
  * 手机的底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。
  *
  * 底栏占满画布那一块的高：调节面板从工具那一行往上长出来，盖在画布上，图不跟着往上顶。
- * 画布只给这条线以下让地方；没有这条线的（宽屏的那一栏、用途水印面板）照它们自己的高让。
+ * 画布只给这条线以下让地方；没有这条线的（宽屏的那一栏）照它自己的高让。
  */
 val PanelTop = HorizontalAlignmentLine(::min)
 
@@ -148,6 +148,8 @@ val PanelTop = HorizontalAlignmentLine(::min)
  *
  * 样式的调节面板（展开一组后再点当前的样式）不另外弹一层：胶囊直接往上长成一块大圆角面板，
  * 面板的名字、参数在上面一点点显出来，工具那一行还在面板最底下，换样式不用先收起。
+ * 用途水印的面板（点「编辑」里的水印）也是这样长出来的，和样式面板一次只开一个：开着一个时点另一个，
+ * 胶囊不收回去，面板换成另一个的，一点点变高变矮。
  * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
  * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
  * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点左下角的返回一样：面板和这一组一起收起。
@@ -158,6 +160,7 @@ val PanelTop = HorizontalAlignmentLine(::min)
  *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
+ * @param purpose 用途水印：设了水印时「编辑」里的水印着主题色，面板开着时从胶囊长出来
  */
 @Composable
 fun EditorBottomBar(
@@ -170,16 +173,18 @@ fun EditorBottomBar(
     modifier: Modifier = Modifier,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
-    /** 已设用途水印：「编辑」里的水印着主题色。 */
-    purposeOn: Boolean = false,
-    onPurpose: () -> Unit = {},
+    purpose: PurposePanelModel = PurposePanelModel(),
+    purposeActions: PurposePanelActions = object : PurposePanelActions {},
     /** 批量时的胶片条。单张时为 null。 */
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    val wanted = styleBar.panelOpen && styleBar.colorPick == null && toolGroup != null
+    val wanted = (styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null
     val grow = animateFloatAsState(if (wanted) 1f else 0f, tween(EXPAND_MS, easing = EASING), label = "stylePanel")
     val shown by remember { derivedStateOf { grow.value > 0f } }
     val panelShown = wanted || shown
+    // 收回去的半路上两样都已经关了，刚才开着的那一个还要接着画完
+    val last = remember { LastPanel() }
+    if (purpose.open) last.purpose = true else if (styleBar.panelOpen) last.purpose = false
     val container = MaterialTheme.colorScheme.surfaceContainer
     val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = EDGE_ALPHA)
 
@@ -196,14 +201,19 @@ fun EditorBottomBar(
                     .floatingSurface(container, edge, PANEL_RADIUS)
                     .then(if (panelShown) Modifier.pointerInput(Unit) { swallowTouches() } else Modifier),
             )
-            if (panelShown) StylePanelContent(styleBar, styleActions, Modifier.layoutId(BarPart.CONTENT))
+            // 两种面板换着开时外面这一列不换，跟着里面的东西一点点变高变矮
+            if (panelShown) PanelColumn(Modifier.layoutId(BarPart.CONTENT)) {
+                if (last.purpose) PurposePanelContent(purpose, purposeActions, compactWhileTyping = true)
+                else StylePanelContent(styleBar, styleActions)
+            }
             EditorToolbar(
                 open = toolGroup,
                 onOpen = onToolGroup,
                 styleBar = styleBar,
                 styleActions = styleActions,
-                purposeOn = purposeOn,
-                onPurpose = onPurpose,
+                purposeOn = purpose.text != null,
+                purposeOpen = purpose.open,
+                onPurpose = purposeActions::onToggle,
                 aiReview = aiReview,
                 onAiReview = onAiReview,
                 compare = compare,
@@ -253,6 +263,11 @@ fun EditorBottomBar(
 }
 
 private enum class BarPart { SCRIM, FILM, PILL, CONTENT, ROW }
+
+/** 胶囊上一次长出来的是不是用途水印的面板。只在组合时读写，不触发重组。 */
+private class LastPanel {
+    var purpose = false
+}
 
 /**
  * 面板上的东西只露出胶囊盖着的、工具那一行上面的那一截：左右从 [left] 到 [right]，往下到 [bottom]，按它自己的坐标。
