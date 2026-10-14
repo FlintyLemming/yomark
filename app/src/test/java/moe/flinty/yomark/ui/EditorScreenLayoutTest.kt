@@ -11,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasAnyAncestor
@@ -23,6 +24,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.click
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import androidx.core.net.toUri
@@ -260,6 +264,38 @@ class EditorScreenLayoutTest {
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         compose.onNodeWithText("马赛克").assertDoesNotExist()
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
+    }
+
+    /**
+     * 面板开着时点它外面，图上、顶栏上都一样：和点底栏左下角的返回一样，面板连这一组一起收起。
+     * 这一下只收起：点在顶栏的撤销上也不撤销。
+     */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone tapping outside the panel folds it and the group`() {
+        val vm = open()
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+        // 图的上半截，面板盖不到那儿
+        compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        compose.onNodeWithText("打码").assertIsDisplayed()
+
+        // 先打一块码，撤销点得动
+        compose.runOnUiThread { vm.onTap(PointF(160f, 135f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.plan.items.single { it.candidateId == url.candidateId }.state).isEqualTo(MaskState.MASKED)
+        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+        compose.onNodeWithContentDescription("撤销").assertIsEnabled().performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        assertThat(vm.state.value.plan.items.single { it.candidateId == url.candidateId }.state).isEqualTo(MaskState.MASKED)
     }
 
     /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */

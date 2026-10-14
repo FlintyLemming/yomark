@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -149,6 +150,7 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * 面板的名字、参数在上面一点点显出来，工具那一行还在面板最底下，换样式不用先收起。
  * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
  * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
+ * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点左下角的返回一样：面板和这一组一起收起。
  *
  * 胶囊就画在这里，只有这一块：上沿跟着面板长到哪儿，左右跟着工具那一行说的走（见 PillLeft），
  * 面板收着时它就是工具那一行的胶囊。长出来、缩回去的半路上也只有这一圈边、一层投影，看着是整个胶囊在变大变小；
@@ -183,6 +185,8 @@ fun EditorBottomBar(
 
     Layout(
         content = {
+            // 垫在最底下，铺满底栏这一整块（画布那一块都是它的）：落在胶囊外面的手指都归它。顶栏那一截见 EditorScreen
+            if (wanted) FoldOnTouch({ onToolGroup(null) }, Modifier.layoutId(BarPart.SCRIM))
             filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
             // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框。
             // 面板收着时不接：两组只有 40 dp 高，按在它们上下边外面一点也算按到，胶囊接了就按不着了
@@ -231,8 +235,10 @@ fun EditorBottomBar(
         val pillLeft = row[PillLeft]
         val pillRight = row[PillRight]
         val pill = part(BarPart.PILL)!!.measure(Constraints.fixed((pillRight - pillLeft).coerceAtLeast(0), height - pad - pillTop))
+        val scrim = part(BarPart.SCRIM)?.measure(Constraints.fixed(width, height))
 
         layout(width, height, mapOf(PanelTop to height - resting)) {
+            scrim?.place(0, 0)
             film?.place(FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
             pill.place(pillLeft, pillTop)
             // 名字、参数跟着胶囊的上沿往上走，胶囊没盖到的地方不露出来，后半程显出来
@@ -246,7 +252,7 @@ fun EditorBottomBar(
     }
 }
 
-private enum class BarPart { FILM, PILL, CONTENT, ROW }
+private enum class BarPart { SCRIM, FILM, PILL, CONTENT, ROW }
 
 /**
  * 面板上的东西只露出胶囊盖着的、工具那一行上面的那一截：左右从 [left] 到 [right]，往下到 [bottom]，按它自己的坐标。
@@ -257,9 +263,21 @@ private class AbovePill(private val left: Float, private val right: Float, priva
         Outline.Rectangle(Rect(left, 0f, right, bottom.coerceIn(0f, size.height)))
 }
 
-/** 接住落在面板上的手指，什么也不做。 */
-private suspend fun PointerInputScope.swallowTouches() = awaitEachGesture {
+/**
+ * 调节面板开着时铺在它外面的一层，看不见：手指一落下就等于点了底栏左下角的返回，面板和这一组一起收起（[onFold]）。
+ * 这一下只收起，不往下传：不在画布上画框，顶栏的按钮也不响应。
+ * 吸管等着取色时面板缩回去了，没有这一层，点的是图（见 EditorBottomBar 的 wanted）。
+ */
+@Composable
+internal fun FoldOnTouch(onFold: () -> Unit, modifier: Modifier = Modifier) {
+    val fold by rememberUpdatedState(onFold)
+    Box(modifier.pointerInput(Unit) { swallowTouches(onDown = { fold() }) })
+}
+
+/** 接住落在这儿的手指，落下时 [onDown]，别的什么也不做。 */
+private suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
     awaitFirstDown().consume()
+    onDown()
     do {
         val event = awaitPointerEvent()
         event.changes.forEach { it.consume() }

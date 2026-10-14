@@ -85,6 +85,7 @@ import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
+import moe.flinty.yomark.ui.components.FoldOnTouch
 import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.MaskItemList
 import moe.flinty.yomark.ui.components.PanelTop
@@ -211,24 +212,35 @@ fun EditorScreen(
             val exportLabel = if (vm.forCaller) R.string.done else R.string.export
             val canCompare = state.image != null &&
                 (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED })
-            EditorTopBar(
-                canUndo = state.canUndo, canRedo = state.canRedo,
-                onUndo = vm::undo, onRedo = vm::redo,
-                // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角
-                onPurpose = if (phone) null else vm::showPurposeSheet,
-                purposeOn = state.purposeText != null,
-                // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
-                onSettings = onSettings,
-                // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
-                onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
-                onNavigateUp = onNavigateUp,
-                onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
-                compare = if (phone) null else compare,
-                canCompare = canCompare,
-                onExport = if (phone) onExport else null,
-                exportLabel = exportLabel,
-                exporting = state.exporting,
-            )
+            val onToolGroup: (ToolGroup?) -> Unit = {
+                // 收起这一组，从它长出来的调节面板也一起收
+                if (it == null && state.stylePanelOpen) vm.dismissStylePanel()
+                toolGroup = it
+            }
+            // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点底栏左下角的返回一样（见 FoldOnTouch）。
+            // 画布那一块由底栏铺（见 EditorBottomBar），顶栏这一截铺在这里：这一下只收起，不撤销、不导出
+            val panelUp = phone && toolGroup != null && state.stylePanelOpen && state.colorPick == null && !state.purposeSheetVisible
+            Box {
+                EditorTopBar(
+                    canUndo = state.canUndo, canRedo = state.canRedo,
+                    onUndo = vm::undo, onRedo = vm::redo,
+                    // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角
+                    onPurpose = if (phone) null else vm::showPurposeSheet,
+                    purposeOn = state.purposeText != null,
+                    // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
+                    onSettings = onSettings,
+                    // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
+                    onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
+                    onNavigateUp = onNavigateUp,
+                    onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
+                    compare = if (phone) null else compare,
+                    canCompare = canCompare,
+                    onExport = if (phone) onExport else null,
+                    exportLabel = exportLabel,
+                    exporting = state.exporting,
+                )
+                if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
+            }
             // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开当前样式所在的那一组接着显示它
             LaunchedEffect(phone, state.stylePanelOpen) {
                 if (phone && state.stylePanelOpen && toolGroup == null) toolGroup = ToolGroup.of(state.barLook.style)
@@ -313,11 +325,7 @@ fun EditorScreen(
                         )
                         layout == EditorLayout.PHONE -> EditorBottomBar(
                             toolGroup = toolGroup,
-                            onToolGroup = {
-                                // 收起这一组，从它长出来的调节面板也一起收
-                                if (it == null && state.stylePanelOpen) vm.dismissStylePanel()
-                                toolGroup = it
-                            },
+                            onToolGroup = onToolGroup,
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             compare = compare,
