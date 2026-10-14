@@ -19,9 +19,12 @@ data class ChatFixture(
     val avatars: List<Box>,
     val names: List<ChatText>,
     val title: ChatText?,
-    val pixels: Pixels,
+    val image: File,
 ) {
     val app: String get() = name.split('-')[2]
+
+    /** 每次现解，不留在内存里：三十几张图常驻要上百 MB，和同一个 JVM 里跑的其他单测抢堆。 */
+    val pixels: Pixels get() = Png.read(image)
 }
 
 object ChatFixtures {
@@ -40,7 +43,6 @@ object ChatFixtures {
 
     private fun load(tsv: File): ChatFixture {
         val stem = tsv.nameWithoutExtension
-        val image = Png.read(File(tsv.parentFile, "$stem.png"))
         var chat = false
         val lines = ArrayList<ChatLine>()
         val avatars = ArrayList<Box>()
@@ -61,7 +63,7 @@ object ChatFixtures {
                 "title" -> title = ChatText(box, text)
             }
         }
-        return ChatFixture(stem, chat, lines, avatars, names, title, image)
+        return ChatFixture(stem, chat, lines, avatars, names, title, File(tsv.parentFile, "$stem.png"))
     }
 
     fun iou(a: Box, b: Box): Float {

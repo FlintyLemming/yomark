@@ -27,8 +27,11 @@ data class Box(val left: Float, val top: Float, val right: Float, val bottom: Fl
     val centerY get() = (top + bottom) / 2f
 }
 
-/** OCR 读出的一行：外接框和原文。 */
-data class ChatLine(val box: Box, val text: String)
+/**
+ * OCR 读出的一行：外接框和原文。
+ * [chars] 有的话与 text 逐字对齐（空格这种没有框的位置是 null），切掉压在头像上的字时用；没有就按字数比例切。
+ */
+data class ChatLine(val box: Box, val text: String, val chars: List<Box?>? = null)
 
 /** 一张图的像素：[argb] 按行存，长度 width * height。 */
 class Pixels(val width: Int, val height: Int, val argb: IntArray) {
@@ -73,7 +76,7 @@ object ChatLayout {
         if (score < CHAT_THRESHOLD) return ChatFindings(false, score, reasons, emptyList(), emptyList(), null)
 
         val header = Avatars.header(grid, zones)
-        val names = Names.find(zones, avatars.body)
+        val names = Names.find(Zones.of(lines.mapNotNull { Avatars.cutOff(it, avatars.body, w) }, w, h), avatars.body)
         return ChatFindings(
             isChat = true,
             score = score,
@@ -315,6 +318,38 @@ internal object Avatars {
 
     data class Found(val body: List<Box>, val mirrored: Boolean)
 
+    /**
+     * 头像上印着字（默认头像上的姓、首字母）时，OCR 会把它和旁边的昵称读成一行：「卢 曹雨」。
+     * 把压在头像上的那几个字切掉；整行都在头像上的去掉（返回 null）；没压着头像的原样返回。
+     */
+    fun cutOff(line: ChatLine, avatars: List<Box>, w: Float): ChatLine? {
+        val b = line.box
+        val a = avatars.firstOrNull { a ->
+            b.left < a.right && b.right > a.left &&
+                min(b.bottom, a.bottom) - max(b.top, a.top) > 0.5f * min(b.height, a.height)
+        } ?: return line
+        if (b.right <= a.right + 0.02f * w) return null
+        val chars = line.chars
+        val start = if (chars != null && chars.size == line.text.length) {
+            chars.indices.firstOrNull { i -> chars[i]?.let { it.centerX >= a.right } ?: false } ?: return null
+        } else {
+            val units = line.text.map { if (it.code >= 0x2E80) 2f else 1f }
+            val total = units.sum()
+            var acc = 0f
+            line.text.indices.firstOrNull { i -> (b.left + b.width * (acc + units[i] / 2f) / total >= a.right).also { acc += units[i] } } ?: return null
+        }
+        val text = line.text.substring(start)
+        val lead = text.length - text.trimStart().length
+        val first = start + lead
+        if (first >= line.text.length) return null
+        val left = chars?.getOrNull(first)?.left ?: TextSpan.boxOf(line, first, line.text.length - first).left
+        // 头像上的字通常比昵称大，整行的框是按它撑高的；有逐字框就按剩下的字收紧上下
+        val kept = chars?.subList(first, chars.size)?.filterNotNull().orEmpty()
+        val top = kept.minOfOrNull { it.top } ?: b.top
+        val bottom = kept.maxOfOrNull { it.bottom } ?: b.bottom
+        return ChatLine(Box(max(left, a.right), top, b.right, bottom), line.text.substring(first), chars?.subList(first, chars.size))
+    }
+
     private const val GUTTER = 0.13f
     private const val EDGE = 0.06f
     private const val MIN_SIZE = 0.045f
@@ -510,8 +545,9 @@ internal object Names {
 
     /** 字号比消息小这么多才算昵称（真实界面上昵称大约是消息字号的七八成）。 */
     private const val SMALLER = 0.88f
+    private const val SMALLER_THAN_TYPICAL = 0.95f
 
-    private val NOT_NAME = Regex("[，。！？!?；;…]|\\d{3,}")
+    private val NOT_NAME = Regex("[，。！？!?；;…]|[：:]$|\\d{3,}")
 
     /**
      * 这一页消息的字高：取上四分位。群聊里昵称、时间这些小字可能和消息差不多一样多，中位数会落到它们中间；
@@ -547,7 +583,8 @@ internal object Names {
                     abs(it.box.left - l.box.left) < 0.03f * z.w
             }.minByOrNull { it.box.top }
             if (below != null) {
-                if (l.box.height > SMALLER * below.box.height) return@mapNotNull null
+                // 和这页消息的字高也比一比：下面那行要是网址、邮箱这种全是字母的，OCR 的框比同字号的汉字高一截
+                if (l.box.height > SMALLER * below.box.height || l.box.height > SMALLER_THAN_TYPICAL * typical) return@mapNotNull null
             } else {
                 // 下面没有字的：发的是图片、表情。名字顶边和左边的头像顶边对齐、字号比这页的消息小，也是昵称
                 val small = l.box.height < SMALLER * typical
@@ -621,11 +658,18 @@ internal object Names {
         Regex("^(.{1,$MAX_LEN}?)\\s+(?:joined|left|unsent a message)\\b", RegexOption.IGNORE_CASE),
     )
 
+    /** OCR 在小字之间常补空格（「"孟 华" 拍 了 拍 我」）：去掉汉字之间的空格再配，名字的位置换回原文里的下标。 */
     private fun inSystemMessages(z: Zones): List<ChatText> = z.body.filter { z.isCentered(it) }.mapNotNull { l ->
         val text = l.text.trim()
-        val m = SYSTEM_NAME.firstNotNullOfOrNull { it.find(text) } ?: return@mapNotNull null
+        val kept = text.indices.filter { i ->
+            !(text[i] == ' ' && i > 0 && i < text.length - 1 && (text[i - 1].code >= 0x2E80 || text[i + 1].code >= 0x2E80))
+        }
+        val compact = String(CharArray(kept.size) { text[kept[it]] })
+        val m = SYSTEM_NAME.firstNotNullOfOrNull { it.find(compact) } ?: return@mapNotNull null
         val name = m.groups[1] ?: return@mapNotNull null
         if (name.value.isBlank() || name.value == "你" || name.value.equals("You", ignoreCase = true)) return@mapNotNull null
-        ChatText(TextSpan.boxOf(l, name.range.first, name.value.length, text), name.value)
+        val first = kept[name.range.first]
+        val last = kept[name.range.last]
+        ChatText(TextSpan.boxOf(l, first, last - first + 1, text), name.value)
     }
 }

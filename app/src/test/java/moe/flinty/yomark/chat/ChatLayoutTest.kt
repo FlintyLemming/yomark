@@ -13,8 +13,12 @@ import org.junit.Test
  */
 class ChatLayoutTest {
 
+    /** 一张图分析一次，整个类共用（JUnit 每个测试方法新建一个实例）。 */
+    companion object {
+        private val results by lazy { ChatFixtures.all.associateWith { ChatLayout.analyze(it.lines, it.pixels) } }
+    }
+
     private val all = ChatFixtures.all
-    private val results by lazy { all.associateWith { ChatLayout.analyze(it.lines, it.pixels) } }
 
     @Test fun `every page is told apart as chat or not`() {
         results.forEach { (fx, r) ->
@@ -91,6 +95,21 @@ class ChatLayoutTest {
         val names = Names.headerRows(z)
         assertThat(names.map { it.text }).containsExactly("Rob Fletcher")
         assertThat(names.single().box.right).isLessThan(line.box.right * 0.6f)
+    }
+
+    /** 默认头像上的姓和旁边的昵称被 OCR 读成一行：切掉压在头像上的字，框收到剩下的字上。 */
+    @Test fun `text printed on an avatar is cut off the name beside it`() {
+        val avatar = Box(12f, 135f, 56f, 179f)
+        val chars = listOf(Box(20f, 135f, 50f, 170f), null, Box(64f, 139f, 78f, 156f), null, Box(82f, 139f, 96f, 156f))
+        val cut = Avatars.cutOff(ChatLine(Box(20f, 135f, 96f, 170f), "卢 曹 雨", chars), listOf(avatar), 540f)!!
+        assertThat(cut.text).isEqualTo("曹 雨")
+        assertThat(cut.box).isEqualTo(Box(64f, 139f, 96f, 156f))
+        // 没有逐字框时按字数比例切
+        assertThat(Avatars.cutOff(ChatLine(Box(20f, 135f, 96f, 170f), "卢曹雨"), listOf(avatar), 540f)!!.text).isEqualTo("曹雨")
+        // 整行都在头像上的不要；不挨着头像的原样留着
+        assertThat(Avatars.cutOff(ChatLine(Box(20f, 140f, 50f, 170f), "卢"), listOf(avatar), 540f)).isNull()
+        val apart = ChatLine(Box(70f, 300f, 200f, 320f), "收到")
+        assertThat(Avatars.cutOff(apart, listOf(avatar), 540f)).isSameInstanceAs(apart)
     }
 
     @Test fun `titles lose the member count and the chevron`() {
