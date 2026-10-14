@@ -93,6 +93,9 @@
     <string name="kind_face">Face</string>
     <string name="kind_barcode">Barcode</string>
     <string name="kind_manual">Manual</string>
+    <string name="kind_chat_avatar">Avatar</string>
+    <string name="kind_chat_name">Display name</string>
+    <string name="kind_chat_title">Chat title</string>
 
     <!-- tool groups -->
     <string name="tool_group_redact">Redact</string>
@@ -185,6 +188,7 @@
     <string name="settings_text">Text</string>
     <string name="settings_face">Faces</string>
     <string name="settings_barcode">Barcodes</string>
+    <string name="settings_chat">Chat screenshots</string>
     <string name="settings_ai">AI</string>
     <string name="settings_export">Export</string>
     <string name="settings_appearance">Appearance</string>
@@ -268,6 +272,8 @@
     <string name="barcode_strict_summary">Only codes that decode, and similar codes right beside them</string>
     <string name="barcode_loose_summary">Also outlines likely codes that don\'t decode; may be wrong</string>
     <string name="barcode_footer">QR codes and barcodes.</string>
+    <string name="chat_when_found">When a chat screenshot is found</string>
+    <string name="chat_footer">Once a screenshot is recognized as a chat, covers every sender\'s avatar and display name, plus the chat title at the top (the other person\'s name or the group name). It goes by the layout, not by the app, so it works for WeChat, QQ, Telegram, WhatsApp, iMessage, LINE, Messenger, Discord and the like. Phone numbers, addresses and other details inside messages are still handled under Text.</string>
 
     <!-- settings: AI -->
     <string name="ai_model">Model</string>

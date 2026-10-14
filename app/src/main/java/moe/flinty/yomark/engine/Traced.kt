@@ -25,6 +25,8 @@ fun RegionDetector.traced(): RegionDetector = TracedRegionDetector(this)
 
 fun SensitivityClassifier.traced(): SensitivityClassifier = TracedClassifier(this)
 
+fun PageAnalyzer.traced(): PageAnalyzer = TracedPageAnalyzer(this)
+
 private class TracedTextRecognizer(private val inner: TextRecognizer) : TextRecognizer by inner {
     override suspend fun recognize(image: SourceImage): List<TextLine> {
         val trace = currentTrace() ?: return inner.recognize(image)
@@ -56,6 +58,15 @@ private class TracedClassifier(private val inner: SensitivityClassifier) : Sensi
     override suspend fun classify(lines: List<TextLine>): List<Candidate> {
         val trace = currentTrace() ?: return inner.classify(lines)
         return trace.step(TraceStage.CLASSIFY, "判定 · ${inner.id}", { inner.classify(lines) }) { found, ms ->
+            "${formatDuration(ms)} · ${found.size} 处（合并之前）" to found.map { describeCandidate(it, lines) }
+        }
+    }
+}
+
+private class TracedPageAnalyzer(private val inner: PageAnalyzer) : PageAnalyzer by inner {
+    override suspend fun analyze(image: SourceImage, lines: List<TextLine>): List<Candidate> {
+        val trace = currentTrace() ?: return inner.analyze(image, lines)
+        return trace.step(TraceStage.CLASSIFY, "整页 · ${inner.id}", { inner.analyze(image, lines) }) { found, ms ->
             "${formatDuration(ms)} · ${found.size} 处（合并之前）" to found.map { describeCandidate(it, lines) }
         }
     }

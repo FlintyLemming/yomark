@@ -93,6 +93,9 @@
     <string name="kind_face">人脸</string>
     <string name="kind_barcode">条码</string>
     <string name="kind_manual">手动</string>
+    <string name="kind_chat_avatar">头像</string>
+    <string name="kind_chat_name">昵称</string>
+    <string name="kind_chat_title">聊天标题</string>
 
     <!-- tool groups -->
     <string name="tool_group_redact">打码</string>
@@ -185,6 +188,7 @@
     <string name="settings_text">文字</string>
     <string name="settings_face">人脸</string>
     <string name="settings_barcode">条码</string>
+    <string name="settings_chat">聊天记录</string>
     <string name="settings_ai">AI</string>
     <string name="settings_export">导出</string>
     <string name="settings_appearance">外观</string>
@@ -268,6 +272,8 @@
     <string name="barcode_strict_summary">只认能解码的条码，和紧挨着的同款码</string>
     <string name="barcode_loose_summary">解不出的疑似条码也圈出，可能误圈</string>
     <string name="barcode_footer">包括二维码和条形码。</string>
+    <string name="chat_when_found">识别到聊天记录时</string>
+    <string name="chat_footer">认出是聊天记录截图后，遮住每个发言者的头像和昵称，以及顶栏的聊天标题（对方名字或群名）。按版面认，不分是哪个应用：微信、QQ、Telegram、WhatsApp、iMessage、LINE、Messenger、Discord 等都适用。消息里的电话、地址等仍按「文字」里的各类处理。</string>
 
     <!-- settings: AI -->
     <string name="ai_model">大模型</string>

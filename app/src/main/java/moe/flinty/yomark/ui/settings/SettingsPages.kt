@@ -12,12 +12,14 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AlternateEmail
 import androidx.compose.material.icons.outlined.AssignmentInd
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.CarRepair
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -25,6 +27,7 @@ import androidx.compose.material.icons.outlined.Domain
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.FlightTakeoff
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lan
@@ -283,6 +286,26 @@ fun BarcodeSettingsScreen(
 }
 
 /**
+ * 聊天记录：认出是聊天截图之后，头像、昵称、聊天标题怎么处理。三类共用一个处理方式：
+ * 用户要遮的是「这段对话是谁和谁」，分开设没有意义。没有识别模式可选，说明写在页脚。
+ */
+@Composable
+fun ChatSettingsScreen(
+    config: RecognitionConfig,
+    onChange: (RecognitionConfig) -> Unit,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsScaffold(title = stringResource(R.string.settings_chat), onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            SectionHeader(stringResource(R.string.chat_when_found), first = true)
+            HandlingGroup(config.chatState) { onChange(config.copy(chatState = it)) }
+            FooterText(stringResource(R.string.chat_footer))
+        }
+    }
+}
+
+/**
  * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
  * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。都只显示，没有可设的项。
  * AI 增强识别的开关和识别引擎的选择都在「文字」页的「文字识别」一组里。
@@ -501,6 +524,9 @@ internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.ORG_NAME -> Icons.Outlined.Domain
     SensitiveKind.ID_NUMBER -> Icons.Outlined.AssignmentInd
     SensitiveKind.VIN -> Icons.Outlined.CarRepair
+    SensitiveKind.CHAT_AVATAR -> Icons.Outlined.AccountCircle
+    SensitiveKind.CHAT_NAME -> Icons.Outlined.ChatBubbleOutline
+    SensitiveKind.CHAT_TITLE -> Icons.Outlined.Forum
     SensitiveKind.FACE -> Icons.Outlined.Face
     SensitiveKind.BARCODE -> Icons.Outlined.QrCode2
     SensitiveKind.MANUAL -> Icons.Outlined.Edit

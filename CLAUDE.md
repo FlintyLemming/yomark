@@ -32,3 +32,12 @@
 - **启动与检查：** `adb -s $s shell monkey -p moe.flinty.yomark -c android.intent.category.LAUNCHER 1`，然后看 `pidof moe.flinty.yomark` 和 `logcat -d -b crash`。crash 日志里 `android.hardware.uwb-service` 的 SIGABRT 是模拟器自己的问题，不用管。
 - **打开测试图：** `.\tools\emu\open-image.ps1 <图片路径>`，把图放进媒体库并在编辑器里打开（现成的测试图在 `app\src\test\resources\`）。别自己用 `am start` 发分享 intent（`--eu android.intent.extra.STREAM`）：extra 里的 URI 拿不到读权限，编辑器是空白的。多张（批量）只能在首页点「选择图片」走 Photo Picker。截图时确认画布上真有图。
 - **截图：** `adb -s $s shell screencap -p /sdcard/x.png` 再 `adb pull` 到 scratchpad（别用 PowerShell 的 `exec-out ... >`，二进制会被弄坏），读图确认改动的界面，把图的路径告诉我。
+
+## Claude Code 云端会话
+
+云端容器里没有模拟器，上面那节在云端做不了，也不要用 `claim.ps1`。`.claude/hooks/session-start.sh` 会在开会话时装好 Android SDK（`/opt/android-sdk`）并把 Maven Central 换成 Google 的镜像（云端直连常被限流成 429），所以可以直接跑：
+
+- `./gradlew --no-daemon :app:assembleDebug :app:assertDebugNoRuntimePermissions`
+- `./gradlew --no-daemon :app:testDebugUnitTest`（含真 OCR 的端到端单测）
+
+模拟器上的验证留给本机，在回复里说明这一步没做。

@@ -38,6 +38,12 @@ enum class SensitiveKind {
     /** 车架号（车辆识别代号，VIN）和发动机号。车架号有校验位，出厂打码。 */
     VIN,
 
+    /**
+     * 聊天截图里发言者的头像、昵称，和顶栏的聊天标题（对方名字或群名）。由版面认出（chat/ChatLayout）：
+     * 先判断这一页是不是聊天记录，是才认；三类共用设置里「聊天记录」一项的处理方式，出厂打码。
+     */
+    CHAT_AVATAR, CHAT_NAME, CHAT_TITLE,
+
     FACE, BARCODE, MANUAL,
 }
 

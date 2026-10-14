@@ -1,0 +1,59 @@
+chat	1
+line	30	18	84	32	10:24
+line	55	72	119	94	# 闲聊
+line	35	1114	152	1132	Message #闲聊
+line	70	140	106	152	Jess
+line	116	140	180	153	今天 09:12
+line	70	166	106	184	收到
+line	70	193	232	212	好嘞，几点到合适？
+line	70	244	153	260	Priya Shah
+line	163	246	287	257	Yesterday at 9:46 PM
+line	70	272	252	288	Meeting moved to 3pm
+line	70	300	256	316	Who's bringing snacks?
+line	70	348	152	360	Ana Souza
+line	162	350	286	361	Yesterday at 9:46 PM
+line	70	376	252	392	Meeting moved to 3pm
+line	70	404	278	420	Running 10 min late, sorry
+line	70	452	152	464	Ana Souza
+line	162	454	272	465	Today at 10:24 AM
+line	70	477	286	496	我手机快没电了，等下回你
+line	70	508	88	520	lol
+line	70	556	106	568	Jess
+line	116	558	240	569	Yesterday at 9:46 PM
+line	70	582	124	600	我也去
+line	70	610	124	627	已转账
+line	70	637	268	656	孩子明天要带彩笔和剪刀
+line	70	688	153	704	Priya Shah
+line	163	688	228	701	今天 09:12
+line	70	714	232	732	记得带伞，下午有雨
+line	70	764	162	776	Marcus Lee
+line	172	766	280	777	Today at 10:24 AM
+line	70	792	154	808	On my way
+line	70	818	160	836	好的没问题
+line	70	848	276	864	Can you send me the file?
+line	70	896	162	908	Marcus Lee
+line	172	896	236	909	今天 09:12
+line	70	921	178	940	周报我晚点交
+line	70	949	369	967	群里统计一下，下周五聚餐能来的扣1
+line	70	1000	162	1012	Marcus Lee
+line	172	1000	236	1013	今天 09:12
+line	70	1026	232	1044	有人知道物业电话吗
+title	55	72	119	94	闲聊
+avatar	15	135	57	177
+name	70	140	106	152	Jess
+avatar	15	239	57	281
+name	70	244	153	260	Priya Shah
+avatar	15	343	57	385
+name	70	348	152	360	Ana Souza
+avatar	15	447	57	489
+name	70	452	152	464	Ana Souza
+avatar	15	551	57	593
+name	70	556	106	568	Jess
+avatar	15	683	57	725
+name	70	688	153	704	Priya Shah
+avatar	15	759	57	801
+name	70	764	162	776	Marcus Lee
+avatar	15	891	57	933
+name	70	896	162	908	Marcus Lee
+avatar	15	995	57	1037
+name	70	1000	162	1012	Marcus Lee

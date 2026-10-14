@@ -26,6 +26,8 @@ class RedactionEngine(
      * 挡在第一批结果前面会让「选中即打码」变成「选中后干等」。用户点「AI 增强识别」时才由调用方跑 refine()。
      */
     private val refiners: List<SensitivityClassifier> = emptyList(),
+    /** 文字出来之后、拿文字和像素一起看整页的分析（聊天截图）。和判定器一样，失败降级为空。 */
+    private val pageAnalyzers: List<PageAnalyzer> = emptyList(),
 ) {
     val canRefine: Boolean get() = refiners.isNotEmpty()
 
@@ -58,10 +60,11 @@ class RedactionEngine(
         val fromText = classifiers
             .filter { it.isAvailable() }                    // 不可用的直接跳过
             .flatMap { c -> runCatching { c.classify(lines) }.getOrElse { emptyList() } }
+        val fromPage = pageAnalyzers.flatMap { a -> runCatching { a.analyze(image, lines) }.getOrElse { emptyList() } }
 
         AnalysisResult(
             lines = lines,
-            candidates = merger.merge(fromText + regionJobs.awaitAll().flatten() + uprightJobs.awaitAll().flatten(), frame),
+            candidates = merger.merge(fromText + fromPage + regionJobs.awaitAll().flatten() + uprightJobs.awaitAll().flatten(), frame),
         )
     }
 
