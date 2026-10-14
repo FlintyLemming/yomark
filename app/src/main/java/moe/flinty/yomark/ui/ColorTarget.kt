@@ -12,12 +12,16 @@ enum class ColorTarget {
     SOLID,
 
     /** 马克笔的颜色。只换颜色，浓淡（透明度）另外调，不跟着变。 */
-    MARKER;
+    MARKER,
+
+    /** 画笔的颜色，不透明。 */
+    PEN;
 
     /** 这一项现在的颜色，不透明的 RGB。 */
     fun colorOf(options: MaskOptions): Int = when (this) {
         SOLID -> options.solidColor
         MARKER -> options.markerColor
+        PEN -> options.penColor
     } or OPAQUE
 
     /**
@@ -27,6 +31,7 @@ enum class ColorTarget {
     fun withColor(options: MaskOptions, rgb: Int): MaskOptions = when (this) {
         SOLID -> options.copy(solidColor = rgb or OPAQUE, solidNear = false)
         MARKER -> options.copy(markerColor = MaskOptions.withAlpha(rgb, options.markerAlpha))
+        PEN -> options.copy(penColor = rgb or OPAQUE)
     }
 
     private companion object {

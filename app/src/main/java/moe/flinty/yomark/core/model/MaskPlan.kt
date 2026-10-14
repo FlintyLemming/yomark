@@ -12,11 +12,12 @@ enum class MaskState { MASKED, OUTLINED }
  * 枚举名是持久化格式的一部分（SettingsStore 记着画笔的样式名）。
  * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）；
  * 还有一种「表情」，2026-10-12 去掉了。记着这两个名字的旧设置读回来认不出，落回色块。
+ * 画笔（[PEN]）2026-10-14 加上：不透明的线，和马克笔一样只做标记，可以拉框也可以手画。
  */
-enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER }
+enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, PEN }
 
 /**
- * 各样式的参数。一份里装着全部四种样式的参数，每块码只读它自己那种样式的几项；
+ * 各样式的参数。一份里装着全部五种样式的参数，每块码只读它自己那种样式的几项；
  * 编辑器里调好的参数记在 SettingsStore，下次打开沿用。
  *
  * 能调的项都有范围（见 [normalized]），范围的边界是安全底线，不是审美：
@@ -46,6 +47,16 @@ data class MaskOptions(
     val blurRadiusRatio: Float = DEFAULT_BLUR_RATIO,
     /** 马克笔的颜色，ARGB。透明度就在 alpha 里，范围见 [MARKER_ALPHA_RANGE]。 */
     val markerColor: Int = DEFAULT_MARKER_COLOR,
+    /** 马克笔下一笔是拉框（照旧涂一块）还是手画（一道半透明的粗线）。 */
+    val markerShape: StrokeShape = StrokeShape.BOX,
+    /** 马克笔手画时的笔宽，按图的短边算的比例（见 [halfWidth]）。拉框时用不着。 */
+    val markerWidth: Float = DEFAULT_MARKER_WIDTH,
+    /** 画笔的颜色，不透明。 */
+    val penColor: Int = DEFAULT_PEN_COLOR,
+    /** 画笔下一笔是拉框（描一圈框线）还是手画。出厂是手画：画笔就是拿来随手画的。 */
+    val penShape: StrokeShape = StrokeShape.FREEHAND,
+    /** 画笔的笔宽，按图的短边算的比例（见 [halfWidth]）。 */
+    val penWidth: Float = DEFAULT_PEN_WIDTH,
     /**
      * 当前渲染坐标系相对**原图**的比例。预览画在降采样的分析图上（< 1），导出画在原图上（= 1）。
      *
@@ -70,7 +81,27 @@ data class MaskOptions(
         pixelBlockDivisor = pixelBlockDivisor.coerceIn(PIXEL_DIVISOR_RANGE),
         blurRadiusRatio = blurRadiusRatio.orIfNaN(DEFAULT_BLUR_RATIO).coerceIn(BLUR_RATIO_RANGE),
         markerColor = withAlpha(markerColor, markerAlpha.coerceIn(MARKER_ALPHA_RANGE)),
+        markerWidth = markerWidth.orIfNaN(DEFAULT_MARKER_WIDTH).coerceIn(MARKER_WIDTH_RANGE),
+        penColor = penColor or OPAQUE,
+        penWidth = penWidth.orIfNaN(DEFAULT_PEN_WIDTH).coerceIn(PEN_WIDTH_RANGE),
     )
+
+    /** [style] 下一笔怎么画。只有马克笔、画笔能手画，别的样式一律拉框。 */
+    fun shapeFor(style: MaskStyle): StrokeShape = when (style) {
+        MaskStyle.MARKER -> markerShape
+        MaskStyle.PEN -> penShape
+        else -> StrokeShape.BOX
+    }
+
+    /**
+     * [style] 的半个笔宽：图的短边（[shortSide]，与要画的那张图同一坐标系）乘上笔宽比例的一半。
+     * 按比例算，预览画在分析图上、导出画在原图上，粗细看上去一样。马克笔拉框、打码的几种不描线，是 0。
+     */
+    fun halfWidth(style: MaskStyle, shortSide: Float): Float = when (style) {
+        MaskStyle.MARKER -> markerWidth
+        MaskStyle.PEN -> penWidth
+        else -> 0f
+    } * shortSide / 2f
 
     /** 只把 [style] 用到的几项放回出厂值，别的样式调好的不动。面板上的「恢复默认」。 */
     fun resetFor(style: MaskStyle): MaskOptions {
@@ -79,7 +110,8 @@ data class MaskOptions(
             MaskStyle.SOLID -> copy(solidColor = factory.solidColor, solidNear = factory.solidNear)
             MaskStyle.PIXELATE -> copy(pixelBlockDivisor = factory.pixelBlockDivisor)
             MaskStyle.BLUR -> copy(blurRadiusRatio = factory.blurRadiusRatio)
-            MaskStyle.MARKER -> copy(markerColor = factory.markerColor)
+            MaskStyle.MARKER -> copy(markerColor = factory.markerColor, markerShape = factory.markerShape, markerWidth = factory.markerWidth)
+            MaskStyle.PEN -> copy(penColor = factory.penColor, penShape = factory.penShape, penWidth = factory.penWidth)
         }
     }
 
@@ -114,6 +146,15 @@ data class MaskOptions(
          * 而它的边是手绘抖动的，盖不严。下限再低就看不出标了哪儿。
          */
         val MARKER_ALPHA_RANGE = 0.2f..0.7f
+
+        /** 马克笔手画的笔宽：出厂差不多是截图上一行字的高。 */
+        const val DEFAULT_MARKER_WIDTH = 0.035f
+        val MARKER_WIDTH_RANGE = 0.015f..0.07f
+
+        /** 画笔：出厂是红色，细线。 */
+        const val DEFAULT_PEN_COLOR: Int = 0xFFE53935.toInt()
+        const val DEFAULT_PEN_WIDTH = 0.008f
+        val PEN_WIDTH_RANGE = 0.003f..0.025f
 
         private const val OPAQUE = 0xFF000000.toInt()
 
@@ -152,6 +193,11 @@ data class MaskItem(
      * 而不是沿用上一次的——用户换了样式再点虚线框，要的就是新样式。
      */
     val look: MaskLook = MaskLook(),
+    /**
+     * 手画的一笔（马克笔、画笔手画时）：[quad] 是它的外接框，渲染器照着这条线画，不填满框。
+     * null 是拉的框。手画的那一笔换成打码的样式时盖住整个外接框，宁可多盖。
+     */
+    val ink: InkPath? = null,
 ) : Parcelable
 
 @Parcelize

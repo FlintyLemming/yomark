@@ -3,6 +3,7 @@ package moe.flinty.yomark.render
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 
@@ -13,8 +14,10 @@ import moe.flinty.yomark.core.model.MaskStyle
  * @param source 被打码的位图。像素化/模糊、开了近似色的色块需要读它的原始像素；
  *               固定颜色的色块不需要，但签名统一。
  * @param quad   与 canvas 同一坐标系下的目标区域。
+ * @param ink    手画的一笔（见 MaskItem.ink），[quad] 是它的外接框。只有马克笔、画笔照着它画；
+ *               打码的几种不看它，盖住整个外接框。
  */
 interface MaskRenderer {
     val style: MaskStyle
-    fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions)
+    fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath? = null)
 }

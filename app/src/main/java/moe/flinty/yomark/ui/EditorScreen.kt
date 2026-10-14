@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.AlignmentLine
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalConfiguration
@@ -86,6 +87,7 @@ import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
 import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.MaskItemList
+import moe.flinty.yomark.ui.components.PanelTop
 import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.components.PendingExportDialog
 import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
@@ -227,6 +229,10 @@ fun EditorScreen(
                 exportLabel = exportLabel,
                 exporting = state.exporting,
             )
+            // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开当前样式所在的那一组接着显示它
+            LaunchedEffect(phone, state.stylePanelOpen) {
+                if (phone && state.stylePanelOpen && toolGroup == null) toolGroup = ToolGroup.of(state.barLook.style)
+            }
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
             BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)
             BackHandler(
@@ -259,6 +265,7 @@ fun EditorScreen(
                             registry = registry,
                             onTap = vm::onTap,
                             onManualBox = vm::onManualBox,
+                            onInk = vm::onInk,
                             onResize = vm::previewSelectedQuad,
                             onCommitDrag = vm::commitDrag,
                             onDeleteSelected = vm::deleteSelected,
@@ -306,7 +313,11 @@ fun EditorScreen(
                         )
                         layout == EditorLayout.PHONE -> EditorBottomBar(
                             toolGroup = toolGroup,
-                            onToolGroup = { toolGroup = it },
+                            onToolGroup = {
+                                // 收起这一组，从它长出来的调节面板也一起收
+                                if (it == null && state.stylePanelOpen) vm.dismissStylePanel()
+                                toolGroup = it
+                            },
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             compare = compare,
@@ -356,6 +367,7 @@ fun EditorScreen(
  * 画布和它旁边的那一块（手机的底栏或右边那一栏，宽屏的样式与列表，用途水印面板）。
  *
  * 旁边那一块先量：在下面时高度由它自己定，在右边（[panelAtSide]）时宽度由它自己定，画布占剩下的。
+ * 手机的底栏例外：它占满整块，画布让到它给的 [PanelTop] 为止，上面那一截是往上长的调节面板，盖在图上。
  * 画布永远是第一个孩子：转个方向，那一块从下面挪到右边，画布还是原来那一个，放大到哪儿、识别动效走到哪儿都接着来。
  * 分开写成 Column 和 Row 的话，一转就换成了一块新画布。
  */
@@ -386,7 +398,10 @@ private fun CanvasAndPanel(
             }
         } else {
             val p = panelPart.measure(Constraints(minWidth = width, maxWidth = width, maxHeight = height))
-            val c = canvasPart.measure(Constraints.fixed(width, (height - p.height).coerceAtLeast(0)))
+            // 手机的底栏占满这一块（调节面板往上长时盖在画布上），画布只让到它说的那条线为止（见 PanelTop）
+            val top = p[PanelTop]
+            val reserved = if (top == AlignmentLine.Unspecified) p.height else p.height - top
+            val c = canvasPart.measure(Constraints.fixed(width, (height - reserved).coerceAtLeast(0)))
             layout(width, height) {
                 c.place(0, 0)
                 p.place(0, height - p.height)

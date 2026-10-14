@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,10 +56,13 @@ import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.DetectorSource
+import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKindLabels
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.PurposeWatermarkDrawer
 import moe.flinty.yomark.render.MaskOrder
 import moe.flinty.yomark.render.RendererRegistry
@@ -66,6 +70,7 @@ import moe.flinty.yomark.ui.EditorUiState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.hypot
+import kotlin.math.min
 import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -76,9 +81,11 @@ import moe.flinty.yomark.R
  *
  * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
  * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）。
+ * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
+ * @param onInk 手画完一笔：手指走过的点，图像坐标
  */
 @Composable
 fun ImageCanvas(
@@ -92,6 +99,7 @@ fun ImageCanvas(
     modifier: Modifier = Modifier,
     scanStyle: ScanStyle = ScanStyle.SWEEP,
     showOriginal: Boolean = false,
+    onInk: (List<PointF>) -> Unit = {},
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
@@ -161,10 +169,13 @@ fun ImageCanvas(
     // 这时要重新摆，否则图的下半截就被挤出画布，调水印时看不到效果。
     var laidOutFor by remember(image) { mutableStateOf(0 to 0) }
     var draftQuad by remember { mutableStateOf<Quad?>(null) }
+    // 正在手画的一笔，图像坐标。点一多每帧复制一遍不划算：点存在普通的表里，加了点改一下 inkTick 让画布重画
+    val draftInk = remember { InkDraft() }
+    var inkTick by remember { mutableIntStateOf(0) }
     // 正在拖选中框的手柄或框体。拖的时候收起工具条，免得它跟着框一路晃
     var editingSelection by remember(image) { mutableStateOf(false) }
     // 草稿框每一帧都在变；工具条只关心「是不是正在画」，不跟着每帧重组
-    val drafting by remember { derivedStateOf { draftQuad != null } }
+    val drafting by remember { derivedStateOf { draftQuad != null || inkTick > 0 } }
     // 双击自己数时间戳，不叠第二层 detectTapGestures：
     // 两层 pointerInput 里第二层根本收不到本层已在处理的手势（实机验证过），
     // 而把单击延后 300ms 去等第二击又会让「点遮罩」明显发滞。
@@ -205,6 +216,9 @@ fun ImageCanvas(
                             }
                         }
 
+                        // 画笔照手画还是拉框，按下去那一刻定下来
+                        val brush = latest.brush
+                        val freehand = brush.options.shapeFor(brush.style) == StrokeShape.FREEHAND
                         val start = down.position
                         var last = down.position
                         var pointerCount = 1
@@ -221,6 +235,10 @@ fun ImageCanvas(
                                 // 此后这一手势剩下的单指部分不再改框，也不画框
                                 mode = Mode.NAVIGATE
                                 draftQuad = null
+                                if (draftInk.points != null) {
+                                    draftInk.points = null
+                                    inkTick = 0
+                                }
                                 val a = pressed[0]; val b = pressed[1]
                                 val prevCentroid = Offset(
                                     (a.previousPosition.x + b.previousPosition.x) / 2f,
@@ -258,6 +276,15 @@ fun ImageCanvas(
                                     } else if (selected != null && grabbingBody) {
                                         editingSelection = true
                                         onResize(SelectionHandles.move(selected.quad, now.x - downImage.x, now.y - downImage.y))
+                                    } else if (freehand) {
+                                        // 起手那一段 touch slop 也算进去：线从手指按下的地方开始
+                                        val points = draftInk.points
+                                            ?: arrayListOf(viewport.screenToImage(PointF(start.x, start.y))).also { draftInk.points = it }
+                                        c.historical.forEach { h ->
+                                            points.addIfApart(viewport.screenToImage(PointF(h.position.x, h.position.y)), INK_STEP_PX / viewport.scale)
+                                        }
+                                        points.addIfApart(now, INK_STEP_PX / viewport.scale)
+                                        inkTick++
                                     } else {
                                         draftQuad = GestureRules.quadFromDrag(
                                             viewport.screenToImage(PointF(start.x, start.y)), now,
@@ -280,8 +307,13 @@ fun ImageCanvas(
                             mode == Mode.DRAG && grabbedHandle == null && !grabbingBody -> {
                                 val q = draftQuad
                                 draftQuad = null
+                                val ink = draftInk.points
+                                draftInk.points = null
+                                inkTick = 0
                                 val minInImage = minBoxPx / viewport.scale
                                 if (q != null && GestureRules.acceptsBox(q, minInImage)) onManualBox(q)
+                                // 和框一样，太短的一笔是手抖
+                                if (ink != null && Ink.length(ink) >= minInImage) onInk(ink.toList())
                             }
                             // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了
                             mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null && editable -> {
@@ -349,6 +381,8 @@ fun ImageCanvas(
                     state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp) }
                 }
                 draftQuad?.let { drawDraft(canvas, it, selectionColors, dp) }
+                // 手画的这一笔照画好之后的样子画：用的是同一个渲染器
+                if (inkTick > 0) draftInk.points?.let { drawInkDraft(canvas, it, state.brush, image, registry) }
 
                 canvas.restoreToCount(save)
 
@@ -412,6 +446,32 @@ private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: ()
 
 /** 记住最后一个选中框的位置，供工具条淡出时用。普通字段，改它不触发重组。 */
 private class QuadHolder { var quad: Quad? = null }
+
+/** 正在手画的一笔。普通字段，改它不触发重组（重画靠 ImageCanvas 的 inkTick）。 */
+private class InkDraft { var points: ArrayList<PointF>? = null }
+
+/** 手指走得比 [step] 远了才记一个点：停着不动时不攒一堆重合的点。 */
+private fun ArrayList<PointF>.addIfApart(p: PointF, step: Float) {
+    val tail = lastOrNull()
+    if (tail == null || hypot(p.x - tail.x, p.y - tail.y) >= step) add(p)
+}
+
+/** 手画时隔多远记一个点（屏幕像素）。 */
+private const val INK_STEP_PX = 3f
+
+/** 正在手画的一笔，按画笔的样子画，和画完落进 plan 的那一笔一个样。 */
+private fun drawInkDraft(
+    canvas: android.graphics.Canvas,
+    points: List<PointF>,
+    brush: MaskLook,
+    image: SourceImage,
+    registry: RendererRegistry,
+) {
+    val options = brush.options.copy(renderScale = image.scale)
+    val half = options.halfWidth(brush.style, min(image.width, image.height).toFloat())
+    val (quad, ink) = Ink.fit(points, half)
+    registry[brush.style].render(canvas, image.bitmap, quad, options, ink)
+}
 
 private enum class Mode { UNDECIDED, DRAG, NAVIGATE }
 private const val LONG_PRESS_MS = 450L
@@ -661,7 +721,7 @@ private fun drawItems(
             // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
             // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
             val options = it.look.options.copy(renderScale = image.scale)
-            registry[it.look.style].render(canvas, image.bitmap, it.quad, options)
+            registry[it.look.style].render(canvas, image.bitmap, it.quad, options, it.ink)
         }
     }
     items.filter { it.state == MaskState.OUTLINED }.forEach { item ->

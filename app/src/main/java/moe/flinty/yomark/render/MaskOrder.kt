@@ -25,7 +25,7 @@ object MaskOrder {
     /** 这一块要读底下的像素。近似色不算：它在开画之前就从原图上取好了（见 [pinNearColor]）。 */
     fun readsPixels(look: MaskLook): Boolean = when (look.style) {
         MaskStyle.PIXELATE, MaskStyle.BLUR -> true
-        MaskStyle.SOLID, MaskStyle.MARKER -> false
+        MaskStyle.SOLID, MaskStyle.MARKER, MaskStyle.PEN -> false
     }
 
     fun forDrawing(items: List<MaskItem>): List<MaskItem> {

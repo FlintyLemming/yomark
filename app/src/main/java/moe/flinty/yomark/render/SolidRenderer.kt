@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 
@@ -18,7 +19,7 @@ class SolidRenderer : MaskRenderer {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.style = Paint.Style.FILL }
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
         paint.color = colorFor(source, quad, options)
         paint.alpha = 255                      // 不透明是安全属性，不接受 options 覆盖
         canvas.drawPath(quad.toPath(), paint)

@@ -44,7 +44,7 @@ internal class MaskComposite {
         canvas.drawBitmap(image.bitmap, 0f, 0f, COPY)
         items.forEach {
             val options = MaskOrder.pinNearColor(it.look.options.copy(renderScale = image.scale), image.bitmap, it.quad)
-            registry[it.look.style].render(canvas, bmp, it.quad, options)
+            registry[it.look.style].render(canvas, bmp, it.quad, options, it.ink)
         }
         return bmp
     }

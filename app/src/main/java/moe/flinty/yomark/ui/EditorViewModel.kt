@@ -13,6 +13,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.AnalysisResult
 import moe.flinty.yomark.core.model.DetectorSource
+import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
@@ -55,6 +56,7 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.math.min
 import moe.flinty.yomark.R
 
 class EditorViewModel(
@@ -713,6 +715,30 @@ class EditorViewModel(
         )
         mutate { it.add(item) }
         // 画完直接进选中态：手柄就在手边，不用再点一下才能调大小；面板上接着调，改的就是这个框
+        uiState = _state.value.copy(selectedManualId = item.candidateId, colorPick = null)
+    }
+
+    /**
+     * 手画完一笔（马克笔、画笔选了手画）：和画完一个框一样，落笔就打上、画完进选中态，拖得动、删得掉。
+     * [quad] 是这一笔的外接框，四边让出半个笔宽（见 Ink.fit）。
+     */
+    fun onInk(pointsInImageSpace: List<PointF>) {
+        val s = _state.value
+        val image = s.image ?: return
+        if (pointsInImageSpace.isEmpty()) return
+        val brush = s.brush
+        val half = brush.options.halfWidth(brush.style, min(image.width, image.height).toFloat())
+        val (quad, ink) = Ink.fit(pointsInImageSpace, half)
+        val item = MaskItem(
+            candidateId = "manual-${UUID.randomUUID()}",
+            quad = quad,
+            kind = SensitiveKind.MANUAL,
+            source = DetectorSource.MANUAL,
+            state = MaskState.MASKED,
+            look = brush,
+            ink = ink,
+        )
+        mutate { it.add(item) }
         uiState = _state.value.copy(selectedManualId = item.candidateId, colorPick = null)
     }
 

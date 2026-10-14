@@ -133,6 +133,26 @@ class EditorViewModelTest {
         assertThat(item.source).isEqualTo(DetectorSource.MANUAL)
     }
 
+    /** 画笔手画的一笔：和框一样落笔就打上、画完选中，外接框把整条线（连笔宽）包在里面，撤销得回来。 */
+    @Test
+    fun `a freehand pen stroke becomes a selected item that holds the stroke`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        vm.onInk(listOf(PointF(20f, 30f), PointF(60f, 40f), PointF(80f, 30f)))
+
+        val item = vm.state.value.plan.items.single()
+        assertThat(item.look.style).isEqualTo(MaskStyle.PEN)
+        assertThat(item.ink!!.points).hasSize(3)
+        assertThat(item.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+        val box = item.quad.bounds()
+        assertThat(box.left).isLessThan(20f)
+        assertThat(box.right).isGreaterThan(80f)
+        vm.undo()
+        assertThat(vm.state.value.plan.items).isEmpty()
+    }
+
     @Test
     fun `a freshly drawn box is selected so its handles show right away`() = runTest(dispatcher) {
         val vm = vm()
