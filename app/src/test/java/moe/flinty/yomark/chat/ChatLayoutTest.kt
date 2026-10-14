@@ -206,38 +206,214 @@ class ChatLayoutTest {
      * 名字下面先是引用里的彩色人名、再是白字的也认；彩色的网址、置顶消息条不认。
      */
     @Test fun `colored names as large as the message are found`() {
-        val px = Pixels(540, 1170, IntArray(540 * 1170) { 0xFF1E2A36.toInt() })
-        fun paint(b: Box, color: Int) {
-            // 字的笔画：框里隔行的横条，框边上留着底色
-            for (y in b.top.toInt() + 2 until b.bottom.toInt() - 2 step 2) for (x in b.left.toInt() + 2 until b.right.toInt() - 2) px.argb[y * 540 + x] = color
-        }
-        val blue = 0xFF5FB0F0.toInt()
-        val pink = 0xFFE87A9A.toInt()
-        val white = 0xFFF0F0F0.toInt()
+        val px = Pixels(540, 1170, IntArray(540 * 1170) { DARK })
         val lines = listOf(
-            ChatLine(Box(70f, 200f, 300f, 220f), "置顶消息") to blue,
-            ChatLine(Box(70f, 226f, 400f, 246f), "周六上午十点集合") to white,
-            ChatLine(Box(70f, 400f, 150f, 420f), "Jerry") to blue,
-            ChatLine(Box(70f, 426f, 300f, 446f), "你想幹啥") to white,
-            ChatLine(Box(70f, 500f, 250f, 520f), "Angelic47") to pink,
-            ChatLine(Box(80f, 528f, 150f, 548f), "Jerry") to blue,
-            ChatLine(Box(80f, 552f, 200f, 572f), "你想幹啥") to white,
-            ChatLine(Box(70f, 650f, 250f, 670f), "pan.example.com") to blue,
-            ChatLine(Box(70f, 676f, 300f, 696f), "资料都在这里了") to white,
+            ChatLine(Box(70f, 200f, 300f, 220f), "置顶消息") to BLUE,
+            ChatLine(Box(70f, 226f, 400f, 246f), "周六上午十点集合") to WHITE,
+            ChatLine(Box(70f, 400f, 150f, 420f), "Jerry") to BLUE,
+            ChatLine(Box(70f, 426f, 300f, 446f), "你想幹啥") to WHITE,
+            ChatLine(Box(70f, 500f, 250f, 520f), "Angelic47") to PINK,
+            ChatLine(Box(80f, 528f, 150f, 548f), "Jerry") to BLUE,
+            ChatLine(Box(80f, 552f, 200f, 572f), "你想幹啥") to WHITE,
+            ChatLine(Box(70f, 650f, 250f, 670f), "pan.example.com") to BLUE,
+            ChatLine(Box(70f, 676f, 300f, 696f), "资料都在这里了") to WHITE,
         )
-        lines.forEach { (l, c) -> paint(l.box, c) }
+        lines.forEach { (l, c) -> px.strokes(l.box, c) }
         val found = Names.find(zonesOf(lines.map { it.first }), emptyList()) { TextInk.chroma(it, px) }
         assertThat(found.map { it.text }).containsExactly("Jerry", "Angelic47", "Jerry")
     }
 
+    /** Telegram 的渐变壁纸斜着变色：离屏幕边一成屏宽，颜色就和边上差出一截。左右两边的底色也不一样。 */
+    @Test fun `avatars on a wallpaper that shades across the screen are found`() {
+        val px = canvas(540, 1170) { x, y -> rgb(170 - x / 4, 200 - x / 20 + y / 50, 120 + x / 5) }
+        val truth = listOf(300, 420, 540, 700).map { Box(8f, it.toFloat(), 56f, it + 48f) }
+        truth.forEachIndexed { i, b ->
+            px.fill(Box(70f, b.top - 10f, 380f, b.bottom), 0xFFFFFFFF.toInt())
+            px.disc(b, AVATAR_COLORS[i])
+        }
+        val found = Avatars.find(Grid.of(px), Zones.of(emptyList(), 540f, 1170f))
+        assertThat(found.body).hasSize(truth.size)
+        truth.forEach { t -> assertWithMessage("$t in ${found.body}").that(found.body.any { ChatFixtures.matches(it, t) }).isTrue() }
+    }
+
+    /**
+     * 微信深色：头像右缘到屏宽 12.9%，自己的头像在右边；滑动着截的图右边上还有一道滚动条，盖住了右边的底色。
+     */
+    @Test fun `wide avatars and a scrollbar at the right edge`() {
+        val px = canvas(540, 1170) { _, _ -> 0xFF111111.toInt() }
+        val left = listOf(200, 400, 600).map { Box(16f, it.toFloat(), 70f, it + 54f) }
+        val right = Box(470f, 800f, 524f, 854f)
+        left.forEachIndexed { i, b ->
+            px.fill(Box(84f, b.top, 300f, b.top + 50f), 0xFF2C2C2C.toInt())
+            px.fill(b, AVATAR_COLORS[i])
+        }
+        px.fill(Box(250f, 805f, 456f, 850f), 0xFF2DC160.toInt())
+        px.fill(right, AVATAR_COLORS[3])
+        px.fill(Box(534f, 700f, 540f, 1000f), 0xFF686868.toInt())
+        val found = Avatars.find(Grid.of(px), Zones.of(emptyList(), 540f, 1170f))
+        (left + right).forEach { t -> assertWithMessage("$t in ${found.body}").that(found.body.any { ChatFixtures.matches(it, t) }).isTrue() }
+        assertThat(found.mirrored).isTrue()
+    }
+
+    /**
+     * 滚动条的滑块停在最新一条消息旁边：滑块的下端只盖住那一段的八成多，自己的头像就在这一段里。
+     * 图宽 1220（不是 540 的倍数，网格每三个像素取一个）。
+     */
+    @Test fun `an own avatar beside the end of the scroll thumb is found`() {
+        val px = canvas(1220, 2600) { _, _ -> 0xFF111111.toInt() }
+        val left = listOf(400, 800, 1200).map { Box(36f, it.toFloat(), 156f, it + 120f) }
+        val right = Box(1064f, 2070f, 1184f, 2190f)
+        left.forEachIndexed { i, b ->
+            px.fill(Box(190f, b.top, 700f, b.top + 110f), 0xFF2C2C2C.toInt())
+            px.fill(b, AVATAR_COLORS[i])
+        }
+        px.fill(Box(700f, 2080f, 1040f, 2180f), 0xFF2DC160.toInt())
+        px.fill(right, AVATAR_COLORS[3])
+        px.fill(Box(1205f, 1500f, 1220f, 2170f), 0xFF686868.toInt())
+        val found = Avatars.find(Grid.of(px), Zones.of(emptyList(), 1220f, 2600f))
+        (left + right).forEach { t -> assertWithMessage("$t in ${found.body}").that(found.body.any { ChatFixtures.matches(it, t) }).isTrue() }
+    }
+
+    /** 壁纸上一笔粗的涂鸦搭在头像和气泡之间，连成一大块：拆开以后头像还认得出。 */
+    @Test fun `an avatar bridged to its bubble by a thick doodle stroke is still found`() {
+        val px = canvas(540, 1170) { _, _ -> 0xFFEDEDED.toInt() }
+        val truth = listOf(300, 450).map { Box(8f, it.toFloat(), 56f, it + 48f) }
+        truth.forEachIndexed { i, b ->
+            px.fill(Box(70f, b.top - 10f, 400f, b.bottom), 0xFFFFFFFF.toInt())
+            px.disc(b, AVATAR_COLORS[i])
+        }
+        px.fill(Box(50f, 326f, 72f, 331f), 0xFF8A8A8A.toInt())
+        val found = Avatars.find(Grid.of(px), Zones.of(emptyList(), 540f, 1170f))
+        truth.forEach { t -> assertWithMessage("$t in ${found.body}").that(found.body.any { ChatFixtures.matches(it, t) }).isTrue() }
+    }
+
+    /**
+     * Telegram 转发的消息：「转发自」不是名字，它下面那行（或同一行后面）才是，频道名带数字也认。
+     * 打字打出来的「转发自……」（不是彩色的）不算。
+     */
+    @Test fun `a forwarded message names its source, not the word forwarded`() {
+        val px = Pixels(540, 1170, IntArray(540 * 1170) { DARK })
+        val lines = listOf(
+            ChatLine(Box(70f, 300f, 180f, 320f), "Maple Syrup") to PINK,
+            ChatLine(Box(70f, 326f, 130f, 346f), "转发自") to BLUE,
+            ChatLine(Box(70f, 352f, 330f, 372f), "量产型小熊0815号的频道存档") to BLUE,
+            ChatLine(Box(70f, 380f, 300f, 400f), "千万别把门锁上") to WHITE,
+            ChatLine(Box(70f, 500f, 330f, 520f), "Forwarded from Tech News 2077") to BLUE,
+            ChatLine(Box(70f, 526f, 300f, 546f), "Big update tonight") to WHITE,
+            ChatLine(Box(70f, 650f, 330f, 670f), "转发自家里的群 周六大扫除") to WHITE,
+            ChatLine(Box(70f, 676f, 130f, 696f), "收到") to WHITE,
+        )
+        lines.forEach { (l, c) -> px.strokes(l.box, c) }
+        val found = Names.find(zonesOf(lines.map { it.first }), emptyList()) { TextInk.chroma(it, px) }
+        assertThat(found.map { it.text }).containsExactly("Maple Syrup", "量产型小熊0815号的频道存档", "Tech News 2077")
+        assertThat(found.first { it.text == "Tech News 2077" }.box.left).isGreaterThan(200f)
+    }
+
+    /**
+     * Telegram 的引用回复：发送人名字后面跟着头衔（OCR 读成一长行），引用里被引用的人名下面那句小字是他说的话，不是名字；
+     * 带缩略图的引用人名往右挪，正好落在屏幕正中，也认。
+     */
+    @Test fun `in a Telegram reply the quoted words are not a name`() {
+        val px = Pixels(540, 1170, IntArray(540 * 1170) { DARK })
+        val lines = listOf(
+            ChatLine(Box(70f, 300f, 330f, 320f), "Lost in the long night 夜猫子") to PURPLE,
+            ChatLine(Box(80f, 328f, 200f, 346f), "Nova d' Lune") to BLUE,
+            ChatLine(Box(80f, 350f, 230f, 364f), "可是它真的能用吗") to WHITE,
+            ChatLine(Box(70f, 372f, 160f, 392f), "反正挺快！") to WHITE,
+            ChatLine(Box(130f, 500f, 410f, 520f), "七月 (某某小区业主委员会主任)") to PURPLE,
+            ChatLine(Box(131f, 526f, 170f, 546f), "图片") to GRAY,
+            ChatLine(Box(70f, 556f, 110f, 576f), "还好") to WHITE,
+        )
+        lines.forEach { (l, c) -> px.strokes(l.box, c) }
+        val found = Names.find(zonesOf(lines.map { it.first }), emptyList()) { TextInk.chroma(it, px) }
+        assertThat(found.map { it.text }).containsExactly("Lost in the long night 夜猫子", "Nova d' Lune", "七月 (某某小区业主委员会主任)")
+    }
+
+    /** 消息中间的彩色链接（不是一段的开头）照常按名字的长度认，长的不算名字。 */
+    @Test fun `a colored link inside a message is not a name`() {
+        val px = Pixels(540, 1170, IntArray(540 * 1170) { DARK })
+        val lines = listOf(
+            ChatLine(Box(70f, 300f, 130f, 320f), "Maple") to PINK,
+            ChatLine(Box(70f, 326f, 160f, 346f), "看看这个") to WHITE,
+            ChatLine(Box(70f, 352f, 330f, 372f), "Download the release notes here") to BLUE,
+            ChatLine(Box(70f, 378f, 200f, 398f), "明天之前看完") to WHITE,
+        )
+        lines.forEach { (l, c) -> px.strokes(l.box, c) }
+        val found = Names.find(zonesOf(lines.map { it.first }), emptyList()) { TextInk.chroma(it, px) }
+        assertThat(found.map { it.text }).containsExactly("Maple")
+    }
+
+    /** 微信消息下面的引用「方小禾：[图片]」只遮冒号前的名字；同样带冒号的消息、标签、时间、网址不算。 */
+    @Test fun `the name in a WeChat quote is boxed alone`() {
+        val lines = listOf(
+            ChatLine(Box(85f, 300f, 240f, 319f), "周末一起去爬山吗"),
+            ChatLine(Box(85f, 380f, 300f, 399f), "好久不见，你一点没变"),
+            ChatLine(Box(80f, 420f, 140f, 435f), "方小禾："),
+            ChatLine(Box(230f, 520f, 365f, 539f), "这张照片你还留着啊"),
+            ChatLine(Box(260f, 560f, 380f, 575f), "方小禾：今晚加班吗"),
+            ChatLine(Box(85f, 620f, 330f, 639f), "地址：长江路88号阳光新村"),
+            ChatLine(Box(85f, 660f, 200f, 675f), "备注：明天带伞"),
+            ChatLine(Box(85f, 700f, 150f, 715f), "今天 09:12"),
+            ChatLine(Box(85f, 740f, 260f, 755f), "https://example.com/a"),
+        )
+        val found = Names.find(zonesOf(lines), emptyList())
+        assertThat(found.map { it.text }).containsExactly("方小禾", "方小禾")
+        found.forEach { n ->
+            val line = lines.first { it.box.top == n.box.top }
+            assertThat(n.box.width).isLessThan(line.box.width * 0.8f)
+        }
+    }
+
+    /**
+     * 微信群里发图片的人：名字下面是一张截图，OCR 读出截图上一行小字，不是消息。名字顶边和头像顶边对齐，照样认。
+     * 名字和气泡左缘对齐、气泡里的字缩进屏宽 3.7% 的也认。
+     */
+    @Test fun `a WeChat name above a picture or an indented bubble is found`() {
+        val typical = listOf(
+            ChatLine(Box(85f, 600f, 180f, 619f), "好的没问题"),
+            ChatLine(Box(85f, 700f, 140f, 719f), "我也去"),
+            ChatLine(Box(85f, 800f, 240f, 819f), "周六来我家吃饭吧"),
+        )
+        val picture = listOf(ChatLine(Box(78f, 300f, 120f, 313f), "方小禾"), ChatLine(Box(90f, 330f, 160f, 334f), "相册截图(123/456)")) + typical
+        assertThat(Names.find(zonesOf(picture), listOf(Box(14f, 300f, 62f, 348f))).map { it.text }).containsExactly("方小禾")
+        val indented = listOf(ChatLine(Box(78f, 300f, 120f, 313f), "程一舟"), ChatLine(Box(98f, 330f, 300f, 349f), "好久不见你一点没变")) + typical
+        assertThat(Names.find(zonesOf(indented), emptyList()).map { it.text }).containsExactly("程一舟")
+    }
+
     private fun zonesOf(lines: List<ChatLine>): Zones = Zones.of(lines, 540f, 1170f)
 
+    private fun rgb(r: Int, g: Int, b: Int) = (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
+
+    private fun canvas(w: Int, h: Int, color: (Int, Int) -> Int) = Pixels(w, h, IntArray(w * h) { color(it % w, it / w) })
+
     /** 一张纯色图，再一块块涂上颜色。 */
-    private fun paint(w: Int, h: Int, background: Int, vararg blocks: Pair<Box, Int>): Pixels {
-        val argb = IntArray(w * h) { background }
-        blocks.forEach { (b, color) ->
-            for (y in b.top.toInt() until b.bottom.toInt()) for (x in b.left.toInt() until b.right.toInt()) argb[y * w + x] = color
-        }
-        return Pixels(w, h, argb)
+    private fun paint(w: Int, h: Int, background: Int, vararg blocks: Pair<Box, Int>): Pixels =
+        canvas(w, h) { _, _ -> background }.also { px -> blocks.forEach { (b, color) -> px.fill(b, color) } }
+
+    private fun Pixels.fill(b: Box, color: Int) {
+        for (y in b.top.toInt() until b.bottom.toInt()) for (x in b.left.toInt() until b.right.toInt()) argb[y * width + x] = color
     }
+
+    /** [b] 里内切的实心圆。 */
+    private fun Pixels.disc(b: Box, color: Int) {
+        val r = b.width / 2f
+        for (y in b.top.toInt() until b.bottom.toInt()) for (x in b.left.toInt() until b.right.toInt()) {
+            val dx = x + 0.5f - b.centerX
+            val dy = y + 0.5f - b.centerY
+            if (dx * dx + dy * dy <= r * r) argb[y * width + x] = color
+        }
+    }
+
+    /** 字的笔画：框里隔行的横条，框边上留着底色。 */
+    private fun Pixels.strokes(b: Box, color: Int) {
+        for (y in b.top.toInt() + 2 until b.bottom.toInt() - 2 step 2) for (x in b.left.toInt() + 2 until b.right.toInt() - 2) argb[y * width + x] = color
+    }
+
+    private val AVATAR_COLORS = listOf(0xFFE5533D, 0xFF3D7BE5, 0xFF8E44AD, 0xFFF0A030).map { it.toInt() }
+    private val DARK = 0xFF1E2A36.toInt()
+    private val PINK = 0xFFE87A9A.toInt()
+    private val BLUE = 0xFF5FB0F0.toInt()
+    private val PURPLE = 0xFFA77BE0.toInt()
+    private val WHITE = 0xFFF0F0F0.toInt()
+    private val GRAY = 0xFF8E8E93.toInt()
 }
