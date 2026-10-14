@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Gesture
@@ -71,8 +70,6 @@ data class StyleBarModel(
     val panelOpen: Boolean = false,
     /** 吸管正在等着取色的那一项。 */
     val colorPick: ColorTarget? = null,
-    /** 「应用到全部」会改动的已打码块数。0 时按钮不可点。 */
-    val applicable: Int = 0,
     /** 这张图上取到的近似色，最多三种：面板上「近似色」那一颗、开着近似色时色块的小样子都画它们（见 [nearColorsOf]）。 */
     val nearColors: List<Int> = emptyList(),
 )
@@ -85,7 +82,6 @@ interface StyleBarActions {
     fun onLookChange(look: MaskLook, inProgress: Boolean) {}
     fun onLookChangeFinished() {}
     fun onReset() {}
-    fun onApplyToAll() {}
     fun onCollapse() {}
 
     /** 开吸管（[target] 非 null）或收起吸管（null）。 */
@@ -266,23 +262,15 @@ private fun PanelHeader(model: StyleBarModel, actions: StyleBarActions, title: S
     }
 }
 
-/** 面板的主体：当前样式能调的，底下是「恢复默认」和「应用到全部」。 */
+/** 面板的主体：当前样式能调的，底下是「恢复默认」。 */
 @Composable
 private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions) {
     val look = model.look
     Column(Modifier.padding(end = 12.dp)) {
         StyleControls(look, model.colorPick, model.nearColors, actions)
     }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = actions::onReset, enabled = !look.options.isDefaultFor(look.style)) {
-            Text(stringResource(R.string.reset_defaults))
-        }
-        Spacer(Modifier.weight(1f))
-        TextButton(onClick = actions::onApplyToAll, enabled = model.applicable > 0) {
-            Icon(Icons.Filled.DoneAll, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (model.applicable > 0) stringResource(R.string.apply_to_all_n, model.applicable) else stringResource(R.string.apply_to_all))
-        }
+    TextButton(onClick = actions::onReset, enabled = !look.options.isDefaultFor(look.style)) {
+        Text(stringResource(R.string.reset_defaults))
     }
 }
 

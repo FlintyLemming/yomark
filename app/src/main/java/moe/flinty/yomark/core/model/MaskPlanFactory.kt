@@ -7,7 +7,7 @@ package moe.flinty.yomark.core.model
  * true → MASKED（已打码），false → OUTLINED（圈出未打码）。
  * 未被任何候选覆盖的区域根本不进 plan，所以 MaskState 只有两个值。
  *
- * [look] 是结果到达那一刻编辑器的画笔：识别期间换了样式，打上的码就是新样式。
+ * [look] 是结果到达那一刻编辑器「打码」里的样式：识别期间在「打码」里换了样式，打上的码就是新样式。
  */
 object MaskPlanFactory {
     fun itemsFrom(candidates: List<Candidate>, look: MaskLook = MaskLook()): List<MaskItem> = candidates.map { c ->

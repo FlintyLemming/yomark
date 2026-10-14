@@ -34,7 +34,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  *
  * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。
  * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
- * 编辑器的画笔（下一次打码用的样式）存样式的枚举名加各样式的参数；每块码自己的样式只活在 MaskPlan 里。
+ * 编辑器里「打码」上次选的样式存枚举名，画笔里各样式（连马克笔、画笔）的参数逐项存；每块码自己的样式只活在 MaskPlan 里。
  */
 class SettingsStore internal constructor(
     private val store: DataStore<Preferences>,
@@ -44,12 +44,17 @@ class SettingsStore internal constructor(
 
     constructor(context: Context) : this(context.applicationContext.settingsDataStore)
 
+    /**
+     * 「打码」里上次选的样式：识别出来直接打码的用它，下次打开编辑器时画笔也是它。
+     * 只会是色块、马赛克、模糊之一：之前的版本记的是画笔停在哪一种，读回来是马克笔、画笔的按色块算——
+     * 打码的样式只从「打码」里来。
+     */
     val lastStyle: Flow<MaskStyle> = store.data.map { prefs ->
         val raw = prefs[KEY_STYLE] ?: return@map MaskStyle.SOLID
         // 枚举名是持久化格式的一部分：删掉或改名一个样式后，旧安装里的值会读不回来。
         // 读不回来就退回 SOLID，而不是崩在启动路径上。抹除并进色块（近似色）后，旧安装里的抹除也走这一条，
         // 近似色由 maskOptions 接上；去掉的表情也走这一条
-        runCatching { MaskStyle.valueOf(raw) }.getOrDefault(MaskStyle.SOLID)
+        runCatching { MaskStyle.valueOf(raw) }.getOrNull()?.takeIf { it.redacts } ?: MaskStyle.SOLID
     }
 
     suspend fun setLastStyle(style: MaskStyle) {
