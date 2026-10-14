@@ -7,7 +7,8 @@
             kind = avatar（头像，role=other/self/header）| name（发言者昵称，role=above/inbubble/system）| title（聊天标题）
 用法：python3 make_chat_samples.py [输出目录]，默认脚本旁边的 out-chat/。
       python3 make_chat_samples.py --fixtures app/src/test/resources/chat
-          另外挑出一份缩到 540 宽的子集给 app 的单测（ChatLayoutTest）：手机截图进识别引擎时就是缩到这个宽度。
+          另外挑出一份缩到 540 宽的子集给 app 的单测（ChatLayoutTest）：存小图省地方，版面规则按屏宽的比例量，图大图小一样认。
+          微信长截图再存一张原尺寸的到旁边的 chat-native/（ChatDetectorTest 拿真 OCR 按原图读，截图进识别引擎时不缩）。
 """
 import json, math, os, random, sys
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
@@ -543,14 +544,20 @@ def main():
 
 
 def export_fixtures(dst):
-    """每种皮肤 × 深浅色 × 单聊群聊各取一张（各组的第一张，原尺寸、PNG），加上 Discord、长截图和非聊天页，缩到 540 宽。"""
+    """每种皮肤 × 深浅色 × 单聊群聊各取一张（各组的第一张，原尺寸、PNG），加上 Discord、长截图和非聊天页，缩到 540 宽。
+    微信长截图另存一张原尺寸的到 dst 旁边的 chat-native/。"""
     os.makedirs(dst, exist_ok=True)
+    native = os.path.join(os.path.dirname(os.path.abspath(dst)), "chat-native")
     seen = set()
     for name, img, t in SAVED:
         key = (t["app"], t["theme"], t["group"], t.get("long"))
         if key in seen:
             continue
         seen.add(key)
+        if t.get("long") and t["app"] == "wechat":
+            os.makedirs(native, exist_ok=True)
+            _save(native, name, img, json.loads(json.dumps(t)))
+            os.remove(os.path.join(native, name + ".json"))
         k = 540 / img.width
         small = img.resize((540, round(img.height * k)), Image.LANCZOS)
         for b in t["boxes"]:

@@ -96,6 +96,12 @@ object BarcodeHits {
         }
     }
 
+    /**
+     * 整张扫的那一遍看不到原分辨率：识别图缩过（[scale] < 1），或者 ML Kit 自己还要缩（长边超过 [TILE]，按原图识别的截图）。
+     * 这时回原图分块再扫。
+     */
+    fun needsTiles(scale: Float, width: Int, height: Int): Boolean = scale < 1f || max(width, height) > TILE
+
     /** 原图长边超过 [MAX_TILED_EDGE] 的，先按 2 的幂降采样再分块：50MP 的照片也只切 6 块。 */
     fun sampleSize(longEdge: Int): Int {
         var s = 1

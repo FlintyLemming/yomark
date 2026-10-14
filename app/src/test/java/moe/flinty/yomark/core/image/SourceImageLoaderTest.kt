@@ -63,6 +63,65 @@ class SourceImageLoaderTest {
         assertThat(img.originalHeight).isEqualTo(2400)
     }
 
+    /** 截图、长截图按原图识别：按长边缩，1080 宽的截图缩到 540、长截图缩到 270，聊天里的小字和头像就认不出了。 */
+    @Test
+    fun `screenshots keep their full width`() {
+        fun sample(w: Int, h: Int) = SourceImageLoader.sampleSizeForAnalysis(w, h)
+        assertThat(sample(1080, 1920)).isEqualTo(1)
+        assertThat(sample(1080, 2400)).isEqualTo(1)
+        assertThat(sample(1170, 2532)).isEqualTo(1)
+        assertThat(sample(1440, 3200)).isEqualTo(1)
+        assertThat(sample(1080, 5148)).isEqualTo(1)
+        assertThat(sample(720, 5000)).isEqualTo(1)
+        assertThat(sample(2400, 1080)).isEqualTo(1)                // 横着存的截图（EXIF 转正之前）一样
+        assertThat(sample(1812, 2176)).isEqualTo(1)                // 折叠屏内屏
+        assertThat(sample(2048, 2732)).isEqualTo(1)                // iPad
+    }
+
+    /** 再长的长截图：长边不过 8192、像素不过一条 1080×8192，超了就缩一半，还是比按长边缩到 2048 清楚得多。 */
+    @Test
+    fun `very long screenshots are halved, not squeezed to 2048`() {
+        fun sample(w: Int, h: Int) = SourceImageLoader.sampleSizeForAnalysis(w, h)
+        assertThat(sample(1080, 8192)).isEqualTo(1)
+        assertThat(sample(1080, 10000)).isEqualTo(2)
+        assertThat(sample(1440, 6000)).isEqualTo(1)
+        assertThat(sample(1440, 8000)).isEqualTo(2)
+        assertThat(sample(1080, 20000)).isEqualTo(4)
+    }
+
+    /** 照片（短边 2160 以上）照旧按长边缩到 2048 以内。 */
+    @Test
+    fun `photos are still downsampled by their long edge`() {
+        fun sample(w: Int, h: Int) = SourceImageLoader.sampleSizeForAnalysis(w, h)
+        assertThat(sample(4000, 3000)).isEqualTo(2)
+        assertThat(sample(3000, 4000)).isEqualTo(2)
+        assertThat(sample(4032, 3024)).isEqualTo(2)
+        assertThat(sample(4032, 2268)).isEqualTo(2)
+        assertThat(sample(3840, 2160)).isEqualTo(2)
+        assertThat(sample(4624, 3472)).isEqualTo(4)
+        assertThat(sample(6000, 4000)).isEqualTo(4)
+        assertThat(sample(8160, 6120)).isEqualTo(4)
+        assertThat(sample(800, 600)).isEqualTo(1)
+    }
+
+    /** 截图按原图识别，像素再多也不会缩得比照片的缩法还小。 */
+    @Test
+    fun `a screenshot is never shrunk more than a photo of its size`() {
+        for (w in 320..2159 step 37) for (h in w..30000 step 211) {
+            val photo = SourceImageLoader.sampleSizeForEdge(h, SourceImageLoader.ANALYSIS_MAX_EDGE)
+            assertThat(SourceImageLoader.sampleSizeForAnalysis(w, h)).isAtMost(photo)
+        }
+    }
+
+    @Test
+    fun `a long screenshot is analysed at full size`() = runTest {
+        val f = writeJpeg("long.jpg", 1080, 5148)
+        val img = SourceImageLoader.loadForAnalysis(f, "image/jpeg")
+        assertThat(img.bitmap.width).isEqualTo(1080)
+        assertThat(img.bitmap.height).isEqualTo(5148)
+        assertThat(img.scale).isWithin(1e-4f).of(1f)
+    }
+
     @Test
     fun `rotate 90 exif swaps width and height`() = runTest {
         val f = writeJpeg("rot.jpg", 400, 200, ExifInterface.ORIENTATION_ROTATE_90)
