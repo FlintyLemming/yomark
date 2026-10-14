@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
@@ -14,6 +15,7 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -82,15 +84,27 @@ class EditorToolbarTest {
         listOf("色块", "马克笔", "水印").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
     }
 
-    /** 马克笔盖不住：用着它的时候亮的是「编辑」，不是「打码」。 */
-    @Test fun theGroupHoldingTheBrushIsTheSelectedOne() {
+    /**
+     * 两组都只是按钮，没有选中态（选中的胶囊看着像「已经在这儿了」，点了也没用）。
+     * 画笔在哪一组，那一组就说出在用的样式：马克笔盖不住，用着它的时候说话的是「编辑」。
+     */
+    @Test fun theGroupHoldingTheBrushSaysWhatItIsUsing() {
         look = MaskLook(MaskStyle.PIXELATE)
         show()
-        compose.onNodeWithText("打码").assertIsSelected()
-        compose.onNodeWithText("编辑").assertIsNotSelected()
+        listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected)) }
+        compose.onNodeWithText("打码").assert(stateIs("马赛克"))
+        compose.onNodeWithText("编辑").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
         look = MaskLook(MaskStyle.MARKER)
-        compose.onNodeWithText("打码").assertIsNotSelected()
-        compose.onNodeWithText("编辑").assertIsSelected()
+        compose.onNodeWithText("打码").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+        compose.onNodeWithText("编辑").assert(stateIs("马克笔"))
+    }
+
+    /** 点一组是展开，点开着的那一组是收起：读屏照着念。 */
+    @Test fun aGroupSaysTappingUnfoldsIt() {
+        show()
+        compose.onNodeWithText("打码").assert(clickLabelIs("展开"))
+        compose.onNodeWithText("打码").performClick()
+        compose.onNodeWithText("打码").assert(clickLabelIs("收起"))
     }
 
     @Test fun redactUnfoldsTheStylesThatCoverAndHidesTheRest() {
@@ -169,8 +183,14 @@ class EditorToolbarTest {
         compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
     }
 
+    private fun stateIs(text: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text)
+
+    private fun clickLabelIs(text: String) = SemanticsMatcher("点击说的是「$text」") {
+        it.config.getOrNull(SemanticsActions.OnClick)?.label == text
+    }
+
     @Test fun theWatermarkSaysWhenItIsOn() {
         show(purposeOn = true, initial = ToolGroup.EDIT)
-        compose.onNodeWithText("水印").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已开启"))
+        compose.onNodeWithText("水印").assert(stateIs("已开启"))
     }
 }

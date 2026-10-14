@@ -15,11 +15,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
@@ -46,13 +48,13 @@ import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import moe.flinty.yomark.R
+import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskSafety
 import moe.flinty.yomark.render.MaskStyleInfo
@@ -82,7 +84,7 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 另一组、AI、导出让开。点返回（或系统返回键，见 EditorScreen）收回来。
  *
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种弹出调节面板（StyleSheet）。
- * 收着时，画笔所在的那一组垫着选中的胶囊：马克笔盖不住，用着它的时候亮的是「编辑」，看得出来。
+ * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
@@ -121,7 +123,8 @@ fun EditorToolbar(
                 if (collapsedRow || (expandedRow && group == shown)) {
                     GroupButton(
                         group = group,
-                        active = group == active,
+                        inUse = styleBar.look.takeIf { group == active },
+                        nearColors = styleBar.nearColors,
                         isOpen = group == open,
                         morph = { if (group == shown) progress.value else 0f },
                         // 收回去的半路上不接着点开：等这一行停稳
@@ -261,15 +264,21 @@ private fun StyleItem(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
 // ---------- 按钮 ----------
 
 /**
- * 收着时的一组：上面是这一组的样子，下面是名字；画笔在这一组时垫着选中的胶囊。
- * 展开后它就是返回：样子换成返回箭头，胶囊褪掉，名字留着，看得出现在在哪一组里。
+ * 收着时的一组：上面是这一组眼下的样子，下面是名字，名字后面一个小箭头，说明点开里面还有东西。
+ * 画笔在这一组时，样子就是画笔的样子（色块是当前的颜色，和图上的码一个颜色）；不在时是这一组自己的图标——
+ * 用着马克笔时「编辑」换成马克笔的样子，看得出现在点框是在标记、不是在打码。
+ * 不垫选中的胶囊：那是导航栏「已经在这儿了」的样子，看着像点了也没用。
  *
+ * 展开后它就是返回：样子换成返回箭头，小箭头褪掉，名字留着，看得出现在在哪一组里。
+ *
+ * @param inUse 画笔在这一组时它的样子；不在时为 null，画这一组自己的图标
  * @param morph 变成返回走到哪儿了，0～1。只在绘制时读
  */
 @Composable
 private fun GroupButton(
     group: ToolGroup,
-    active: Boolean,
+    inUse: MaskLook?,
+    nearColors: List<Int>,
     isOpen: Boolean,
     morph: () -> Float,
     enabled: Boolean,
@@ -277,27 +286,26 @@ private fun GroupButton(
     modifier: Modifier = Modifier,
 ) {
     val colors = MaterialTheme.colorScheme
+    val inUseName = inUse?.let { stringResource(MaskStyleInfo.label(it.style)) }
     Column(
         modifier
             .clip(RoundedCornerShape(16.dp))
-            .semantics { if (!isOpen) selected = active }
-            .clickable(enabled = enabled, role = Role.Button, onClick = onClick)
+            .semantics { if (!isOpen && inUseName != null) stateDescription = inUseName }
+            .clickable(
+                enabled = enabled,
+                role = Role.Button,
+                onClickLabel = stringResource(if (isOpen) R.string.tool_group_collapse else R.string.tool_group_expand),
+                onClick = onClick,
+            )
             .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(Modifier.size(PILL_WIDTH, PILL_HEIGHT), contentAlignment = Alignment.Center) {
-            if (active) {
-                Box(
-                    Modifier
-                        .matchParentSize()
-                        .graphicsLayer { alpha = 1f - span(morph(), 0f, FADE_OUT) }
-                        .background(colors.secondaryContainer, CircleShape),
-                )
-            }
             Box(Modifier.graphicsLayer { alpha = 1f - span(morph(), 0f, FADE_OUT) }) {
-                when (group) {
-                    ToolGroup.REDACT -> MosaicGlyph(colors.onSurfaceVariant, 18.dp)
-                    ToolGroup.EDIT -> Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = colors.onSurfaceVariant)
+                when {
+                    inUse != null -> StyleGlyph(inUse.style, inUse.options, nearColors)
+                    group == ToolGroup.REDACT -> MosaicGlyph(colors.onSurfaceVariant, 18.dp)
+                    else -> Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = colors.onSurfaceVariant)
                 }
             }
             Icon(
@@ -315,12 +323,24 @@ private fun GroupButton(
             )
         }
         Spacer(Modifier.height(4.dp))
-        Text(
-            stringResource(group.label),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (active || isOpen) colors.onSurface else colors.onSurfaceVariant,
-            maxLines = 1,
-        )
+        // 小箭头挂在名字右边，左边空出一样宽，名字还在图标正下方；展开后箭头褪掉，名字不挪
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Spacer(Modifier.width(CHEVRON))
+            Text(
+                stringResource(group.label),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (isOpen) colors.onSurface else colors.onSurfaceVariant,
+                maxLines = 1,
+            )
+            Icon(
+                Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(CHEVRON)
+                    .graphicsLayer { alpha = 1f - span(morph(), 0f, FADE_OUT) },
+                tint = colors.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -454,4 +474,7 @@ private val ROW_MIN_HEIGHT = 64.dp
 private val PILL_WIDTH = 52.dp
 private val PILL_HEIGHT = 32.dp
 private val GLYPH_ICON = 20.dp
+
+/** 组名后面的小箭头。 */
+private val CHEVRON = 14.dp
 private const val DISABLED_ALPHA = 0.38f
