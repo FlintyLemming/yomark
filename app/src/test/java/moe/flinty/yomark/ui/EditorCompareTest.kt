@@ -48,7 +48,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 「按住对比」（手机竖着拿时在底栏那一行里）：按住时画布只剩打码前的原图（打码块、圈出框都不画），松手回到打码后。
+ * 「按住对比」（手机竖着拿时是底栏胶囊旁边的圆钮）：按住时画布只剩打码前的原图（打码块、圈出框都不画），松手回到打码后。
  * 什么都还没打码时没有可比的，按钮灰掉。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -140,7 +140,7 @@ class EditorCompareTest {
         return pixels.count { it == color }
     }
 
-    private val compareButton get() = compose.onNodeWithText("按住对比")
+    private val compareButton get() = compose.onNodeWithContentDescription("按住对比")
 
     @Test fun `holding compare shows the image before masking, letting go brings the masks back`() {
         open(MaskPlan(listOf(phone, url)))

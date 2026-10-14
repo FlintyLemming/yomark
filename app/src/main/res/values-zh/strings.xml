@@ -39,6 +39,9 @@
     <string name="ai_review_none">没有新发现</string>
     <string name="ai_review_found">新发现 %1$d 处</string>
     <string name="ai_review_failed">识别失败，重试</string>
+    <string name="ai_review_result_found">AI 新发现 %1$d 处</string>
+    <string name="ai_review_result_none">AI 没有新发现</string>
+    <string name="ai_review_result_failed">AI 增强识别失败</string>
     <string name="analyzing">识别中…</string>
     <string name="original">原图</string>
     <string name="eyedropper_hint">点一下图片，取那里的颜色</string>

@@ -57,6 +57,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import java.io.File
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.performSemanticsAction
 
@@ -148,7 +149,7 @@ class EditorScreenLayoutTest {
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `a phone has one row of tools, export up top, and no list`() {
         open()
-        val compare = compose.onNodeWithText("按住对比").getUnclippedBoundsInRoot()
+        val compare = compose.onNodeWithContentDescription("按住对比").getUnclippedBoundsInRoot()
         for (label in listOf("打码", "编辑")) {
             val group = compose.onNodeWithText(label).getUnclippedBoundsInRoot()
             assertThat(group.top).isLessThan(compare.bottom)
@@ -160,7 +161,7 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
     }
 
-    /** 点一组，它滑到最左边变成返回，工具就地展开，对比让开；系统返回先把它收回去，不退出编辑器。 */
+    /** 点一组，胶囊撑满、最左边只留返回箭头，工具就地展开，对比让开；系统返回先把它收回去，不退出编辑器。 */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone a group unfolds in place and back folds it`() {
         open()
@@ -168,13 +169,16 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("打码").performClick()
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("马赛克").assertIsDisplayed()
-        compose.onNodeWithText("按住对比").assertDoesNotExist()
+        compose.onNodeWithContentDescription("按住对比").assertDoesNotExist()
         compose.onNodeWithText("导出").assertIsDisplayed()     // 在右上角，展开时也在
-        assertThat(compose.onNodeWithText("打码").getUnclippedBoundsInRoot().left).isLessThan(bar.left)
+        compose.onNodeWithText("打码").assertDoesNotExist()
+        // 顶栏左上角也有一个「返回」：底栏这一个点了是收起
+        val foldBack = compose.onNode(SemanticsMatcher("点了是收起") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "收起" })
+        assertThat(foldBack.getUnclippedBoundsInRoot().left).isLessThan(bar.left)
         compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("马赛克").assertDoesNotExist()
-        compose.onNodeWithText("按住对比").assertIsDisplayed()
+        compose.onNodeWithContentDescription("按住对比").assertIsDisplayed()
         assertThat(compose.onNodeWithText("打码").getUnclippedBoundsInRoot()).isEqualTo(bar)
         assertThat(compose.activity.isFinishing).isFalse()
     }

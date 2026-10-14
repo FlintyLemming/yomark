@@ -39,6 +39,9 @@
     <string name="ai_review_none">Nothing new</string>
     <string name="ai_review_found">%1$d new</string>
     <string name="ai_review_failed">Failed, retry</string>
+    <string name="ai_review_result_found">AI found %1$d more</string>
+    <string name="ai_review_result_none">AI found nothing new</string>
+    <string name="ai_review_result_failed">AI review failed</string>
     <string name="analyzing">Analyzing…</string>
     <string name="original">Original</string>
     <string name="eyedropper_hint">Tap the image to pick a color</string>

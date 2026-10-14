@@ -19,10 +19,18 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.width
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
@@ -37,7 +45,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 手机底栏的工具那一行：收着时「打码」「编辑」两组、AI、按住对比，点一组展开它的工具，那一组变成返回。
+ * 手机底栏的工具那一行：收着时胶囊里「打码」「编辑」两组，旁边 AI、按住对比两颗圆钮；点一组胶囊撑满这一行，
+ * 那一组变成返回，圆钮让开。圆钮上没有字，按读屏念的那一句找。
  * 换样式、弹面板由 ViewModel 管（见 EditorViewModelTest），这里只看这一行发出什么。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -90,8 +99,44 @@ class EditorToolbarTest {
 
     @Test fun collapsedItShowsTheTwoGroupsAndCompare() {
         show()
-        listOf("打码", "编辑", "按住对比").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        compareButton.assertIsDisplayed()
         listOf("色块", "马克笔", "水印").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+    }
+
+    /** 收着时整组居中，圆钮在胶囊右边；展开后胶囊撑满，返回挪到最左边。 */
+    @Test fun theRowFloatsInTheMiddleAndOpensToTheFullWidth() {
+        ai = AiReview.Ready
+        show()
+        val width = compose.onRoot().getUnclippedBoundsInRoot().right
+        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
+        val edit = compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()
+        val sparkle = compose.onNodeWithContentDescription("AI 增强识别").getUnclippedBoundsInRoot()
+        val cmp = compareButton.getUnclippedBoundsInRoot()
+        assertThat(sparkle.left).isGreaterThan(edit.right)
+        assertThat(cmp.left).isGreaterThan(sparkle.right)
+        // 胶囊两头里面各留 8 dp
+        assertThat((redact.left - 8.dp - (width - cmp.right)).value).isWithin(1f).of(0f)
+
+        compose.onNodeWithText("打码").performClick()
+        // 左边只剩一颗返回箭头，按下去的水波碰不到它右边的分隔线和工具
+        val back = backButton.getUnclippedBoundsInRoot()
+        assertThat(back.left.value).isWithin(1f).of(20f)
+        assertThat(back.width.value).isWithin(1f).of(48f)
+        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().left).isGreaterThan(back.right)
+        assertThat(compose.onNodeWithText("模糊").getUnclippedBoundsInRoot().right).isGreaterThan(width - 40.dp)
+    }
+
+    /** 窄屏上字调大了：先去掉小箭头，名字不截断。 */
+    @Config(qualifiers = "en-rUS-w360dp-h740dp-xxhdpi", fontScale = 1.5f)
+    @Test fun onANarrowScreenTheNamesStayWhole() {
+        ai = AiReview.Ready
+        show()
+        listOf("Redact", "Edit").forEach { name ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+        }
     }
 
     /**
@@ -109,12 +154,12 @@ class EditorToolbarTest {
         compose.onNodeWithText("编辑").assert(stateIs("马克笔"))
     }
 
-    /** 点一组是展开，点开着的那一组是收起：读屏照着念。 */
+    /** 点一组是展开，点返回箭头是收起：读屏照着念。 */
     @Test fun aGroupSaysTappingUnfoldsIt() {
         show()
         compose.onNodeWithText("打码").assert(clickLabelIs("展开"))
         compose.onNodeWithText("打码").performClick()
-        compose.onNodeWithText("打码").assert(clickLabelIs("收起"))
+        backButton.assert(clickLabelIs("收起"))
     }
 
     @Test fun redactUnfoldsTheStylesThatCoverAndHidesTheRest() {
@@ -123,7 +168,10 @@ class EditorToolbarTest {
         assertThat(opened).containsExactly(ToolGroup.REDACT)
         listOf("色块", "马赛克", "模糊").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         compose.onNodeWithText("色块").assertIsSelected()
-        listOf("马克笔", "编辑", "按住对比").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        // 两组都让开了，「打码」两个字也不留，左边只有返回箭头
+        listOf("马克笔", "编辑", "打码").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        backButton.assertIsDisplayed()
+        compareButton.assertDoesNotExist()
         compose.onNodeWithText("抹除").assertDoesNotExist()      // 并进了色块，是色块的近似色
     }
 
@@ -135,14 +183,18 @@ class EditorToolbarTest {
         assertThat(opened).isEmpty()
     }
 
-    /** 展开后那一组就是返回：点它收回去，两组和右边的按钮回来。 */
-    @Test fun theOpenGroupIsTheWayBack() {
+    /** 点返回箭头收回去，两组和右边的圆钮回来。 */
+    @Test fun theArrowIsTheWayBack() {
         show(initial = ToolGroup.REDACT)
-        compose.onNodeWithText("打码").performClick()
+        backButton.performClick()
         assertThat(opened).containsExactly(null)
         compose.onNodeWithText("色块").assertDoesNotExist()
-        listOf("编辑", "按住对比").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        backButton.assertDoesNotExist()
+        listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        compareButton.assertIsDisplayed()
     }
+
+    private val backButton get() = compose.onNodeWithContentDescription("返回")
 
     /** 编辑：马克笔、画笔（还没做，点不动）、水印（点开用途水印）。 */
     @Test fun editHoldsTheMarkerThePenAndTheWatermark() {
@@ -158,39 +210,39 @@ class EditorToolbarTest {
         assertThat(purposeClicks).isEqualTo(1)
     }
 
-    // ---------- AI 增强识别：和两组并排 ----------
+    // ---------- AI 增强识别：胶囊旁边一颗圆钮 ----------
 
     @Test fun aiReviewSitsBesideTheGroupsAndRunsOnClick() {
         ai = AiReview.Ready
         show()
-        compose.onNodeWithText("AI 增强识别").assertIsEnabled().performClick()
+        compose.onNodeWithContentDescription("AI 增强识别").assertIsEnabled().performClick()
         assertThat(aiClicks).isEqualTo(1)
     }
 
     @Test fun aiReviewIsNotOfferedWhereItCannotRun() {
         show()
-        compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
-        compose.onNodeWithText("按住对比").assertIsDisplayed()
+        compose.onNodeWithContentDescription("AI 增强识别").assertDoesNotExist()
+        compareButton.assertIsDisplayed()
     }
 
-    /** 跑着、跑完了都点不动，结果写在字上；没跑成是另一句话，还能点。 */
+    /** 跑着、跑完了都点不动；圆钮上写不下字，读屏念的是结果，新发现几处是角标上的数。没跑成是另一句话，还能点。 */
     @Test fun aiReviewShowsItsProgressAndResultInPlace() {
         ai = AiReview.Running
         show()
-        compose.onNodeWithText("增强识别中…").assertIsNotEnabled()
+        compose.onNodeWithContentDescription("增强识别中…").assertIsNotEnabled()
         ai = AiReview.Done(found = 3)
-        compose.onNodeWithText("新发现 3 处").assertIsDisplayed().assertIsNotEnabled()
+        compose.onNodeWithContentDescription("新发现 3 处").assertIsDisplayed().assertIsNotEnabled().assert(hasText("3"))
         ai = AiReview.Done(found = 0)
-        compose.onNodeWithText("没有新发现").assertIsDisplayed()
+        compose.onNodeWithContentDescription("没有新发现").assertIsDisplayed().assert(!hasText("0"))
         ai = AiReview.Failed
-        compose.onNodeWithText("识别失败，重试").assertIsEnabled().performClick()
+        compose.onNodeWithContentDescription("识别失败，重试").assertIsEnabled().performClick()
         assertThat(aiClicks).isEqualTo(1)
     }
 
     @Test fun aiReviewStepsAsideWhileAGroupIsOpen() {
         ai = AiReview.Ready
         show(initial = ToolGroup.EDIT)
-        compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
+        compose.onNodeWithContentDescription("AI 增强识别").assertDoesNotExist()
     }
 
     private fun stateIs(text: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text)
@@ -201,21 +253,36 @@ class EditorToolbarTest {
 
     // ---------- 按住对比 ----------
 
-    /** 按下去就是在比，松手就回来；点一下没有别的动作。 */
+    private val compareButton get() = compose.onNodeWithContentDescription("按住对比")
+
+    /** 按下去就是在比，一直按着也是，松手就回来；按住的时候不弹提示。 */
     @Test fun holdingComparePressesUntilLetGo() {
         show()
-        compose.onNodeWithText("按住对比").performTouchInput { down(center) }
-        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compareButton.performTouchInput { down(center) }
+        compose.mainClock.advanceTimeBy(1_000)
         assertThat(compareEvents.last()).isInstanceOf(PressInteraction.Press::class.java)
-        compose.onNodeWithText("按住对比").performTouchInput { up() }
-        compose.waitForIdle()
+        compareButton.performTouchInput { up() }
+        compose.mainClock.advanceTimeBy(100)
         assertThat(compareEvents.last()).isInstanceOf(PressInteraction.Release::class.java)
+        compose.onNodeWithText("按住对比原图").assertDoesNotExist()
+    }
+
+    /** 圆钮上写不下「按住」：点一下没比上，就弹个提示说要按住，过一会儿自己收起。 */
+    @Test fun tappingCompareSaysToHoldIt() {
+        show()
+        compose.mainClock.autoAdvance = false
+        compareButton.performClick()
+        compose.mainClock.advanceTimeBy(300)
+        compose.onNodeWithText("按住对比原图").assertIsDisplayed()
+        compose.mainClock.advanceTimeBy(3_000)
+        compose.onNodeWithText("按住对比原图").assertDoesNotExist()
     }
 
     @Test fun nothingToCompareGraysItOut() {
         canCompare = false
         show()
-        compose.onNodeWithText("按住对比").assertIsNotEnabled()
+        compareButton.assertIsNotEnabled()
     }
 
     @Test fun theWatermarkSaysWhenItIsOn() {

@@ -25,7 +25,7 @@ sealed interface EditorMessage {
  *
  * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
  * 还会在画面上冒出一批不打码的框。现在是用户点了才跑。
- * 跑的结果就写在按钮上，不另弹提示。
+ * 跑的结果就写在按钮上，不另弹提示。手机底栏的圆钮上写不下字，跑完那一下在画布顶上说一声（见 [EditorUiState.aiReviewsFinished]）。
  */
 sealed interface AiReview {
     /** 不出现：设置里关了、机型不支持、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
@@ -53,6 +53,12 @@ data class EditorUiState(
     val analyzing: Boolean = false,
     /** 端侧大模型的第二遍。只在用户点了之后跑，结果追加进 plan，只圈出。 */
     val aiReview: AiReview = AiReview.Hidden,
+    /**
+     * AI 增强识别跑完了几次，成没成都算。手机上画布顶上那一声结果看它变没变（见 AiReviewResultPill），
+     * 不看 [aiReview] 从什么变过来：批量里换回跑过的图时 [aiReview] 也直接变成 Done，那不是刚跑完；
+     * 一下子就失败时界面也可能来不及看到 Running。
+     */
+    val aiReviewsFinished: Int = 0,
     val exporting: Boolean = false,
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
