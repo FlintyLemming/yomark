@@ -263,7 +263,7 @@ class PlayScreenshots {
         shoot("reminder")
     }
 
-    /** 用途水印：整张图铺一行字。调节面板点「完成」收起。 */
+    /** 用途水印：整张图铺一行字。调节面板收起后拍。 */
     @Test fun purpose() {
         val vm = open(sample("/readme/order-page.png"))
         compose.runOnUiThread {

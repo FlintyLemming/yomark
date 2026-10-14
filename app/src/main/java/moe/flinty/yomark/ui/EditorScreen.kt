@@ -67,7 +67,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.flinty.yomark.billing.Edition
@@ -75,6 +74,7 @@ import moe.flinty.yomark.billing.RestoreResult
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.batch.BatchThumbnails
 import moe.flinty.yomark.ui.canvas.ImageCanvas
@@ -91,15 +91,14 @@ import moe.flinty.yomark.ui.components.MaskItemList
 import moe.flinty.yomark.ui.components.PanelTop
 import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.components.PendingExportDialog
-import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
+import moe.flinty.yomark.ui.components.PurposePanelActions
+import moe.flinty.yomark.ui.components.PurposePanelModel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
 import moe.flinty.yomark.ui.components.UnopenedExportDialog
 import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.nearColorsOf
-import moe.flinty.yomark.ui.components.purposePanelMaxHeight
-import moe.flinty.yomark.ui.components.wideSidePanelWidth
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
@@ -121,6 +120,7 @@ fun EditorScreen(
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
     val styleActions = remember(vm) { ViewModelStyleActions(vm) }
+    val purposeActions = remember(vm) { ViewModelPurposeActions(vm) }
     // 批量里各张的缩略图：胶片条上画它，切图时画布载入的那一下也先垫上它
     val context = LocalContext.current
     val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
@@ -128,7 +128,7 @@ fun EditorScreen(
     // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
-    // 手机底栏展开着的那一组（打码、编辑）。只是界面上的事，不进 ViewModel；用途水印面板顶替底栏再回来时还展开着
+    // 手机底栏展开着的那一组（打码、编辑）。只是界面上的事，不进 ViewModel
     var toolGroup by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
     LaunchedEffect(state.message) {
@@ -200,7 +200,7 @@ fun EditorScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
         // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
-        // 输入法不在这里：只有用途水印面板里有输入框，由面板自己让开（见下方 imePadding）。
+        // 输入法不在这里：只有用途水印面板里有输入框，开着它时画布和面板那一块自己让开（见下方 imePadding）。
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
     ) { padding ->
         // consumeWindowInsets：面板的 imePadding 只补输入法比导航栏多出来的那一截，不重复算导航栏
@@ -213,19 +213,21 @@ fun EditorScreen(
             val canCompare = state.image != null &&
                 (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED })
             val onToolGroup: (ToolGroup?) -> Unit = {
-                // 收起这一组，从它长出来的调节面板也一起收
+                // 收起这一组，从它长出来的调节面板（样式的、用途水印的）也一起收
                 if (it == null && state.stylePanelOpen) vm.dismissStylePanel()
+                if (it == null && state.purposeSheetVisible) vm.dismissPurposeSheet()
                 toolGroup = it
             }
+            val panelOpen = state.stylePanelOpen || state.purposeSheetVisible
             // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点底栏左下角的返回一样（见 FoldOnTouch）。
             // 画布那一块由底栏铺（见 EditorBottomBar），顶栏这一截铺在这里：这一下只收起，不撤销、不导出
-            val panelUp = phone && toolGroup != null && state.stylePanelOpen && state.colorPick == null && !state.purposeSheetVisible
+            val panelUp = phone && toolGroup != null && panelOpen && state.colorPick == null
             Box {
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
                     // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角
-                    onPurpose = if (phone) null else vm::showPurposeSheet,
+                    onPurpose = if (phone) null else vm::togglePurposeSheet,
                     purposeOn = state.purposeText != null,
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                     onSettings = onSettings,
@@ -241,30 +243,33 @@ fun EditorScreen(
                 )
                 if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
             }
-            // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开当前样式所在的那一组接着显示它
-            LaunchedEffect(phone, state.stylePanelOpen) {
-                if (phone && state.stylePanelOpen && toolGroup == null) toolGroup = ToolGroup.of(state.barLook.style)
+            // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
+            // 用途水印在「编辑」里，样式在它自己那一组
+            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible) {
+                if (!phone || toolGroup != null) return@LaunchedEffect
+                if (state.purposeSheetVisible) toolGroup = ToolGroup.EDIT
+                else if (state.stylePanelOpen) toolGroup = ToolGroup.of(state.barLook.style)
             }
-            // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
+            // 吸管在等取色时，返回先收吸管；样式面板、用途水印面板开着时，返回先收面板，不直接退出编辑器。
+            // 都不拦的时候不常驻 BackHandler（见 EditorActivity）
             BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)
             BackHandler(
                 enabled = state.colorPick == null && state.stylePanelOpen && !state.purposeSheetVisible,
                 onBack = vm::dismissStylePanel,
             )
-            // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
-            if (state.purposeSheetVisible) BackHandler(onBack = vm::dismissPurposeSheet)
+            BackHandler(enabled = state.colorPick == null && state.purposeSheetVisible, onBack = vm::dismissPurposeSheet)
             // 底栏展开着一组时，返回先收回去。上面几样开着时先收它们
             BackHandler(
-                enabled = phone && toolGroup != null && state.colorPick == null &&
-                    !state.stylePanelOpen && !state.purposeSheetVisible,
+                enabled = phone && toolGroup != null && state.colorPick == null && !panelOpen,
                 onBack = { toolGroup = null },
             )
             CanvasAndPanel(
                 panelAtSide = atSide,
-                // 横着拿时用途水印面板在右边，输入法弹起来时整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
+                // 用途水印面板开着时输入法弹起来，整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
+                // （手机上面板盖在图上，打字时它只留文字那一格，见 PurposePanelContent）
                 modifier = Modifier
                     .weight(1f)
-                    .then(if (atSide && state.purposeSheetVisible) Modifier.imePadding() else Modifier),
+                    .then(if (state.purposeSheetVisible) Modifier.imePadding() else Modifier),
                 canvas = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         // 批量里切图的那一下，画布上先垫着这一张的缩略图，载入完换成原图
@@ -310,19 +315,13 @@ fun EditorScreen(
                             )
                         }
                     } else null
+                    val purpose = PurposePanelModel(
+                        text = state.purposeText,
+                        style = state.purposeStyle,
+                        open = state.purposeSheetVisible,
+                        picking = state.colorPick == ColorTarget.PURPOSE,
+                    )
                     when {
-                        state.purposeSheetVisible -> PurposeWatermarkPanel(
-                            text = state.purposeText,
-                            style = state.purposeStyle,
-                            onTextChange = vm::setPurposeText,
-                            onStyleChange = vm::setPurposeStyle,
-                            onReset = vm::resetPurposeStyle,
-                            onRemove = vm::removePurposeWatermark,
-                            onDone = vm::dismissPurposeSheet,
-                            modifier = if (atSide) Modifier.wideSidePanelWidth() else Modifier.imePadding(),
-                            // 在右边那一栏里时整栏都给它，多出来的滚动
-                            maxHeight = if (atSide) Dp.Unspecified else purposePanelMaxHeight(),
-                        )
                         layout == EditorLayout.PHONE -> EditorBottomBar(
                             toolGroup = toolGroup,
                             onToolGroup = onToolGroup,
@@ -332,14 +331,16 @@ fun EditorScreen(
                             canCompare = canCompare,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
-                            purposeOn = state.purposeText != null,
-                            onPurpose = vm::showPurposeSheet,
+                            purpose = purpose,
+                            purposeActions = purposeActions,
                             filmstrip = filmstrip,
                         )
                         else -> WideEditorPanel(
                             atSide = atSide,
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
+                            purpose = purpose,
+                            purposeActions = purposeActions,
                             // 手机横着拿没有列表，右边那一栏只放样式和导出
                             list = if (layout.listed) ({ modifier ->
                                 MaskItemList(
@@ -372,7 +373,7 @@ fun EditorScreen(
 }
 
 /**
- * 画布和它旁边的那一块（手机的底栏或右边那一栏，宽屏的样式与列表，用途水印面板）。
+ * 画布和它旁边的那一块（手机的底栏或右边那一栏，宽屏的样式与列表）。
  *
  * 旁边那一块先量：在下面时高度由它自己定，在右边（[panelAtSide]）时宽度由它自己定，画布占剩下的。
  * 手机的底栏例外：它占满整块，画布让到它给的 [PanelTop] 为止，上面那一截是往上长的调节面板，盖在图上。
@@ -439,6 +440,17 @@ private fun styleBarModel(state: EditorUiState): StyleBarModel {
         colorPick = state.colorPick,
         nearColors = nearColors,
     )
+}
+
+/** 用途水印面板的动作都交给 ViewModel。 */
+private class ViewModelPurposeActions(private val vm: EditorViewModel) : PurposePanelActions {
+    override fun onToggle() = vm.togglePurposeSheet()
+    override fun onTextChange(text: String) = vm.setPurposeText(text)
+    override fun onStyleChange(style: PurposeWatermarkStyle) = vm.setPurposeStyle(style)
+    override fun onReset() = vm.resetPurposeStyle()
+    override fun onRemove() = vm.removePurposeWatermark()
+    override fun onCollapse() = vm.dismissPurposeSheet()
+    override fun onPickColor(pick: Boolean) = if (pick) vm.startColorPick(ColorTarget.PURPOSE) else vm.cancelColorPick()
 }
 
 /** 样式栏的动作都交给 ViewModel。 */

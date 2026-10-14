@@ -786,10 +786,16 @@ class EditorViewModel(
     /**
      * 点样式栏上的一项。换了样式只是换，面板不跟着弹出来——多数时候换个样式就够了，用不着调参数；
      * 宽屏上面板本来开着的话照样开着，换成新样式的参数。点的正是当前这一项，才弹出或收起面板。
+     * 用途水印的面板开着时也一样是面板开着：换成这一种样式的面板，点的是当前这一种也是。
      * 换样式本身照 [setStyle] 的规矩：管之后画的，选中了同一组的手动框时也管那个框。
      */
     fun onStyleChipClick(style: MaskStyle) {
         val s = _state.value
+        if (s.purposeSheetVisible) {
+            _state.value = s.copy(purposeSheetVisible = false, stylePanelOpen = true, colorPick = null)
+            if (style != s.barLook.style) setStyle(style)
+            return
+        }
         if (style == s.barLook.style) {
             _state.value = s.copy(stylePanelOpen = !s.stylePanelOpen, colorPick = null)
             return
@@ -873,6 +879,10 @@ class EditorViewModel(
         val y = imagePoint.y.toInt()
         if (imagePoint.x < 0f || imagePoint.y < 0f || x >= image.width || y >= image.height) return
         val color = pickColor(image.bitmap, x, y)
+        if (target == ColorTarget.PURPOSE) {
+            setPurposeStyle(s.purposeStyle.copy(color = color))
+            return
+        }
         val bar = s.barLook
         editLook(bar.copy(options = target.withColor(bar.options, color)))
     }
@@ -1030,18 +1040,26 @@ class EditorViewModel(
     /**
      * 打开调节面板即打开水印：还没设文案时先填上默认措辞，画布上马上就能看到效果，
      * 用户改中间那几个字即可。不想要就点面板上的「移除」。
+     * 它和样式的调节面板是同一块地方（手机上都是底栏的胶囊长出来的），一次只开一个：样式面板开着就换成它。
      */
     fun showPurposeSheet() {
+        finishLookEdit()
         val s = _state.value
         _state.value = s.copy(
             purposeSheetVisible = true,
+            stylePanelOpen = false,
             colorPick = null,
             purposeText = s.purposeText ?: lastPurposeText ?: defaultPurposeText,
         )
     }
 
+    /** 点了水印（手机底栏「编辑」里的那一项，宽屏顶栏上的按钮）：收着就打开，开着就收起，和再点一下当前的样式一样。 */
+    fun togglePurposeSheet() {
+        if (_state.value.purposeSheetVisible) dismissPurposeSheet() else showPurposeSheet()
+    }
+
     /** 收起面板，水印保持现状。 */
-    fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false) }
+    fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false, colorPick = null) }
 
     /** 边打字边生效。清空就等于暂时不加，面板不收，接着打字又回来。 */
     fun setPurposeText(text: String?) {
@@ -1052,16 +1070,18 @@ class EditorViewModel(
 
     /** 移除水印并收起面板。文案记在内存里，这次会话里再打开面板还是它。 */
     fun removePurposeWatermark() {
-        _state.value = _state.value.copy(purposeText = null, purposeSheetVisible = false)
+        _state.value = _state.value.copy(purposeText = null, purposeSheetVisible = false, colorPick = null)
     }
 
     /**
      * 拖滑条时每一帧都会进来：状态即时更新给画布预览，落盘做一次去抖，
      * 不让 DataStore 跟着滑条每帧写一次。
+     * 吸管在等着给水印取色时，挑了颜色、动了滑条，吸管就收起，和打码的样子一样（见 [editLook]）。
      */
     fun setPurposeStyle(style: PurposeWatermarkStyle) {
         val next = style.normalized()
         purposeStyleTouched = true
+        if (_state.value.colorPick == ColorTarget.PURPOSE) _state.value = _state.value.copy(colorPick = null)
         if (next == _state.value.purposeStyle) return
         _state.value = _state.value.copy(purposeStyle = next)
         purposeStyleSave?.cancel()
