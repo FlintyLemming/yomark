@@ -151,7 +151,7 @@ class MlKitBarcodeDetector(
         }
 
     /**
-     * 识别图是降采样过的（照片、长截图）时，回原图上分块再扫一遍。
+     * 整张扫的不是原分辨率时，回原图上分块再扫一遍：识别图是降采样过的（照片），或者长边超过 2048（截图按原图识别，长截图更长）。
      *
      * ML Kit 自己会把长边超过 2048 的图缩到 2048 再找（见 [BarcodeHits.TILE]），整张原图喂给它跟喂识别图一样；
      * 切成 2048 的块，每块按原分辨率看。真机拍的两张 4096×3072 的照片，桌上 SIM 卡贴纸的四个二维码，
@@ -162,7 +162,7 @@ class MlKitBarcodeDetector(
      */
     private suspend fun tiles(image: SourceImage): List<BarcodeHits.Hit> {
         val original = image.original ?: return emptyList()
-        if (image.scale >= 1f) return emptyList()
+        if (!BarcodeHits.needsTiles(image.scale, image.width, image.height)) return emptyList()
         return withContext(Dispatchers.IO) {
             runCatching {
                 val decoder = if (Build.VERSION.SDK_INT >= 31) BitmapRegionDecoder.newInstance(original.file.path)

@@ -41,6 +41,13 @@ object ChatFixtures {
 
     fun named(prefix: String): ChatFixture = all.first { it.name.startsWith(prefix) }
 
+    /** 原尺寸的测试图（chat-native/，生成脚本 --fixtures 另存的）：给真 OCR 按原图读。 */
+    fun native(name: String): ChatFixture {
+        val url = ChatFixtures::class.java.classLoader!!.getResource("chat-native/$name.tsv")
+            ?: error("缺少测试图 chat-native/$name：先跑 tools/model-eval/make_chat_samples.py --fixtures app/src/test/resources/chat")
+        return load(File(url.toURI()))
+    }
+
     private fun load(tsv: File): ChatFixture {
         val stem = tsv.nameWithoutExtension
         var chat = false

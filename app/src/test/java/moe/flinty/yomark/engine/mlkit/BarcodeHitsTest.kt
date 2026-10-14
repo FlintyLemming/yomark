@@ -107,6 +107,18 @@ class BarcodeHitsTest {
         assertThat(BarcodeHits.spans(1080, 2048, 512)).containsExactly(0 to 1080)
     }
 
+    /**
+     * 截图按原图识别，识别图没缩，可长边过了 2048，ML Kit 自己会缩：也得回原图分块扫。
+     * 识别图缩过的（照片）照旧分块；没缩、ML Kit 也不缩的不用。
+     */
+    @Test fun `tiles run whenever the whole-frame scan is not at full resolution`() {
+        assertThat(BarcodeHits.needsTiles(scale = 1f, width = 1080, height = 2400)).isTrue()
+        assertThat(BarcodeHits.needsTiles(scale = 1f, width = 1080, height = 5148)).isTrue()
+        assertThat(BarcodeHits.needsTiles(scale = 0.5f, width = 2000, height = 1500)).isTrue()
+        assertThat(BarcodeHits.needsTiles(scale = 1f, width = 1080, height = 1920)).isFalse()
+        assertThat(BarcodeHits.needsTiles(scale = 1f, width = 2048, height = 1536)).isFalse()
+    }
+
     /** 50MP、200MP 的照片先降采样，还是切 6 块上下。 */
     @Test fun `very large photos are sampled down before tiling`() {
         assertThat(BarcodeHits.sampleSize(4096)).isEqualTo(1)

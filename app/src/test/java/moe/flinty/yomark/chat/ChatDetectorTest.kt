@@ -7,6 +7,7 @@ import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
 import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -70,8 +71,8 @@ class ChatDetectorTest {
     }
 
     /**
-     * 合成的微信群聊页，缩到 540 宽（1080 宽的手机截图进识别时就是这个尺寸），字最小的昵称只有十二三个像素高：
-     * 真 OCR 读这么小的字会漏、会拼行，这里只要求大头认得出。
+     * 合成的微信群聊页，测试图存的是缩到 540 宽的，字最小的昵称只有十二三个像素高：
+     * 真 OCR 读这么小的字会漏、会拼行，这里只要求大头认得出。原尺寸的见下面的长截图。
      */
     @Test fun `a downscaled group chat still gets most avatars and names`() {
         val fx = ChatFixtures.named("chat-003-wechat-light-group")
@@ -83,6 +84,30 @@ class ChatDetectorTest {
         val n = ChatFixtures.Tally()
         ChatFixtures.tally(found.of(SensitiveKind.CHAT_NAME).map { it.box() }, fx.names.map { it.box }, n)
         assertWithMessage("昵称 ${n.hit}/${n.truth}").that(n.recall).isAtLeast(0.5f)
+    }
+
+    /**
+     * 原尺寸的微信群聊长截图（1080×5148），照 App 里那样读进来：按原图识别，文字检测分条跑。
+     * 以前缩到 270 宽，字只读对一半，不算聊天页，什么都没遮。
+     */
+    @Test fun `a full-size long screenshot is read at full size and masked`() {
+        val fx = ChatFixtures.native("chat-057-wechat-light-group-long")
+        val image = runBlocking { SourceImageLoader.loadForAnalysis(fx.image, "image/png") }
+        assertThat(image.scale).isEqualTo(1f)
+        assertThat(image.bitmap.width to image.bitmap.height).isEqualTo(1080 to 5148)
+        val lines = runBlocking { PaddleTextRecognizer(ApplicationProvider.getApplicationContext()).recognize(image) }
+        val found = runBlocking { ChatDetector(true).analyze(image, lines) }
+
+        val title = found.of(SensitiveKind.CHAT_TITLE).single().box()
+        assertWithMessage("标题 $title").that(ChatFixtures.matches(title, fx.title!!.box)).isTrue()
+        val a = ChatFixtures.Tally()
+        ChatFixtures.tally(found.of(SensitiveKind.CHAT_AVATAR).map { it.box() }, fx.avatars, a)
+        assertWithMessage("头像 ${a.hit}/${a.truth}，多 ${a.extra}").that(a.recall).isAtLeast(0.95f)
+        assertWithMessage("头像 ${a.hit}/${a.truth}，多 ${a.extra}").that(a.extra).isAtMost(1)
+        val n = ChatFixtures.Tally()
+        ChatFixtures.tally(found.of(SensitiveKind.CHAT_NAME).map { it.box() }, fx.names.map { it.box }, n)
+        assertWithMessage("昵称 ${n.hit}/${n.truth}，多 ${n.extra}").that(n.recall).isAtLeast(0.9f)
+        assertWithMessage("昵称 ${n.hit}/${n.truth}，多 ${n.extra}").that(n.extra).isAtMost(1)
     }
 
     /** 候选的框比找到的框放宽了一圈（头像 6%、字两个像素），配对时缩回去比。 */

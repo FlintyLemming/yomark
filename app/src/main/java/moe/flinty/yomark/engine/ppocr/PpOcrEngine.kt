@@ -493,8 +493,24 @@ class PpOcrEngine(
 
     // ---------- 检测 ----------
 
+    /** 竖长的大图（截图、长截图）按整宽的横条检测，每条不缩，见 [DetBands]；照片照旧整张缩到长边 [DET_LIMIT]。 */
     private fun detect(image: Pixels): List<Box> {
-        // 截图长边 2000+，全分辨率检测在手机上太慢；1536 仍让常见字号的字高保持在 20px 以上
+        if (!DetBands.wanted(image.width, image.height, DET_LIMIT)) return detectWhole(image)
+        return DetBands.merge(
+            DetBands.spans(image.height, DET_LIMIT.toInt()).map { (top, bottom) ->
+                val band = object : Pixels {
+                    override val width = image.width
+                    override val height = bottom - top
+                    override fun sample(x: Float, y: Float) = image.sample(x, y + top)
+                }
+                (top to bottom) to detectWhole(band).map { b -> b.map { Pt(it.x, it.y + top) } }
+            },
+            image.height,
+        )
+    }
+
+    private fun detectWhole(image: Pixels): List<Box> {
+        // 全分辨率整张检测在手机上太慢，长边缩到 1536；比这大的竖长图分条（detect），照片缩下来字也够大
         val s = min(1f, DET_LIMIT / max(image.width, image.height))
         val nw = max(32, (image.width * s / 32).roundToInt() * 32)
         val nh = max(32, (image.height * s / 32).roundToInt() * 32)

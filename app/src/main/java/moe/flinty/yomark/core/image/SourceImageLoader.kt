@@ -10,16 +10,31 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 解码 + EXIF 转正 + 降采样（spec §5.1、§9.2）。
  *
- * 识别跑在长边 2048 的缩略图上（省时省内存），打码在原图上画。
+ * 照片的识别跑在长边 2048 的缩略图上（省时省内存），截图按原图识别，见 [sampleSizeForAnalysis]；打码在原图上画。
  * 两者之间靠 SourceImage.scale 换算。
  */
 object SourceImageLoader {
 
     const val ANALYSIS_MAX_EDGE = 2048
+
+    /**
+     * 短边到这么大的是照片，按长边缩到 [ANALYSIS_MAX_EDGE]：手机照片最小也是 800 万像素 16:9 的 3840×2160。
+     * 手机、折叠屏、平板的截图短边都在这以下（1080、1440，折叠屏内屏 1800 上下，iPad 2048）。
+     */
+    const val PHOTO_MIN_SHORT_EDGE = 2160
+
+    /**
+     * 截图的识别图最大到一条 1080×8192 的像素、长边 8192（预览要整张画上去）。
+     * 再长的长截图（三屏半以上）缩一半，还是比照片的缩法清楚得多。
+     */
+    const val ANALYSIS_MAX_LONG_EDGE = 8192
+    const val ANALYSIS_MAX_PIXELS = 1080 * ANALYSIS_MAX_LONG_EDGE
+
     const val EXPORT_MAX_PIXELS = 32_000_000
 
     /**
@@ -33,7 +48,7 @@ object SourceImageLoader {
     ): SourceImage = withContext(dispatcher) {
         val (rawW, rawH) = readSize(file)
         val orientation = readOrientation(file)
-        val sample = sampleSizeForEdge(max(rawW, rawH), ANALYSIS_MAX_EDGE)
+        val sample = sampleSizeForAnalysis(rawW, rawH)
 
         val decoded = decode(file, sample)
         val upright = applyOrientation(decoded, orientation)
@@ -94,6 +109,21 @@ object SourceImageLoader {
         }
         return BitmapFactory.decodeFile(file.absolutePath, opts)
             ?: throw IOException("解码返回 null：${file.name}")
+    }
+
+    /**
+     * 识别图的降采样倍数（2 的幂）。照片（短边 ≥ [PHOTO_MIN_SHORT_EDGE]）：长边缩到 ≤ [ANALYSIS_MAX_EDGE]，和原来一样。
+     *
+     * 截图不能这样缩：1080×2400 的截图会缩到 540 宽，1080×5148 的长截图缩到 270 宽，字只读对一半，聊天截图的头像一个也找不到。
+     * 所以截图按原图识别，像素超过 [ANALYSIS_MAX_PIXELS] 或长边超过 [ANALYSIS_MAX_LONG_EDGE] 的才缩一半（还超再缩）。
+     * 这样缩出来的不会比照片的缩法还小。文字检测在竖长的大图上分条跑，见 DetBands。
+     */
+    internal fun sampleSizeForAnalysis(width: Int, height: Int): Int {
+        val long = max(width, height)
+        if (min(width, height) >= PHOTO_MIN_SHORT_EDGE) return sampleSizeForEdge(long, ANALYSIS_MAX_EDGE)
+        var s = 1
+        while (long / s > ANALYSIS_MAX_LONG_EDGE || (width / s).toLong() * (height / s) > ANALYSIS_MAX_PIXELS) s *= 2
+        return s
     }
 
     /** 2 的幂降采样，保证降采样后长边 ≤ maxEdge。 */
