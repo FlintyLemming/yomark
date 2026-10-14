@@ -48,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -58,7 +57,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -66,6 +64,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -124,6 +123,10 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种，胶囊往上长成调节面板（见 EditorBottomBar）。
  * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
+ * 胶囊的底子不在这里画，底栏画：面板就是它往上长出来的，长出来、缩回去都得是同一块，一圈边、一层投影。
+ * 原先这一行自己画一条胶囊、面板在底下另垫一块，半路上两块的边和投影一起露出来，工具上面多一道线、面板里多一层影子。
+ * 这一行只摆胶囊里的东西，胶囊眼下左右到哪儿用 [PillLeft]、[PillRight] 告诉底栏。
+ *
  * 圆钮上没有字。AI 的结果在圆钮上是角标和颜色，跑完那一下画布顶上再说一声（见 AiReviewResultPill）；
  * 对比点一下没有比上，弹个提示说要按住。
  *
@@ -131,8 +134,6 @@ enum class ToolGroup(@StringRes val label: Int) {
  * @param onOpen 点了一组（展开它）或点了返回（null）
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
- * @param merge 调节面板从胶囊往上长出来了多少，0～1（见 EditorBottomBar）：面板的底子垫在胶囊底下，
- *   胶囊自己的边和投影跟着淡掉，看上去是一整块。只在画的时候读，动起来不重组
  */
 @Composable
 fun EditorToolbar(
@@ -147,7 +148,6 @@ fun EditorToolbar(
     onAiReview: () -> Unit = {},
     compare: MutableInteractionSource? = null,
     canCompare: Boolean = false,
-    merge: () -> Float = { 0f },
 ) {
     val progress = animateFloatAsState(
         if (open != null) 1f else 0f,
@@ -170,7 +170,6 @@ fun EditorToolbar(
 
     Layout(
         content = {
-            Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge, chrome = { 1f - merge() }))
             ToolGroup.entries.forEach { group ->
                 // 两组一直都在组合里：胶囊收着时多宽要按两组一起量。展开停稳后不摆出来、读屏也读不到
                 GroupButton(
@@ -211,12 +210,10 @@ fun EditorToolbar(
         val circleParts = HashMap<Slot, Measurable>()
         val toolParts = ArrayList<Measurable>()
         var picked = -1
-        var pillPart: Measurable? = null
         var backPart: Measurable? = null
         var dividerPart: Measurable? = null
         for (m in measurables) when (val id = m.layoutId) {
             is ToolGroup -> groupParts[id] = m
-            Slot.PILL -> pillPart = m
             Slot.BACK -> backPart = m
             Slot.DIVIDER -> dividerPart = m
             Slot.TOOL -> toolParts += m
@@ -278,18 +275,16 @@ fun EditorToolbar(
         val toolX = toolWidths.runningFold(toolsStart) { x, w -> x + w }
 
         val height = max(rowMin, (groups.values + tools + circlePlaceables.values + listOfNotNull(back)).maxOf { it.height })
-        // 胶囊有多宽跟着动画走：每一帧重新量它（它自己画边和投影，见 floatingSurface）。
-        // 别的孩子约束不变，不会跟着重新量；动画也不重组
+        // 胶囊有多宽跟着动画走：每一帧重新算，交给底栏画（见 PillLeft）。
+        // 孩子们约束不变，不会跟着重新量；动画也不重组
         val p = progress.value
         val left = lerp(shutLeft, openLeft, p)
         val right = lerp(shutRight, openRight, p)
-        val pill = pillPart!!.measure(Constraints.fixed((right - left).coerceAtLeast(0), height))
         val slide = SLIDE.roundToPx()
         fun Placeable.centerY() = (height - this.height) / 2
 
-        layout(width, height) {
+        layout(width, height, mapOf(PillLeft to left, PillRight to right)) {
             val fadeOut = span(p, 0f, FADE_OUT)
-            pill.place(left, 0)
             // 两组在前半程淡掉；展开停稳后不摆出来
             if (collapsedRow) groups.forEach { (group, placeable) ->
                 placeable.placeWithLayer(shutX.getValue(group), placeable.centerY()) { alpha = 1f - fadeOut }
@@ -339,7 +334,14 @@ private class LastOpen {
 }
 
 /** [TOOL] 是展开后的一项工具，选中的那一项是 [PICKED]（分宽度时它的名字留到最后，见 [toolWidths]）。 */
-private enum class Slot { PILL, AI, COMPARE, BACK, DIVIDER, TOOL, PICKED }
+private enum class Slot { AI, COMPARE, BACK, DIVIDER, TOOL, PICKED }
+
+/**
+ * 胶囊眼下的左沿、右沿，按工具那一行自己的坐标（见 EditorToolbar）。收着、展开、半路上都不一样宽，
+ * 底栏照着这两条线画胶囊（见 EditorBottomBar）。
+ */
+internal val PillLeft = VerticalAlignmentLine(::min)
+internal val PillRight = VerticalAlignmentLine(::max)
 
 /** [p] 落在 [start]～[end] 这一段的哪儿，0～1。 */
 internal fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
@@ -550,46 +552,34 @@ private fun NameOrNothing(modifier: Modifier = Modifier, name: @Composable () ->
 }
 
 /**
- * 浮起来的底子：胶囊、圆钮都是它。一圈很细的边，底下两层很淡的投影，照 Bettbox 1.19.4 的悬浮底栏：
- * 一层铺得开（模糊 30、往下 10、8% 的黑），一层贴着边（模糊 10、往下 2、4% 的黑）。
+ * 浮起来的底子：胶囊（连同从它长出来的调节面板，见 EditorBottomBar）、圆钮都是它。一圈很细的边，底下两层很淡的投影，
+ * 照 Bettbox 1.19.4 的悬浮底栏：一层铺得开（模糊 30、往下 10、8% 的黑），一层贴着边（模糊 10、往下 2、4% 的黑）。
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
  */
-internal fun Modifier.floatingSurface(
-    fill: Color,
-    edge: Color,
-    maxRadius: Dp = Dp.Infinity,
-    chrome: () -> Float = { 1f },
-) = drawWithCache {
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) = drawWithCache {
     val radius = min(size.minDimension / 2, maxRadius.toPx())
-    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
+    val shadows = SHADOWS.map { (blur, dy, alpha) ->
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = fill.toArgb()
+            setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha).toArgb())
+        }
+    }
     val line = EDGE_WIDTH.toPx()
     onDrawBehind {
-        // 边和投影的浓淡（见 EditorToolbar 的 merge）每一帧都可能不同，投影在画的时候设
-        val a = chrome().coerceIn(0f, 1f)
-        drawIntoCanvas {
-            for ((blur, dy, alpha) in SHADOWS) {
-                paint.setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha * a).toArgb())
-                it.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, paint)
-            }
+        drawIntoCanvas { canvas ->
+            shadows.forEach { canvas.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, it) }
         }
-        if (a > 0f) drawFloatingEdge(edge.copy(alpha = edge.alpha * a), radius, line)
+        // 边画在里面，和 Flutter 的 Border.all 一样
+        drawRoundRect(
+            edge,
+            topLeft = Offset(line / 2, line / 2),
+            size = Size(size.width - line, size.height - line),
+            cornerRadius = CornerRadius(radius - line / 2),
+            style = Stroke(line),
+        )
     }
 }
-
-/** 浮起来的那一圈细边，单独画：调节面板的边画在底栏的工具上面（见 EditorBottomBar）。 */
-internal fun Modifier.floatingEdge(edge: Color, maxRadius: Dp = Dp.Infinity) = drawBehind {
-    drawFloatingEdge(edge, min(size.minDimension / 2, maxRadius.toPx()), EDGE_WIDTH.toPx())
-}
-
-// 边画在里面，和 Flutter 的 Border.all 一样
-private fun DrawScope.drawFloatingEdge(edge: Color, radius: Float, line: Float) = drawRoundRect(
-    edge,
-    topLeft = Offset(line / 2, line / 2),
-    size = Size(size.width - line, size.height - line),
-    cornerRadius = CornerRadius(radius - line / 2),
-    style = Stroke(line),
-)
 
 /** 两层投影：模糊、往下、黑色的浓淡（见 floatingSurface）。 */
 private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.04f))
@@ -830,8 +820,8 @@ private val CIRCLE_SIZES = listOf(56.dp, 52.dp, 48.dp)
 /** 圆钮缩进胶囊时缩到多小（按原来的比例少掉这么多）。 */
 private const val CIRCLE_SHRINK = 0.4f
 
-/** 浮起来的那一圈细边：outlineVariant 淡一半，1 dp（见 floatingSurface）。 */
-private const val EDGE_ALPHA = 0.5f
+/** 浮起来的那一圈细边：outlineVariant 淡一半，1 dp（见 floatingSurface）。底栏画的胶囊也是这一圈（见 EditorBottomBar）。 */
+internal const val EDGE_ALPHA = 0.5f
 private val EDGE_WIDTH = 1.dp
 
 private val GROUP_HEIGHT = 40.dp

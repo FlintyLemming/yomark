@@ -47,7 +47,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
@@ -151,6 +150,10 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
  * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
  *
+ * 胶囊就画在这里，只有这一块：上沿跟着面板长到哪儿，左右跟着工具那一行说的走（见 PillLeft），
+ * 面板收着时它就是工具那一行的胶囊。长出来、缩回去的半路上也只有这一圈边、一层投影，看着是整个胶囊在变大变小；
+ * 开着面板点返回收起这一组，胶囊一边往下缩一边往回收窄。
+ *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
  */
@@ -176,17 +179,20 @@ fun EditorBottomBar(
     val shown by remember { derivedStateOf { grow.value > 0f } }
     val panelShown = wanted || shown
     val container = MaterialTheme.colorScheme.surfaceContainer
-    val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PANEL_EDGE_ALPHA)
+    val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = EDGE_ALPHA)
 
     Layout(
         content = {
             filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
-            if (panelShown) {
-                // 面板的底子垫在工具那一行底下，和胶囊一个颜色、一样的投影，胶囊自己的边和投影淡掉（见 EditorToolbar 的 merge）。
-                // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框
-                Box(Modifier.layoutId(BarPart.CARD).floatingSurface(container, Color.Transparent, PANEL_RADIUS).pointerInput(Unit) { swallowTouches() })
-                StylePanelContent(styleBar, styleActions, Modifier.layoutId(BarPart.CONTENT))
-            }
+            // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框。
+            // 面板收着时不接：两组只有 40 dp 高，按在它们上下边外面一点也算按到，胶囊接了就按不着了
+            Box(
+                Modifier
+                    .layoutId(BarPart.PILL)
+                    .floatingSurface(container, edge, PANEL_RADIUS)
+                    .then(if (panelShown) Modifier.pointerInput(Unit) { swallowTouches() } else Modifier),
+            )
+            if (panelShown) StylePanelContent(styleBar, styleActions, Modifier.layoutId(BarPart.CONTENT))
             EditorToolbar(
                 open = toolGroup,
                 onOpen = onToolGroup,
@@ -198,11 +204,8 @@ fun EditorBottomBar(
                 onAiReview = onAiReview,
                 compare = compare,
                 canCompare = canCompare,
-                merge = { grow.value },
                 modifier = Modifier.layoutId(BarPart.ROW),
             )
-            // 边画在工具上面：底子垫在工具底下，它的边被胶囊的底色盖住了
-            if (panelShown) Box(Modifier.layoutId(BarPart.EDGE).floatingEdge(edge, PANEL_RADIUS))
         },
         modifier = modifier.fillMaxWidth(),
     ) { measurables, constraints ->
@@ -217,38 +220,41 @@ fun EditorBottomBar(
         // 有多高就占多高：面板往上长的那一截在画布上面，画布只让到 PanelTop 为止
         val height = if (constraints.hasBoundedHeight) max(constraints.maxHeight, resting) else resting
         val rowY = height - pad - row.height
-        val cardWidth = (width - margin * 2).coerceAtLeast(0)
+        val panelWidth = (width - margin * 2).coerceAtLeast(0)
         // 面板最高长到画布那一块的顶上，再高就在面板里面滚动
         val roomAbove = (rowY - pad).coerceAtLeast(0)
-        val content = part(BarPart.CONTENT)?.measure(Constraints(minWidth = cardWidth, maxWidth = cardWidth, maxHeight = roomAbove))
+        val content = part(BarPart.CONTENT)?.measure(Constraints(minWidth = panelWidth, maxWidth = panelWidth, maxHeight = roomAbove))
         val p = grow.value
         val openTop = rowY - (content?.height ?: 0)
-        val cardTop = lerp(rowY, openTop, p)
-        val cardHeight = height - pad - cardTop
-        val card = part(BarPart.CARD)?.measure(Constraints.fixed(cardWidth, cardHeight))
-        val edgePart = part(BarPart.EDGE)?.measure(Constraints.fixed(cardWidth, cardHeight))
+        val pillTop = lerp(rowY, openTop, p)
+        // 左右听工具那一行的：收着、展开、半路上都不一样宽。面板开着时它撑满这一行，和面板一样宽
+        val pillLeft = row[PillLeft]
+        val pillRight = row[PillRight]
+        val pill = part(BarPart.PILL)!!.measure(Constraints.fixed((pillRight - pillLeft).coerceAtLeast(0), height - pad - pillTop))
 
         layout(width, height, mapOf(PanelTop to height - resting)) {
             film?.place(FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
-            card?.place(margin, cardTop)
-            // 名字、参数跟着面板的上沿往上走，面板还没长到的地方不露出来，后半程显出来
-            content?.placeWithLayer(margin, cardTop) {
+            pill.place(pillLeft, pillTop)
+            // 名字、参数跟着胶囊的上沿往上走，胶囊没盖到的地方不露出来，后半程显出来
+            content?.placeWithLayer(margin, pillTop) {
                 alpha = span(p, CONTENT_IN_START, 1f)
                 clip = true
-                shape = TopSlice((rowY - cardTop).toFloat())
+                shape = AbovePill((pillLeft - margin).toFloat(), (pillRight - margin).toFloat(), (rowY - pillTop).toFloat())
             }
             row.place(0, rowY)
-            edgePart?.place(margin, cardTop)
         }
     }
 }
 
-private enum class BarPart { FILM, CARD, CONTENT, ROW, EDGE }
+private enum class BarPart { FILM, PILL, CONTENT, ROW }
 
-/** 只留最上面 [height] 那一截：面板上的东西在工具那一行上面露出来，不从面板底下漏出去。 */
-private class TopSlice(private val height: Float) : Shape {
+/**
+ * 面板上的东西只露出胶囊盖着的、工具那一行上面的那一截：左右从 [left] 到 [right]，往下到 [bottom]，按它自己的坐标。
+ * 不从面板底下漏到工具那一行里；开着面板收起这一组时胶囊往回收窄，也不从两边漏出去。
+ */
+private class AbovePill(private val left: Float, private val right: Float, private val bottom: Float) : Shape {
     override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) =
-        Outline.Rectangle(Rect(0f, 0f, size.width, height.coerceIn(0f, size.height)))
+        Outline.Rectangle(Rect(left, 0f, right, bottom.coerceIn(0f, size.height)))
 }
 
 /** 接住落在面板上的手指，什么也不做。 */
@@ -268,11 +274,8 @@ private val FILM_MARGIN = 12.dp
 private val PANEL_MARGIN = 12.dp
 private val FILM_GAP = 6.dp
 
-/** 面板的圆角：和胶囊两头的半圆一样大（胶囊高 48），长高了四个角还是这么圆，看得出是胶囊长出来的。 */
+/** 胶囊的圆角：收着时就是两头的半圆，长高了四个角还是这么圆，看得出面板是胶囊长出来的。 */
 private val PANEL_RADIUS = TOOL_ROW_HEIGHT / 2
-
-/** 面板的那一圈细边，和胶囊一样（见 EditorToolbar 的 EDGE_ALPHA）。 */
-private const val PANEL_EDGE_ALPHA = 0.5f
 
 /** 面板上的名字、参数从这儿起淡入：面板先长出一截再显出来，不和它一起挤在一条缝里。 */
 private const val CONTENT_IN_START = 0.35f
