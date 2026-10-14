@@ -29,6 +29,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
@@ -153,7 +154,19 @@ class EditorToolbarTest {
             assertThat((text.left - slot.left).value).isAtLeast(8f + 24f)
             assertThat(((text.top + text.bottom) / 2 - (slot.top + slot.bottom) / 2).value).isWithin(1.5f).of(0f)
         }
-        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(48f)
+        assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(56f)
+    }
+
+    /** 选中的名字加粗，照作者给的悬浮底栏截图；没选中的不加粗。 */
+    @Test fun thePickedToolsNameIsBold() {
+        show(initial = ToolGroup.REDACT)
+        fun weight(name: String): FontWeight? {
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(name, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            return layouts.single().layoutInput.style.fontWeight
+        }
+        assertThat(weight("色块")).isEqualTo(FontWeight.Bold)
+        assertThat(weight("马赛克")).isNotEqualTo(FontWeight.Bold)
     }
 
     /**

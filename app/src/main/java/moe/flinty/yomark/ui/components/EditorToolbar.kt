@@ -74,6 +74,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -708,7 +709,8 @@ private fun rememberHintPosition(): PopupPositionProvider {
  * 展开后的一项工具：左边是小样子，右边是名字，排成一行，和收着时胶囊里的一组一个排法。
  * 原先小样子叠在名字上面，胶囊压到 48 dp 之后两样都得缩一号，挤（2026-10-14）。并排之后名字和收着时一样大。
  *
- * 选中的垫一颗深一点的小胶囊：主题色 20% 叠在胶囊的底色上，小样子、名字、小箭头着主题色（照作者给的悬浮底栏截图）。
+ * 选中的垫一颗深一点的小胶囊：主题色 20% 叠在胶囊的底色上，小样子、名字、小箭头着主题色，名字加粗（照作者给的悬浮底栏截图）。
+ * 截图上是粗体；labelLarge 的 Medium 在不少系统的中文字体上和常规体看不出差别。
  * 没选中的不垫底，左右只留一点空，地方让给选中的那一颗。
  *
  * 整格都能点（和胶囊一样高），按下去的水波只在小胶囊里：整格一样大的水波会碰到胶囊的上下沿。
@@ -763,7 +765,14 @@ private fun ToolItem(
         ) {
             Box(Modifier.size(GLYPH_BOX), contentAlignment = Alignment.Center) { glyph(ink) }
             val name = @Composable {
-                Text(label, style = MaterialTheme.typography.labelLarge, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = ink,
+                    fontWeight = if (selected) FontWeight.Bold else null,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
             if (panelOpen != null) {
                 Spacer(Modifier.width(TOOL_GLYPH_GAP))
@@ -809,13 +818,14 @@ private val INSET = 8.dp
 private val GAP = 8.dp
 
 /**
- * 胶囊的高，也是这一行最矮的高度。原先 64，比批量时上面那一条胶片条（40）厚出一大截，压到 48：
- * 展开后的工具小样子和名字并排成一行（见 [ToolItem]），和收着时的两组一样。
+ * 胶囊的高，也是这一行最矮的高度。原先 64，比批量时上面那一条胶片条（40）厚出一大截；压到 48 又挤：
+ * 选中的小胶囊只剩 32，小样子上下各 4 dp（2026-10-14）。
+ * 56 照作者给的悬浮底栏截图的比例：那张图上底栏约 62、小胶囊 44，小胶囊占底栏七成（见 [TOOL_CHIP_HEIGHT]）。
  */
-internal val TOOL_ROW_HEIGHT = 48.dp
+internal val TOOL_ROW_HEIGHT = 56.dp
 
 /** 圆钮和胶囊一样高；放不下就一档档缩小。 */
-private val CIRCLE_SIZES = listOf(48.dp, 44.dp, 40.dp)
+private val CIRCLE_SIZES = listOf(56.dp, 52.dp, 48.dp)
 
 /** 圆钮缩进胶囊时缩到多小（按原来的比例少掉这么多）。 */
 private const val CIRCLE_SHRINK = 0.4f
@@ -835,12 +845,15 @@ private val DIVIDER_GAP = 6.dp
 private val DIVIDER_HEIGHT = 32.dp
 private val SLIDE = 24.dp
 
-/** 展开后一项工具的小胶囊：高 32，上下各留 8 dp 的胶囊底色，和截图上的比例差不多。 */
-private val TOOL_CHIP_HEIGHT = 32.dp
+/** 展开后一项工具的小胶囊：高 40，上下各留 8 dp 的胶囊底色，占这一行七成，和截图上一样。 */
+private val TOOL_CHIP_HEIGHT = 40.dp
 
-/** 选中的小胶囊：小样子左边、名字右边（含小箭头）留的空。没选中的不垫底，两边只留 [TOOL_PAD_QUIET]。 */
-private val TOOL_PAD_START = 12.dp
-private val TOOL_PAD_END = 14.dp
+/**
+ * 选中的小胶囊：小样子左边、名字右边（含小箭头）留的空，照截图（左 16，名字后面 24，这里小箭头自己带着一点空）。
+ * 没选中的不垫底，两边只留 [TOOL_PAD_QUIET]。
+ */
+private val TOOL_PAD_START = 16.dp
+private val TOOL_PAD_END = 18.dp
 private val TOOL_PAD_QUIET = 6.dp
 private val TOOL_GLYPH_GAP = 8.dp
 
