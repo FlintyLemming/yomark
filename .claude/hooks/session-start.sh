@@ -9,7 +9,7 @@ fi
 
 SDK="${ANDROID_HOME:-/opt/android-sdk}"
 CMDLINE_TOOLS_ZIP="commandlinetools-linux-13114758_latest.zip"
-PACKAGES=("platform-tools" "platforms;android-36" "build-tools;35.0.0")
+PACKAGES=("platform-tools" "platforms;android-36" "build-tools;36.0.0")
 
 if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
   echo "安装 Android cmdline-tools 到 $SDK"

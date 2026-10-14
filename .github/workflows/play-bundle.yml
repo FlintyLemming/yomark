@@ -42,7 +42,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6
 
       - name: Install Android SDK packages
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;35.0.0" "ndk;27.3.13750724" > /dev/null
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0" "ndk;27.3.13750724" > /dev/null
 
       # Play 上的应用签名密钥就是这把 keystore（首次上传时选「使用自己的密钥」导入），
       # 与 GitHub Releases 的 APK 同一签名，两个渠道才能互相覆盖安装。没有它宁可不打。
