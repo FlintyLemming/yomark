@@ -1,13 +1,16 @@
 package moe.flinty.yomark.chat
 
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
 import java.io.File
-import javax.imageio.ImageIO
+import java.util.zip.InflaterInputStream
 
 /**
  * 合成的聊天截图（tools/model-eval/make_chat_samples.py --fixtures 生成，全是编的）：
  * 每张图一个同名 .tsv，记着图上写过的每一行字（当作 OCR 的结果）和该打码的头像、昵称、标题。
  *
- * 用 javax.imageio 读图、不用 Bitmap：版面分析本身不碰安卓，这样在桌面 JVM 上也能跑。
+ * 图自己解（[Png]），不用 Bitmap 也不用 javax.imageio：单测的类路径是 android.jar，没有 imageio；
+ * 版面分析本身不碰安卓，这样不起 Robolectric 也能跑。
  */
 data class ChatFixture(
     val name: String,
@@ -37,8 +40,7 @@ object ChatFixtures {
 
     private fun load(tsv: File): ChatFixture {
         val stem = tsv.nameWithoutExtension
-        val image = ImageIO.read(File(tsv.parentFile, "$stem.png").takeIf { it.exists() } ?: File(tsv.parentFile, "$stem.jpg"))
-        val argb = image.getRGB(0, 0, image.width, image.height, null, 0, image.width)
+        val image = Png.read(File(tsv.parentFile, "$stem.png"))
         var chat = false
         val lines = ArrayList<ChatLine>()
         val avatars = ArrayList<Box>()
@@ -59,7 +61,7 @@ object ChatFixtures {
                 "title" -> title = ChatText(box, text)
             }
         }
-        return ChatFixture(stem, chat, lines, avatars, names, title, Pixels(image.width, image.height, argb))
+        return ChatFixture(stem, chat, lines, avatars, names, title, image)
     }
 
     fun iou(a: Box, b: Box): Float {
@@ -125,5 +127,77 @@ object ChatFixtures {
         sb.append(String.format("%-10s %14s %14s %14s\n", "合计", f(total.first), f(total.second), f(total.third)))
         sb.append("聊天页判错 $wrongVerdict 张\n")
         return sb.toString()
+    }
+}
+
+/** 只认生成脚本写出的那一种 PNG：8 位、不隔行，RGB 或 RGBA。 */
+internal object Png {
+    fun read(file: File): Pixels {
+        val input = DataInputStream(file.inputStream().buffered())
+        input.skipBytes(8)
+        var width = 0
+        var height = 0
+        var channels = 0
+        val idat = ByteArrayOutputStream()
+        input.use {
+            while (true) {
+                val length = it.readInt()
+                val type = String(ByteArray(4).also { t -> it.readFully(t) }, Charsets.US_ASCII)
+                val data = ByteArray(length).also { d -> it.readFully(d) }
+                it.skipBytes(4)
+                when (type) {
+                    "IHDR" -> {
+                        width = int(data, 0)
+                        height = int(data, 4)
+                        val depth = data[8].toInt()
+                        channels = when (data[9].toInt()) { 2 -> 3; 6 -> 4; else -> 0 }
+                        require(depth == 8 && channels != 0 && data[12].toInt() == 0) { "${file.name}: 只认 8 位不隔行的 RGB/RGBA" }
+                    }
+                    "IDAT" -> idat.write(data)
+                    "IEND" -> break
+                }
+            }
+        }
+        val raw = InflaterInputStream(idat.toByteArray().inputStream()).readBytes()
+        val stride = width * channels
+        val argb = IntArray(width * height)
+        var prev = ByteArray(stride)
+        for (y in 0 until height) {
+            val filter = raw[y * (stride + 1)].toInt()
+            val row = raw.copyOfRange(y * (stride + 1) + 1, (y + 1) * (stride + 1))
+            for (i in 0 until stride) {
+                val a = if (i >= channels) row[i - channels].u() else 0
+                val b = prev[i].u()
+                val c = if (i >= channels) prev[i - channels].u() else 0
+                val add = when (filter) {
+                    0 -> 0
+                    1 -> a
+                    2 -> b
+                    3 -> (a + b) / 2
+                    4 -> paeth(a, b, c)
+                    else -> error("${file.name}: 不认识的行过滤 $filter")
+                }
+                row[i] = (row[i].u() + add).toByte()
+            }
+            for (x in 0 until width) {
+                val o = x * channels
+                val alpha = if (channels == 4) row[o + 3].u() else 255
+                argb[y * width + x] = (alpha shl 24) or (row[o].u() shl 16) or (row[o + 1].u() shl 8) or row[o + 2].u()
+            }
+            prev = row
+        }
+        return Pixels(width, height, argb)
+    }
+
+    private fun Byte.u() = toInt() and 0xff
+
+    private fun int(b: ByteArray, at: Int) = (b[at].u() shl 24) or (b[at + 1].u() shl 16) or (b[at + 2].u() shl 8) or b[at + 3].u()
+
+    private fun paeth(a: Int, b: Int, c: Int): Int {
+        val p = a + b - c
+        val pa = kotlin.math.abs(p - a)
+        val pb = kotlin.math.abs(p - b)
+        val pc = kotlin.math.abs(p - c)
+        return if (pa <= pb && pa <= pc) a else if (pb <= pc) b else c
     }
 }
