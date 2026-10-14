@@ -27,7 +27,7 @@
   - `Galaxy_Z_Fold8` 可能正被别的窗口或 Android Studio 用着，别关它、别往上装。
   - 收尾时跑 `.\tools\emu\release.ps1` 关掉自己那台。忘了也没关系，下次有人领的时候会回收已经没有进程的锁，但还开着的实例会一直占内存。
   - 脚本要用 pwsh 7 跑（PowerShell 工具默认就是），Windows PowerShell 5.1 读中文会乱码。锁和启动日志在 `$env:TEMP\yomark-emu`。
-- **JDK：** Android Studio 自带的 jbr 是 JDK 25，Gradle 8.14.3 不认（报错只有一行 `25.0.3`）。构建前先设 `$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"`，再跑 `.\gradlew.bat :app:assembleDebug`。
+- **JDK：** 直接跑 `.\gradlew.bat :app:assembleDebug`，不用先设 `JAVA_HOME`：`gradle/gradle-daemon-jvm.properties` 让 Gradle 自己在本机挑 JDK 21（`$env:USERPROFILE\.jdks\jbr-21.0.11`），用 Android Studio 自带的 JDK 25 启动也行。要是报找不到 Java 21，再设 `$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"`。
 - **安装：** APK 按 ABI 拆分，模拟器装 `app\build\outputs\apk\debug\app-x86_64-debug.apk`（没有 `app-debug.apk`）：`adb -s $s install -r <apk>`。
 - **启动与检查：** `adb -s $s shell monkey -p moe.flinty.yomark -c android.intent.category.LAUNCHER 1`，然后看 `pidof moe.flinty.yomark` 和 `logcat -d -b crash`。crash 日志里 `android.hardware.uwb-service` 的 SIGABRT 是模拟器自己的问题，不用管。
 - **打开测试图：** `.\tools\emu\open-image.ps1 <图片路径>`，把图放进媒体库并在编辑器里打开（现成的测试图在 `app\src\test\resources\`）。别自己用 `am start` 发分享 intent（`--eu android.intent.extra.STREAM`）：extra 里的 URI 拿不到读权限，编辑器是空白的。多张（批量）只能在首页点「选择图片」走 Photo Picker。截图时确认画布上真有图。
