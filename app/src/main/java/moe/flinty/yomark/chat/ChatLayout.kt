@@ -1,6 +1,8 @@
 package moe.flinty.yomark.chat
 
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
 
@@ -69,14 +71,21 @@ object ChatLayout {
         val h = pixels.height.toFloat()
         if (w <= 0f || h < w) return ChatFindings.NONE   // 横着的图不是手机聊天截图（电脑版、平板横屏不在这一版里）
 
-        val zones = Zones.of(lines, w, h)
+        val split = Titles.split(lines, w)
+        val tight = split.map { TextInk.tighten(it, pixels) }
+        val onHeader = { b: Box -> TextInk.onPageColor(b, pixels) }
+        val zones = Zones.of(tight, w, h, onHeader)
         val grid = Grid.of(pixels)
         val avatars = Avatars.find(grid, zones)
         val (score, reasons) = score(zones, avatars)
         if (score < CHAT_THRESHOLD) return ChatFindings(false, score, reasons, emptyList(), emptyList(), null)
 
         val header = Avatars.header(grid, zones)
-        val names = Names.find(Zones.of(lines.mapNotNull { Avatars.cutOff(it, avatars.body, w) }, w, h), avatars.body)
+        // 头像上的字按 OCR 原来的框切（收紧以后的框已经不压着头像了），切剩的再收
+        val cut = split.indices.mapNotNull { i ->
+            Avatars.cutOff(split[i], avatars.body, w)?.let { if (it === split[i]) tight[i] else TextInk.tighten(it, pixels) }
+        }
+        val names = Names.find(Zones.of(cut, w, h, onHeader), avatars.body)
         return ChatFindings(
             isChat = true,
             score = score,
@@ -175,10 +184,11 @@ internal class Zones private constructor(
         /** 底栏：输入栏、导航栏大约屏宽的 15%。 */
         const val BOTTOM = 0.17f
 
-        fun of(lines: List<ChatLine>, w: Float, h: Float): Zones {
+        /** @param onHeader 这个框是不是直接写在顶栏的底色上（不是印在头像上的字），见 [Titles.pick]。 */
+        fun of(lines: List<ChatLine>, w: Float, h: Float, onHeader: (Box) -> Boolean = { true }): Zones {
             val status = STATUS * w
             val visible = lines.filter { it.text.isNotBlank() && it.box.centerY > status }
-            val title = Titles.pick(visible, w)
+            val title = Titles.pick(visible, w, onHeader)
             val headerBottom = Titles.headerBottom(title, visible, w)
             val bottomTop = h - BOTTOM * w
             return Zones(
@@ -217,18 +227,74 @@ internal object Titles {
         RegexOption.IGNORE_CASE,
     )
 
-    /** 群聊人数「(23)」「（23）」，iMessage 名字后面的「›」「>」。 */
-    private val SUFFIX = Regex("\\s*([(（]\\d+[)）]|[›>〉]+)\\s*$")
+    /** 群聊人数「(23)」「（23）」，iMessage 名字后面的「›」（原图上常读成「·」「>」）。 */
+    private val SUFFIX = Regex("\\s*([(（]\\d+[)）]|[›>〉》·•]+)\\s*$")
+
+    /** 和标题读成一段的返回箭头「<」、Discord 频道名前的「#」。 */
+    private val PREFIX = Regex("^[<‹«〈《←#＃·•|]+\\s*")
+
+    /** 贴着屏幕边这么近（屏宽的比例）的不是标题：返回箭头（原图上常被读成「<」「一」）、未读数、菜单键。 */
+    private const val EDGE = 0.12f
 
     /**
      * 顶栏标题：状态栏以下第一行字（屏宽 [Zones.HEADER_MAX] 以上，去掉状态行）。按字号挑不可靠：
-     * 有的应用标题和消息一样大。iMessage 标题上面是对方头像，没有字，第一行仍是标题。
+     * 有的应用标题和消息一样大。iMessage 标题上面是对方头像，第一行仍是标题。
      * 太长的不是标题（标题一般一行放得下，宽不过屏宽七成）。
+     * 也不是标题的：贴着屏幕边的、只有符号的、印在头像上的字（[onHeader] 说它底下不是顶栏的底色）：
+     * iMessage 的默认头像是一个圆里一个姓，在标题上面，比标题还靠上。
      */
-    fun pick(lines: List<ChatLine>, w: Float): ChatLine? = lines
+    fun pick(lines: List<ChatLine>, w: Float, onHeader: (Box) -> Boolean = { true }): ChatLine? = lines
         .filter { it.box.centerY < Zones.HEADER_MAX * w && it.box.width < 0.7f * w && !STATUS_LINE.containsMatchIn(it.text) }
         .filter { it.text.trim().length in 1..40 && !ChatLayout.TIME.matches(it.text.trim()) }
-        .minByOrNull { it.box.top }
+        .filter { it.text.any { c -> c.isLetterOrDigit() } && it.box.right > EDGE * w && it.box.left < (1 - EDGE) * w }
+        .sortedBy { it.box.top }
+        .firstOrNull { onHeader(it.box) }
+
+    /**
+     * 顶栏一带（屏宽 [Zones.HEADER_MAX] 以上）的行按逐字框拆开：返回箭头、头像上的字、标题、标题下面那行状态挨得近，
+     * 原图上会被 OCR 连成一行（「一 马 不吃香菜 最近在线」「B Marcus Lee」「梁 Family 182 位成员」），
+     * 整行当标题不对，整行因为带着「在线」「位成员」被当成状态行扔掉也不对。
+     * 先按空格切成词，同一高度上挨着的词再连回一段。没有逐字框的行原样留着。
+     */
+    fun split(lines: List<ChatLine>, w: Float): List<ChatLine> =
+        lines.flatMap { if (it.box.centerY < Zones.HEADER_MAX * w) pieces(it) else listOf(it) }
+
+    private fun pieces(line: ChatLine): List<ChatLine> {
+        val chars = line.chars?.takeIf { it.size == line.text.length } ?: return listOf(line)
+        val words = ArrayList<IntRange>()
+        var start = -1
+        for (i in 0..chars.size) {
+            val solid = i < chars.size && chars[i] != null && !line.text[i].isWhitespace()
+            if (solid && start < 0) start = i
+            if (!solid && start >= 0) {
+                words += start until i
+                start = -1
+            }
+        }
+        fun boxOf(r: IntRange): Box {
+            val bs = r.mapNotNull { chars[it] }
+            return Box(bs.minOf { it.left }, bs.minOf { it.top }, bs.maxOf { it.right }, bs.maxOf { it.bottom })
+        }
+        val groups = ArrayList<MutableList<IntRange>>()
+        words.forEach { r ->
+            val last = groups.lastOrNull()
+            if (last != null && sameRow(boxOf(last.last()), boxOf(r))) last += r else groups += mutableListOf(r)
+        }
+        if (groups.size < 2) return listOf(line)
+        return groups.map { g ->
+            val range = g.first().first..g.last().last
+            // 逐字框是按识别的时间步切的，字可能压出一点：左右各放宽一点（段和段之间至少隔着半个字高）
+            val b = boxOf(range)
+            val box = Box(b.left - 0.15f * b.height, b.top, b.right + 0.15f * b.height, b.bottom)
+            ChatLine(box, line.text.substring(range.first, range.last + 1), chars.subList(range.first, range.last + 1))
+        }
+    }
+
+    /** 一行里接着写的两个词：中线差不到矮的那个字高的四分之一，中间空当不到半个字高。 */
+    private fun sameRow(a: Box, b: Box): Boolean {
+        val h = min(a.height, b.height)
+        return abs(a.centerY - b.centerY) < 0.25f * h && b.left - a.right < 0.5f * h
+    }
 
     /**
      * 正文从哪儿开始：标题下面紧跟的状态行也算顶栏。没认出标题的，按常见的顶栏高度（屏宽 22%）。
@@ -242,27 +308,181 @@ internal object Titles {
         return bottom + 0.01f * w
     }
 
-    /** 标题去掉人数和箭头，框按字数比例缩到名字那一截。 */
+    /** 标题去掉前面的箭头、「#」和后面的人数、箭头，框缩到名字那一截。 */
     fun clean(line: ChatLine): ChatText {
-        val raw = line.text.trim()
-        val name = SUFFIX.replace(raw, "").trim().ifEmpty { raw }
-        return ChatText(TextSpan.boxOf(line, raw.indexOf(name).coerceAtLeast(0), name.length, raw), name)
+        val text = line.text
+        var start = text.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+        var end = text.indexOfLast { !it.isWhitespace() } + 1
+        PREFIX.find(text.substring(start, end))?.let { start += it.value.length }
+        SUFFIX.find(text.substring(start, end))?.let { end = start + it.range.first }
+        if (end <= start) return ChatText(line.box, text.trim())
+        return ChatText(TextSpan.boxOf(line, start, end - start), text.substring(start, end))
     }
 }
 
-/** 一行里一段字的框：OCR 只给整行的框，按字宽比例（汉字算两份，其余算一份）切出来。 */
+/**
+ * 一行里一段字的框。有逐字框的按逐字框取，左右不出整行的框，上下就是整行的上下沿；
+ * 没有的按字宽比例（汉字算两份，其余算一份）切出来。[text] 是 line.text 本身或其中一段（比如 trim 过的）。
+ */
 internal object TextSpan {
     private fun units(s: String) = s.sumOf { if (it.code >= 0x2E80) 2 else 1 }.toFloat()
 
     fun boxOf(line: ChatLine, start: Int, length: Int, text: String = line.text): Box {
         val total = units(text)
         if (total <= 0f || length >= text.length) return line.box
+        val chars = line.chars
+        val offset = line.text.indexOf(text)
+        if (chars != null && chars.size == line.text.length && offset >= 0) {
+            val from = (offset + start).coerceIn(0, chars.size)
+            val picked = chars.subList(from, (from + length).coerceIn(from, chars.size)).filterNotNull()
+            val b = line.box
+            val left = max(b.left, picked.minOfOrNull { it.left } ?: b.right)
+            val right = min(b.right, picked.maxOfOrNull { it.right } ?: b.left)
+            if (right > left) return Box(left, b.top, right, b.bottom)
+        }
         val before = units(text.substring(0, start.coerceIn(0, text.length)))
         val span = units(text.substring(start.coerceIn(0, text.length), (start + length).coerceIn(0, text.length)))
         val b = line.box
         val left = b.left + b.width * before / total
         return Box(left, b.top, min(b.right, left + b.width * span / total), b.bottom)
     }
+}
+
+/**
+ * OCR 的框收到字上，和框底下的颜色。
+ *
+ * PP-OCR 的检测框比字大一圈，而且按 unclip 往外扩的多少随行长变：短行扩得多（两个字的昵称上下各多出小半个字高），
+ * 长消息只多一两个像素。昵称比消息小一号要靠字高比出来，拿这种框比，字高比 0.7 的成了 0.9，和上下两行消息分不开。
+ * 所以先把框收到字的墨迹上：框边上最常见的颜色是底色，和它差得多的像素是字。
+ * 本来就贴着字的框（ML Kit 的、测试页上记的）收了也基本不变。
+ */
+internal object TextInk {
+    /** 和底色差这么多（三个通道差的和）才算字：浅灰的时间戳和底色也差一百五以上，JPEG 的噪点二三十。 */
+    private const val INK = 60
+
+    /** 底色算一样：三个通道差的和不过这些（量化到 8 级一档，相邻两档也算）。 */
+    private const val SAME = 60
+
+    /** 往框外多看这么多像素：连到这一圈上的墨迹伸出了框，不是这一行的字。 */
+    private const val MARGIN = 3
+
+    fun tighten(line: ChatLine, p: Pixels): ChatLine {
+        val b = tight(line.box, p) ?: return line
+        return if (b == line.box) line else line.copy(box = b)
+    }
+
+    /**
+     * 框里字的外接框。伸出框外的墨迹不算：框下沿压到的气泡、框边上的头像、挤进框里的上下两行，都和框外连着；
+     * 这一行的字整个在框里。收不出来的（见 [SHRINK]）返回 null。
+     */
+    fun tight(box: Box, p: Pixels): Box? {
+        val r = Region.of(box, p) ?: return null
+        val bg = r.border(p)
+        val x0 = max(0, r.x0 - MARGIN)
+        val y0 = max(0, r.y0 - MARGIN)
+        val x1 = min(p.width, r.x1 + MARGIN)
+        val y1 = min(p.height, r.y1 + MARGIN)
+        val w = x1 - x0
+        val h = y1 - y0
+        val ink = BooleanArray(w * h) { i -> diff(p.at(x0 + i % w, y0 + i / w), bg) > INK }
+        // 从外圈灌进来：和外圈连着的墨迹（八邻接）都不是这一行的字
+        val outside = BooleanArray(w * h)
+        val stack = IntArray(w * h)
+        var sp = 0
+        fun seed(i: Int) {
+            if (ink[i] && !outside[i]) { outside[i] = true; stack[sp++] = i }
+        }
+        for (x in 0 until w) { seed(x); seed((h - 1) * w + x) }
+        for (y in 0 until h) { seed(y * w); seed(y * w + w - 1) }
+        while (sp > 0) {
+            val i = stack[--sp]
+            val cx = i % w
+            val cy = i / w
+            for (dy in -1..1) for (dx in -1..1) {
+                val nx = cx + dx
+                val ny = cy + dy
+                if (nx in 0 until w && ny in 0 until h) seed(ny * w + nx)
+            }
+        }
+        // 字边上 JPEG 的振铃也和底色差过 INK（深底浅字的截图上一圈两三个像素）：外接框只认够深的像素，按这行字本身的反差定
+        var strongest = 0
+        for (y in r.y0 until r.y1) for (x in r.x0 until r.x1) {
+            val i = (y - y0) * w + (x - x0)
+            if (ink[i] && !outside[i]) strongest = max(strongest, diff(p.at(x, y), bg))
+        }
+        val deep = max(INK, (DEEP * strongest).toInt())
+        var top = -1
+        var bottom = -1
+        var left = Int.MAX_VALUE
+        var right = -1
+        for (y in r.y0 until r.y1) for (x in r.x0 until r.x1) {
+            val i = (y - y0) * w + (x - x0)
+            if (!ink[i] || outside[i] || diff(p.at(x, y), bg) <= deep) continue
+            if (top < 0) top = y
+            bottom = y
+            if (x < left) left = x
+            if (x > right) right = x
+        }
+        if (top < 0 || bottom + 1 - top < SHRINK * (r.y1 - r.y0) || right + 1 - left < SHRINK * (r.x1 - r.x0)) return null
+        return Box(max(box.left, left.toFloat()), max(box.top, top.toFloat()), min(box.right, right + 1f), min(box.bottom, bottom + 1f))
+    }
+
+    /** 外接框只算和底色的差到这行字最大反差这么多成的像素（振铃一般不到两成，字的笔画都在五成以上）。 */
+    private const val DEEP = 0.35f
+
+    /**
+     * 收出来不到原框这么多成高、宽的不收：一横、一点这种字，或者框里找不到字。
+     * 不定得太高：和头像上的字连成一个框的昵称，切掉那个字以后框还是头像那么高，字只占两成多。
+     */
+    private const val SHRINK = 0.15f
+
+    /**
+     * 框底下的颜色和同一高度上屏幕两边的颜色一样：字直接写在页面（顶栏）上，不是印在头像、按钮这种色块上。
+     * 屏幕最左、最右各 1.5% 屏宽的两条上是页面本身的颜色（头像、箭头离边总留着一道缝）。
+     */
+    fun onPageColor(box: Box, p: Pixels): Boolean {
+        val r = Region.of(box, p) ?: return true
+        val edge = max(2, (0.015f * p.width).toInt())
+        val counts = HashMap<Int, Int>()
+        for (y in r.y0 until r.y1) for (x in (0 until edge) + (p.width - edge until p.width)) {
+            val key = quantize(p.at(x, y))
+            counts[key] = (counts[key] ?: 0) + 1
+        }
+        val page = counts.maxByOrNull { it.value }?.key ?: return true
+        return diff(r.border(p), color(page)) <= SAME
+    }
+
+    /** 框落在图里的整数像素范围 [x0, x1) × [y0, y1)。太小的（不到 4 像素）不算。 */
+    private class Region(val x0: Int, val y0: Int, val x1: Int, val y1: Int) {
+        /** 框边上最常见的颜色。 */
+        fun border(p: Pixels): Int {
+            val counts = HashMap<Int, Int>()
+            fun add(x: Int, y: Int) {
+                val key = quantize(p.at(x, y))
+                counts[key] = (counts[key] ?: 0) + 1
+            }
+            for (x in x0 until x1) { add(x, y0); add(x, y1 - 1) }
+            for (y in y0 + 1 until y1 - 1) { add(x0, y); add(x1 - 1, y) }
+            return color(counts.maxByOrNull { it.value }!!.key)
+        }
+
+        companion object {
+            fun of(box: Box, p: Pixels): Region? {
+                val x0 = floor(box.left).toInt().coerceIn(0, p.width - 1)
+                val x1 = ceil(box.right).toInt().coerceIn(x0 + 1, p.width)
+                val y0 = floor(box.top).toInt().coerceIn(0, p.height - 1)
+                val y1 = ceil(box.bottom).toInt().coerceIn(y0 + 1, p.height)
+                return if (x1 - x0 < 4 || y1 - y0 < 4) null else Region(x0, y0, x1, y1)
+            }
+        }
+    }
+
+    private fun quantize(c: Int) = (c shr 19 and 31 shl 10) or (c shr 11 and 31 shl 5) or (c shr 3 and 31)
+
+    private fun color(k: Int) = ((k shr 10 and 31) * 8 + 4 shl 16) or ((k shr 5 and 31) * 8 + 4 shl 8) or ((k and 31) * 8 + 4)
+
+    private fun diff(a: Int, b: Int) =
+        abs((a shr 16 and 0xFF) - (b shr 16 and 0xFF)) + abs((a shr 8 and 0xFF) - (b shr 8 and 0xFF)) + abs((a and 0xFF) - (b and 0xFF))
 }
 
 /** 底部导航栏：「微信 通讯录 发现 我」「Chats Calls Settings」。会话列表、通讯录页有，聊天页没有。 */
@@ -319,7 +539,8 @@ internal object Avatars {
     data class Found(val body: List<Box>, val mirrored: Boolean)
 
     /**
-     * 头像上印着字（默认头像上的姓、首字母）时，OCR 会把它和旁边的昵称读成一行：「卢 曹雨」。
+     * 头像上印着字（默认头像上的姓、首字母）时，OCR 会把它和旁边的昵称读成一行：「卢 曹雨」；
+     * 原图上右边头像上的字也会接在自己那条消息后面：「地址：长江路88号… 何」。
      * 把压在头像上的那几个字切掉；整行都在头像上的去掉（返回 null）；没压着头像的原样返回。
      */
     fun cutOff(line: ChatLine, avatars: List<Box>, w: Float): ChatLine? {
@@ -328,26 +549,37 @@ internal object Avatars {
             b.left < a.right && b.right > a.left &&
                 min(b.bottom, a.bottom) - max(b.top, a.top) > 0.5f * min(b.height, a.height)
         } ?: return line
-        if (b.right <= a.right + 0.02f * w) return null
-        val chars = line.chars
-        val start = if (chars != null && chars.size == line.text.length) {
-            chars.indices.firstOrNull { i -> chars[i]?.let { it.centerX >= a.right } ?: false } ?: return null
-        } else {
+        val chars = line.chars?.takeIf { it.size == line.text.length }
+        // 每个字的横向中点：有逐字框按框，没有按字数比例
+        val centers: List<Float?> = chars?.map { it?.centerX } ?: run {
             val units = line.text.map { if (it.code >= 0x2E80) 2f else 1f }
             val total = units.sum()
             var acc = 0f
-            line.text.indices.firstOrNull { i -> (b.left + b.width * (acc + units[i] / 2f) / total >= a.right).also { acc += units[i] } } ?: return null
+            units.map { u -> (b.left + b.width * (acc + u / 2f) / total).also { acc += u } }
         }
-        val text = line.text.substring(start)
-        val lead = text.length - text.trimStart().length
-        val first = start + lead
-        if (first >= line.text.length) return null
-        val left = chars?.getOrNull(first)?.left ?: TextSpan.boxOf(line, first, line.text.length - first).left
+        val onLeft = a.centerX < b.centerX
+        var first: Int
+        var last: Int                                                    // 留下 [first, last)
+        if (onLeft) {
+            if (b.right <= a.right + 0.02f * w) return null
+            first = centers.indices.firstOrNull { centers[it]?.let { c -> c >= a.right } ?: false } ?: return null
+            last = line.text.length
+        } else {
+            if (b.left >= a.left - 0.02f * w) return null
+            first = 0
+            last = (centers.indices.lastOrNull { centers[it]?.let { c -> c <= a.left } ?: false } ?: return null) + 1
+        }
+        while (first < last && line.text[first].isWhitespace()) first++
+        while (last > first && line.text[last - 1].isWhitespace()) last--
+        if (first >= last) return null
+        val span = TextSpan.boxOf(line, first, last - first)
+        val left = if (onLeft) max(chars?.get(first)?.left ?: span.left, a.right) else b.left
+        val right = if (onLeft) b.right else min(chars?.get(last - 1)?.right ?: span.right, a.left)
         // 头像上的字通常比昵称大，整行的框是按它撑高的；有逐字框就按剩下的字收紧上下
-        val kept = chars?.subList(first, chars.size)?.filterNotNull().orEmpty()
+        val kept = chars?.subList(first, last)?.filterNotNull().orEmpty()
         val top = kept.minOfOrNull { it.top } ?: b.top
         val bottom = kept.maxOfOrNull { it.bottom } ?: b.bottom
-        return ChatLine(Box(max(left, a.right), top, b.right, bottom), line.text.substring(first), chars?.subList(first, chars.size))
+        return ChatLine(Box(left, top, right, bottom), line.text.substring(first, last), chars?.subList(first, last))
     }
 
     private const val GUTTER = 0.13f
@@ -564,9 +796,27 @@ internal object Names {
         val out = ArrayList<ChatText>()
         out += aboveMessages(z, avatars)
         out += sameColumn(z, out)
+        out.replaceAll { joinRight(z, it) }
         out += headerRows(z).filter { r -> out.none { it.box == r.box } }
         out += inSystemMessages(z)
         return out
+    }
+
+    /**
+     * 昵称右边同一行上紧挨着的一截也是它的：OCR 偶尔把一个名字检测成两段（「Ana S」「Souza」），
+     * 名字后面也可能跟着备注、号码。字号一样、隔着不到一个字高的连上。
+     */
+    private fun joinRight(z: Zones, name: ChatText): ChatText {
+        var b = name.box
+        var text = name.text
+        while (true) {
+            val next = z.body.firstOrNull {
+                it.box.left >= b.right - 1f && it.box.left - b.right < b.height && abs(it.box.centerY - b.centerY) < 0.3f * b.height &&
+                    abs(it.box.height - b.height) < 0.25f * b.height && plausible(it.text.trim())
+            } ?: return ChatText(b, text)
+            b = Box(b.left, min(b.top, next.box.top), next.box.right, max(b.bottom, next.box.bottom))
+            text = "$text ${next.text.trim()}"
+        }
     }
 
     private fun aboveMessages(z: Zones, avatars: List<Box>): List<ChatText> {
@@ -652,8 +902,11 @@ internal object Names {
     /** 单独一行的消息头时间。 */
     private val STAMP = Regex("(?:今天|昨天|Today at|Yesterday at|\\d{4}/\\d{1,2}/\\d{1,2})?\\s*\\d{1,2}:\\d{2}(?:\\s*[AP]M)?", RegexOption.IGNORE_CASE)
 
+    /** 引号：小字里的「“」常被读成「'」「‘」，前引号也会整个漏掉（「番茄炒蛋” 撤回了一条消息」）。 */
+    private const val QUOTES = "\"“”「」'‘’"
+
     private val SYSTEM_NAME = listOf(
-        Regex("[\"“「]([^\"”」]{1,$MAX_LEN})[\"”」]\\s*(?:撤回了一条消息|拍了拍|加入了群聊|退出了群聊|移出了群聊)"),
+        Regex("[\"“「'‘]([^$QUOTES]{1,$MAX_LEN})[\"”」'’]\\s*(?:撤回了一条消息|拍了拍|加入了群聊|退出了群聊|移出了群聊)"),
         Regex("^(.{1,$MAX_LEN}?)\\s*(?:撤回了一条消息|加入了群聊|退出了群聊)"),
         Regex("^(.{1,$MAX_LEN}?)\\s+(?:joined|left|unsent a message)\\b", RegexOption.IGNORE_CASE),
     )
@@ -666,10 +919,16 @@ internal object Names {
         }
         val compact = String(CharArray(kept.size) { text[kept[it]] })
         val m = SYSTEM_NAME.firstNotNullOfOrNull { it.find(compact) } ?: return@mapNotNull null
-        val name = m.groups[1] ?: return@mapNotNull null
-        if (name.value.isBlank() || name.value == "你" || name.value.equals("You", ignoreCase = true)) return@mapNotNull null
-        val first = kept[name.range.first]
-        val last = kept[name.range.last]
-        ChatText(TextSpan.boxOf(l, first, last - first + 1, text), name.value)
+        val group = m.groups[1] ?: return@mapNotNull null
+        var from = group.range.first
+        var to = group.range.last
+        while (from <= to && (compact[from] in QUOTES || compact[from].isWhitespace())) from++
+        while (to >= from && (compact[to] in QUOTES || compact[to].isWhitespace())) to--
+        if (from > to) return@mapNotNull null
+        val name = compact.substring(from, to + 1)
+        if (name == "你" || name.equals("You", ignoreCase = true)) return@mapNotNull null
+        val first = kept[from]
+        val last = kept[to]
+        ChatText(TextSpan.boxOf(l, first, last - first + 1, text), name)
     }
 }
