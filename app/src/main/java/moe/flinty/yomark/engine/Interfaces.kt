@@ -38,6 +38,15 @@ interface RegionDetector {
 }
 
 /**
+ * 整页分析：既要文字行、又要像素，在文字识别之后跑。聊天截图的头像、昵称、标题（ChatDetector）：
+ * 先得看文字的排法才知道这一页是不是聊天记录、头像该在哪一列找。
+ */
+interface PageAnalyzer {
+    val id: String
+    suspend fun analyze(image: SourceImage, lines: List<TextLine>): List<Candidate>
+}
+
+/**
  * 判定层。输入文本行，输出候选区域。
  * 首版只有 RuleClassifier。规则永远在第一位且永不缺席。
  */

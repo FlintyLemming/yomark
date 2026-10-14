@@ -1,6 +1,7 @@
 package moe.flinty.yomark.engine
 
 import android.content.Context
+import moe.flinty.yomark.chat.ChatDetector
 import moe.flinty.yomark.engine.mlkit.MlKitBarcodeDetector
 import moe.flinty.yomark.engine.mlkit.MlKitFaceDetector
 import moe.flinty.yomark.engine.mlkit.MlKitTextRecognizer
@@ -37,6 +38,9 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
     refiners = when (config.semantic) {
         SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier().traced())
         SemanticOption.OFF -> emptyList()
+    },
+    pageAnalyzers = if (config.chatState == RuleState.OFF) emptyList() else {
+        listOf(ChatDetector(masked = config.chatState == RuleState.MASKED).traced())
     },
 )
 

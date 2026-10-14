@@ -30,6 +30,9 @@ object SensitiveKindLabels {
         SensitiveKind.ORG_NAME -> R.string.kind_org
         SensitiveKind.ID_NUMBER -> R.string.kind_id_number
         SensitiveKind.VIN -> R.string.kind_vin
+        SensitiveKind.CHAT_AVATAR -> R.string.kind_chat_avatar
+        SensitiveKind.CHAT_NAME -> R.string.kind_chat_name
+        SensitiveKind.CHAT_TITLE -> R.string.kind_chat_title
         SensitiveKind.FACE -> R.string.kind_face
         SensitiveKind.BARCODE -> R.string.kind_barcode
         SensitiveKind.MANUAL -> R.string.kind_manual
@@ -74,6 +77,9 @@ object SensitiveKindLabels {
         SensitiveKind.ORG_NAME -> "机构名"
         SensitiveKind.ID_NUMBER -> "证件号码"
         SensitiveKind.VIN -> "车架号"
+        SensitiveKind.CHAT_AVATAR -> "头像"
+        SensitiveKind.CHAT_NAME -> "昵称"
+        SensitiveKind.CHAT_TITLE -> "聊天标题"
         SensitiveKind.FACE -> "人脸"
         SensitiveKind.BARCODE -> "条码"
         SensitiveKind.MANUAL -> "手动"
