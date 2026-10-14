@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import moe.flinty.yomark.core.image.ImageIntake
+import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.data.isolatedSettingsStore
 import moe.flinty.yomark.engine.CandidateMerger
@@ -127,10 +128,12 @@ class ReadmeScreenshots {
     @Test fun styles() {
         val vm = openSample()
         MaskStyle.entries.filter { it != MaskStyle.SOLID }.forEach { style ->
-            // 样式只管之后的打码，对照图要整张图都换成这种：换了再「应用到全部」
+            // 样式只管之后画的，编辑器里没有一下换掉整张图上的码的按钮；对照图要整张图都是这一种，直接把打好的码换掉
             compose.runOnUiThread {
                 vm.setStyle(style)
-                vm.applyLookToAll()
+                val look = vm.state.value.brush
+                val plan = vm.state.value.plan
+                vm.replacePlanForTest(plan.copy(items = plan.items.map { if (it.state == MaskState.MASKED) it.copy(look = look) else it }))
             }
             settle()
             shoot("editor-${style.name.lowercase()}")

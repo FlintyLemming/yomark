@@ -99,7 +99,6 @@ import kotlinx.coroutines.launch
 import moe.flinty.yomark.R
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
-import moe.flinty.yomark.render.MaskSafety
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
 import kotlin.math.max
@@ -116,9 +115,8 @@ enum class ToolGroup(@StringRes val label: Int) {
     EDIT(R.string.tool_group_edit);
 
     companion object {
-        /** 样式归哪一组：只做标记、盖不住的马克笔归「编辑」，其余归「打码」。 */
-        fun of(style: MaskStyle): ToolGroup =
-            if (MaskStyleInfo.safety(style) == MaskSafety.ANNOTATION_ONLY) EDIT else REDACT
+        /** 样式归哪一组：只做标记、盖不住的马克笔、画笔归「编辑」，其余归「打码」（见 MaskStyle.redacts）。 */
+        fun of(style: MaskStyle): ToolGroup = if (style.redacts) REDACT else EDIT
     }
 }
 

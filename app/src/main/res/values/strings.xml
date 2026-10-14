@@ -112,8 +112,6 @@
     <string name="style_marker">Marker</string>
     <string name="style_pen">Pen</string>
     <string name="collapse_style_panel">Collapse style panel</string>
-    <string name="apply_to_all">Apply to all</string>
-    <string name="apply_to_all_n">Apply to all %1$d</string>
     <string name="color">Color</string>
     <string name="grain">Grain</string>
     <string name="strength">Strength</string>

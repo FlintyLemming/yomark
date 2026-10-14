@@ -236,14 +236,15 @@ class EditorViewModel(
     }
 
     /**
-     * 「记住上次样式」（spec §12 M5）：画笔的样式与各样式的参数。读设置是异步的，用户完全可能抢在它之前
-     * 就点了样式栏——那时以用户的当次选择为准，不要把他刚调的改回去。
+     * 「记住上次样式」（spec §12 M5）：画笔回到「打码」里上次选的样式，各样式的参数是上次调好的。
+     * 上次停在马克笔、画笔也一样：打开编辑器先是打码，识别出来的码也用它（见 EditorUiState.maskLook）。
+     * 读设置是异步的，用户完全可能抢在它之前就点了样式栏——那时以用户的当次选择为准，不要把他刚调的改回去。
      */
     private fun restoreBrush(): Job = viewModelScope.launch {
         val style = settings.lastStyle.first()
         val options = settings.maskOptions.first()
         if (brushTouched) return@launch
-        _state.value = _state.value.copy(brush = MaskLook(style, options))
+        _state.value = _state.value.copy(brush = MaskLook(style, options), maskStyle = style)
     }
 
     /** 与 restoreBrush 同理：持久化的外观晚到时，不覆盖用户这次已经调过的。 */
@@ -290,7 +291,7 @@ class EditorViewModel(
             uiState = EditorUiState(
                 image = image, plan = plan,
                 isPro = _state.value.isPro, purposeStyle = _state.value.purposeStyle,
-                brush = _state.value.brush,
+                brush = _state.value.brush, maskStyle = _state.value.maskStyle,
             )
         }
         return true
@@ -328,6 +329,7 @@ class EditorViewModel(
                     isPro = _state.value.isPro,
                     purposeStyle = _state.value.purposeStyle,
                     brush = _state.value.brush,
+                    maskStyle = _state.value.maskStyle,
                     stylePanelOpen = _state.value.stylePanelOpen,
                 )
                 analyze(image)
@@ -369,6 +371,7 @@ class EditorViewModel(
             isPro = _state.value.isPro,
             purposeStyle = _state.value.purposeStyle,
             brush = _state.value.brush,
+            maskStyle = _state.value.maskStyle,
             stylePanelOpen = _state.value.stylePanelOpen,
             batch = BatchSession(items = uris.map { BatchItem(it) }, index = 0),
         )
@@ -513,8 +516,8 @@ class EditorViewModel(
         val batch = current.batch ?: return
         val shown = current.image?.takeIf { batch.index == target.index }
         val base = if (shown != null) current.plan else batch.items[target.index].plan ?: MaskPlan.empty()
-        // 直接打码的用结果到达这一刻的画笔，和单张一样；用户在识别期间画的手动框排在后面，不被覆盖
-        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.brush)
+        // 直接打码的用结果到达这一刻「打码」里的样式，和单张一样；用户在识别期间画的手动框排在后面，不被覆盖
+        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.maskLook)
         val kept = if (keepOnlyManual) base.items.filter { it.kind == SensitiveKind.MANUAL } else base.items
         val merged = base.copy(items = detected + kept)
         if (shown == null) {
@@ -564,8 +567,9 @@ class EditorViewModel(
         // 用户在分析期间画的手动框排在后面，不被覆盖。
         val current = _state.value
         if (current.image !== image) return            // 用户已经换了图，丢弃这批结果
-        // 直接打码的用结果到达这一刻的画笔：识别期间换了样式，打上的就是新样式
-        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.brush)
+        // 直接打码的用结果到达这一刻「打码」里的样式：识别期间在「打码」里换了样式，打上的就是新样式；
+        // 换成了马克笔、画笔不算，它们只做标记
+        val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.maskLook)
         val kept =
             if (keepOnlyManual) current.plan.items.filter { it.kind == SensitiveKind.MANUAL }
             else current.plan.items
@@ -647,7 +651,7 @@ class EditorViewModel(
                 return@launch
             }
             val known = now.plan.items.mapTo(HashSet()) { it.candidateId }
-            val added = MaskPlanFactory.itemsFrom(extra, now.brush).filter { it.candidateId !in known }
+            val added = MaskPlanFactory.itemsFrom(extra, now.maskLook).filter { it.candidateId !in known }
             if (added.isNotEmpty()) undoStack.push(now.plan)
             uiState = now.copy(
                 aiReview = AiReview.Done(found = added.size),
@@ -664,7 +668,8 @@ class EditorViewModel(
      * 手动框是用户自己画的，画它就是要打码，不想要就删掉——点它要是把码去掉了，
      * 「点一下再调一调」就成了「点一下码没了」。
      *
-     * 圈出的候选被点成打码时用的是画笔，不是它上一次打码时的样子：换了样式再点虚线框，要的就是新样式。
+     * 圈出的候选被点成打码时用的是「打码」里眼下的样式（[EditorUiState.maskLook]），不是它上一次打码时的样子：
+     * 换了样式再点虚线框，要的就是新样式。手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码。
      * 吸管在等着取色时，这一下只取颜色。
      */
     fun onTap(imagePoint: PointF) {
@@ -699,7 +704,7 @@ class EditorViewModel(
             return
         }
         // 点候选也算点了别处：选中态收起
-        mutate { it.toggle(item.candidateId, _state.value.brush) }
+        mutate { it.toggle(item.candidateId, _state.value.maskLook) }
         finishLookEdit()
         uiState = _state.value.copy(selectedManualId = null)
     }
@@ -781,7 +786,7 @@ class EditorViewModel(
     /**
      * 点样式栏上的一项。换了样式只是换，面板不跟着弹出来——多数时候换个样式就够了，用不着调参数；
      * 宽屏上面板本来开着的话照样开着，换成新样式的参数。点的正是当前这一项，才弹出或收起面板。
-     * 换样式本身照 [setStyle] 的规矩：管下一次打码，选中了手动框时也管那个框。
+     * 换样式本身照 [setStyle] 的规矩：管之后画的，选中了同一组的手动框时也管那个框。
      */
     fun onStyleChipClick(style: MaskStyle) {
         val s = _state.value
@@ -792,17 +797,22 @@ class EditorViewModel(
         setStyle(style)
     }
 
-    /** 换样式，参数沿用样式栏上那一份里这种样式的参数。 */
+    /** 换样式。这种样式的参数用画笔里调好的；选中了框时，别的几项照框自己的。 */
     fun setStyle(style: MaskStyle) {
-        val bar = _state.value.barLook
-        editLook(bar.copy(style = style))
+        val s = _state.value
+        editLook(MaskLook(style, s.barLook.options.withParamsOf(style, s.brush.options)))
     }
 
     /**
      * 面板上改了样式或参数。
      *
-     * 改的是画笔：从下一次打码起生效，已经打好的码不变——这一版之前样式是全局的，一换整张图的码全跟着变。
+     * 改的是画笔：从之后画的起生效，已经打好的码不变——这一版之前样式是全局的，一换整张图的码全跟着变。
+     * 画笔只收这一种样式的那几项：选中的框带着它画上时的一整份，别的样式那几项可能早就过时了，不能顶掉画笔里调好的。
+     * 换成「打码」里的样式，它也成了之后打码用的（见 [EditorUiState.maskLook]）。
+     *
      * 选中了手动框时，那个框也一起换成改后的样子（刚画完的框就是选中的，画完再调颜色是最顺手的用法）。
+     * 只限同一组：马克笔、画笔不往打码的框上用，打码的样式也不把画的线变成一块码。
+     * 换到另一组是换手里的工具，框原样留着，选中收起。
      *
      * @param inProgress 滑条还没松手。拖动期间选中的框跟着变，但不压撤销栈，松手时由 [finishLookEdit] 补一次，
      *   与拖框的 previewSelectedQuad / commitDrag 同一个道理。
@@ -810,7 +820,9 @@ class EditorViewModel(
     fun editLook(look: MaskLook, inProgress: Boolean = false) {
         val next = look.normalized()
         if (_state.value.colorPick != null) _state.value = _state.value.copy(colorPick = null)
-        setBrush(next)
+        val selected = _state.value.selectedItem
+        if (selected != null && selected.look.style.redacts != next.style.redacts) clearSelection()
+        setBrush(MaskLook(next.style, _state.value.brush.options.withParamsOf(next.style, next.options)))
         val s = _state.value
         val item = s.selectedItem
         if (item != null && item.look != next) {
@@ -833,16 +845,6 @@ class EditorViewModel(
     fun resetLookOptions() {
         val bar = _state.value.barLook
         editLook(bar.copy(options = bar.options.resetFor(bar.style)))
-    }
-
-    /**
-     * 面板上的「应用到全部」：这张图上所有已打码的都换成样式栏上的样子，一步撤销得回来。
-     * 想要回原来「一换全换」的效果，就是这一下。圈出的不动，它们打码时自然用画笔。
-     */
-    fun applyLookToAll() {
-        val look = _state.value.barLook
-        setBrush(look)
-        mutate { it.restyleMasked(look) }
     }
 
     fun dismissStylePanel() {
@@ -877,15 +879,19 @@ class EditorViewModel(
 
     /**
      * 画笔变了：立即生效，落盘做一次去抖——拖滑条时每一帧都会进来，不让 DataStore 跟着每帧写一次。
+     * 换成的是「打码」里的样式，它也是之后打码用的那一种（[EditorUiState.maskStyle]）；落盘的样式只记这一种，
+     * 马克笔、画笔只记参数。
      */
     private fun setBrush(look: MaskLook) {
         brushTouched = true
-        if (look == _state.value.brush) return
-        _state.value = _state.value.copy(brush = look)
+        val s = _state.value
+        if (look == s.brush) return
+        val maskStyle = if (look.style.redacts) look.style else s.maskStyle
+        _state.value = s.copy(brush = look, maskStyle = maskStyle)
         brushSave?.cancel()
         brushSave = viewModelScope.launch {
             delay(BRUSH_SAVE_DEBOUNCE_MS)
-            settings.setLastStyle(look.style)
+            settings.setLastStyle(maskStyle)
             settings.setMaskOptions(look.options)
         }
     }
@@ -980,17 +986,17 @@ class EditorViewModel(
         if (stopReminding) stopExportReminder()
         uiState = _state.value.copy(pendingDialogVisible = false)
         val batch = _state.value.liveBatch
-        val brush = _state.value.brush
+        val look = _state.value.maskLook
         if (batch != null) {
-            val cleared = batch.maskAllEverywhere(brush)
+            val cleared = batch.maskAllEverywhere(look)
             val s = _state.value
             uiState = s.copy(
                 batch = cleared,
-                plan = if (s.image != null) cleared.current.plan ?: s.plan.maskAll(brush) else s.plan,
+                plan = if (s.image != null) cleared.current.plan ?: s.plan.maskAll(look) else s.plan,
             )
             runBatchExport(cleared)
         } else {
-            mutate { it.maskAll(brush) }
+            mutate { it.maskAll(look) }
             runExport(_state.value.plan)
         }
     }

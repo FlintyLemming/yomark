@@ -55,6 +55,19 @@ class MaskOptionsTest {
         assertThat(tuned.resetFor(MaskStyle.SOLID).blurRadiusRatio).isEqualTo(0.3f)
     }
 
+    /** 画笔从选中的框那儿接改动：只接那一种样式的几项，框里别的样式的老参数不能顶掉画笔里调好的。 */
+    @Test fun `taking one style's params from other options leaves the rest alone`() {
+        val brush = MaskOptions(solidColor = 0xFF000000.toInt(), pixelBlockDivisor = 4, penColor = 0xFF1E88E5.toInt())
+        val box = MaskOptions(solidColor = 0xFFE53935.toInt(), solidNear = true, pixelBlockDivisor = 7)
+        val took = brush.withParamsOf(MaskStyle.SOLID, box)
+        assertThat(took.solidColor).isEqualTo(0xFFE53935.toInt())
+        assertThat(took.solidNear).isTrue()
+        assertThat(took.pixelBlockDivisor).isEqualTo(4)
+        assertThat(took.penColor).isEqualTo(0xFF1E88E5.toInt())
+        assertThat(brush.withParamsOf(MaskStyle.PEN, box).penColor).isEqualTo(MaskOptions.DEFAULT_PEN_COLOR)
+        MaskStyle.entries.forEach { assertThat(brush.withParamsOf(it, brush)).isEqualTo(brush) }
+    }
+
     /** 出厂两种都是中间那档，不是最轻的。 */
     @Test fun `mosaic and blur default to the middle step`() {
         val factory = MaskOptions()

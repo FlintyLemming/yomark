@@ -69,7 +69,7 @@ data class BatchSession(val items: List<BatchItem>, val index: Int) {
 
     fun withFailed(i: Int): BatchSession = update(i) { it.copy(failed = true) }
 
-    /** 拦截对话框的「全部打码」：每一张的圈出项都用 [look]（编辑器当下的画笔）打上码。 */
+    /** 拦截对话框的「全部打码」：每一张的圈出项都用 [look]（编辑器「打码」里眼下的样式）打上码。 */
     fun maskAllEverywhere(look: MaskLook): BatchSession =
         copy(items = items.map { it.copy(plan = it.plan?.maskAll(look)) })
 

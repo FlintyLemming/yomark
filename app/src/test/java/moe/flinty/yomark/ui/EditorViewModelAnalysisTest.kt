@@ -15,6 +15,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskState
+import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.isolatedSettingsStore
@@ -103,6 +104,24 @@ class EditorViewModelAnalysisTest {
         assertThat(states["hi"]).isEqualTo(MaskState.MASKED)
         assertThat(states["lo"]).isEqualTo(MaskState.OUTLINED)
         assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
+    }
+
+    /** 手里拿着画笔打开一张图：识别出来直接打的码用「打码」里上次选的样式，画笔只做标记。 */
+    @Test
+    fun `detected masks take the last redact style even with the pen in hand`() = runTest(dispatcher) {
+        val vm = vm(listOf(
+            candidate("hi", enabled = true, 10f, 10f, 60f, 30f),
+            candidate("lo", enabled = false, 100f, 10f, 160f, 30f),
+        ))
+        vm.setStyle(MaskStyle.PIXELATE)
+        vm.setStyle(MaskStyle.PEN)
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+
+        assertThat(vm.state.value.plan.find("hi")!!.look.style).isEqualTo(MaskStyle.PIXELATE)
+        vm.onTap(PointF(130f, 20f))                                        // 圈出的那一处点成打码
+        assertThat(vm.state.value.plan.find("lo")!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.find("lo")!!.look.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PEN)
     }
 
     @Test

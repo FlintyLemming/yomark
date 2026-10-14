@@ -95,10 +95,9 @@ class MaskPlanTest {
     }
 
     @Test
-    fun `restyle changes one item and restyleMasked every masked one`() {
+    fun `restyle changes only the one item`() {
         val p = plan(item("a", MaskState.MASKED), item("b", MaskState.MASKED), item("c", MaskState.OUTLINED))
         assertThat(p.restyle("a", marker).items.map { it.look }).containsExactly(marker, MaskLook(), MaskLook()).inOrder()
-        assertThat(p.restyleMasked(marker).items.map { it.look }).containsExactly(marker, marker, MaskLook()).inOrder()
     }
 
     @Test

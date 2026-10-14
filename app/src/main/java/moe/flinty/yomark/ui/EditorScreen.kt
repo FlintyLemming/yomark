@@ -422,7 +422,7 @@ private const val CANVAS = "canvas"
 private const val PANEL = "panel"
 
 /**
- * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、「应用到全部」能改几处、这张图上取到的近似色。
+ * 样式栏要显示的东西：样式栏上那一份（选中框的或画笔）、这张图上取到的近似色。
  * 近似色要逐块采样，只在用得上时取：面板开在色块上（「近似色」那一颗要画它），或者开着近似色（色块的小样子要画它）。
  */
 @Composable
@@ -437,7 +437,6 @@ private fun styleBarModel(state: EditorUiState): StyleBarModel {
         look = look,
         panelOpen = state.stylePanelOpen,
         colorPick = state.colorPick,
-        applicable = state.plan.items.count { it.state == MaskState.MASKED && it.look != look },
         nearColors = nearColors,
     )
 }
@@ -448,7 +447,6 @@ private class ViewModelStyleActions(private val vm: EditorViewModel) : StyleBarA
     override fun onLookChange(look: MaskLook, inProgress: Boolean) = vm.editLook(look, inProgress)
     override fun onLookChangeFinished() = vm.finishLookEdit()
     override fun onReset() = vm.resetLookOptions()
-    override fun onApplyToAll() = vm.applyLookToAll()
     override fun onCollapse() = vm.dismissStylePanel()
     override fun onPickColor(target: ColorTarget?) =
         if (target == null) vm.cancelColorPick() else vm.startColorPick(target)

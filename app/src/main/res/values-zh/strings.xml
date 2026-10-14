@@ -112,8 +112,6 @@
     <string name="style_marker">马克笔</string>
     <string name="style_pen">画笔</string>
     <string name="collapse_style_panel">收起样式面板</string>
-    <string name="apply_to_all">应用到全部</string>
-    <string name="apply_to_all_n">应用到全部 %1$d 处</string>
     <string name="color">颜色</string>
     <string name="grain">颗粒</string>
     <string name="strength">强度</string>
