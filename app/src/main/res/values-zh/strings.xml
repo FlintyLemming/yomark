@@ -92,6 +92,7 @@
     <string name="kind_vin">车架号</string>
     <string name="kind_face">人脸</string>
     <string name="kind_barcode">条码</string>
+    <string name="kind_line">文字</string>
     <string name="kind_manual">手动</string>
     <string name="kind_chat_avatar">头像</string>
     <string name="kind_chat_name">昵称</string>
@@ -216,7 +217,7 @@
     <string name="handling_masked">打码</string>
     <string name="handling_outlined">仅圈出</string>
     <string name="handling_off">关闭</string>
-    <string name="handling_outlined_summary">只画虚线框，点一下才打码</string>
+    <string name="handling_outlined_summary">不打码，导出前提醒</string>
 
     <!-- settings: text -->
     <string name="text_recognition">文字识别</string>

@@ -476,7 +476,7 @@ class EditorViewModelTest {
     // ---------- 马克笔、画笔不拿来打码，打码用「打码」里上次选的样式（2026-10-14） ----------
 
     @Test
-    fun `with the marker or the pen in hand a dashed box is masked in the last redact style`() = runTest(dispatcher) {
+    fun `with the marker or the pen in hand an outlined item is masked in the last redact style`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(

@@ -128,6 +128,22 @@ class ScanSceneDrawTest {
         listOf(top, manual, bottom).forEach { assertThat(frame.at(it)).isEqualTo(MaskOptions.SKY_BLUE) }
     }
 
+    /** 圈出没打码的什么都不画（2026-10-14 起没有虚线框和类型小标签）；点一行字打上的码和手动框一样，识别中也一直在。 */
+    @Test
+    fun `an outlined box draws nothing, a tapped line stays through recognition`() {
+        val outlined = block("url", 300f, DetectorSource.RULE).copy(kind = SensitiveKind.URL, state = MaskState.OUTLINED)
+        val line = block("line", 600f, DetectorSource.LINE).copy(kind = SensitiveKind.MANUAL)
+        val source = image()
+        fun frame(time: ScanTime?) = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also {
+            drawScene(Canvas(it), source, MaskPlan(listOf(outlined, line)), RendererRegistry.default(), scale, density, time, ScanPaints())
+        }
+        val settled = frame(null)
+        // 框四周连同上方原先放类型标签的地方，一个像素都没动
+        for (y in 270 until 340) for (x in 0 until 120) assertThat(settled.getPixel(x, y)).isEqualTo(Color.WHITE)
+        assertThat(settled.at(line)).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(frame(ScanTime.START).at(line)).isEqualTo(MaskOptions.SKY_BLUE)
+    }
+
     @Test
     fun `the page is dimmed while recognition runs`() {
         val frame = render(ScanTime(ScanEffect.FADE_IN_MS, null))

@@ -48,7 +48,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 「按住对比」（手机竖着拿时是底栏胶囊旁边的圆钮）：按住时画布只剩打码前的原图（打码块、圈出框都不画），松手回到打码后。
+ * 「按住对比」（手机竖着拿时是底栏胶囊旁边的圆钮）：按住时画布只剩打码前的原图（打码块都不画），松手回到打码后。
  * 什么都还没打码时没有可比的，按钮灰掉。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -145,8 +145,8 @@ class EditorCompareTest {
     @Test fun `holding compare shows the image before masking, letting go brings the masks back`() {
         open(MaskPlan(listOf(phone, url)))
         val masked = window()
-        val amber = Color.rgb(0xFF, 0xB3, 0x00)
-        assertThat(masked.count(amber)).isGreaterThan(0)
+        // 圈出没打码的网址不画：画布上没有琥珀色的虚线框和类型标签（2026-10-14）
+        assertThat(masked.count(Color.rgb(0xFF, 0xB3, 0x00))).isEqualTo(0)
 
         compareButton.assertIsEnabled().performTouchInput { down(center) }
         frames(SETTLE_FRAMES)
@@ -154,14 +154,12 @@ class EditorCompareTest {
         val original = window()
         // 打码块（天蓝）没了：样式栏上的小样也是天蓝，只看少了多少——至少是图上那一块
         assertThat(masked.count(MaskOptions.SKY_BLUE) - original.count(MaskOptions.SKY_BLUE)).isGreaterThan(10_000)
-        assertThat(original.count(amber)).isEqualTo(0)
 
         compareButton.performTouchInput { up() }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("原图").assertDoesNotExist()
         val back = window()
         assertThat(back.count(MaskOptions.SKY_BLUE)).isEqualTo(masked.count(MaskOptions.SKY_BLUE))
-        assertThat(back.count(amber)).isEqualTo(masked.count(amber))
     }
 
     @Test fun `nothing masked yet, nothing to compare`() {
@@ -177,7 +175,7 @@ class EditorCompareTest {
     }
 
     private companion object {
-        /** 落码那一遍和标签的淡入淡出都走完。 */
+        /** 落码那一遍走完。 */
         const val SETTLE_FRAMES = 400
     }
 }

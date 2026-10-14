@@ -229,7 +229,7 @@ class EditorViewModel(
      * 这就是「切着看」这件事成立的全部依据。
      *
      * 丢掉的是用户对规则候选做过的三态切换：新方案产出的候选和旧的不是同一批，
-     * 把旧的状态往新候选上贴没有正确答案。手动框留着——那是用户自己画的。
+     * 把旧的状态往新候选上贴没有正确答案。手动框、点一行字打上的码留着——那是用户自己加的。
      */
     private fun reanalyze(image: SourceImage) {
         undoStack.push(_state.value.plan)
@@ -283,6 +283,7 @@ class EditorViewModel(
             return false
         }
         uiState = uiState.copy(restoring = true)
+        val savedLines = savedState.get<FloatArray>(KEY_LINES)?.let(::unpackQuads).orEmpty()
         viewModelScope.launch {
             val image = runCatching {
                 SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher)
@@ -292,6 +293,7 @@ class EditorViewModel(
                 return@launch
             }
             intakeResult = IntakeResult(file, mime)
+            lines = savedLines
             uiState = EditorUiState(
                 image = image, plan = plan,
                 isPro = _state.value.isPro, purposeStyle = _state.value.purposeStyle,
@@ -305,6 +307,7 @@ class EditorViewModel(
         savedState.remove<String>(KEY_FILE)
         savedState.remove<String>(KEY_MIME)
         savedState.remove<MaskPlan>(KEY_PLAN)
+        savedState.remove<FloatArray>(KEY_LINES)
     }
 
     fun onImageChosen(uri: Uri) {
@@ -325,6 +328,7 @@ class EditorViewModel(
                 intakeResult = result
                 undoStack.clear()                     // 换图时两个栈都清空
                 lookEditOrigin = null
+                takeLines(null)                       // 上一张图的行，点在这张图上不作数
                 uiState = EditorUiState(
                     image = image,
                     plan = MaskPlan.empty(),
@@ -366,6 +370,7 @@ class EditorViewModel(
         // 像 onImageChosen 那样逐张 clear() 会把前面几张就地删掉，导出只剩最后看的那一张。
         intake.clear()
         intakeResult = null
+        takeLines(null)
         undoStack = UndoStack()
         lookEditOrigin = null
         dragOrigin = null
@@ -410,6 +415,7 @@ class EditorViewModel(
         undoStack = UndoStack()
         // 载入期间进程被杀的话，宁可什么都不恢复，也不要把上一张的图配上这里的占位 plan
         intakeResult = null
+        takeLines(null)
         uiState = s.copy(
             image = null,
             plan = MaskPlan.empty(),
@@ -469,7 +475,7 @@ class EditorViewModel(
             lookEditOrigin = null
             dragOrigin = null
             analyzedWith = record?.ranWith
-            reviewLines = record?.lines
+            takeLines(record?.lines)
             uiState = s.copy(
                 image = image,
                 plan = stored.plan ?: MaskPlan.empty(),
@@ -529,7 +535,7 @@ class EditorViewModel(
             return
         }
         analyzedWith = ranWith
-        reviewLines = result?.lines
+        takeLines(result?.lines)
         uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged)
         if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
     }
@@ -578,7 +584,7 @@ class EditorViewModel(
             if (keepOnlyManual) current.plan.items.filter { it.kind == SensitiveKind.MANUAL }
             else current.plan.items
         analyzedWith = ranWith
-        reviewLines = result?.lines
+        takeLines(result?.lines)
         uiState = current.copy(
             analyzing = false,
             aiReview = AiReview.Hidden,
@@ -600,6 +606,23 @@ class EditorViewModel(
 
     /** 最近一次识别出的整页文字，「AI 增强识别」要把它送给模型。只活在内存里，重建后就没有了。 */
     private var reviewLines: List<TextLine>? = null
+
+    /**
+     * 画布上这张图识别出的每一行字的框（TextLine.quad）：点在没打码的字上，打码的就是它所在的那一行。
+     * 和 [reviewLines] 不同，它跟着 plan 进 SavedStateHandle（一行八个数），重建之后照样点得上。
+     * 还没识别完、识别失败时是空的。
+     */
+    private var lines: List<Quad> = emptyList()
+        set(value) {
+            field = value
+            savedState[KEY_LINES] = packQuads(value)
+        }
+
+    /** 换上画布上这张图识别出的文字（没有就是 null）：增强识别要送的整页文字，点字打码要的每一行的框。 */
+    private fun takeLines(found: List<TextLine>?) {
+        reviewLines = found
+        lines = found.orEmpty().map { it.quad }
+    }
 
     private var aiReviewJob: Job? = null
 
@@ -668,27 +691,32 @@ class EditorViewModel(
     // ---------- 编辑 ----------
 
     /**
-     * 点一下：识别出的候选在 MASKED ⇄ OUTLINED 之间切换；手动框不切换，而是选中它，调出手柄与删除。
-     * 手动框是用户自己画的，画它就是要打码，不想要就删掉——点它要是把码去掉了，
-     * 「点一下再调一调」就成了「点一下码没了」。
+     * 点一下（spec §7.3，2026-10-14 修订；点中了什么见 GestureRules.tapTarget）：
+     * - 打了码的：识别出的取消打码（退回圈出，画布上不画）；点一行字打上的码拿掉；
+     * - 没打码的字：它所在的那一整行打上码，框是文字识别给的这一行。圈出的人脸、条码、头像打码它整块；
+     * - 手动框：不切换，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
+     *   点它要是把码去掉了，「点一下再调一调」就成了「点一下码没了」。
      *
-     * 圈出的候选被点成打码时用的是「打码」里眼下的样式（[EditorUiState.maskLook]），不是它上一次打码时的样子：
-     * 换了样式再点虚线框，要的就是新样式。手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码。
+     * 点上的码用的是「打码」里眼下的样式（[EditorUiState.maskLook]），圈出的候选也不沿用它上一次打码时的样子：
+     * 换了样式再点，要的就是新样式。手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码。
      * 吸管在等着取色时，这一下只取颜色。
+     *
+     * @param reach 点没落在任何一行字里时，离一行多近也算点中它（图像像素）
      */
-    fun onTap(imagePoint: PointF) {
+    fun onTap(imagePoint: PointF, reach: Float = 0f) {
         if (_state.value.colorPick != null) {
             pickColorAt(imagePoint)
             return
         }
-        val hit = GestureRules.hitTest(_state.value.plan.items, imagePoint)
-        if (hit != null) {
-            tapItem(hit)
-            return
+        when (val target = GestureRules.tapTarget(_state.value.plan.items, lines, imagePoint, reach)) {
+            is GestureRules.TapTarget.Item -> tapItem(target.item)
+            is GestureRules.TapTarget.Line -> maskLine(target.quad)
+            null -> {
+                // 点空白算点了别处：选中态收起
+                finishLookEdit()
+                uiState = _state.value.copy(selectedManualId = null)
+            }
         }
-        // 点空白算点了别处：选中态收起
-        finishLookEdit()
-        uiState = _state.value.copy(selectedManualId = null)
     }
 
     /**
@@ -707,9 +735,25 @@ class EditorViewModel(
             uiState = _state.value.copy(selectedManualId = item.candidateId)
             return
         }
-        // 点候选也算点了别处：选中态收起
-        mutate { it.toggle(item.candidateId, _state.value.maskLook) }
+        // 点上的一行再点就拿掉，不在 plan 里留一行看不见的「没打码」；识别出的在打码、圈出之间切换。
+        // 点它们也算点了别处：选中态收起
+        if (item.source == DetectorSource.LINE) mutate { it.remove(item.candidateId) }
+        else mutate { it.toggle(item.candidateId, _state.value.maskLook) }
         finishLookEdit()
+        uiState = _state.value.copy(selectedManualId = null)
+    }
+
+    /** 点了没打码的一行字：整行打上码，用「打码」里眼下的样式。和点识别出的码一样，不进选中态。 */
+    private fun maskLine(quad: Quad) {
+        val item = MaskItem(
+            candidateId = "line-${UUID.randomUUID()}",
+            quad = quad,
+            kind = SensitiveKind.MANUAL,
+            source = DetectorSource.LINE,
+            state = MaskState.MASKED,
+            look = _state.value.maskLook,
+        )
+        mutate { it.add(item) }
         uiState = _state.value.copy(selectedManualId = null)
     }
 
@@ -1209,6 +1253,7 @@ class EditorViewModel(
         const val KEY_FILE = "intake.file"
         const val KEY_MIME = "intake.mime"
         const val KEY_PLAN = "plan"
+        const val KEY_LINES = "lines"
         const val DEFAULT_PURPOSE_TEXT = "仅供办理 XX 使用"
         const val PURPOSE_STYLE_SAVE_DEBOUNCE_MS = 400L
         const val BRUSH_SAVE_DEBOUNCE_MS = 400L
@@ -1218,4 +1263,19 @@ class EditorViewModel(
     fun replacePlanForTest(plan: MaskPlan) {
         uiState = _state.value.copy(plan = plan)
     }
+}
+
+/** 存成一串数，一行八个（四个角的 x、y）：长截图上几百行，进 SavedStateHandle 也只有几 KB。 */
+private fun packQuads(quads: List<Quad>): FloatArray = FloatArray(quads.size * 8).also { out ->
+    quads.forEachIndexed { i, q ->
+        q.points().forEachIndexed { k, p ->
+            out[i * 8 + k * 2] = p.x
+            out[i * 8 + k * 2 + 1] = p.y
+        }
+    }
+}
+
+private fun unpackQuads(packed: FloatArray): List<Quad> = (0 until packed.size / 8).map { i ->
+    fun at(k: Int) = PointF(packed[i * 8 + k * 2], packed[i * 8 + k * 2 + 1])
+    Quad(at(0), at(1), at(2), at(3))
 }

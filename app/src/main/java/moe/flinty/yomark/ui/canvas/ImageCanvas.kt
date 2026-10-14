@@ -8,7 +8,6 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.PorterDuff
-import android.graphics.RectF
 import android.graphics.Shader
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -55,13 +54,11 @@ import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
-import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskState
-import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.PurposeWatermarkDrawer
 import moe.flinty.yomark.render.MaskOrder
@@ -72,26 +69,28 @@ import kotlinx.coroutines.withContext
 import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
 /**
  * 画布：图像 + 遮罩 + 叠层 + 手势。
  *
- * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
- * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）。
+ * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。只画打了码的：圈出没打码的不画（2026-10-14 起
+ * 没有虚线框和类型小标签），点它的字就打上码。
+ * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）、
+ * 点码取消、点没打码的字打码那一行（见 EditorViewModel.onTap）。
  * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
+ * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一行多远还算点中它（图像像素）
  * @param onInk 手画完一笔：手指走过的点，图像坐标
  */
 @Composable
 fun ImageCanvas(
     state: EditorUiState,
     registry: RendererRegistry,
-    onTap: (PointF) -> Unit,
+    onTap: (PointF, Float) -> Unit,
     onManualBox: (Quad) -> Unit,
     onResize: (Quad) -> Unit,
     onCommitDrag: () -> Unit,
@@ -103,8 +102,6 @@ fun ImageCanvas(
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
-    val resources = LocalContext.current.resources
-    val labelOf = remember(resources) { { item: MaskItem -> SensitiveKindLabels.display(resources, item) } }
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
 
@@ -331,7 +328,7 @@ fun ImageCanvas(
                                     )
                                     lastTapAt = 0L
                                 } else {
-                                    onTap(p)
+                                    onTap(p, GestureRules.LINE_REACH_DP * density.density / viewport.scale)
                                     lastTapAt = if (quick) now else 0L
                                     lastTapAtScreen = PointF(last.x, last.y)
                                 }
@@ -357,7 +354,7 @@ fun ImageCanvas(
                 canvas.concat(viewport.matrix())
 
                 if (showOriginal) {
-                    // 打码、圈出框、用途水印、选中框和识别动效一概不画
+                    // 打码、用途水印、选中框和识别动效一概不画
                     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
                     canvas.restoreToCount(save)
                     return@drawIntoCanvas
@@ -370,7 +367,7 @@ fun ImageCanvas(
                     ScanStyle.SWEEP -> ScanLook.Sweep
                     ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
                 }
-                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite, labelOf)
+                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite)
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
                 state.purposeText?.let {
@@ -501,14 +498,6 @@ private const val TOOLBAR_MARGIN_DP = 8f
 /** 草稿框内那层主题色的不透明度，约 12%，与 Material 的状态层一个量级。 */
 private const val DRAFT_FILL_ALPHA = 0x1F
 
-/** 2dp 虚线框（琥珀色）—— 圈出未打码的外观（spec §7.2）。线宽按缩放反算，保持视觉恒定。 */
-private fun outlinePaint(scale: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-    style = Paint.Style.STROKE
-    color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
-    strokeWidth = 4f / scale
-    pathEffect = DashPathEffect(floatArrayOf(12f / scale, 8f / scale), 0f)
-}
-
 /** 选中框、草稿框与手柄的颜色，取自主题（见 YomarkTheme）。 */
 private class SelectionColors(val primary: Int, val surface: Int)
 
@@ -564,52 +553,6 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
     })
 }
 
-/** 琥珀色小标签的画笔与尺寸。字号按缩放反算，视觉大小恒定。 */
-private class LabelPaints(val scale: Float) {
-    val text = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.BLACK
-        textSize = 26f / scale
-    }
-    val bg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = AndroidColor.rgb(0xFF, 0xB3, 0x00)
-        style = Paint.Style.FILL
-    }
-    val padding = 6f / scale
-    val height = text.textSize + padding * 2
-    fun width(label: String) = text.measureText(label) + padding * 2
-}
-
-/**
- * 给所有圈出框的类型标签找位置（见 LabelLayout）：贴在框四周，避开画面上所有的框
- * 和先摆好的标签。从上到下、从左到右依次摆，同一个 plan 每帧摆出来都一样，不会跳。
- *
- * 缩放比 < 0.5 时不画标签，返回空：避免密集截图上标签糊成一片。
- */
-internal fun layoutKindLabels(items: List<MaskItem>, image: SourceImage, scale: Float, labelOf: (MaskItem) -> String): Map<String, RectF> {
-    if (scale < GestureRules.LABEL_MIN_SCALE) return emptyMap()
-    val outlined = items.withIndex()
-        .filter { it.value.state == MaskState.OUTLINED }
-        .sortedWith(compareBy({ it.value.quad.bounds().top }, { it.value.quad.bounds().left }))
-    if (outlined.isEmpty()) return emptyMap()
-    val paints = LabelPaints(scale)
-    val rects = LabelLayout.place(
-        boxes = items.map { it.quad.bounds() },
-        requests = outlined.map { LabelLayout.Request(it.index, paints.width(labelOf(it.value)), paints.height) },
-        area = RectF(0f, 0f, image.width.toFloat(), image.height.toFloat()),
-        gap = 2f / scale,
-    )
-    return outlined.zip(rects) { item, rect -> item.value.candidateId to rect }.toMap()
-}
-
-private fun drawKindLabel(canvas: android.graphics.Canvas, label: String, rect: RectF, paints: LabelPaints) {
-    val scale = paints.scale
-    canvas.drawRoundRect(rect, 4f / scale, 4f / scale, paints.bg)
-    canvas.drawText(
-        label, rect.left + paints.padding,
-        rect.bottom - paints.padding - paints.text.descent() * 0.5f, paints.text,
-    )
-}
-
 /**
  * 图像、遮罩与扫描动效——画布上除了选中态、草稿框和磨砂的等待图标之外的全部内容。拆出来是为了
  * 让像素测试能直接画出动效的任意一帧。
@@ -631,17 +574,13 @@ internal fun drawScene(
     paints: ScanPaints,
     look: ScanLook = ScanLook.Sweep,
     composite: MaskComposite = MaskComposite(),
-    /** 类型小标签的文字（见 SensitiveKindLabels），与宽屏的框列表同一套。单测里不传，画类型名。 */
-    labelOf: (MaskItem) -> String = { it.kind.name },
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
-    // 识别出的在底下，手动框后画的盖在先画的上面——与导出同一个顺序（见 MaskOrder）
-    val sorted = MaskOrder.forDrawing(plan.items)
-    // 标签按整张 plan 一起摆：识别中/落码时打码块分两批画，标签之间也得互相避让
-    val labels = layoutKindLabels(sorted, image, scale, labelOf)
-    val composed = composite.of(image, sorted.filter { it.state == MaskState.MASKED }, registry)
-    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, scale, labels, composed, labelOf) }
+    // 识别出的在底下，用户加的后加的盖在先加的上面——与导出同一个顺序（见 MaskOrder）。圈出没打码的不画
+    val sorted = MaskOrder.forDrawing(plan.items.filter { it.state == MaskState.MASKED })
+    val composed = composite.of(image, sorted, registry)
+    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
     if (time == null) {
         drawItems(sorted)
         return
@@ -649,7 +588,7 @@ internal fun drawScene(
 
     val dp = density / scale
     if (look is ScanLook.Frost) {
-        val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
+        val (manual, detected) = sorted.partition { it.byUser }
         drawFrostScene(
             canvas, image.width.toFloat(), image.height.toFloat(), dp, time, look, paints.frost,
             drawDetected = { drawItems(detected) },
@@ -662,7 +601,7 @@ internal fun drawScene(
     val trail = ScanEffect.TRAIL_DP * dp
     val lead = ScanEffect.LEAD_DP * dp
     val light = LightSpec(image.width, height, trail, lead, ScanEffect.HUE_SPAN_DP * dp, ScanEffect.drift(time.sinceScan))
-    val (detected, manual) = sorted.partition { it.source != DetectorSource.MANUAL }
+    val (manual, detected) = sorted.partition { it.byUser }
     val feather = ScanEffect.FEATHER_DP * dp
     // 结果到达后，循环光先提速走完手头这一趟，落码那一遍紧接着从顶上开始
     val front = ScanEffect.revealMs(time.sinceScan, time.sinceResult)?.let { ScanEffect.revealFront(it, height, lead, trail, feather) }
@@ -687,13 +626,12 @@ internal fun drawScene(
             paints,
         )
     }
-    // 手动框是用户自己画的，识别期间也一直在，清楚地浮在光上面
+    // 手动框、点上的一行是用户自己加的，识别期间也一直在，清楚地浮在光上面
     drawItems(manual)
 }
 
 /**
- * 先画打码块，再画圈出框：圈出框（还没打码的）永远在打码块之上，不会被盖住。
- * 每块码按它自己的样式画；[items] 已经按 MaskOrder 排好了。
+ * 画打了码的那几块（[items] 只有打了码的，已经按 MaskOrder 排好了），每块码按它自己的样式画。
  * 有 [composite]（见 MaskComposite）时，码所在的地方直接从合成好的图上取。
  */
 private fun drawItems(
@@ -701,36 +639,24 @@ private fun drawItems(
     items: List<MaskItem>,
     image: SourceImage,
     registry: RendererRegistry,
-    scale: Float,
-    labels: Map<String, RectF>,
     composite: android.graphics.Bitmap?,
-    labelOf: (MaskItem) -> String,
 ) {
-    val masked = items.filter { it.state == MaskState.MASKED }
     if (composite != null) {
-        if (masked.isNotEmpty()) {
+        if (items.isNotEmpty()) {
             val area = android.graphics.Path()
-            masked.forEach { area.op(it.quad.toPath(), android.graphics.Path.Op.UNION) }
+            items.forEach { area.op(it.quad.toPath(), android.graphics.Path.Op.UNION) }
             val save = canvas.save()
             canvas.clipPath(area)
             canvas.drawBitmap(composite, 0f, 0f, null)
             canvas.restoreToCount(save)
         }
     } else {
-        masked.forEach {
+        items.forEach {
             // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
             // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
             val options = it.look.options.copy(renderScale = image.scale)
             registry[it.look.style].render(canvas, image.bitmap, it.quad, options, it.ink)
         }
-    }
-    items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
-        canvas.drawPath(item.quad.toPath(), outlinePaint(scale))
-    }
-    // 标签在全部描边之后画：贴在别的框外侧的标签不会被后画的描边划过
-    val labelPaints = LabelPaints(scale)
-    items.filter { it.state == MaskState.OUTLINED }.forEach { item ->
-        labels[item.candidateId]?.let { drawKindLabel(canvas, labelOf(item), it, labelPaints) }
     }
 }
 
@@ -805,7 +731,7 @@ private const val KEEP_STOPS = 8
 
 /**
  * 落码图层上只留光已经走过的部分：光的中心往上 [feather] 处以上原样保留，中心以下抹掉，
- * 中间按 ScanEffect.coverage 渐变。蒙版的范围比图像大出一圈，探出图像边的标签与描边也一样处理。
+ * 中间按 ScanEffect.coverage 渐变。蒙版的范围比图像大出一圈，探出图像边的码也一样处理。
  */
 private fun keepRevealed(
     canvas: android.graphics.Canvas,

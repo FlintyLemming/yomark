@@ -92,6 +92,7 @@
     <string name="kind_vin">VIN</string>
     <string name="kind_face">Face</string>
     <string name="kind_barcode">Barcode</string>
+    <string name="kind_line">Text</string>
     <string name="kind_manual">Manual</string>
     <string name="kind_chat_avatar">Avatar</string>
     <string name="kind_chat_name">Display name</string>
@@ -216,7 +217,7 @@
     <string name="handling_masked">Mask</string>
     <string name="handling_outlined">Outline only</string>
     <string name="handling_off">Off</string>
-    <string name="handling_outlined_summary">Dashed box only, tap to mask</string>
+    <string name="handling_outlined_summary">Not masked; asked about before export</string>
 
     <!-- settings: text -->
     <string name="text_recognition">Text recognition</string>

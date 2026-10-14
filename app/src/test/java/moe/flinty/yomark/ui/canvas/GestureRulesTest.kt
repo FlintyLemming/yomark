@@ -73,8 +73,83 @@ class GestureRulesTest {
         assertThat(GestureRules.hitTest(listOf(manual, small, big), PointF(50f, 50f))?.candidateId).isEqualTo("manual")
     }
 
+    // ---------- 点一下点中了什么（spec §7.3，2026-10-14 修订） ----------
+
+    private fun detected(
+        id: String, l: Float, t: Float, r: Float, b: Float,
+        state: MaskState = MaskState.MASKED, kind: SensitiveKind = SensitiveKind.PHONE,
+    ) = item(id, l, t, r, b).copy(kind = kind, source = DetectorSource.RULE, state = state)
+
+    private fun line(l: Float, t: Float, r: Float, b: Float) = Quad.fromRect(RectF(l, t, r, b))
+
     @Test
-    fun `label threshold matches the spec`() {
-        assertThat(GestureRules.LABEL_MIN_SCALE).isEqualTo(0.5f)
+    fun `an outlined box draws nothing, so a tap cannot hit it`() {
+        val outlined = detected("url", 0f, 0f, 100f, 100f, MaskState.OUTLINED, SensitiveKind.URL)
+        assertThat(GestureRules.hitTest(listOf(outlined), PointF(50f, 50f))).isNull()
+    }
+
+    @Test
+    fun `a tap on unmasked text takes its whole line, even over an outlined date in it`() {
+        val date = detected("date", 60f, 10f, 120f, 30f, MaskState.OUTLINED, SensitiveKind.DATETIME)
+        val row = line(10f, 8f, 300f, 32f)
+        assertThat(GestureRules.tapTarget(listOf(date), listOf(row), PointF(80f, 20f)))
+            .isEqualTo(GestureRules.TapTarget.Line(row))
+    }
+
+    @Test
+    fun `a tap on a mask hits the mask, the rest of its line is still a line`() {
+        val phone = detected("phone", 60f, 10f, 120f, 30f)
+        val row = line(10f, 8f, 300f, 32f)
+        assertThat(GestureRules.tapTarget(listOf(phone), listOf(row), PointF(80f, 20f)))
+            .isEqualTo(GestureRules.TapTarget.Item(phone))
+        assertThat(GestureRules.tapTarget(listOf(phone), listOf(row), PointF(200f, 20f)))
+            .isEqualTo(GestureRules.TapTarget.Line(row))
+    }
+
+    @Test
+    fun `an outlined face is masked whole, not the text read on it`() {
+        val face = item("face", 0f, 0f, 200f, 200f)
+            .copy(kind = SensitiveKind.FACE, source = DetectorSource.FACE, state = MaskState.OUTLINED)
+        val word = line(50f, 90f, 150f, 110f)
+        assertThat(GestureRules.tapTarget(listOf(face), listOf(word), PointF(100f, 100f)))
+            .isEqualTo(GestureRules.TapTarget.Item(face))
+    }
+
+    /** 从重建里恢复、识别不出字的地方：没有这一行的框，圈出的那一处照样点得上。 */
+    @Test
+    fun `with no line under the finger the outlined item there is the target`() {
+        val url = detected("url", 10f, 10f, 200f, 30f, MaskState.OUTLINED, SensitiveKind.URL)
+        assertThat(GestureRules.tapTarget(listOf(url), emptyList(), PointF(50f, 20f)))
+            .isEqualTo(GestureRules.TapTarget.Item(url))
+    }
+
+    @Test
+    fun `blank space far from any line is nothing`() {
+        assertThat(GestureRules.tapTarget(emptyList(), listOf(line(10f, 10f, 100f, 30f)), PointF(50f, 200f), reach = 8f))
+            .isNull()
+    }
+
+    @Test
+    fun `a tap between two lines takes the nearer one within reach`() {
+        val upper = line(10f, 10f, 300f, 30f)
+        val lower = line(10f, 40f, 300f, 60f)
+        assertThat(GestureRules.lineAt(listOf(upper, lower), PointF(100f, 37f), reach = 6f)).isEqualTo(lower)
+        assertThat(GestureRules.lineAt(listOf(upper, lower), PointF(100f, 33f), reach = 6f)).isEqualTo(upper)
+        assertThat(GestureRules.lineAt(listOf(upper, lower), PointF(100f, 37f), reach = 2f)).isNull()
+    }
+
+    @Test
+    fun `of two lines under the finger the smaller one wins`() {
+        // 斜着压在字上的水印也读成了一行，框比字那一行大得多
+        val watermark = line(0f, 0f, 400f, 200f)
+        val text = line(10f, 90f, 300f, 110f)
+        assertThat(GestureRules.lineAt(listOf(watermark, text), PointF(100f, 100f), reach = 0f)).isEqualTo(text)
+    }
+
+    @Test
+    fun `a tapped line sits over the detected masks in it`() {
+        val phone = detected("phone", 60f, 10f, 120f, 30f)
+        val tapped = item("line", 10f, 8f, 300f, 32f).copy(source = DetectorSource.LINE)
+        assertThat(GestureRules.hitTest(listOf(tapped, phone), PointF(80f, 20f))?.candidateId).isEqualTo("line")
     }
 }

@@ -127,7 +127,7 @@ class CandidateMerger(
         c.readingDegrees?.takeIf { it != page.degrees }?.let { ReadingFrame.at(it) } ?: page
 
     private fun priority(source: DetectorSource): Int = when (source) {
-        DetectorSource.RULE, DetectorSource.FACE, DetectorSource.BARCODE, DetectorSource.MANUAL -> 0
+        DetectorSource.RULE, DetectorSource.FACE, DetectorSource.BARCODE, DetectorSource.MANUAL, DetectorSource.LINE -> 0
         DetectorSource.ENTITY_MODEL -> 1
         DetectorSource.LLM -> 2
     }

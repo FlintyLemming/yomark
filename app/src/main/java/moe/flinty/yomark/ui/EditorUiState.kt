@@ -114,7 +114,7 @@ data class EditorUiState(
     val barLook: MaskLook get() = selectedItem?.look ?: brush
 
     /**
-     * 打码用的样子：识别出来直接打的码、点了打码的虚线框、导出前的「全部打码」都用它。
+     * 打码用的样子：识别出来直接打的码、点一下打上的码、导出前的「全部打码」都用它。
      * 样式是「打码」里上次选的那一种，参数是画笔里调好的；马克笔、画笔只做标记，不拿来打码（2026-10-14）。
      */
     val maskLook: MaskLook get() = MaskLook(maskStyle, brush.options)

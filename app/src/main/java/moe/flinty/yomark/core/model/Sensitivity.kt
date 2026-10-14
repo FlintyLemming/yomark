@@ -47,5 +47,9 @@ enum class SensitiveKind {
     FACE, BARCODE, MANUAL,
 }
 
-/** 候选是谁提出来的。UI 上区分「规则命中」和「模型猜的」，后者标为实验性。 */
-enum class DetectorSource { RULE, ENTITY_MODEL, LLM, FACE, BARCODE, MANUAL }
+/**
+ * 候选是谁提出来的。UI 上区分「规则命中」和「模型猜的」，后者标为实验性。
+ * 最后两个不是识别出来的，是用户自己加的：MANUAL 是拉的框、手画的线，LINE 是点一行没打码的字打上的码，
+ * 框是文字识别给的这一行（TextLine.quad）。
+ */
+enum class DetectorSource { RULE, ENTITY_MODEL, LLM, FACE, BARCODE, MANUAL, LINE }

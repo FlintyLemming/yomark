@@ -173,6 +173,17 @@ class MaskItemListTest {
         compose.onNodeWithText("网址 · AI").assertExists()
     }
 
+    /** 点一行字打上的码列作「文字」；被它整个盖住的圈出项，图上看着已经遮住了，不另列一行。 */
+    @Test fun `a tapped line is listed as text and hides the outlined item under it`() {
+        val date = item("date", 60f, 10f, 120f, 30f, kind = SensitiveKind.DATETIME, state = MaskState.OUTLINED)
+        val line = item("line", 10f, 8f, 300f, 32f, kind = SensitiveKind.MANUAL, source = DetectorSource.LINE)
+        show(MaskPlan(listOf(date, line)))
+        compose.onNodeWithText("文字").assertIsOn()
+        compose.onNodeWithText("日期时间").assertDoesNotExist()
+        compose.onNodeWithText("框出 1 处").assertExists()
+        compose.onNodeWithText("都已打码").assertExists()
+    }
+
     /** 识别中（换方案重跑时也是）只列手动框：识别出的块这时在画布上也不画。 */
     @Test fun `while recognizing only the manual boxes are listed`() {
         show(plan, analyzing = true)

@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.annotation.StringRes
 import moe.flinty.yomark.R
 
-/** 类型的显示名。画布小标签、宽屏的框列表与导出拦截对话框共用同一套措辞。 */
+/** 类型的显示名。宽屏的框列表与导出拦截对话框共用同一套措辞。 */
 object SensitiveKindLabels {
 
     @StringRes
@@ -40,9 +40,15 @@ object SensitiveKindLabels {
 
     fun display(res: Resources, kind: SensitiveKind): String = res.getString(nameRes(kind))
 
-    /** 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */
-    fun display(res: Resources, item: MaskItem): String =
-        display(res, item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
+    /**
+     * 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。
+     * 点一行字打上的码说不上是哪一类，就叫「文字」。
+     */
+    fun display(res: Resources, item: MaskItem): String = when (item.source) {
+        DetectorSource.LINE -> res.getString(R.string.kind_line)
+        DetectorSource.LLM -> display(res, item.kind) + " · AI"
+        else -> display(res, item.kind)
+    }
 
     /**
      * 「2 个网址」「1 个 IP 地址」：中文里名字以字母开头的补一个空格（kind_count_latin），纯中文名不补。
