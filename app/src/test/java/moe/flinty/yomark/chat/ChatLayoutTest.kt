@@ -201,6 +201,35 @@ class ChatLayoutTest {
         assertThat(ChatLayout.analyze(listOf(ChatLine(Box(10f, 10f, 50f, 20f), "发送")), px)).isEqualTo(ChatFindings.NONE)
     }
 
+    /**
+     * Telegram 群里的昵称和消息一样大，只是彩色的；引用回复里被引用的人名也是。
+     * 名字下面先是引用里的彩色人名、再是白字的也认；彩色的网址、置顶消息条不认。
+     */
+    @Test fun `colored names as large as the message are found`() {
+        val px = Pixels(540, 1170, IntArray(540 * 1170) { 0xFF1E2A36.toInt() })
+        fun paint(b: Box, color: Int) {
+            // 字的笔画：框里隔行的横条，框边上留着底色
+            for (y in b.top.toInt() + 2 until b.bottom.toInt() - 2 step 2) for (x in b.left.toInt() + 2 until b.right.toInt() - 2) px.argb[y * 540 + x] = color
+        }
+        val blue = 0xFF5FB0F0.toInt()
+        val pink = 0xFFE87A9A.toInt()
+        val white = 0xFFF0F0F0.toInt()
+        val lines = listOf(
+            ChatLine(Box(70f, 200f, 300f, 220f), "置顶消息") to blue,
+            ChatLine(Box(70f, 226f, 400f, 246f), "周六上午十点集合") to white,
+            ChatLine(Box(70f, 400f, 150f, 420f), "Jerry") to blue,
+            ChatLine(Box(70f, 426f, 300f, 446f), "你想幹啥") to white,
+            ChatLine(Box(70f, 500f, 250f, 520f), "Angelic47") to pink,
+            ChatLine(Box(80f, 528f, 150f, 548f), "Jerry") to blue,
+            ChatLine(Box(80f, 552f, 200f, 572f), "你想幹啥") to white,
+            ChatLine(Box(70f, 650f, 250f, 670f), "pan.example.com") to blue,
+            ChatLine(Box(70f, 676f, 300f, 696f), "资料都在这里了") to white,
+        )
+        lines.forEach { (l, c) -> paint(l.box, c) }
+        val found = Names.find(zonesOf(lines.map { it.first }), emptyList()) { TextInk.chroma(it, px) }
+        assertThat(found.map { it.text }).containsExactly("Jerry", "Angelic47", "Jerry")
+    }
+
     private fun zonesOf(lines: List<ChatLine>): Zones = Zones.of(lines, 540f, 1170f)
 
     /** 一张纯色图，再一块块涂上颜色。 */

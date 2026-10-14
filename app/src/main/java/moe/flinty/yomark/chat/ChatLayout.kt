@@ -85,7 +85,7 @@ object ChatLayout {
         val cut = split.indices.mapNotNull { i ->
             Avatars.cutOff(split[i], avatars.body, w)?.let { if (it === split[i]) tight[i] else TextInk.tighten(it, pixels) }
         }
-        val names = Names.find(Zones.of(cut, w, h, onHeader), avatars.body)
+        val names = Names.find(Zones.of(cut, w, h, onHeader), avatars.body) { TextInk.chroma(it, pixels) }
         return ChatFindings(
             isChat = true,
             score = score,
@@ -425,6 +425,30 @@ internal object TextInk {
         }
         if (top < 0 || bottom + 1 - top < SHRINK * (r.y1 - r.y0) || right + 1 - left < SHRINK * (r.x1 - r.x0)) return null
         return Box(max(box.left, left.toFloat()), max(box.top, top.toFloat()), min(box.right, right + 1f), min(box.bottom, bottom + 1f))
+    }
+
+    /**
+     * 框里字的颜色有多「彩」：和底色差到最大反差一半以上的像素（字的笔画心，避开抗锯齿那一圈），RGB 最大减最小的平均。
+     * 白字、黑字、灰字接近 0，Telegram、WhatsApp 群里的彩色昵称一百上下。
+     */
+    fun chroma(box: Box, p: Pixels): Int {
+        val r = Region.of(box, p) ?: return 0
+        val bg = r.border(p)
+        var strongest = 0
+        for (y in r.y0 until r.y1) for (x in r.x0 until r.x1) strongest = max(strongest, diff(p.at(x, y), bg))
+        if (strongest <= INK) return 0
+        var sum = 0L
+        var n = 0
+        for (y in r.y0 until r.y1) for (x in r.x0 until r.x1) {
+            val c = p.at(x, y)
+            if (diff(c, bg) * 2 < strongest) continue
+            val red = c shr 16 and 0xFF
+            val green = c shr 8 and 0xFF
+            val blue = c and 0xFF
+            sum += max(red, max(green, blue)) - min(red, min(green, blue))
+            n++
+        }
+        return if (n == 0) 0 else (sum / n).toInt()
     }
 
     /** 外接框只算和底色的差到这行字最大反差这么多成的像素（振铃一般不到两成，字的笔画都在五成以上）。 */
@@ -792,10 +816,13 @@ internal object Names {
     private fun plausible(text: String) =
         text.length <= MAX_LEN && text.any { it.isLetter() } && !NOT_NAME.containsMatchIn(text) && !ChatLayout.TIME.containsMatchIn(text)
 
-    fun find(z: Zones, avatars: List<Box>): List<ChatText> {
+    fun find(z: Zones, avatars: List<Box>, chroma: (Box) -> Int = { 0 }): List<ChatText> {
         val out = ArrayList<ChatText>()
         out += aboveMessages(z, avatars)
-        out += sameColumn(z, out)
+        // 同一列的小字只按上面认出的那些推：彩色昵称和消息一样大，拿它们推会把引用里的小字也算进来
+        val small = sameColumn(z, out)
+        out += colored(z, chroma).filter { c -> out.none { it.box == c.box } }
+        out += small.filter { c -> out.none { it.box == c.box } }
         out.replaceAll { joinRight(z, it) }
         out += headerRows(z).filter { r -> out.none { it.box == r.box } }
         out += inSystemMessages(z)
@@ -858,6 +885,45 @@ internal object Names {
             ChatText(l.box, text)
         }
     }
+
+    /**
+     * 彩色的昵称：Telegram、WhatsApp 这类把名字写在气泡第一行，字号和消息一样，按颜色区分（每人一种颜色）；
+     * 引用回复里被引用的人名也是这样。靠左、像个名字、字是彩色的，下面紧跟着（左缘差不到 5% 屏宽）一行不是彩色的字。
+     * 彩色的网址、话题标签不算。
+     */
+    private fun colored(z: Zones, chroma: (Box) -> Int): List<ChatText> {
+        val body = z.body.filter { !z.isCentered(it) && it.box.left <= 0.35f * z.w }
+        val hue = HashMap<ChatLine, Int>()
+        fun of(l: ChatLine) = hue.getOrPut(l) { chroma(l.box) }
+        fun next(l: ChatLine) = body.filter {
+            it !== l && it.box.top >= l.box.bottom - 0.2f * l.box.height && it.box.top - l.box.bottom < 2f * l.box.height &&
+                abs(it.box.left - l.box.left) < 0.05f * z.w
+        }.minByOrNull { it.box.top }
+        return body.mapNotNull { l ->
+            val text = l.text.trim()
+            // 单个字母的（图片里的大字、表情上的字）不算
+            if (text.count { !it.isWhitespace() } < 2 || !plausible(text) || LINK.containsMatchIn(text) || PINNED.containsMatchIn(text)) return@mapNotNull null
+            if (of(l) < COLORED) return@mapNotNull null
+            // 往下找第一行不是彩色的字：名字下面可能先是引用里被引用的人名（也是彩色的）
+            var below = next(l)
+            var hops = 0
+            while (below != null && of(below) >= COLORED && hops < 2) {
+                below = next(below)
+                hops++
+            }
+            if (below == null || of(below) >= PLAIN) return@mapNotNull null
+            ChatText(l.box, text)
+        }
+    }
+
+    /** 字的平均彩度（RGB 最大减最小）到这个数算彩色字；白、黑、灰字不到 [PLAIN]。 */
+    private const val COLORED = 55
+    private const val PLAIN = 35
+
+    /** 置顶消息条：标题也是彩色的。 */
+    private val PINNED = Regex("置顶|消息$|Pinned", RegexOption.IGNORE_CASE)
+
+    private val LINK = Regex("https?://|www\\.|[A-Za-z0-9]\\.(?:com|net|org|cn|io|me|co)\\b|^#", RegexOption.IGNORE_CASE)
 
     /**
      * 已经认出两个以上昵称的页上，和它们左缘对齐（误差 1% 屏宽）、一样大小的短行也是昵称：
