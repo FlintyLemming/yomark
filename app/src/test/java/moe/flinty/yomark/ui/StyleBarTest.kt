@@ -26,10 +26,10 @@ import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
-import moe.flinty.yomark.ui.components.StyleBar
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.StylePanel
+import moe.flinty.yomark.ui.components.StyleSheet
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,8 +37,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 样式栏与它弹出的调节面板（spec §7.5 修订）。面板只发出新的样子，写进画笔、改选中的框由 ViewModel 管，
- * 那一段见 EditorViewModelTest。原先在 androidTest 里的样式栏测试挪到了这里：放在 androidTest 里 CI 不跑。
+ * 样式的调节面板（spec §7.5 修订）：手机上弹出来的那个、宽屏上占列表位置的那个。面板只发出新的样子，
+ * 写进画笔、改选中的框由 ViewModel 管，那一段见 EditorViewModelTest。底栏上挑样式的那一行见 EditorToolbarTest。
+ * 原先在 androidTest 里的样式栏测试挪到了这里：放在 androidTest 里 CI 不跑。
  *
  * 手机上的面板是弹出来的底部动作条，在自己的对话框窗口里；查找节点时各个窗口都会找到。
  */
@@ -49,14 +50,12 @@ class StyleBarTest {
     @get:Rule val compose = createComposeRule()
 
     private class Recorder : StyleBarActions {
-        val clicked = mutableListOf<MaskStyle>()
         val looks = mutableListOf<Pair<MaskLook, Boolean>>()
         var finished = 0
         var resets = 0
         var appliedToAll = 0
         var collapsed = 0
         val picks = mutableListOf<ColorTarget?>()
-        override fun onStyleClick(style: MaskStyle) { clicked += style }
         override fun onLookChange(look: MaskLook, inProgress: Boolean) { looks += look to inProgress }
         override fun onLookChangeFinished() { finished++ }
         override fun onReset() { resets++ }
@@ -66,30 +65,11 @@ class StyleBarTest {
     }
 
     private fun show(model: StyleBarModel, actions: StyleBarActions = Recorder()) {
-        compose.setContent { MaterialTheme { Surface { StyleBar(model, actions) } } }
+        compose.setContent { MaterialTheme { Surface { StyleSheet(model, actions) } } }
     }
 
     private fun open(style: MaskStyle, options: MaskOptions = MaskOptions()) =
         StyleBarModel(MaskLook(style, options), panelOpen = true)
-
-    // ---------- 样式那一排 ----------
-
-    @Test fun allFourStylesAreOffered() {
-        show(StyleBarModel(MaskLook()))
-        listOf("色块", "马赛克", "模糊", "马克笔").forEach {
-            compose.onNodeWithText(it).assertIsDisplayed()
-        }
-        compose.onNodeWithText("抹除").assertDoesNotExist()      // 并进了色块，是色块的近似色
-        compose.onNodeWithText("表情").assertDoesNotExist()      // 去掉了
-        compose.onNodeWithText("色块").assertIsSelected()
-    }
-
-    @Test fun tappingAStyleReportsIt() {
-        val actions = Recorder()
-        show(StyleBarModel(MaskLook()), actions)
-        compose.onNodeWithText("马赛克").performClick()
-        assertThat(actions.clicked).containsExactly(MaskStyle.PIXELATE)
-    }
 
     @Test fun thePanelStaysOutOfTheWayUntilOpened() {
         show(StyleBarModel(MaskLook()))
@@ -144,7 +124,7 @@ class StyleBarTest {
     @Test fun theSheetStepsAsideWhileTheEyedropperWaits() {
         val actions = Recorder()
         var model by mutableStateOf(open(MaskStyle.SOLID))
-        compose.setContent { MaterialTheme { Surface { StyleBar(model, actions) } } }
+        compose.setContent { MaterialTheme { Surface { StyleSheet(model, actions) } } }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         assertThat(actions.picks).containsExactly(ColorTarget.SOLID)
         model = model.copy(colorPick = ColorTarget.SOLID)

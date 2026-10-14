@@ -56,7 +56,7 @@ class AiReviewButtonTest {
     @Test
     fun `a failure is not passed off as nothing new, and the button retries`() {
         show(AiReview.Failed)
-        compose.onNodeWithText("识别失败，点击重试").assertHasClickAction().assertIsEnabled().performClick()
+        compose.onNodeWithText("识别失败，重试").assertHasClickAction().assertIsEnabled().performClick()
         assertThat(clicks).isEqualTo(1)
     }
 }

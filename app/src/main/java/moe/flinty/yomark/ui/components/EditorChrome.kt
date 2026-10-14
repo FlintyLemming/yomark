@@ -44,7 +44,8 @@ fun EditorTopBar(
     canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onPurpose: () -> Unit,
+    /** 用途水印。手机竖着拿时它在底栏的「编辑」里，传 null，这里就不出现。 */
+    onPurpose: (() -> Unit)?,
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -68,12 +69,14 @@ fun EditorTopBar(
         if (onRemoveWatermark != null) {
             IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark)) }
         }
-        IconButton(onClick = onPurpose) {
-            Icon(
-                Icons.Filled.Layers,
-                stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
-                tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-            )
+        if (onPurpose != null) {
+            IconButton(onClick = onPurpose) {
+                Icon(
+                    Icons.Filled.Layers,
+                    stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
+                    tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
+            }
         }
         if (compare != null) {
             // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
@@ -88,8 +91,16 @@ fun EditorTopBar(
     }
 }
 
+/**
+ * 手机的底栏：一行工具（见 [EditorToolbar]），「AI 增强识别」挨着两组，导出在最右边。
+ * 批量时胶片条单独一行，在工具上面。
+ *
+ * @param toolGroup 展开着的那一组，收着时为 null
+ */
 @Composable
 fun EditorBottomBar(
+    toolGroup: ToolGroup?,
+    onToolGroup: (ToolGroup?) -> Unit,
     styleBar: StyleBarModel,
     styleActions: StyleBarActions,
     onExport: () -> Unit,
@@ -99,26 +110,34 @@ fun EditorBottomBar(
     @StringRes exportLabel: Int = R.string.export,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
-    /** 批量时的胶片条（见 [EditorActionRow]）。单张时为 null。 */
+    /** 已设用途水印：「编辑」里的水印着主题色。 */
+    purposeOn: Boolean = false,
+    onPurpose: () -> Unit = {},
+    /** 批量时的胶片条。单张时为 null。 */
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    // 样式的调节面板是弹出来盖在画布上的（见 StyleBar），底栏的高度不随它变
+    // 样式的调节面板是弹出来盖在画布上的（见 StyleSheet），底栏的高度不随它变
     Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        StyleBar(model = styleBar, actions = styleActions)
-        EditorActionRow(
-            onExport = onExport,
-            exportLabel = exportLabel,
-            exporting = exporting,
+        filmstrip?.invoke(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp))
+        EditorToolbar(
+            open = toolGroup,
+            onOpen = onToolGroup,
+            styleBar = styleBar,
+            styleActions = styleActions,
+            purposeOn = purposeOn,
+            onPurpose = onPurpose,
             aiReview = aiReview,
             onAiReview = onAiReview,
-            filmstrip = filmstrip,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+            modifier = Modifier.padding(start = 8.dp, end = 12.dp),
+        ) {
+            Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
+        }
     }
+    StyleSheet(styleBar, styleActions)
 }
 
 /**
- * 底栏的最后一行，手机的底栏和宽屏的样式列表那一块（WideEditorPanel）共用。
+ * 宽屏的样式列表那一块（WideEditorPanel）最底下那一行。手机上这两样都在工具那一行里（见 [EditorBottomBar]）。
  *
  * 单张时左边「AI 增强识别」，右边「导出」。批量时左边是胶片条，占掉导出左边剩下的地方，
  * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。

@@ -90,6 +90,7 @@ import moe.flinty.yomark.ui.components.PendingExportDialog
 import moe.flinty.yomark.ui.components.PurposeWatermarkPanel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
+import moe.flinty.yomark.ui.components.ToolGroup
 import moe.flinty.yomark.ui.components.UnopenedExportDialog
 import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.nearColorsOf
@@ -123,6 +124,8 @@ fun EditorScreen(
     // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
+    // 手机底栏展开着的那一组（打码、编辑）。只是界面上的事，不进 ViewModel；用途水印面板顶替底栏再回来时还展开着
+    var toolGroup by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -201,7 +204,8 @@ fun EditorScreen(
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
-                onPurpose = vm::showPurposeSheet,
+                // 手机竖着拿时用途水印在底栏的「编辑」里
+                onPurpose = if (layout == EditorLayout.PHONE) null else vm::showPurposeSheet,
                 purposeOn = state.purposeText != null,
                 // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                 onSettings = onSettings,
@@ -222,6 +226,12 @@ fun EditorScreen(
             )
             // 面板顶替底栏，画布留在上面实时预览。返回键先收面板，不直接退出编辑器。
             if (state.purposeSheetVisible) BackHandler(onBack = vm::dismissPurposeSheet)
+            // 底栏展开着一组时，返回先收回去。上面几样开着时先收它们
+            BackHandler(
+                enabled = layout == EditorLayout.PHONE && toolGroup != null && state.colorPick == null &&
+                    !state.stylePanelOpen && !state.purposeSheetVisible,
+                onBack = { toolGroup = null },
+            )
             CanvasAndPanel(
                 panelAtSide = atSide,
                 // 横着拿时用途水印面板在右边，输入法弹起来时整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
@@ -287,6 +297,8 @@ fun EditorScreen(
                             maxHeight = if (atSide) Dp.Unspecified else purposePanelMaxHeight(),
                         )
                         layout == EditorLayout.PHONE -> EditorBottomBar(
+                            toolGroup = toolGroup,
+                            onToolGroup = { toolGroup = it },
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             onExport = onExport,
@@ -294,6 +306,8 @@ fun EditorScreen(
                             exporting = state.exporting,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
+                            purposeOn = state.purposeText != null,
+                            onPurpose = vm::showPurposeSheet,
                             filmstrip = filmstrip,
                         )
                         else -> WideEditorPanel(

@@ -65,8 +65,9 @@ import androidx.compose.ui.test.performSemanticsAction
  * 平板、阔折叠在画布下面或右边多出列表，点列表的一行就切换那一块。
  * 哪些尺寸算宽屏的细账在 EditorLayoutTest，列表本身在 MaskItemListTest。
  *
+ * 手机的底栏是一行工具：点「打码」「编辑」就地展开，返回收起；用途水印在「编辑」里，不在顶栏。
  * 手机上样式的调节面板是弹出来盖在图上的：弹出时底栏不动，吸管取色时让开再回来，点外面、按返回都收起。
- * 这几条用真的 ViewModel 走一遍，面板自己的控件在 StyleBarTest。
+ * 这几条用真的 ViewModel 走一遍，这一行自己的细节在 EditorToolbarTest，面板自己的控件在 StyleBarTest。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -145,25 +146,59 @@ class EditorScreenLayoutTest {
     private fun screenBounds() = compose.onRoot().getUnclippedBoundsInRoot()
 
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
-    @Test fun `a phone keeps the style bar and has no list`() {
+    @Test fun `a phone has one row of tools and no list`() {
         open()
-        compose.onNodeWithText("色块").assertExists()
-        compose.onNodeWithText("导出").assertExists()
+        val export = compose.onNodeWithText("导出").getUnclippedBoundsInRoot()
+        for (label in listOf("打码", "编辑")) {
+            val group = compose.onNodeWithText(label).getUnclippedBoundsInRoot()
+            assertThat(group.top).isLessThan(export.bottom)
+            assertThat(group.bottom).isGreaterThan(export.top)
+        }
+        compose.onNodeWithText("色块").assertDoesNotExist()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+    }
+
+    /** 点一组就地展开它的工具，导出让开；系统返回先把它收回去，不退出编辑器。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone a group unfolds in place and back folds it`() {
+        open()
+        val bar = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
+        compose.onNodeWithText("打码").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
+        compose.onNodeWithText("导出").assertDoesNotExist()
+        assertThat(compose.onNodeWithText("打码").getUnclippedBoundsInRoot()).isEqualTo(bar)
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        compose.onNodeWithText("导出").assertIsDisplayed()
+        assertThat(compose.activity.isFinishing).isFalse()
+    }
+
+    /** 手机竖着拿，用途水印在「编辑」里，顶栏上没有它。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the purpose watermark is under edit, not in the top bar`() {
+        val vm = open()
+        compose.onNodeWithContentDescription("用途水印").assertDoesNotExist()
+        compose.onNodeWithText("编辑").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("水印").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
     }
 
     /** 手机上样式的调节面板从底下弹出来盖在图上，不把底栏和画布往上顶。 */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the style panel pops up over the image instead of pushing it up`() {
         val vm = open()
-        val bar = compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()
+        val bar = compose.onNodeWithText("导出").getUnclippedBoundsInRoot()
         compose.runOnUiThread {
             // 色块本来就选着，再点一下就弹出面板。别换成带安全性说明的样式：说明会把样式栏往上顶
             vm.onStyleChipClick(MaskStyle.SOLID)
         }
         frames(SETTLE_FRAMES)
         compose.onNode(hasText("恢复默认") and hasAnyAncestor(isDialog())).assertIsDisplayed()
-        assertThat(compose.onNodeWithText("马克笔").getUnclippedBoundsInRoot()).isEqualTo(bar)
+        assertThat(compose.onNodeWithText("导出").getUnclippedBoundsInRoot()).isEqualTo(bar)
         compose.runOnUiThread { vm.dismissStylePanel() }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
