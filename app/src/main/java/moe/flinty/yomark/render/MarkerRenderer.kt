@@ -5,12 +5,14 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import kotlin.math.sin
 
 /**
  * 马克笔（spec §8）：半透明色叠加，路径带轻微手绘抖动。
+ * 手画的一笔（[InkPath]）是一道半透明的粗线：整条线一次画完，自己和自己交叉的地方不会更深。
  *
  * **安全性：不遮蔽，仅标记。** 这是六种样式里唯一不遮住内容的，
  * 用途是「圈出来给人看」而不是「盖住不让人看」。UI 必须标注。
@@ -19,7 +21,12 @@ class MarkerRenderer : MaskRenderer {
 
     override val style = MaskStyle.MARKER
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+        if (ink != null) {
+            val half = InkStroke.halfWidth(style, options, source)
+            canvas.drawPath(InkStroke.path(ink, quad, half), InkStroke.paint(options.markerColor, half))
+            return
+        }
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             this.style = Paint.Style.FILL
             color = options.markerColor

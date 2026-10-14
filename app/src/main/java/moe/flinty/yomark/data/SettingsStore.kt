@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.debug.TraceLog
 import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
@@ -56,7 +57,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡。
+     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡，马克笔、画笔的画法与粗细。
      * 与 lastStyle 一样是编辑器里记住的偏好，不是设置页上的项，「恢复默认设置」不动它。
      *
      * 读回来一律 normalized()：手改过的或以后改了范围的旧值收回范围内，色块不会变成半透明的，
@@ -73,6 +74,11 @@ class SettingsStore internal constructor(
             pixelBlockDivisor = prefs[KEY_PIXEL_DIVISOR] ?: fallback.pixelBlockDivisor,
             blurRadiusRatio = prefs[KEY_BLUR_RATIO] ?: fallback.blurRadiusRatio,
             markerColor = prefs[KEY_MARKER_COLOR] ?: fallback.markerColor,
+            markerShape = prefs[KEY_MARKER_SHAPE].toShape(fallback.markerShape),
+            markerWidth = prefs[KEY_MARKER_WIDTH] ?: fallback.markerWidth,
+            penColor = prefs[KEY_PEN_COLOR] ?: fallback.penColor,
+            penShape = prefs[KEY_PEN_SHAPE].toShape(fallback.penShape),
+            penWidth = prefs[KEY_PEN_WIDTH] ?: fallback.penWidth,
         ).normalized()
     }
 
@@ -84,8 +90,16 @@ class SettingsStore internal constructor(
             it[KEY_PIXEL_DIVISOR] = o.pixelBlockDivisor
             it[KEY_BLUR_RATIO] = o.blurRadiusRatio
             it[KEY_MARKER_COLOR] = o.markerColor
+            it[KEY_MARKER_SHAPE] = o.markerShape.name
+            it[KEY_MARKER_WIDTH] = o.markerWidth
+            it[KEY_PEN_COLOR] = o.penColor
+            it[KEY_PEN_SHAPE] = o.penShape.name
+            it[KEY_PEN_WIDTH] = o.penWidth
         }
     }
+
+    private fun String?.toShape(fallback: StrokeShape): StrokeShape =
+        this?.let { raw -> StrokeShape.entries.firstOrNull { it.name == raw } } ?: fallback
 
     @VisibleForTesting
     internal suspend fun writeRawMaskOptionsForTest(markerColor: Int, pixelDivisor: Int, solidColor: Int) {
@@ -325,6 +339,11 @@ class SettingsStore internal constructor(
         val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor")
         val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio")
         val KEY_MARKER_COLOR = intPreferencesKey("mask_marker_color")
+        val KEY_MARKER_SHAPE = stringPreferencesKey("mask_marker_shape")
+        val KEY_MARKER_WIDTH = floatPreferencesKey("mask_marker_width")
+        val KEY_PEN_COLOR = intPreferencesKey("mask_pen_color")
+        val KEY_PEN_SHAPE = stringPreferencesKey("mask_pen_shape")
+        val KEY_PEN_WIDTH = floatPreferencesKey("mask_pen_width")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
         val KEY_PURPOSE_COLOR = intPreferencesKey("purpose_watermark_color")
         val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")

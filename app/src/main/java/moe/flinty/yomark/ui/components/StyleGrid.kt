@@ -38,12 +38,12 @@ import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
 /**
- * 宽屏的样式按钮：四种样式排成两行两列的圆角方块（宽屏增补设计）。
+ * 宽屏的样式按钮：五种样式排成两行三列的圆角方块（宽屏增补设计）。
  *
  * 方块跟着给它的地方变大变小，不在旁边空出一块：竖着拿时铺满下面那一块的左半边（[fillHeight]），
  * 横着拿时铺满右边那一栏的宽、高取宽的四分之三。方块大了，里面的小样子和名字跟着放大。
  *
- * 一行一行地放：色块、马赛克，模糊、马克笔——越往后越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
+ * 一行一行地放：色块、马赛克、模糊，马克笔、画笔——越往后越只是做个样子。和手机的样式栏是同一份状态、同一套动作：
  * 点一种换样式，再点当前那一种才弹出或收起调节面板。
  *
  * @param fillHeight 方块往下长到给它的高度为止，但不比宽高出 [MAX_ASPECT] 倍；false 时高按宽定
@@ -159,8 +159,8 @@ private fun StyleTile(
     }
 }
 
-private const val ROWS = 2
-private const val COLUMNS = 2
+private const val COLUMNS = 3
+private val ROWS = (MaskStyleInfo.ORDER.size + COLUMNS - 1) / COLUMNS
 
 private val GAP = 12.dp
 

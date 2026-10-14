@@ -74,10 +74,10 @@ class Exporter(
                 .map { item ->
                     val quad = item.quad.scaled(factor)
                     val options = item.look.options.copy(renderScale = renderScale)
-                    Triple(item.look.style, quad, MaskOrder.pinNearColor(options, bitmap, quad))
+                    Triple(item, quad, MaskOrder.pinNearColor(options, bitmap, quad))
                 }
-                .forEach { (style, quad, options) ->
-                    registry[style].render(canvas, bitmap, quad, options)
+                .forEach { (item, quad, options) ->
+                    registry[item.look.style].render(canvas, bitmap, quad, options, item.ink)
                     maskedBounds += quad.bounds()
                 }
 

@@ -102,7 +102,6 @@
     <string name="tool_group_edit">编辑</string>
     <string name="tool_group_expand">展开</string>
     <string name="tool_group_collapse">收起</string>
-    <string name="tool_pen">画笔</string>
     <string name="tool_watermark">水印</string>
     <string name="tool_on">已开启</string>
 
@@ -111,6 +110,7 @@
     <string name="style_pixelate">马赛克</string>
     <string name="style_blur">模糊</string>
     <string name="style_marker">马克笔</string>
+    <string name="style_pen">画笔</string>
     <string name="collapse_style_panel">收起样式面板</string>
     <string name="apply_to_all">应用到全部</string>
     <string name="apply_to_all_n">应用到全部 %1$d 处</string>
@@ -118,6 +118,10 @@
     <string name="grain">颗粒</string>
     <string name="strength">强度</string>
     <string name="marker_opacity">浓淡</string>
+    <string name="stroke_shape">画法</string>
+    <string name="stroke_shape_box">框选</string>
+    <string name="stroke_shape_freehand">手绘</string>
+    <string name="stroke_width">粗细</string>
     <string name="near_color">近似色</string>
     <string name="custom_color">自定义颜色</string>
     <string name="eyedropper">从图上取色</string>

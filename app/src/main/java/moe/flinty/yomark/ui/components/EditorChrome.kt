@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -43,6 +42,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.HorizontalAlignmentLine
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.util.lerp
+import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.delay
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
@@ -115,8 +135,21 @@ fun EditorTopBar(
 }
 
 /**
+ * 手机的底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。
+ *
+ * 底栏占满画布那一块的高：调节面板从工具那一行往上长出来，盖在画布上，图不跟着往上顶。
+ * 画布只给这条线以下让地方；没有这条线的（宽屏的那一栏、用途水印面板）照它们自己的高让。
+ */
+val PanelTop = HorizontalAlignmentLine(::min)
+
+/**
  * 手机的底栏：一行浮着的工具（见 [EditorToolbar]），它自己留两边的空。导出在顶栏右上角（见 [EditorTopBar]）。
  * 批量时胶片条单独一行，在工具上面。
+ *
+ * 样式的调节面板（展开一组后再点当前的样式）不另外弹一层：胶囊直接往上长成一块大圆角面板，
+ * 面板的名字、参数在上面一点点显出来，工具那一行还在面板最底下，换样式不用先收起。
+ * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
+ * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
  *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
@@ -138,24 +171,111 @@ fun EditorBottomBar(
     /** 批量时的胶片条。单张时为 null。 */
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
-    // 样式的调节面板是弹出来盖在画布上的（见 StyleSheet），底栏的高度不随它变
-    Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        filmstrip?.invoke(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp))
-        EditorToolbar(
-            open = toolGroup,
-            onOpen = onToolGroup,
-            styleBar = styleBar,
-            styleActions = styleActions,
-            purposeOn = purposeOn,
-            onPurpose = onPurpose,
-            aiReview = aiReview,
-            onAiReview = onAiReview,
-            compare = compare,
-            canCompare = canCompare,
-        )
+    val wanted = styleBar.panelOpen && styleBar.colorPick == null && toolGroup != null
+    val grow = animateFloatAsState(if (wanted) 1f else 0f, tween(EXPAND_MS, easing = EASING), label = "stylePanel")
+    val shown by remember { derivedStateOf { grow.value > 0f } }
+    val panelShown = wanted || shown
+    val container = MaterialTheme.colorScheme.surfaceContainer
+    val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = PANEL_EDGE_ALPHA)
+
+    Layout(
+        content = {
+            filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
+            if (panelShown) {
+                // 面板的底子垫在工具那一行底下，和胶囊一个颜色、一样的投影，胶囊自己的边和投影淡掉（见 EditorToolbar 的 merge）。
+                // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框
+                Box(Modifier.layoutId(BarPart.CARD).floatingSurface(container, Color.Transparent, PANEL_RADIUS).pointerInput(Unit) { swallowTouches() })
+                StylePanelContent(styleBar, styleActions, Modifier.layoutId(BarPart.CONTENT))
+            }
+            EditorToolbar(
+                open = toolGroup,
+                onOpen = onToolGroup,
+                styleBar = styleBar,
+                styleActions = styleActions,
+                purposeOn = purposeOn,
+                onPurpose = onPurpose,
+                aiReview = aiReview,
+                onAiReview = onAiReview,
+                compare = compare,
+                canCompare = canCompare,
+                merge = { grow.value },
+                modifier = Modifier.layoutId(BarPart.ROW),
+            )
+            // 边画在工具上面：底子垫在工具底下，它的边被胶囊的底色盖住了
+            if (panelShown) Box(Modifier.layoutId(BarPart.EDGE).floatingEdge(edge, PANEL_RADIUS))
+        },
+        modifier = modifier.fillMaxWidth(),
+    ) { measurables, constraints ->
+        val width = constraints.maxWidth
+        val pad = BAR_PAD.roundToPx()
+        val margin = PANEL_MARGIN.roundToPx()
+        val part = { id: BarPart -> measurables.firstOrNull { it.layoutId == id } }
+        val row = part(BarPart.ROW)!!.measure(Constraints.fixedWidth(width))
+        val film = part(BarPart.FILM)?.measure(Constraints.fixedWidth((width - FILM_MARGIN.roundToPx() * 2).coerceAtLeast(0)))
+        val filmGap = if (film != null) FILM_GAP.roundToPx() else 0
+        val resting = pad + (film?.height ?: 0) + filmGap + row.height + pad
+        // 有多高就占多高：面板往上长的那一截在画布上面，画布只让到 PanelTop 为止
+        val height = if (constraints.hasBoundedHeight) max(constraints.maxHeight, resting) else resting
+        val rowY = height - pad - row.height
+        val cardWidth = (width - margin * 2).coerceAtLeast(0)
+        // 面板最高长到画布那一块的顶上，再高就在面板里面滚动
+        val roomAbove = (rowY - pad).coerceAtLeast(0)
+        val content = part(BarPart.CONTENT)?.measure(Constraints(minWidth = cardWidth, maxWidth = cardWidth, maxHeight = roomAbove))
+        val p = grow.value
+        val openTop = rowY - (content?.height ?: 0)
+        val cardTop = lerp(rowY, openTop, p)
+        val cardHeight = height - pad - cardTop
+        val card = part(BarPart.CARD)?.measure(Constraints.fixed(cardWidth, cardHeight))
+        val edgePart = part(BarPart.EDGE)?.measure(Constraints.fixed(cardWidth, cardHeight))
+
+        layout(width, height, mapOf(PanelTop to height - resting)) {
+            film?.place(FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
+            card?.place(margin, cardTop)
+            // 名字、参数跟着面板的上沿往上走，面板还没长到的地方不露出来，后半程显出来
+            content?.placeWithLayer(margin, cardTop) {
+                alpha = span(p, CONTENT_IN_START, 1f)
+                clip = true
+                shape = TopSlice((rowY - cardTop).toFloat())
+            }
+            row.place(0, rowY)
+            edgePart?.place(margin, cardTop)
+        }
     }
-    StyleSheet(styleBar, styleActions)
 }
+
+private enum class BarPart { FILM, CARD, CONTENT, ROW, EDGE }
+
+/** 只留最上面 [height] 那一截：面板上的东西在工具那一行上面露出来，不从面板底下漏出去。 */
+private class TopSlice(private val height: Float) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density) =
+        Outline.Rectangle(Rect(0f, 0f, size.width, height.coerceIn(0f, size.height)))
+}
+
+/** 接住落在面板上的手指，什么也不做。 */
+private suspend fun PointerInputScope.swallowTouches() = awaitEachGesture {
+    awaitFirstDown().consume()
+    do {
+        val event = awaitPointerEvent()
+        event.changes.forEach { it.consume() }
+    } while (event.changes.any { it.pressed })
+}
+
+/** 底栏上下各留的空。原先 8，底栏压薄时一起收一点。 */
+private val BAR_PAD = 6.dp
+private val FILM_MARGIN = 12.dp
+
+/** 面板离屏幕两边多远：和展开后的胶囊一样宽（见 EditorToolbar 的 MARGIN）。 */
+private val PANEL_MARGIN = 12.dp
+private val FILM_GAP = 6.dp
+
+/** 面板的圆角：和胶囊两头的半圆一样大（胶囊高 48），长高了四个角还是这么圆，看得出是胶囊长出来的。 */
+private val PANEL_RADIUS = TOOL_ROW_HEIGHT / 2
+
+/** 面板的那一圈细边，和胶囊一样（见 EditorToolbar 的 EDGE_ALPHA）。 */
+private const val PANEL_EDGE_ALPHA = 0.5f
+
+/** 面板上的名字、参数从这儿起淡入：面板先长出一截再显出来，不和它一起挤在一条缝里。 */
+private const val CONTENT_IN_START = 0.35f
 
 /**
  * 手机竖着拿时，AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：底栏的圆钮上写不下字（见 [EditorToolbar]）。

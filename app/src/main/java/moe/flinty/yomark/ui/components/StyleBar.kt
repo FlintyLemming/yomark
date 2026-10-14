@@ -8,15 +8,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -24,23 +19,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.outlined.CropSquare
+import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -60,6 +53,7 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.render.NearColor
 import moe.flinty.yomark.ui.ColorTarget
@@ -118,10 +112,20 @@ internal fun StyleGlyph(style: MaskStyle, options: MaskOptions, nearColors: List
         )
         MaskStyle.PIXELATE -> MosaicGlyph(ink, 18.dp * scale)
         MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = ink)
-        MaskStyle.MARKER -> Box(
+        MaskStyle.MARKER -> if (options.markerShape == StrokeShape.FREEHAND) {
+            Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.markerColor))
+        } else Box(
             Modifier
                 .size(width = 22.dp * scale, height = 12.dp * scale)
                 .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
+        )
+        // 画笔：手画是一道弯线，拉框是一个空心框，都是画笔的颜色
+        MaskStyle.PEN -> if (options.penShape == StrokeShape.FREEHAND) {
+            Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
+        } else Box(
+            Modifier
+                .size(width = 20.dp * scale, height = 14.dp * scale)
+                .border(2.dp * scale, Color(options.penColor), RoundedCornerShape(2.dp * scale)),
         )
     }
 }
@@ -172,49 +176,21 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 // ---------- 调节面板 ----------
 
 /**
- * 手机上的调节面板：底栏展开一组后再点一下当前的样式就弹出来（见 EditorToolbar）。
- * 是从屏幕底下弹出的模态底部动作条（Material 3 的 ModalBottomSheet），盖在画布上，不把底栏和画布往上顶。样式和参数管的是下一笔，调的时候用不着一直看着整张图；
- * 选中了手动框时那个框照样当场跟着变，只是隔着一层暗幕。
- *
- * 往下拖、点面板外面、按返回、点右上角的箭头都能收起。吸管在等取色时面板先让开——要点的是底下的图，
- * 取完色（或取消了）再弹回来，看得到取到的颜色。
+ * 手机上的调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
+ * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶。
+ * 样式和参数管的是下一笔；选中了手动框时那个框照样当场跟着变。
+ * 吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
-    val wanted = model.panelOpen && model.colorPick == null
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    // 收起时先让面板滑下去，滑完再从组合里拿掉；面板自己收起（往下拖、点外面、返回）时已经滑完了
-    var shown by remember { mutableStateOf(wanted) }
-    LaunchedEffect(wanted) {
-        when {
-            wanted && shown -> sheetState.show()   // 滑到一半又要弹回来
-            wanted -> shown = true
-            shown -> {
-                sheetState.hide()
-                shown = false
-            }
-        }
-    }
-    if (!shown) return
-    ModalBottomSheet(
-        onDismissRequest = {
-            shown = false
-            actions.onCollapse()
-        },
-        sheetState = sheetState,
-        // 面板比屏幕还高时（横着拿的手机）顶到状态栏下面为止，多出来的在面板里面滚动
-        modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
+internal fun StylePanelContent(model: StyleBarModel, actions: StyleBarActions, modifier: Modifier = Modifier) {
+    Column(
+        modifier
+            .verticalScroll(rememberScrollState())
+            .animateContentSize()
+            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
     ) {
-        DarkSystemBarIcons()
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .padding(start = 16.dp, end = 4.dp, bottom = 8.dp),
-        ) {
-            PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
-            StylePanelBody(model, actions)
-        }
+        PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
+        StylePanelBody(model, actions)
     }
 }
 
@@ -357,6 +333,7 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         }
 
         MaskStyle.MARKER -> {
+            ShapeChoice(options.markerShape) { emit(options.copy(markerShape = it)) }
             Colors(ColorTarget.MARKER, MARKER_PALETTE, stringResource(R.string.color))
             SliderRow(
                 label = stringResource(R.string.marker_opacity),
@@ -367,9 +344,75 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
             )
+            // 拉框是涂一整块，没有笔宽
+            if (options.markerShape == StrokeShape.FREEHAND) {
+                WidthSlider(options.markerWidth, MaskOptions.MARKER_WIDTH_RANGE, actions) { emit(options.copy(markerWidth = it), inProgress = true) }
+            }
+        }
+
+        MaskStyle.PEN -> {
+            ShapeChoice(options.penShape) { emit(options.copy(penShape = it)) }
+            Colors(ColorTarget.PEN, PEN_PALETTE, stringResource(R.string.color))
+            WidthSlider(options.penWidth, MaskOptions.PEN_WIDTH_RANGE, actions) { emit(options.copy(penWidth = it), inProgress = true) }
         }
     }
 }
+
+/**
+ * 马克笔、画笔下一笔怎么画：拉框，还是照着手指画（见 StrokeShape）。管的是下一笔，画好的不变。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ShapeChoice(shape: StrokeShape, onShape: (StrokeShape) -> Unit) {
+    PanelLabel(stringResource(R.string.stroke_shape))
+    val choices = listOf(
+        StrokeShape.BOX to stringResource(R.string.stroke_shape_box),
+        StrokeShape.FREEHAND to stringResource(R.string.stroke_shape_freehand),
+    )
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        choices.forEachIndexed { i, (value, label) ->
+            SegmentedButton(
+                selected = shape == value,
+                onClick = { if (shape != value) onShape(value) },
+                shape = SegmentedButtonDefaults.itemShape(i, choices.size),
+                icon = {},
+            ) {
+                // 按钮里的东西是叠着摆的，图标和字自己排成一行
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (value == StrokeShape.BOX) Icons.Outlined.CropSquare else Icons.Outlined.Gesture,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(label)
+                }
+            }
+        }
+    }
+}
+
+/** 笔宽：滑条往右更粗，旁边写着按 1080 宽的截图算是几像素，心里有个数。 */
+@Composable
+private fun WidthSlider(
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    actions: StyleBarActions,
+    onChange: (Float) -> Unit,
+) {
+    SliderRow(
+        label = stringResource(R.string.stroke_width),
+        value = value,
+        range = range,
+        valueText = "${(value * REFERENCE_SHORT_SIDE).roundToInt()} px",
+        onChange = onChange,
+        onValueChangeFinished = actions::onLookChangeFinished,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+/** 笔宽旁边写的像素数按这么宽的截图算：常见手机截图的短边。 */
+private const val REFERENCE_SHORT_SIDE = 1080
 
 @Composable
 private fun PanelLabel(text: String) {
@@ -427,6 +470,18 @@ internal val MARKER_PALETTE = listOf(
     NamedColor(0xFF448AFF.toInt(), R.string.color_blue),
     NamedColor(0xFF18FFFF.toInt(), R.string.color_cyan),
     NamedColor(0xFF76FF03.toInt(), R.string.color_green),
+)
+
+/** 画笔：先是出厂的红，再是黑白和几种醒目的颜色。 */
+internal val PEN_PALETTE = listOf(
+    NamedColor(MaskOptions.DEFAULT_PEN_COLOR, R.string.color_red),
+    NamedColor(0xFF000000.toInt(), R.string.color_black),
+    NamedColor(0xFFFFFFFF.toInt(), R.string.color_white),
+    NamedColor(0xFFFB8C00.toInt(), R.string.color_orange),
+    NamedColor(0xFFFDD835.toInt(), R.string.color_yellow),
+    NamedColor(0xFF43A047.toInt(), R.string.color_green),
+    NamedColor(0xFF1E88E5.toInt(), R.string.color_blue),
+    NamedColor(0xFF8E24AA.toInt(), R.string.color_purple),
 )
 
 /** 马赛克颗粒的六档，按 8 - divisor 排：0 最细，2 是出厂，5 最粗。 */

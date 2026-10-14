@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import kotlin.math.ceil
@@ -42,7 +43,7 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
     fun willFallBack(quad: Quad, imageShortEdge: Float, divisor: Int, renderScale: Float = 1f): Boolean =
         blockSizeFor(imageShortEdge, divisor, renderScale) >= quad.shortEdge()
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
         val imageShortEdge = min(source.width, source.height).toFloat()
         val block = blockSizeFor(imageShortEdge, options.pixelBlockDivisor, options.renderScale)
         if (block >= quad.shortEdge()) {

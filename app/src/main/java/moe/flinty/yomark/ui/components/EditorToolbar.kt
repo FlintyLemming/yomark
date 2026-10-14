@@ -30,7 +30,6 @@ import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +49,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -59,6 +59,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -93,6 +94,7 @@ import moe.flinty.yomark.render.MaskSafety
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** 手机底栏上的两组工具。 */
@@ -119,7 +121,7 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 点一组，胶囊往两边撑满这一行，圆钮缩进去，两组让开：点的那一组的样子变成返回箭头，滑到胶囊最左边，
  * 那儿只留这一个箭头，地方都给右边一个个展开的工具。点返回（或系统返回键，见 EditorScreen）收回来。
  *
- * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种弹出调节面板（StyleSheet）。
+ * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种，胶囊往上长成调节面板（见 EditorBottomBar）。
  * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
  * 圆钮上没有字。AI 的结果在圆钮上是角标和颜色，跑完那一下画布顶上再说一声（见 AiReviewResultPill）；
@@ -129,6 +131,8 @@ enum class ToolGroup(@StringRes val label: Int) {
  * @param onOpen 点了一组（展开它）或点了返回（null）
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
+ * @param merge 调节面板从胶囊往上长出来了多少，0～1（见 EditorBottomBar）：面板的底子垫在胶囊底下，
+ *   胶囊自己的边和投影跟着淡掉，看上去是一整块。只在画的时候读，动起来不重组
  */
 @Composable
 fun EditorToolbar(
@@ -143,6 +147,7 @@ fun EditorToolbar(
     onAiReview: () -> Unit = {},
     compare: MutableInteractionSource? = null,
     canCompare: Boolean = false,
+    merge: () -> Float = { 0f },
 ) {
     val progress = animateFloatAsState(
         if (open != null) 1f else 0f,
@@ -165,7 +170,7 @@ fun EditorToolbar(
 
     Layout(
         content = {
-            Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge))
+            Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge, chrome = { 1f - merge() }))
             ToolGroup.entries.forEach { group ->
                 // 两组一直都在组合里：胶囊收着时多宽要按两组一起量。展开停稳后不摆出来、读屏也读不到
                 GroupButton(
@@ -201,7 +206,7 @@ fun EditorToolbar(
         val margin = MARGIN.roundToPx()
         val inset = INSET.roundToPx()
         val gap = GAP.roundToPx()
-        val rowMin = ROW_HEIGHT.roundToPx()
+        val rowMin = TOOL_ROW_HEIGHT.roundToPx()
         val groupParts = HashMap<ToolGroup, Measurable>()
         val circleParts = HashMap<Slot, Measurable>()
         val toolParts = ArrayList<Measurable>()
@@ -320,7 +325,7 @@ private class LastOpen {
 private enum class Slot { PILL, AI, COMPARE, BACK, DIVIDER, TOOL }
 
 /** [p] 落在 [start]～[end] 这一段的哪儿，0～1。 */
-private fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
+internal fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
 
 /** 一项工具上胶囊盖住的那一截：从 [left] 到 [right]，按这一项自己的坐标。 */
 private class Reveal(private val left: Float, private val right: Float) : Shape {
@@ -339,15 +344,13 @@ private fun RedactTools(model: StyleBarModel, actions: StyleBarActions) {
 }
 
 /**
- * 编辑：马克笔是一种样式，和打码的几种一样是画笔；画笔还没做，先占个位置；
+ * 编辑：马克笔、画笔是样式，和打码的几种一样是画笔（EditorUiState.brush）：都能拉框，也都能照手画（见 StrokeShape）；
  * 水印是用途水印，点开它的调节面板（顶替底栏），开着时着主题色。
  */
 @Composable
 private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn: Boolean, onPurpose: () -> Unit) {
     StyleItem(MaskStyle.MARKER, model, actions)
-    ToolItem(label = stringResource(R.string.tool_pen), onClick = {}, enabled = false, role = Role.Button) {
-        Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
+    StyleItem(MaskStyle.PEN, model, actions)
     ToolItem(
         label = stringResource(R.string.tool_watermark),
         onClick = onPurpose,
@@ -492,30 +495,44 @@ private fun LabelAndChevron(modifier: Modifier = Modifier, content: @Composable 
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
  */
-private fun Modifier.floatingSurface(fill: Color, edge: Color) = drawWithCache {
-    val radius = size.minDimension / 2
-    fun shadowed(blur: Dp, dy: Dp, alpha: Float) = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-        color = fill.toArgb()
-        setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha).toArgb())
-    }
-    val wide = shadowed(30.dp, 10.dp, 0.08f)
-    val near = shadowed(10.dp, 2.dp, 0.04f)
+internal fun Modifier.floatingSurface(
+    fill: Color,
+    edge: Color,
+    maxRadius: Dp = Dp.Infinity,
+    chrome: () -> Float = { 1f },
+) = drawWithCache {
+    val radius = min(size.minDimension / 2, maxRadius.toPx())
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
     val line = EDGE_WIDTH.toPx()
     onDrawBehind {
+        // 边和投影的浓淡（见 EditorToolbar 的 merge）每一帧都可能不同，投影在画的时候设
+        val a = chrome().coerceIn(0f, 1f)
         drawIntoCanvas {
-            it.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, wide)
-            it.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, near)
+            for ((blur, dy, alpha) in SHADOWS) {
+                paint.setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha * a).toArgb())
+                it.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, paint)
+            }
         }
-        // 边画在里面，和 Flutter 的 Border.all 一样
-        drawRoundRect(
-            edge,
-            topLeft = Offset(line / 2, line / 2),
-            size = Size(size.width - line, size.height - line),
-            cornerRadius = CornerRadius(radius - line / 2),
-            style = Stroke(line),
-        )
+        if (a > 0f) drawFloatingEdge(edge.copy(alpha = edge.alpha * a), radius, line)
     }
 }
+
+/** 浮起来的那一圈细边，单独画：调节面板的边画在底栏的工具上面（见 EditorBottomBar）。 */
+internal fun Modifier.floatingEdge(edge: Color, maxRadius: Dp = Dp.Infinity) = drawBehind {
+    drawFloatingEdge(edge, min(size.minDimension / 2, maxRadius.toPx()), EDGE_WIDTH.toPx())
+}
+
+// 边画在里面，和 Flutter 的 Border.all 一样
+private fun DrawScope.drawFloatingEdge(edge: Color, radius: Float, line: Float) = drawRoundRect(
+    edge,
+    topLeft = Offset(line / 2, line / 2),
+    size = Size(size.width - line, size.height - line),
+    cornerRadius = CornerRadius(radius - line / 2),
+    style = Stroke(line),
+)
+
+/** 两层投影：模糊、往下、黑色的浓淡（见 floatingSurface）。 */
+private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.04f))
 
 /**
  * 「AI 增强识别」：两颗星。跑的时候两颗星转着；跑完了换成对勾、点不动，新发现几处是角标上的数；没跑成星星是红的、还能点。
@@ -662,7 +679,7 @@ private fun ToolItem(
             .layoutId(Slot.TOOL)
             .then(press)
             .semantics { if (stateText != null) stateDescription = stateText }
-            .padding(vertical = 6.dp)
+            .padding(vertical = TOOL_PAD)
             .alpha(if (enabled) 1f else DISABLED_ALPHA),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -674,11 +691,11 @@ private fun ToolItem(
                 .indication(interaction, LocalIndication.current),
             contentAlignment = Alignment.Center,
         ) { glyph() }
-        Spacer(Modifier.height(4.dp))
+        Spacer(Modifier.height(2.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 label,
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelSmall,
                 color = when {
                     on -> colors.primary
                     selected -> colors.onSurface
@@ -690,7 +707,7 @@ private fun ToolItem(
                 Icon(
                     if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
                     contentDescription = null,
-                    modifier = Modifier.size(14.dp),
+                    modifier = Modifier.size(12.dp),
                     tint = colors.onSurfaceVariant,
                 )
             }
@@ -698,10 +715,10 @@ private fun ToolItem(
     }
 }
 
-private const val EXPAND_MS = 350
+internal const val EXPAND_MS = 350
 
 /** Material 3 的标准曲线：起步快、落地缓，展开收起都用它。 */
-private val EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+internal val EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /** 收着的那一排（两组、圆钮）在前半程让开。 */
 private const val FADE_OUT = 0.5f
@@ -714,7 +731,7 @@ private const val BACK_IN_END = 0.75f
 private const val TOOL_IN_START = 0.25f
 private const val TOOL_IN = 0.5f
 
-/** 胶囊展开后离屏幕两边多远；收着时整组也不比这更靠边。 */
+/** 胶囊展开后离屏幕两边多远；收着时整组也不比这更靠边。调节面板也是这么宽（见 EditorBottomBar）。 */
 private val MARGIN = 12.dp
 
 /** 胶囊两头里面留的边。 */
@@ -723,11 +740,14 @@ private val INSET = 8.dp
 /** 胶囊和圆钮、圆钮和圆钮之间的空。 */
 private val GAP = 8.dp
 
-/** 胶囊的高，也是这一行最矮的高度。 */
-private val ROW_HEIGHT = 64.dp
+/**
+ * 胶囊的高，也是这一行最矮的高度。原先 64，比批量时上面那一条胶片条（40）厚出一大截，压到 48：
+ * 展开后的工具小样子、名字都缩一号，刚好放得下（见 [ToolItem]）。
+ */
+internal val TOOL_ROW_HEIGHT = 48.dp
 
 /** 圆钮和胶囊一样高；放不下就一档档缩小。 */
-private val CIRCLE_SIZES = listOf(64.dp, 56.dp, 48.dp)
+private val CIRCLE_SIZES = listOf(48.dp, 44.dp, 40.dp)
 
 /** 圆钮缩进胶囊时缩到多小（按原来的比例少掉这么多）。 */
 private const val CIRCLE_SHRINK = 0.4f
@@ -736,18 +756,21 @@ private const val CIRCLE_SHRINK = 0.4f
 private const val EDGE_ALPHA = 0.5f
 private val EDGE_WIDTH = 1.dp
 
-private val GROUP_HEIGHT = 48.dp
+private val GROUP_HEIGHT = 40.dp
 private val GROUP_PAD_START = 12.dp
 private val GLYPH_BOX = 24.dp
 
 /** 返回箭头那一颗圆，和一组一样高。 */
-private val BACK_SIZE = 48.dp
+private val BACK_SIZE = 40.dp
 private val CIRCLE_ICON = 24.dp
 private val DIVIDER_GAP = 6.dp
 private val DIVIDER_HEIGHT = 32.dp
 private val SLIDE = 24.dp
-private val INDICATOR_WIDTH = 52.dp
-private val INDICATOR_HEIGHT = 32.dp
+private val INDICATOR_WIDTH = 48.dp
+private val INDICATOR_HEIGHT = 24.dp
+
+/** 展开后一项工具上下留的空：3 + 小样子 24 + 2 + 一行小字 16 + 3，正好是胶囊的 48。 */
+private val TOOL_PAD = 3.dp
 private val GLYPH_ICON = 20.dp
 private val HINT_SPACING = 8.dp
 

@@ -122,7 +122,7 @@ class EditorToolbarTest {
         // 左边只剩一颗返回箭头，按下去的水波碰不到它右边的分隔线和工具
         val back = backButton.getUnclippedBoundsInRoot()
         assertThat(back.left.value).isWithin(1f).of(20f)
-        assertThat(back.width.value).isWithin(1f).of(48f)
+        assertThat(back.width.value).isWithin(1f).of(40f)
         assertThat(compose.onNodeWithText("色块").getUnclippedBoundsInRoot().left).isGreaterThan(back.right)
         assertThat(compose.onNodeWithText("模糊").getUnclippedBoundsInRoot().right).isGreaterThan(width - 40.dp)
     }
@@ -196,16 +196,16 @@ class EditorToolbarTest {
 
     private val backButton get() = compose.onNodeWithContentDescription("返回")
 
-    /** 编辑：马克笔、画笔（还没做，点不动）、水印（点开用途水印）。 */
+    /** 编辑：马克笔、画笔（两种样式，和打码的一样点了换）、水印（点开用途水印）。 */
     @Test fun editHoldsTheMarkerThePenAndTheWatermark() {
         val actions = Recorder()
         show(actions = actions)
         compose.onNodeWithText("编辑").performClick()
         compose.onNodeWithText("打码").assertDoesNotExist()
         compose.onNodeWithText("表情").assertDoesNotExist()      // 去掉了
-        compose.onNodeWithText("画笔").assertIsNotEnabled()
         compose.onNodeWithText("马克笔").assertIsNotSelected().performClick()
-        assertThat(actions.clicked).containsExactly(MaskStyle.MARKER)
+        compose.onNodeWithText("画笔").assertIsEnabled().assertIsNotSelected().performClick()
+        assertThat(actions.clicked).containsExactly(MaskStyle.MARKER, MaskStyle.PEN).inOrder()
         compose.onNodeWithText("水印").performClick()
         assertThat(purposeClicks).isEqualTo(1)
     }

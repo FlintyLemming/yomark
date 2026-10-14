@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
+import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import kotlin.math.max
@@ -29,7 +30,7 @@ class BlurRenderer : MaskRenderer {
 
     override val style = MaskStyle.BLUR
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
         val bounds = quad.bounds()
         val src = Rect(
             bounds.left.toInt().coerceIn(0, source.width),
