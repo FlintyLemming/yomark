@@ -169,6 +169,24 @@ class EditorToolbarTest {
         assertThat(weight("马赛克")).isNotEqualTo(FontWeight.Bold)
     }
 
+    /** 换选中的那一项不是一下跳过去（照 GNav）：半路上新选中的那一格正在撑开，换走的那一格正在收窄。 */
+    @Test fun switchingTheStyleMovesTheCapsuleOverInsteadOfJumping() {
+        show(initial = ToolGroup.REDACT)
+        fun width(name: String) = compose.onNodeWithText(name).getUnclippedBoundsInRoot().width
+        val before = width("色块") to width("马赛克")
+        compose.mainClock.autoAdvance = false
+        look = MaskLook(MaskStyle.PIXELATE)
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(64)
+        val halfway = width("色块") to width("马赛克")
+        compose.mainClock.autoAdvance = true
+        val after = width("色块") to width("马赛克")
+        assertThat(halfway.first).isLessThan(before.first)
+        assertThat(halfway.first).isGreaterThan(after.first)
+        assertThat(halfway.second).isGreaterThan(before.second)
+        assertThat(halfway.second).isLessThan(after.second)
+    }
+
     /**
      * 窄屏、英文的长名字：哪个名字都不截断。选中的 Marker 写全，短的 Pen 也写全，
      * 写不下的 Watermark 只剩小样子（名字是透明的，伸出格子外，读屏还念得到）。
