@@ -106,6 +106,8 @@ fun EditorScreen(
     onBuyClicked: () -> Unit = {},
     onRestoreClicked: suspend () -> RestoreResult = { RestoreResult.Unavailable },
     onUnlockFree: () -> Unit = {},
+    /** 别的应用来要图（vm.forCaller），图导出好了：交回给它。 */
+    onHandOver: (List<Uri>) -> Unit = {},
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -132,6 +134,7 @@ fun EditorScreen(
             is EditorMessage.BatchExported -> snackbar.showMessage(context.getString(R.string.saved_batch, m.count), vm)
             is EditorMessage.BatchPartial -> snackbar.showMessage(context.getString(R.string.error_batch_partial, m.ok, m.failed), vm)
             is EditorMessage.Error -> snackbar.showMessage(context.getString(m.text), vm)
+            is EditorMessage.HandedOver -> onHandOver(m.uris)
             null -> Unit
         }
     }
@@ -256,6 +259,8 @@ fun EditorScreen(
                 },
                 panel = {
                     val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+                    // 别的应用来要图时，导出就是把图交回去
+                    val exportLabel = if (vm.forCaller) R.string.done else R.string.export
                     val uris = remember(batch?.items) { batch?.items?.map { it.uri } }
                     val filmstrip: (@Composable (Modifier) -> Unit)? = if (batch != null && uris != null) {
                         { modifier ->
@@ -285,6 +290,7 @@ fun EditorScreen(
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             onExport = onExport,
+                            exportLabel = exportLabel,
                             exporting = state.exporting,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
@@ -309,6 +315,7 @@ fun EditorScreen(
                             actionRow = { modifier ->
                                 EditorActionRow(
                                     onExport = onExport,
+                                    exportLabel = exportLabel,
                                     exporting = state.exporting,
                                     aiReview = state.aiReview,
                                     onAiReview = vm::runAiReview,

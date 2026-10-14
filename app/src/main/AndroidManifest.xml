@@ -68,6 +68,50 @@
             </intent-filter>
         </activity>
 
+        <!--
+          替别的应用选图时的编辑器：还是 EditorActivity，换一个不导出的入口。
+          导出时把图交回调用方（而不是存进相册）只认这个入口，别的应用直接打开编辑器走不到这条路。
+        -->
+        <activity-alias
+            android:name=".ui.EditorForCaller"
+            android:targetActivity=".ui.EditorActivity"
+            android:exported="false" />
+
+        <!--
+          别的应用来要图（ACTION_PICK / GET_CONTENT），比如 Telegram 附件相册页右上角的「在外部应用中打开」。
+          先拉起系统的选图界面，选好了进编辑器，打好码交回去（见 ui/pick/PickImageActivity）。
+          透明主题：它自己什么都不画，选图界面直接盖在调用方上面。
+        -->
+        <activity
+            android:name=".ui.pick.PickImageActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Yomark.Transparent">
+            <intent-filter>
+                <action android:name="android.intent.action.PICK" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <!-- 老写法 Intent(ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI) 解析出来的类型 -->
+                <data android:mimeType="vnd.android.cursor.dir/image" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.GET_CONTENT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.OPENABLE" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- 交给别的应用的图从这里读（见 export/FileProviderSink） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <activity
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />

@@ -15,6 +15,8 @@ sealed interface EditorMessage {
     data class BatchExported(val count: Int) : EditorMessage
     /** 一批里有几张导出失败：成功几张、失败几张。 */
     data class BatchPartial(val ok: Int, val failed: Int) : EditorMessage
+    /** 别的应用来要图，打好码的图导出好了，交回给它。编辑器随之关掉，不弹提示。 */
+    data class HandedOver(val uris: List<Uri>) : EditorMessage
     data class Error(@StringRes val text: Int) : EditorMessage
 }
 

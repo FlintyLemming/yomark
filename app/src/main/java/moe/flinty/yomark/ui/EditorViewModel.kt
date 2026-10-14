@@ -75,6 +75,11 @@ class EditorViewModel(
     val traceLog: TraceLog = TraceLog(),
     /** 用途水印第一次打开时填的文案，按系统语言给（Activity 传 R.string.purpose_default）。 */
     private val defaultPurposeText: String = DEFAULT_PURPOSE_TEXT,
+    /**
+     * 别的应用来要图（见 PickImageActivity）：导出成功不提示「已保存到相册」，而是交回给它（[EditorMessage.HandedOver]），
+     * 编辑器随之关掉。导出到哪儿由 Activity 给的 [exporter] 定。
+     */
+    val forCaller: Boolean = false,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -1068,10 +1073,15 @@ class EditorViewModel(
                 dispatcher = ioDispatcher,
             )
             uiState = when (outcome) {
-                is ExportOutcome.Success -> _state.value.copy(
-                    exporting = false,
-                    message = EditorMessage.Exported(outcome.uri, outcome.downscaled, outcome.width, outcome.height),
-                )
+                // 交回去编辑器就关了，按钮不再放开，免得又导出一张
+                is ExportOutcome.Success -> if (forCaller) {
+                    _state.value.copy(message = EditorMessage.HandedOver(listOf(outcome.uri)))
+                } else {
+                    _state.value.copy(
+                        exporting = false,
+                        message = EditorMessage.Exported(outcome.uri, outcome.downscaled, outcome.width, outcome.height),
+                    )
+                }
                 is ExportOutcome.Failure -> _state.value.copy(
                     exporting = false,
                     message = EditorMessage.Error(R.string.error_export),
@@ -1083,7 +1093,7 @@ class EditorViewModel(
     private fun runBatchExport(batch: BatchSession) {
         uiState = _state.value.copy(exporting = true)
         viewModelScope.launch {
-            var ok = 0
+            val written = ArrayList<Uri>()
             var failed = 0
             batch.items.forEach { item ->
                 val file = item.file ?: return@forEach     // 还没走到的图没有副本，也没有编辑
@@ -1101,13 +1111,19 @@ class EditorViewModel(
                     ),
                     dispatcher = ioDispatcher,
                 )
-                if (outcome is ExportOutcome.Success) ok++ else failed++
+                if (outcome is ExportOutcome.Success) written += outcome.uri else failed++
             }
-            uiState = _state.value.copy(
-                exporting = false,
-                message = if (failed == 0) EditorMessage.BatchExported(ok)
-                else EditorMessage.BatchPartial(ok, failed),
-            )
+            uiState = when {
+                !forCaller -> _state.value.copy(
+                    exporting = false,
+                    message = if (failed == 0) EditorMessage.BatchExported(written.size)
+                    else EditorMessage.BatchPartial(written.size, failed),
+                )
+                failed == 0 && written.isNotEmpty() ->
+                    _state.value.copy(message = EditorMessage.HandedOver(written))
+                // 交回去的缺了几张，调用方那边无从知道：这次一张都不交，再试一次
+                else -> _state.value.copy(exporting = false, message = EditorMessage.Error(R.string.error_export))
+            }
         }
     }
 

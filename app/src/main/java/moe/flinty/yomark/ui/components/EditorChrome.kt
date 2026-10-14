@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.components
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -94,6 +95,8 @@ fun EditorBottomBar(
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
+    /** 导出按钮上的字（见 [EditorActionRow]）。 */
+    @StringRes exportLabel: Int = R.string.export,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
     /** 批量时的胶片条（见 [EditorActionRow]）。单张时为 null。 */
@@ -104,6 +107,7 @@ fun EditorBottomBar(
         StyleBar(model = styleBar, actions = styleActions)
         EditorActionRow(
             onExport = onExport,
+            exportLabel = exportLabel,
             exporting = exporting,
             aiReview = aiReview,
             onAiReview = onAiReview,
@@ -120,12 +124,14 @@ fun EditorBottomBar(
  * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。
  *
  * @param filmstrip 批量时的胶片条，传进来的 Modifier 定好了它的宽。单张时为 null
+ * @param exportLabel 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去
  */
 @Composable
 fun EditorActionRow(
     onExport: () -> Unit,
     exporting: Boolean,
     modifier: Modifier = Modifier,
+    @StringRes exportLabel: Int = R.string.export,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
@@ -139,7 +145,7 @@ fun EditorActionRow(
             AiReviewButton(aiReview, onAiReview)
             Spacer(Modifier.weight(1f))
         }
-        Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else R.string.export)) }
+        Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
     }
 }
 
