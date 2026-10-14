@@ -30,6 +30,7 @@
     <string name="purpose_watermark">用途水印</string>
     <string name="purpose_watermark_on">用途水印（已开启）</string>
     <string name="compare_original">按住对比原图</string>
+    <string name="compare_hold">按住对比</string>
     <string name="debug_info">调试信息</string>
     <string name="export">导出</string>
     <string name="exporting">导出中…</string>
@@ -37,7 +38,7 @@
     <string name="ai_reviewing">增强识别中…</string>
     <string name="ai_review_none">没有新发现</string>
     <string name="ai_review_found">新发现 %1$d 处</string>
-    <string name="ai_review_failed">识别失败，点击重试</string>
+    <string name="ai_review_failed">识别失败，重试</string>
     <string name="analyzing">识别中…</string>
     <string name="original">原图</string>
     <string name="eyedropper_hint">点一下图片，取那里的颜色</string>
@@ -89,6 +90,15 @@
     <string name="kind_face">人脸</string>
     <string name="kind_barcode">条码</string>
     <string name="kind_manual">手动</string>
+
+    <!-- tool groups -->
+    <string name="tool_group_redact">打码</string>
+    <string name="tool_group_edit">编辑</string>
+    <string name="tool_group_expand">展开</string>
+    <string name="tool_group_collapse">收起</string>
+    <string name="tool_pen">画笔</string>
+    <string name="tool_watermark">水印</string>
+    <string name="tool_on">已开启</string>
 
     <!-- styles -->
     <string name="style_solid">色块</string>

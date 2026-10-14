@@ -267,7 +267,7 @@ class PlayScreenshots {
         shoot("reminder")
     }
 
-    /** 用途水印：整张图铺一行字。调节面板点「完成」收起，顶栏的水印按钮着主题色。 */
+    /** 用途水印：整张图铺一行字。调节面板点「完成」收起。 */
     @Test fun purpose() {
         val vm = open(sample("/readme/order-page.png"))
         compose.runOnUiThread {
@@ -279,7 +279,7 @@ class PlayScreenshots {
         shoot("purpose")
     }
 
-    /** 从相册一次分享三张进来：底栏导出的左边是胶片条，停在第一张上。 */
+    /** 从相册一次分享三张进来：底栏工具那一行上面是胶片条，停在第一张上。 */
     @Test fun batch() {
         open(
             sample("/play/chat-page.png"),

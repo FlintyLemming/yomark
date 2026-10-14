@@ -4,7 +4,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -20,16 +18,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -50,7 +43,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -58,7 +50,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
@@ -106,102 +97,11 @@ interface StyleBarActions {
     fun onPickColor(target: ColorTarget?) {}
 }
 
-/**
- * 样式栏（spec §7.5 修订）：一排四种样式，点一种换样式，再点它一下才从屏幕底下弹出它的调节面板（见 [StyleSheet]）。
- *
- * 样式栏是「画笔」：换了样式、调了颜色，从下一次打码起生效——新画的框、点了打码的虚线框都用它，
- * 已经打好的码不变；选中了手动框时，改动也落在那个框上。面板上的「应用到全部」把这张图上打好的码全换成这样。
- */
-@Composable
-fun StyleBar(
-    model: StyleBarModel,
-    actions: StyleBarActions,
-    modifier: Modifier = Modifier,
-) {
-    Column(modifier.fillMaxWidth()) {
-        StylePalette(model.look, model.nearColors, panelOpen = model.panelOpen, onClick = actions::onStyleClick)
-    }
-    StyleSheet(model, actions)
-}
-
-// ---------- 样式那一排 ----------
+// ---------- 小样子 ----------
 
 /**
- * 四种样式排成一排，每一项上面是一个小样子、下面是名字，平分整行宽度，不用横着滑。
- * 小样子跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
- * 选中的那一项名字后面有个小箭头：再点它一下，面板就弹出来。面板从下面往上弹，所以收着时箭头朝上、弹出来后朝下。
- */
-@Composable
-private fun StylePalette(look: MaskLook, nearColors: List<Int>, panelOpen: Boolean, onClick: (MaskStyle) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 8.dp)
-            .selectableGroup(),
-    ) {
-        MaskStyleInfo.ORDER.forEach { style ->
-            StyleTool(
-                style = style,
-                options = look.options,
-                nearColors = nearColors,
-                selected = style == look.style,
-                panelOpen = panelOpen,
-                onClick = { onClick(style) },
-                modifier = Modifier.weight(1f),
-            )
-        }
-    }
-}
-
-@Composable
-private fun StyleTool(
-    style: MaskStyle,
-    options: MaskOptions,
-    nearColors: List<Int>,
-    selected: Boolean,
-    panelOpen: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val colors = MaterialTheme.colorScheme
-    Column(
-        modifier
-            .clip(RoundedCornerShape(16.dp))
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
-            .padding(vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        // 选中的那一项垫一颗胶囊，和 Material 3 导航栏的选中指示一个样子
-        Box(
-            Modifier
-                .size(width = 52.dp, height = 32.dp)
-                .background(if (selected) colors.secondaryContainer else Color.Transparent, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            StyleGlyph(style, options, nearColors)
-        }
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(MaskStyleInfo.label(style)),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (selected) colors.onSurface else colors.onSurfaceVariant,
-                maxLines = 1,
-            )
-            if (selected) {
-                Icon(
-                    if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
-                    contentDescription = null,
-                    modifier = Modifier.size(14.dp),
-                    tint = colors.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/**
- * 样式栏上每一项的小样子。宽屏的样式方块（StyleGrid）也用它，方块大时按 [scale] 放大。
+ * 每种样式的小样子：手机底栏展开后的工具（EditorToolbar）、宽屏的样式方块（StyleGrid）都用它，方块大时按 [scale] 放大。
+ * 跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
  *
  * @param nearColors 色块开着近似色时，小样子画的是图上取到的这几种颜色（见 [NearSolidGlyph]）
  */
@@ -250,9 +150,9 @@ private fun NearSolidGlyph(nearColors: List<Int>, scale: Float) {
     }
 }
 
-/** 马赛克的小样子：3×3 的格子，深浅错开。 */
+/** 马赛克的小样子：3×3 的格子，深浅错开。「打码」那一组也用它。 */
 @Composable
-private fun MosaicGlyph(ink: Color, side: Dp) {
+internal fun MosaicGlyph(ink: Color, side: Dp) {
     Canvas(Modifier.size(side)) {
         val cell = size.width / 3f
         for (i in 0 until 3) for (j in 0 until 3) {
@@ -272,8 +172,8 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 // ---------- 调节面板 ----------
 
 /**
- * 手机上的调节面板：从屏幕底下弹出的模态底部动作条（Material 3 的 ModalBottomSheet），盖在画布上，
- * 不把底栏和画布往上顶。样式和参数管的是下一笔，调的时候用不着一直看着整张图；
+ * 手机上的调节面板：底栏展开一组后再点一下当前的样式就弹出来（见 EditorToolbar）。
+ * 是从屏幕底下弹出的模态底部动作条（Material 3 的 ModalBottomSheet），盖在画布上，不把底栏和画布往上顶。样式和参数管的是下一笔，调的时候用不着一直看着整张图；
  * 选中了手动框时那个框照样当场跟着变，只是隔着一层暗幕。
  *
  * 往下拖、点面板外面、按返回、点右上角的箭头都能收起。吸管在等取色时面板先让开——要点的是底下的图，
@@ -281,7 +181,7 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
+internal fun StyleSheet(model: StyleBarModel, actions: StyleBarActions) {
     val wanted = model.panelOpen && model.colorPick == null
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     // 收起时先让面板滑下去，滑完再从组合里拿掉；面板自己收起（往下拖、点外面、返回）时已经滑完了

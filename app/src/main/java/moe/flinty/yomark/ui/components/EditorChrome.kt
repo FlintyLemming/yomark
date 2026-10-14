@@ -44,7 +44,8 @@ fun EditorTopBar(
     canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onPurpose: () -> Unit,
+    /** 用途水印。手机竖着拿时它在底栏的「编辑」里，传 null，这里就不出现。 */
+    onPurpose: (() -> Unit)?,
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -54,10 +55,18 @@ fun EditorTopBar(
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
-    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现。 */
+    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现：手机竖着拿时它在底栏。 */
     compare: MutableInteractionSource? = null,
     /** 有前后可比：打了码，或者设了用途水印。没有时「对比」灰掉。 */
     canCompare: Boolean = false,
+    /**
+     * 导出，在最右上角。手机竖着拿时在这儿：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，
+     * 展开着一组工具时也一直在。传 null 时不出现：宽屏的导出在样式列表那一块的最底下（见 [EditorActionRow]）。
+     */
+    onExport: (() -> Unit)? = null,
+    /** 导出按钮上的字（见 [EditorActionRow]）。 */
+    @StringRes exportLabel: Int = R.string.export,
+    exporting: Boolean = false,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // 向上回到首页，放在 Android 约定的左上角
@@ -68,12 +77,14 @@ fun EditorTopBar(
         if (onRemoveWatermark != null) {
             IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark)) }
         }
-        IconButton(onClick = onPurpose) {
-            Icon(
-                Icons.Filled.Layers,
-                stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
-                tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-            )
+        if (onPurpose != null) {
+            IconButton(onClick = onPurpose) {
+                Icon(
+                    Icons.Filled.Layers,
+                    stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
+                    tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                )
+            }
         }
         if (compare != null) {
             // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
@@ -85,40 +96,59 @@ fun EditorTopBar(
             IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
         }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-    }
-}
-
-@Composable
-fun EditorBottomBar(
-    styleBar: StyleBarModel,
-    styleActions: StyleBarActions,
-    onExport: () -> Unit,
-    exporting: Boolean,
-    modifier: Modifier = Modifier,
-    /** 导出按钮上的字（见 [EditorActionRow]）。 */
-    @StringRes exportLabel: Int = R.string.export,
-    aiReview: AiReview = AiReview.Hidden,
-    onAiReview: () -> Unit = {},
-    /** 批量时的胶片条（见 [EditorActionRow]）。单张时为 null。 */
-    filmstrip: (@Composable (Modifier) -> Unit)? = null,
-) {
-    // 样式的调节面板是弹出来盖在画布上的（见 StyleBar），底栏的高度不随它变
-    Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-        StyleBar(model = styleBar, actions = styleActions)
-        EditorActionRow(
-            onExport = onExport,
-            exportLabel = exportLabel,
-            exporting = exporting,
-            aiReview = aiReview,
-            onAiReview = onAiReview,
-            filmstrip = filmstrip,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-        )
+        if (onExport != null) {
+            Spacer(Modifier.width(4.dp))
+            Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
+        }
     }
 }
 
 /**
- * 底栏的最后一行，手机的底栏和宽屏的样式列表那一块（WideEditorPanel）共用。
+ * 手机的底栏：一行工具（见 [EditorToolbar]）。导出在顶栏右上角（见 [EditorTopBar]）。
+ * 批量时胶片条单独一行，在工具上面。
+ *
+ * @param toolGroup 展开着的那一组，收着时为 null
+ * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
+ */
+@Composable
+fun EditorBottomBar(
+    toolGroup: ToolGroup?,
+    onToolGroup: (ToolGroup?) -> Unit,
+    styleBar: StyleBarModel,
+    styleActions: StyleBarActions,
+    compare: MutableInteractionSource,
+    canCompare: Boolean,
+    modifier: Modifier = Modifier,
+    aiReview: AiReview = AiReview.Hidden,
+    onAiReview: () -> Unit = {},
+    /** 已设用途水印：「编辑」里的水印着主题色。 */
+    purposeOn: Boolean = false,
+    onPurpose: () -> Unit = {},
+    /** 批量时的胶片条。单张时为 null。 */
+    filmstrip: (@Composable (Modifier) -> Unit)? = null,
+) {
+    // 样式的调节面板是弹出来盖在画布上的（见 StyleSheet），底栏的高度不随它变
+    Column(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        filmstrip?.invoke(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp))
+        EditorToolbar(
+            open = toolGroup,
+            onOpen = onToolGroup,
+            styleBar = styleBar,
+            styleActions = styleActions,
+            purposeOn = purposeOn,
+            onPurpose = onPurpose,
+            aiReview = aiReview,
+            onAiReview = onAiReview,
+            compare = compare,
+            canCompare = canCompare,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
+    }
+    StyleSheet(styleBar, styleActions)
+}
+
+/**
+ * 宽屏的样式列表那一块（WideEditorPanel）最底下那一行。手机上这两样都在工具那一行里（见 [EditorBottomBar]）。
  *
  * 单张时左边「AI 增强识别」，右边「导出」。批量时左边是胶片条，占掉导出左边剩下的地方，
  * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。
