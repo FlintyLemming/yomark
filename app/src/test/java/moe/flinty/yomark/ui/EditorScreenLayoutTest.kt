@@ -71,7 +71,8 @@ import androidx.compose.ui.test.SemanticsMatcher
  *
  * 手机的底栏是一行工具：点「打码」「编辑」就地展开，返回收起；用途水印在「编辑」里，对比在这一行，导出在右上角。
  * 手机上样式的调节面板是从底栏往上长出来盖在图上的：底栏不动，吸管取色时缩回去再长出来，箭头、返回都收起。
- * 这几条用真的 ViewModel 走一遍，这一行自己的细节在 EditorToolbarTest，面板自己的控件在 StyleBarTest。
+ * 用途水印的面板也是这样长出来的，和样式面板换着开。
+ * 这几条用真的 ViewModel 走一遍，这一行自己的细节在 EditorToolbarTest，面板自己的控件在 StyleBarTest、PurposePanelTest。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -186,16 +187,106 @@ class EditorScreenLayoutTest {
         assertThat(compose.activity.isFinishing).isFalse()
     }
 
-    /** 手机竖着拿，用途水印在「编辑」里，顶栏上没有它。 */
+    /**
+     * 手机竖着拿，用途水印在「编辑」里，顶栏上没有它。点它和点了再点马克笔一样，胶囊长出它的面板盖在图上，
+     * 工具那一行不动；再点一下收起，这一组还展开着，图上的水印还在。
+     */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
-    @Test fun `on a phone the purpose watermark is under edit, not in the top bar`() {
+    @Test fun `on a phone the purpose watermark is under edit and grows its panel from the bar`() {
         val vm = open()
         compose.onNodeWithContentDescription("用途水印").assertDoesNotExist()
+        openWatermarkPanel()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        val tool = compose.onNodeWithText("水印").getUnclippedBoundsInRoot()
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
+        val remove = compose.onNodeWithText("移除").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(remove.bottom).isAtMost(tool.top)
+
+        compose.onNodeWithText("水印").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+        // 开着时选中的水印撑宽了一些，这一行上下没挪
+        val folded = compose.onNodeWithText("水印").getUnclippedBoundsInRoot()
+        assertThat(folded.top to folded.bottom).isEqualTo(tool.top to tool.bottom)
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+        assertThat(vm.state.value.purposeText).isNotNull()
+    }
+
+    /** 底栏展开「编辑」，点水印长出它的面板。 */
+    private fun openWatermarkPanel() {
         compose.onNodeWithText("编辑").performClick()
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("水印").performClick()
         frames(SETTLE_FRAMES)
+    }
+
+    /** 水印和样式的面板是同一块地方：水印的开着时点马克笔，换成马克笔的；再点水印，换回来。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the watermark and style panels swap in place`() {
+        val vm = open()
+        openWatermarkPanel()
+        compose.onNodeWithText("马克笔").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.MARKER)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        compose.onNodeWithContentDescription("收起样式面板").assertIsDisplayed()
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+
+        compose.onNodeWithText("水印").performClick()
+        frames(SETTLE_FRAMES)
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
+        compose.onNodeWithContentDescription("收起样式面板").assertDoesNotExist()
+    }
+
+    /** 给水印用吸管：面板先缩回去，点图取色，面板带着取到的颜色长回来。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the watermark panel steps aside for the eyedropper`() {
+        val vm = open()
+        openWatermarkPanel()
+        compose.onNodeWithContentDescription("从图上取色").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.colorPick).isEqualTo(ColorTarget.PURPOSE)
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+        compose.onNodeWithText("点一下图片，取那里的颜色").assertIsDisplayed()
+        compose.runOnUiThread { vm.onTap(PointF(200f, 200f)) }   // 白图
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeStyle.color).isEqualTo(Color.WHITE)
+        compose.onNodeWithText("点一下图片，取那里的颜色").assertDoesNotExist()
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
+        compose.onNodeWithContentDescription("白色").assertIsSelected()
+    }
+
+    /** 水印的面板也是：右上角的箭头、系统返回只收面板，这一组还展开着；点它外面连这一组一起收起。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the arrow, back, or a tap outside folds the watermark panel`() {
+        val vm = open()
+        openWatermarkPanel()
+        compose.onNodeWithContentDescription("收起水印面板").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+
+        compose.onNodeWithText("水印").performClick()
+        frames(SETTLE_FRAMES)
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+        assertThat(compose.activity.isFinishing).isFalse()
+
+        compose.onNodeWithText("水印").performClick()
+        frames(SETTLE_FRAMES)
+        // 图的上半截，面板盖不到那儿
+        compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        compose.onNodeWithText("马克笔").assertDoesNotExist()
+        compose.onNodeWithText("编辑").assertIsDisplayed()
     }
 
     /** 手机上样式的调节面板从底栏往上长出来盖在图上：工具那一行不动。 */
@@ -326,6 +417,20 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("马克笔").assertIsDisplayed()
     }
 
+    /** 手机横着拿：水印的面板和样式面板一样顶替样式方块（顶栏上的水印按钮点开），不盖在图上。 */
+    @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
+    @Test fun `on a phone held sideways the watermark panel takes the styles' place`() {
+        val vm = open()
+        compose.onNodeWithContentDescription("用途水印").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        val title = compose.onNode(hasText("用途水印") and !hasAnyAncestor(isDialog()))
+        title.assertIsDisplayed()
+        assertThat(title.getUnclippedBoundsInRoot().left).isGreaterThan(screenBounds().right * 0.6f)
+        compose.onNodeWithText("马克笔").assertDoesNotExist()
+        compose.onNodeWithText("导出").assertIsDisplayed()
+    }
+
     @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
     @Test fun `an upright tablet lists the boxes below the image`() {
         open()
@@ -385,6 +490,31 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
         compose.runOnUiThread { vm.dismissStylePanel() }
         frames(SETTLE_FRAMES)
+        compose.onNodeWithText("框出 2 处").assertExists()
+    }
+
+    /** 宽屏上点顶栏的水印按钮：水印的面板也占列表的位置，和样式面板一次只开一个；再点一下收起，列表回来。 */
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Test fun `the watermark panel takes the list's place too`() {
+        val vm = open()
+        compose.onNodeWithContentDescription("用途水印").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
+        compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+
+        compose.runOnUiThread { vm.onStyleChipClick(vm.state.value.barLook.style) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+        compose.onNodeWithContentDescription("收起样式面板").assertIsDisplayed()
+
+        // 设了水印，顶栏上的按钮说的是「已开启」
+        compose.onNodeWithContentDescription("用途水印（已开启）").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
+        compose.onNodeWithContentDescription("用途水印（已开启）").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.purposeSheetVisible).isFalse()
         compose.onNodeWithText("框出 2 处").assertExists()
     }
 

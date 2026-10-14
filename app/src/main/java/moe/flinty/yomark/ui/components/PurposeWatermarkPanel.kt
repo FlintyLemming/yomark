@@ -1,30 +1,35 @@
 package moe.flinty.yomark.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import kotlin.math.roundToInt
@@ -32,66 +37,93 @@ import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
+/** 用途水印的调节面板要显示的东西。 */
+@Immutable
+data class PurposePanelModel(
+    /** 文案；null 是图上没有用途水印（没设过、打字时清空了，或者移除了）。 */
+    val text: String? = null,
+    val style: PurposeWatermarkStyle = PurposeWatermarkStyle(),
+    /** 面板开着。和样式的调节面板是同一块地方，一次只开一个（见 EditorViewModel.showPurposeSheet）。 */
+    val open: Boolean = false,
+    /** 吸管正等着给水印取色。 */
+    val picking: Boolean = false,
+)
+
+/** 用途水印面板上的动作。都有空实现，测试只接自己关心的。 */
+interface PurposePanelActions {
+    /** 点了水印（手机底栏「编辑」里的那一项、宽屏顶栏上的按钮）：收着就打开，开着就收起。 */
+    fun onToggle() {}
+    fun onTextChange(text: String) {}
+    fun onStyleChange(style: PurposeWatermarkStyle) {}
+    fun onReset() {}
+
+    /** 移除水印，面板一起收起。 */
+    fun onRemove() {}
+    fun onCollapse() {}
+
+    /** 开吸管（true）或收起吸管（false）。 */
+    fun onPickColor(pick: Boolean) {}
+}
+
 /**
- * 用途水印的调节面板：文案、颜色、角度、透明度、密度。
+ * 用途水印的调节面板里的东西：顶上是名字和收起，下面是文字、颜色、角度、不透明度、密度，最底下是「恢复默认」和「移除」。
  *
- * 它顶替编辑器的底栏（宽屏横着拿时顶替右边那一栏），而不是弹一个对话框或带遮罩的底部弹层——
- * 画布留在旁边不被盖住，每动一下滑条，图上的水印就跟着变，所见即导出。
- * 输入法弹起时编辑器整体让开（见 EditorScreen），打字时也看得到效果。
+ * 和马克笔、画笔的面板一个样子、一个地方：手机上是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在图上，
+ * 外面那一列（[PanelColumn]）由底栏摆；宽屏上占框列表的位置（见 [PurposePanel]）。原先它顶替整个底栏，样子也是另一套。
+ * 每动一下，图上的水印就跟着变，所见即导出。颜色和马克笔一样有自定义和吸管，吸管等着取色时手机上的面板先缩回去。
  *
- * @param maxHeight 再高就滚动，出厂见 [purposePanelMaxHeight]
+ * @param compactWhileTyping 打字时（输入框有焦点、输入法弹着）只留文字那一格，收起输入法再摊开。
+ *   手机上面板盖在图上，输入法又占掉下半截，面板整个摊开的话图一点也露不出来，看不到打的字落在图上是什么样
+ * @param imeVisible 输入法弹着。测试里没有输入法，由测试给
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PurposeWatermarkPanel(
-    text: String?,
-    style: PurposeWatermarkStyle,
-    onTextChange: (String) -> Unit,
-    onStyleChange: (PurposeWatermarkStyle) -> Unit,
-    onReset: () -> Unit,
-    onRemove: () -> Unit,
-    onDone: () -> Unit,
-    modifier: Modifier = Modifier,
-    maxHeight: Dp = purposePanelMaxHeight(),
+internal fun PurposePanelContent(
+    model: PurposePanelModel,
+    actions: PurposePanelActions,
+    compactWhileTyping: Boolean = false,
+    imeVisible: Boolean = WindowInsets.isImeVisible,
 ) {
+    val style = model.style
     // 输入框自己持有正在编辑的文字：清空时 ViewModel 那边是 null（暂不加水印），
     // 但框里该是空的，而不是跳回上一句。
-    var draft by remember { mutableStateOf(text.orEmpty()) }
+    var draft by remember { mutableStateOf(model.text.orEmpty()) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
 
-    Column(
-        modifier
-            .fillMaxWidth()
-            .heightIn(max = maxHeight)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.purpose_watermark), style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onReset) { Text(stringResource(R.string.reset_defaults)) }
-            TextButton(onClick = onRemove) { Text(stringResource(R.string.remove)) }
-            Spacer(Modifier.width(4.dp))
-            Button(onClick = onDone) { Text(stringResource(R.string.done)) }
-        }
+    PanelHeader(
+        title = stringResource(R.string.purpose_watermark),
+        onCollapse = actions::onCollapse,
+        collapseLabel = stringResource(R.string.collapse_purpose_panel),
+    )
+    Column(Modifier.padding(end = 12.dp)) {
+        PanelLabel(stringResource(R.string.purpose_text))
         OutlinedTextField(
             value = draft,
-            onValueChange = { draft = it; onTextChange(it) },
+            onValueChange = { draft = it; actions.onTextChange(it) },
             singleLine = true,
             placeholder = { Text(stringResource(R.string.purpose_placeholder)) },
-            modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+            // 和「画法」那一排按钮、色板上的圆一样是圆头的
+            shape = CircleShape,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+            modifier = Modifier.fillMaxWidth().onFocusChanged { focused = it.isFocused },
         )
+    }
+    // 收起来时面板一点点变矮（PanelColumn 跟着里面的东西变高变矮），输入法收起后再长回来
+    if (compactWhileTyping && focused && imeVisible) return
 
-        LabeledRow(stringResource(R.string.color)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PurposeWatermarkStyle.PALETTE.forEach { argb ->
-                    ColorSwatch(
-                        color = Color(argb),
-                        name = COLOR_NAMES[argb]?.let { stringResource(it) }.orEmpty(),
-                        selected = argb == style.color,
-                        onClick = { onStyleChange(style.copy(color = argb)) },
-                    )
-                }
-            }
-        }
+    Column(Modifier.padding(end = 12.dp)) {
+        PanelLabel(stringResource(R.string.color))
+        ColorPicker(
+            color = style.color,
+            palette = PURPOSE_PALETTE,
+            picking = model.picking,
+            onColor = { rgb, _ -> actions.onStyleChange(style.copy(color = rgb)) },
+            // 水印的样子不进撤销栈，自定义颜色的滑条松手时没有要收尾的
+            onColorFinished = {},
+            onEyedropper = { actions.onPickColor(!model.picking) },
+        )
         SliderRow(
             label = stringResource(R.string.angle),
             value = style.angle,
@@ -100,7 +132,8 @@ fun PurposeWatermarkPanel(
             steps = ((PurposeWatermarkStyle.ANGLE_RANGE.endInclusive -
                 PurposeWatermarkStyle.ANGLE_RANGE.start) / ANGLE_STEP).roundToInt() - 1,
             valueText = "${style.angle.roundToInt()}°",
-            onChange = { onStyleChange(style.copy(angle = it)) },
+            onChange = { actions.onStyleChange(style.copy(angle = it)) },
+            modifier = Modifier.padding(top = 4.dp),
         )
         SliderRow(
             // 叫「不透明度」：数字越大越显眼，和拖动方向、显示的百分比是一回事
@@ -108,21 +141,40 @@ fun PurposeWatermarkPanel(
             value = style.opacity,
             range = PurposeWatermarkStyle.OPACITY_RANGE,
             valueText = "${(style.opacity * 100).roundToInt()}%",
-            onChange = { onStyleChange(style.copy(opacity = it)) },
+            onChange = { actions.onStyleChange(style.copy(opacity = it)) },
+            modifier = Modifier.padding(top = 4.dp),
         )
         SliderRow(
             label = stringResource(R.string.density),
             value = style.density,
             range = PurposeWatermarkStyle.DENSITY_RANGE,
             valueText = stringResource(densityText(style.density)),
-            onChange = { onStyleChange(style.copy(density = it)) },
+            onChange = { actions.onStyleChange(style.copy(density = it)) },
+            modifier = Modifier.padding(top = 4.dp),
         )
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        TextButton(onClick = actions::onReset, enabled = style != PurposeWatermarkStyle()) {
+            Text(stringResource(R.string.reset_defaults))
+        }
+        Spacer(Modifier.weight(1f))
+        // 移除只是这次不加：文字记着，再点开水印还是它（见 EditorViewModel.removePurposeWatermark）
+        TextButton(onClick = actions::onRemove) {
+            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(stringResource(R.string.remove))
+        }
     }
 }
 
-/** 面板在画布下面时最多占屏幕高度的一半：横屏时屏幕矮，画布总有地方留着。 */
+/**
+ * 宽屏上的用途水印面板：和样式面板一样占框列表的位置（见 WideEditorPanel），画布留在旁边不被盖住。
+ * 样式方块里没有水印，顶上总写着名字。
+ */
 @Composable
-internal fun purposePanelMaxHeight(): Dp = (LocalConfiguration.current.screenHeightDp * 0.5f).dp
+internal fun PurposePanel(model: PurposePanelModel, actions: PurposePanelActions, modifier: Modifier = Modifier) {
+    WidePanel(modifier) { PurposePanelContent(model, actions) }
+}
 
 @StringRes
 private fun densityText(density: Float): Int = when {
@@ -133,6 +185,7 @@ private fun densityText(density: Float): Int = when {
 
 private const val ANGLE_STEP = 15f
 
-private val COLOR_NAMES = PurposeWatermarkStyle.PALETTE.zip(
-    listOf(R.string.color_black, R.string.color_gray, R.string.color_white, R.string.color_red, R.string.color_blue, R.string.color_green)
-).toMap()
+/** 用途水印的色板：黑、灰、白、红、蓝、绿（见 PurposeWatermarkStyle.PALETTE），色板外的颜色走自定义和吸管。 */
+internal val PURPOSE_PALETTE = PurposeWatermarkStyle.PALETTE.zip(
+    listOf(R.string.color_black, R.string.color_gray, R.string.color_white, R.string.color_red, R.string.color_blue, R.string.color_green),
+) { argb, name -> NamedColor(argb, name) }

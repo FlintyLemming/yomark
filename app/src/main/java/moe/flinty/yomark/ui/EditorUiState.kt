@@ -84,7 +84,7 @@ data class EditorUiState(
     val purposeText: String? = null,
     /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
     val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
-    /** 用途水印调节面板开着：它顶替底栏，画布留在上面实时预览。 */
+    /** 用途水印调节面板开着：和样式的调节面板在同一个地方（手机上是底栏长出来的那一块），一次只开一个，图上实时预览。 */
     val purposeSheetVisible: Boolean = false,
     /**
      * 批量会话：相册一次分享多张（ACTION_SEND_MULTIPLE），或首页 Picker 里选了多张。单张时为 null，底栏也就没有胶片条。

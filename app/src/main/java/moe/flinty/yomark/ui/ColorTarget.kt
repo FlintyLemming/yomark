@@ -5,7 +5,7 @@ import android.graphics.Color
 import moe.flinty.yomark.core.model.MaskOptions
 
 /**
- * 样式面板上能换颜色的几项。色板、自定义颜色、吸管取色都落在其中一项上。
+ * 样式面板、用途水印面板上能换颜色的几项。色板、自定义颜色、吸管取色都落在其中一项上。
  */
 enum class ColorTarget {
     /** 色块的颜色；马赛克降级成色块时也用它。挑了一种颜色就不再是近似色。 */
@@ -15,13 +15,20 @@ enum class ColorTarget {
     MARKER,
 
     /** 画笔的颜色，不透明。 */
-    PEN;
+    PEN,
+
+    /**
+     * 用途水印的颜色，不透明，浓淡另外调。它不是打码的样子，不在 MaskOptions 里：
+     * 在 PurposeWatermarkStyle.color，吸管取到的颜色交给 EditorViewModel.setPurposeStyle。
+     */
+    PURPOSE;
 
     /** 这一项现在的颜色，不透明的 RGB。 */
     fun colorOf(options: MaskOptions): Int = when (this) {
         SOLID -> options.solidColor
         MARKER -> options.markerColor
         PEN -> options.penColor
+        PURPOSE -> error("用途水印的颜色不在 MaskOptions 里")
     } or OPAQUE
 
     /**
@@ -32,6 +39,7 @@ enum class ColorTarget {
         SOLID -> options.copy(solidColor = rgb or OPAQUE, solidNear = false)
         MARKER -> options.copy(markerColor = MaskOptions.withAlpha(rgb, options.markerAlpha))
         PEN -> options.copy(penColor = rgb or OPAQUE)
+        PURPOSE -> error("用途水印的颜色不在 MaskOptions 里")
     }
 
     private companion object {

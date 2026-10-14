@@ -1,6 +1,5 @@
 package moe.flinty.yomark.ui.components
 
-import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,22 +11,17 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -181,21 +175,19 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 
 /**
  * 手机上的调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
- * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶。
+ * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶；
+ * 外面那一列（[PanelColumn]）由底栏摆，用途水印的面板也在那一列里，换着开时面板一点点变高变矮。
  * 样式和参数管的是下一笔；选中了手动框时那个框照样当场跟着变。
  * 吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
  */
 @Composable
-internal fun StylePanelContent(model: StyleBarModel, actions: StyleBarActions, modifier: Modifier = Modifier) {
-    Column(
-        modifier
-            .verticalScroll(rememberScrollState())
-            .animateContentSize()
-            .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-    ) {
-        PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
-        StylePanelBody(model, actions)
-    }
+internal fun StylePanelContent(model: StyleBarModel, actions: StyleBarActions) {
+    PanelHeader(
+        title = stringResource(MaskStyleInfo.label(model.look.style)),
+        onCollapse = actions::onCollapse,
+        collapseLabel = stringResource(R.string.collapse_style_panel),
+    )
+    StylePanelBody(model, actions)
 }
 
 /**
@@ -228,37 +220,13 @@ internal fun StylePanel(
     modifier: Modifier = Modifier,
     standalone: Boolean = false,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            Modifier
-                .verticalScroll(rememberScrollState())
-                .animateContentSize()
-                .padding(start = 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-        ) {
-            if (standalone) {
-                PanelHeader(model, actions, title = stringResource(MaskStyleInfo.label(model.look.style)))
-            } else {
-                PanelHeader(model, actions)
-            }
-            StylePanelBody(model, actions)
-        }
-    }
-}
-
-/** 面板顶上：弹出的面板上是当前样式的名字，右边是收起。 */
-@Composable
-private fun PanelHeader(model: StyleBarModel, actions: StyleBarActions, title: String? = null) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
-        }
-        IconButton(onClick = actions::onCollapse) {
-            Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.collapse_style_panel))
-        }
+    WidePanel(modifier) {
+        PanelHeader(
+            title = if (standalone) stringResource(MaskStyleInfo.label(model.look.style)) else null,
+            onCollapse = actions::onCollapse,
+            collapseLabel = stringResource(R.string.collapse_style_panel),
+        )
+        StylePanelBody(model, actions)
     }
 }
 
@@ -409,16 +377,6 @@ private fun WidthSlider(
 
 /** 笔宽旁边写的像素数按这么宽的截图算：常见手机截图的短边。 */
 private const val REFERENCE_SHORT_SIDE = 1080
-
-@Composable
-private fun PanelLabel(text: String) {
-    Text(
-        text,
-        style = MaterialTheme.typography.labelMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 6.dp),
-    )
-}
 
 /**
  * 「近似色」那一颗和色块的小样子上画的颜色：这张图上真取到的近似色，最多三种，块数多的排前面。
