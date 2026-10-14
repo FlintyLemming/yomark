@@ -2,6 +2,8 @@ package moe.flinty.yomark.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
@@ -48,7 +50,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -58,14 +59,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasurePolicy
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -75,6 +82,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.lerp
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -84,6 +92,7 @@ import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.PopupPositionProvider
 import kotlinx.coroutines.launch
@@ -95,6 +104,7 @@ import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 
 /** 手机底栏上的两组工具。 */
@@ -124,6 +134,10 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种，胶囊往上长成调节面板（见 EditorBottomBar）。
  * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
+ * 胶囊的底子不在这里画，底栏画：面板就是它往上长出来的，长出来、缩回去都得是同一块，一圈边、一层投影。
+ * 原先这一行自己画一条胶囊、面板在底下另垫一块，半路上两块的边和投影一起露出来，工具上面多一道线、面板里多一层影子。
+ * 这一行只摆胶囊里的东西，胶囊眼下左右到哪儿用 [PillLeft]、[PillRight] 告诉底栏。
+ *
  * 圆钮上没有字。AI 的结果在圆钮上是角标和颜色，跑完那一下画布顶上再说一声（见 AiReviewResultPill）；
  * 对比点一下没有比上，弹个提示说要按住。
  *
@@ -131,8 +145,6 @@ enum class ToolGroup(@StringRes val label: Int) {
  * @param onOpen 点了一组（展开它）或点了返回（null）
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
- * @param merge 调节面板从胶囊往上长出来了多少，0～1（见 EditorBottomBar）：面板的底子垫在胶囊底下，
- *   胶囊自己的边和投影跟着淡掉，看上去是一整块。只在画的时候读，动起来不重组
  */
 @Composable
 fun EditorToolbar(
@@ -147,7 +159,6 @@ fun EditorToolbar(
     onAiReview: () -> Unit = {},
     compare: MutableInteractionSource? = null,
     canCompare: Boolean = false,
-    merge: () -> Float = { 0f },
 ) {
     val progress = animateFloatAsState(
         if (open != null) 1f else 0f,
@@ -170,7 +181,6 @@ fun EditorToolbar(
 
     Layout(
         content = {
-            Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge, chrome = { 1f - merge() }))
             ToolGroup.entries.forEach { group ->
                 // 两组一直都在组合里：胶囊收着时多宽要按两组一起量。展开停稳后不摆出来、读屏也读不到
                 GroupButton(
@@ -211,12 +221,10 @@ fun EditorToolbar(
         val circleParts = HashMap<Slot, Measurable>()
         val toolParts = ArrayList<Measurable>()
         var picked = -1
-        var pillPart: Measurable? = null
         var backPart: Measurable? = null
         var dividerPart: Measurable? = null
         for (m in measurables) when (val id = m.layoutId) {
             is ToolGroup -> groupParts[id] = m
-            Slot.PILL -> pillPart = m
             Slot.BACK -> backPart = m
             Slot.DIVIDER -> dividerPart = m
             Slot.TOOL -> toolParts += m
@@ -264,11 +272,13 @@ fun EditorToolbar(
         val divider = dividerPart?.measure(Constraints())
         val toolsStart = backX + backWidth + dividerGap * 2 + (divider?.width ?: 0)
         val toolsRoom = (openRight - inset - toolsStart).coerceAtLeast(0)
+        val toolNatural = toolParts.map { it.maxIntrinsicWidth(rowMin) }
         val toolWidths = toolWidths(
-            natural = toolParts.map { it.maxIntrinsicWidth(rowMin) },
+            natural = toolNatural,
             room = toolsRoom,
             picked = picked,
-            chevron = chevronRoom,
+            // 选中那一项的小箭头眼下多宽：换选中的半路上它还在长（见 NameAndChevronPolicy）
+            chevron = if (picked >= 0) toolNatural[picked] - toolParts[picked].minIntrinsicWidth(rowMin) else chevronRoom,
             bare = (TOOL_PAD_QUIET * 2 + GLYPH_BOX).roundToPx(),
         )
         // 每一格和胶囊一样高：整格都能点，小胶囊在格子正中
@@ -278,18 +288,16 @@ fun EditorToolbar(
         val toolX = toolWidths.runningFold(toolsStart) { x, w -> x + w }
 
         val height = max(rowMin, (groups.values + tools + circlePlaceables.values + listOfNotNull(back)).maxOf { it.height })
-        // 胶囊有多宽跟着动画走：每一帧重新量它（它自己画边和投影，见 floatingSurface）。
-        // 别的孩子约束不变，不会跟着重新量；动画也不重组
+        // 胶囊有多宽跟着动画走：每一帧重新算，交给底栏画（见 PillLeft）。
+        // 孩子们约束不变，不会跟着重新量；动画也不重组
         val p = progress.value
         val left = lerp(shutLeft, openLeft, p)
         val right = lerp(shutRight, openRight, p)
-        val pill = pillPart!!.measure(Constraints.fixed((right - left).coerceAtLeast(0), height))
         val slide = SLIDE.roundToPx()
         fun Placeable.centerY() = (height - this.height) / 2
 
-        layout(width, height) {
+        layout(width, height, mapOf(PillLeft to left, PillRight to right)) {
             val fadeOut = span(p, 0f, FADE_OUT)
-            pill.place(left, 0)
             // 两组在前半程淡掉；展开停稳后不摆出来
             if (collapsedRow) groups.forEach { (group, placeable) ->
                 placeable.placeWithLayer(shutX.getValue(group), placeable.centerY()) { alpha = 1f - fadeOut }
@@ -339,7 +347,14 @@ private class LastOpen {
 }
 
 /** [TOOL] 是展开后的一项工具，选中的那一项是 [PICKED]（分宽度时它的名字留到最后，见 [toolWidths]）。 */
-private enum class Slot { PILL, AI, COMPARE, BACK, DIVIDER, TOOL, PICKED }
+private enum class Slot { AI, COMPARE, BACK, DIVIDER, TOOL, PICKED }
+
+/**
+ * 胶囊眼下的左沿、右沿，按工具那一行自己的坐标（见 EditorToolbar）。收着、展开、半路上都不一样宽，
+ * 底栏照着这两条线画胶囊（见 EditorBottomBar）。
+ */
+internal val PillLeft = VerticalAlignmentLine(::min)
+internal val PillRight = VerticalAlignmentLine(::max)
 
 /** [p] 落在 [start]～[end] 这一段的哪儿，0～1。 */
 internal fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
@@ -349,8 +364,10 @@ internal fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - st
  * 放得下时各按本来的宽，多出来的平分：小胶囊在各自格子的正中，几项之间的空一样大。
  *
  * 放不下时（窄屏、字调大了、英文的长名字）选中的名字最要紧，一定写全；其次是没选中的名字，从短的起能写几个写几个，
- * 写不下的只留小样子（[bare] 宽，见 [NameOrNothing]），不截断成「Water…」；最后还有地方，选中的名字后面才画小箭头（[chevron]）。
- * 都只剩小样子还放不下，才截断选中的名字（见 [LabelAndChevron]）。
+ * 写不下的只留小样子（[bare] 宽，见 [NameAndChevron]），不截断成「Water…」；最后还有地方，选中的名字后面才画小箭头（[chevron]）。
+ * 都只剩小样子还放不下，才截断选中的名字。
+ *
+ * 换选中的那一项时，两项的本来宽度一路在变（见 ToolItem），这里每一帧重新分，旁边几项跟着挪。
  *
  * 每一项按给它的宽自己定画什么：格子够它本来的宽就画全，不够就照上面的顺序少画，所以这里分出来的和它们画出来的对得上。
  */
@@ -416,7 +433,8 @@ private fun StyleItem(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
         label = stringResource(MaskStyleInfo.label(style)),
         onClick = { actions.onStyleClick(style) },
         selected = selected,
-        panelOpen = if (selected) model.panelOpen else null,
+        // 没选中的也带着小箭头：换走的那一下它要缩回去，不是一下没了（见 ToolItem）
+        panelOpen = model.panelOpen,
     ) { ink ->
         StyleGlyph(style, model.look.options, model.nearColors, ink = ink)
     }
@@ -532,64 +550,101 @@ private fun LabelAndChevron(modifier: Modifier = Modifier, content: @Composable 
 }
 
 /**
- * 没选中的一项的名字，连着它和小样子之间的空：给的地方写得下就写全，写不下整个不画，这一项只剩小样子——
- * 截成「Water…」难认，只有小样子的倒和作者给的悬浮底栏截图一个样子。
+ * 展开后一项工具的名字和它后面的小箭头（[content] 依次是这两样，没有小箭头的只有名字），连着名字和小样子之间的空。
+ *
+ * 小箭头只有选中的样式露出来，照 GNav 选中时名字长出来的样子：[open] 是它那一截长出来了多少（0～1），
+ * 小箭头贴着这一截的右沿，跟着它从名字后面推出来，名字盖着的那一段不露；[drift] 是它还差几成滑到位
+ * （GNav 的名字在自己那一截里往左滑 8，这里停稳时贴着右沿，所以是从右边多出 8 dp 滑回来），[fade] 是它的浓淡。
+ *
+ * 给的地方不够时：选中的（[keep]）先不画小箭头，再截断名字——选中的名字非写不可；
+ * 没选中的写不全就整个不画，只剩小样子：截成「Water…」难认，只有小样子的倒和作者给的悬浮底栏截图一个样子。
  * 不画时名字照样摆着、只是透明：读屏还念得到，点的还是整格。
  */
 @Composable
-private fun NameOrNothing(modifier: Modifier = Modifier, name: @Composable () -> Unit) {
-    Layout(name, modifier) { measurables, constraints ->
-        val gap = TOOL_GLYPH_GAP.roundToPx()
-        val text = measurables.single().measure(Constraints())
-        // 量本来多宽时（宽度不限）总写得下
-        val fits = !constraints.hasBoundedWidth || gap + text.width <= constraints.maxWidth
-        layout(if (fits) gap + text.width else 0, text.height) {
-            if (fits) text.place(gap, 0) else text.placeWithLayer(0, 0) { alpha = 0f }
-        }
-    }
+private fun NameAndChevron(
+    keep: Boolean,
+    open: Float,
+    drift: Float,
+    fade: Float,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(content, modifier, NameAndChevronPolicy(keep, open, drift, fade))
 }
 
 /**
- * 浮起来的底子：胶囊、圆钮都是它。一圈很细的边，底下两层很淡的投影，照 Bettbox 1.19.4 的悬浮底栏：
- * 一层铺得开（模糊 30、往下 10、8% 的黑），一层贴着边（模糊 10、往下 2、4% 的黑）。
+ * [NameAndChevron] 怎么排。几样都一样就是同一个排法，重组时没变不用重新量。
+ * 最窄是名字写全、不带小箭头，最宽带着眼下长出来的那一截小箭头：EditorToolbar 拿两样的差算选中那一项的小箭头眼下多宽，
+ * 换选中的半路上它还在长，按满宽算会把选中的名字截掉一截（见 [toolWidths]）。
+ */
+private data class NameAndChevronPolicy(val keep: Boolean, val open: Float, val drift: Float, val fade: Float) : MeasurePolicy {
+    override fun MeasureScope.measure(measurables: List<Measurable>, constraints: Constraints): MeasureResult {
+        val gap = TOOL_GLYPH_GAP.roundToPx()
+        val label = measurables.first()
+        val chevron = measurables.getOrNull(1)?.measure(Constraints())
+        val room = if (chevron != null) chevronRoom(open) else 0
+        // 量本来多宽时（宽度不限）都写得下
+        val bounded = constraints.hasBoundedWidth
+        val natural = label.maxIntrinsicWidth(constraints.maxHeight)
+        val whole = !bounded || gap + natural <= constraints.maxWidth
+        val withChevron = room > 0 && (!bounded || gap + natural + room <= constraints.maxWidth)
+        val text = label.measure(if (keep && !whole) Constraints(maxWidth = (constraints.maxWidth - gap).coerceAtLeast(0)) else Constraints())
+        val shown = keep || whole
+        val end = gap + text.width
+        val width = if (!shown) 0 else end + if (withChevron) room else 0
+        val height = max(text.height, chevron?.height ?: 0)
+        return layout(width, height) {
+            if (shown) text.place(gap, (height - text.height) / 2) else text.placeWithLayer(0, (height - text.height) / 2) { alpha = 0f }
+            if (withChevron && chevron != null) {
+                val x = end + room - chevron.width + (CHEVRON_DRIFT.toPx() * drift).roundToInt()
+                chevron.placeWithLayer(x, (height - chevron.height) / 2) {
+                    alpha = fade
+                    shape = Reveal((end - x).toFloat(), chevron.width.toFloat())
+                    clip = true
+                }
+            }
+        }
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int) =
+        TOOL_GLYPH_GAP.roundToPx() + measurables.first().maxIntrinsicWidth(height)
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurables: List<IntrinsicMeasurable>, height: Int) =
+        minIntrinsicWidth(measurables, height) + if (measurables.size > 1) chevronRoom(open) else 0
+}
+
+/** 小箭头那一截长出来 [open]（0～1）时多宽。 */
+private fun Density.chevronRoom(open: Float) = (CHEVRON_ROOM.toPx() * open).roundToInt()
+
+/**
+ * 浮起来的底子：胶囊（连同从它长出来的调节面板，见 EditorBottomBar）、圆钮都是它。一圈很细的边，底下两层很淡的投影，
+ * 照 Bettbox 1.19.4 的悬浮底栏：一层铺得开（模糊 30、往下 10、8% 的黑），一层贴着边（模糊 10、往下 2、4% 的黑）。
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
  */
-internal fun Modifier.floatingSurface(
-    fill: Color,
-    edge: Color,
-    maxRadius: Dp = Dp.Infinity,
-    chrome: () -> Float = { 1f },
-) = drawWithCache {
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) = drawWithCache {
     val radius = min(size.minDimension / 2, maxRadius.toPx())
-    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { color = fill.toArgb() }
+    val shadows = SHADOWS.map { (blur, dy, alpha) ->
+        android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+            color = fill.toArgb()
+            setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha).toArgb())
+        }
+    }
     val line = EDGE_WIDTH.toPx()
     onDrawBehind {
-        // 边和投影的浓淡（见 EditorToolbar 的 merge）每一帧都可能不同，投影在画的时候设
-        val a = chrome().coerceIn(0f, 1f)
-        drawIntoCanvas {
-            for ((blur, dy, alpha) in SHADOWS) {
-                paint.setShadowLayer(blur.toPx(), 0f, dy.toPx(), Color.Black.copy(alpha = alpha * a).toArgb())
-                it.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, paint)
-            }
+        drawIntoCanvas { canvas ->
+            shadows.forEach { canvas.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, it) }
         }
-        if (a > 0f) drawFloatingEdge(edge.copy(alpha = edge.alpha * a), radius, line)
+        // 边画在里面，和 Flutter 的 Border.all 一样
+        drawRoundRect(
+            edge,
+            topLeft = Offset(line / 2, line / 2),
+            size = Size(size.width - line, size.height - line),
+            cornerRadius = CornerRadius(radius - line / 2),
+            style = Stroke(line),
+        )
     }
 }
-
-/** 浮起来的那一圈细边，单独画：调节面板的边画在底栏的工具上面（见 EditorBottomBar）。 */
-internal fun Modifier.floatingEdge(edge: Color, maxRadius: Dp = Dp.Infinity) = drawBehind {
-    drawFloatingEdge(edge, min(size.minDimension / 2, maxRadius.toPx()), EDGE_WIDTH.toPx())
-}
-
-// 边画在里面，和 Flutter 的 Border.all 一样
-private fun DrawScope.drawFloatingEdge(edge: Color, radius: Float, line: Float) = drawRoundRect(
-    edge,
-    topLeft = Offset(line / 2, line / 2),
-    size = Size(size.width - line, size.height - line),
-    cornerRadius = CornerRadius(radius - line / 2),
-    style = Stroke(line),
-)
 
 /** 两层投影：模糊、往下、黑色的浓淡（见 floatingSurface）。 */
 private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.04f))
@@ -714,10 +769,15 @@ private fun rememberHintPosition(): PopupPositionProvider {
  * 没选中的不垫底，左右只留一点空，地方让给选中的那一颗。
  *
  * 整格都能点（和胶囊一样高），按下去的水波只在小胶囊里：整格一样大的水波会碰到胶囊的上下沿。
- * 这一格多宽由 EditorToolbar 按名字长短分（见 [toolWidths]）。地方不够时选中的先去掉小箭头、实在不行再截断名字
- * （见 [LabelAndChevron]），没选中的写不全就只留小样子（见 [NameOrNothing]）。
+ * 这一格多宽由 EditorToolbar 按名字长短分（见 [toolWidths]）。地方不够时选中的先去掉小箭头、实在不行再截断名字，
+ * 没选中的写不全就只留小样子（见 [NameAndChevron]）。
  *
- * @param panelOpen 选中的样式名字后面的小箭头：再点一下长出调节面板（开着时朝下）。null 不画
+ * 换选中的那一项不是一下跳过去，照 Bettbox 1.19.4 的底栏（google_nav_bar 的 GNav，250 ms）：
+ * 新选中的底色淡进来，小胶囊往两边撑开，名字后面的小箭头一边长出地方一边从右边滑进来、淡进来；
+ * 换走的那一项倒过来，小箭头一下就淡没了。小样子和名字的颜色、粗细跟着换，起步快。
+ * 两项一个撑开一个收窄，加起来一样宽，旁边几项跟着一点点挪（各格的宽按名字分）。
+ *
+ * @param panelOpen 样式名字后面的小箭头：再点一下长出调节面板（开着时朝下）。只有选中时露出来；null 是没有小箭头的（水印）
  * @param enabled 点不动的灰掉
  * @param on 开着的开关（水印）：名字着主题色
  * @param stateText 读屏念的状态，如水印的「已开启」
@@ -742,7 +802,15 @@ private fun ToolItem(
     } else {
         Modifier.clickable(interactionSource = interaction, indication = null, enabled = enabled, role = role, onClick = onClick)
     }
-    val ink = if (on || selected) colors.primary else colors.onSurfaceVariant
+    // 一条匀速的进度推着几样东西，各按各的曲线走，和 GNav 一个 AnimationController 推着几样一样
+    val pick by animateFloatAsState(if (selected) 1f else 0f, tween(PICK_MS, easing = LinearEasing), label = "pick")
+    // 底色在 GNav 里是 AnimatedContainer：从眼下的颜色按 easeOut 变过去
+    val tint by animateFloatAsState(if (selected) SELECTED_TINT else 0f, tween(PICK_MS, easing = FLUTTER_EASE_OUT), label = "pickTint")
+    // 撑开、收窄：GNav 的 curve（easeInCubic），选中时倒过来用，两头都是起步快
+    val grow = if (selected) FLUTTER_EASE_IN_CUBIC.flipped().transform(pick) else FLUTTER_EASE_IN_CUBIC.transform(pick)
+    val inked = if (selected) FLUTTER_EASE_OUT_CIRC.transform(pick) else FLUTTER_EASE_IN_EXPO.transform(pick)
+    val ink = if (on) colors.primary else lerp(colors.onSurfaceVariant, colors.primary, inked)
+    val style = MaterialTheme.typography.labelLarge
     Box(
         modifier
             .layoutId(if (selected) Slot.PICKED else Slot.TOOL)
@@ -755,29 +823,28 @@ private fun ToolItem(
             Modifier
                 .height(TOOL_CHIP_HEIGHT)
                 .clip(CircleShape)
-                .background(if (selected) colors.primary.copy(alpha = SELECTED_TINT) else Color.Transparent)
+                .background(colors.primary.copy(alpha = tint))
                 .indication(interaction, LocalIndication.current)
-                .padding(
-                    start = if (selected) TOOL_PAD_START else TOOL_PAD_QUIET,
-                    end = if (selected) TOOL_PAD_END else TOOL_PAD_QUIET,
-                ),
+                .padding(start = lerp(TOOL_PAD_QUIET, TOOL_PAD_START, grow), end = lerp(TOOL_PAD_QUIET, TOOL_PAD_END, grow)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(GLYPH_BOX), contentAlignment = Alignment.Center) { glyph(ink) }
-            val name = @Composable {
+            NameAndChevron(
+                keep = selected,
+                open = grow,
+                drift = 1f - FLUTTER_EASE_OUT_SINE.transform(pick),
+                fade = if (selected) FLUTTER_EASE_IN.transform(pick) else pick.pow(13),
+                modifier = Modifier.weight(1f, fill = false),
+            ) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = style,
                     color = ink,
-                    fontWeight = if (selected) FontWeight.Bold else null,
+                    fontWeight = lerp(style.fontWeight ?: FontWeight.Normal, FontWeight.Bold, inked),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            if (panelOpen != null) {
-                Spacer(Modifier.width(TOOL_GLYPH_GAP))
-                LabelAndChevron(Modifier.weight(1f, fill = false)) {
-                    name()
+                if (panelOpen != null) {
                     Icon(
                         if (panelOpen) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
                         contentDescription = null,
@@ -785,8 +852,6 @@ private fun ToolItem(
                         tint = ink,
                     )
                 }
-            } else {
-                NameOrNothing(Modifier.weight(1f, fill = false), name)
             }
         }
     }
@@ -830,8 +895,8 @@ private val CIRCLE_SIZES = listOf(56.dp, 52.dp, 48.dp)
 /** 圆钮缩进胶囊时缩到多小（按原来的比例少掉这么多）。 */
 private const val CIRCLE_SHRINK = 0.4f
 
-/** 浮起来的那一圈细边：outlineVariant 淡一半，1 dp（见 floatingSurface）。 */
-private const val EDGE_ALPHA = 0.5f
+/** 浮起来的那一圈细边：outlineVariant 淡一半，1 dp（见 floatingSurface）。底栏画的胶囊也是这一圈（见 EditorBottomBar）。 */
+internal const val EDGE_ALPHA = 0.5f
 private val EDGE_WIDTH = 1.dp
 
 private val GROUP_HEIGHT = 40.dp
@@ -859,6 +924,27 @@ private val TOOL_GLYPH_GAP = 8.dp
 
 /** 选中的小胶囊是主题色叠这么浓。 */
 private const val SELECTED_TINT = 0.2f
+
+/** 换选中的那一项走多久：Bettbox 1.19.4 给 GNav 设的 250 ms（见 ToolItem）。 */
+private const val PICK_MS = 250
+
+/** 小箭头长出来时从右边多出这么远滑回来：GNav 的名字滑 8。 */
+private val CHEVRON_DRIFT = 8.dp
+
+/**
+ * Flutter 的几条曲线，换选中的那一项用（google_nav_bar 用的就是这些）。
+ * Compose 里同名的 easeInCubic、easeOutSine、easeOutCirc、easeInExpo 控制点和 Flutter 的不一样，照 Flutter 的抄。
+ */
+private val FLUTTER_EASE_IN = CubicBezierEasing(0.42f, 0f, 1f, 1f)
+private val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+private val FLUTTER_EASE_IN_CUBIC = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f)
+private val FLUTTER_EASE_OUT_SINE = CubicBezierEasing(0.39f, 0.575f, 0.565f, 1f)
+private val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
+private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
+
+/** Flutter 的 Curve.flipped：把曲线倒过来走。 */
+private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
+
 private val GLYPH_ICON = 20.dp
 private val HINT_SPACING = 8.dp
 

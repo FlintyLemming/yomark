@@ -8,6 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
@@ -15,8 +16,10 @@ import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -72,12 +75,15 @@ class StyleBarTest {
         compose.setContent { MaterialTheme { Surface { PhoneBar(model, actions) } } }
     }
 
+    /** 底栏要收起（null）或展开哪一组。 */
+    private val toolGroups = mutableListOf<ToolGroup?>()
+
     /** 手机的底栏，展开着当前样式所在的那一组：面板就是从它里面长出来的。 */
     @Composable
     private fun PhoneBar(model: StyleBarModel, actions: StyleBarActions) {
         EditorBottomBar(
             toolGroup = ToolGroup.of(model.look.style),
-            onToolGroup = {},
+            onToolGroup = { toolGroups += it },
             styleBar = model,
             styleActions = actions,
             compare = remember { MutableInteractionSource() },
@@ -301,6 +307,27 @@ class StyleBarTest {
         assertThat(stillTool.top).isWithin(0.5f).of(with(compose.density) { tool.top.toPx() })
         assertThat(title.bottom).isLessThan(stillTool.top)
         assertThat(reset.bottom).isAtMost(tool.top)
+    }
+
+    /** 面板开着时点它外面（画布那一块）：和点左下角的返回一样，面板连这一组一起收起。 */
+    @Test fun tappingOutsideThePanelFoldsEverything() {
+        show(open(MaskStyle.SOLID))
+        compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
+        assertThat(toolGroups).containsExactly(null)
+    }
+
+    /** 点在面板上，没有控件的地方也不收起。 */
+    @Test fun tappingThePanelItselfKeepsItOpen() {
+        show(open(MaskStyle.SOLID))
+        compose.onNodeWithText("颜色").performClick()
+        assertThat(toolGroups).isEmpty()
+    }
+
+    /** 吸管等着取色时面板缩回去了，点的是图：不收起。 */
+    @Test fun whileTheEyedropperWaitsTappingTheImageDoesNotFold() {
+        show(open(MaskStyle.SOLID).copy(colorPick = ColorTarget.SOLID))
+        compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
+        assertThat(toolGroups).isEmpty()
     }
 
     /** 收起时面板缩回去，之后面板不在了。 */
