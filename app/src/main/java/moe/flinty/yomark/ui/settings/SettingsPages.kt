@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
+import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Domain
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
@@ -362,6 +363,33 @@ fun AiSettingsScreen(
                 )
             }
             FooterText(stringResource(R.string.mlkit_footer))
+        }
+    }
+}
+
+/**
+ * 编辑：编辑器里的操作习惯。眼下只有一项「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
+ * 不在识别方案里：改它编辑器不重跑识别。
+ */
+@Composable
+fun EditSettingsScreen(
+    restyleAll: Boolean,
+    onRestyleAllChange: (Boolean) -> Unit,
+    onNavigateUp: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    SettingsScaffold(title = stringResource(R.string.settings_edit), onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            PageTopSpacer()
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.restyle_all),
+                    summary = stringResource(R.string.restyle_all_summary),
+                    icon = Icons.Outlined.DoneAll,
+                    checked = restyleAll,
+                    onCheckedChange = onRestyleAllChange,
+                )
+            }
         }
     }
 }

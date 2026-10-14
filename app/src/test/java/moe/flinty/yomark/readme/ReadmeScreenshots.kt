@@ -128,7 +128,7 @@ class ReadmeScreenshots {
     @Test fun styles() {
         val vm = openSample()
         MaskStyle.entries.filter { it != MaskStyle.SOLID }.forEach { style ->
-            // 样式只管之后画的，编辑器里没有一下换掉整张图上的码的按钮；对照图要整张图都是这一种，直接把打好的码换掉
+            // 对照图要整张图都换成这种：马克笔、画笔换样式时已有的码不跟着变，直接改 plan
             compose.runOnUiThread {
                 vm.setStyle(style)
                 val look = vm.state.value.brush

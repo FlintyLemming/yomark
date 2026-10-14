@@ -3,6 +3,7 @@ package moe.flinty.yomark.ui.settings
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.Info
@@ -25,7 +26,7 @@ import moe.flinty.yomark.ui.AppLanguage
  * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
  * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
  */
-enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, CHAT, AI, EXPORT, APPEARANCE, DEVELOPER, LANGUAGE, ABOUT, DEBUG_TRACE }
+enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, CHAT, AI, EDIT, EXPORT, APPEARANCE, DEVELOPER, LANGUAGE, ABOUT, DEBUG_TRACE }
 
 /**
  * 设置的一级页（2026-10-07 起，见 docs/superpowers/specs/2026-10-07-yomark-settings-pages-design.md）。
@@ -34,7 +35,7 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, CHAT, AI,
  * 直接铺在一级页上，规则却收在二级页里，层级对不齐；现在一律收进二级页，一级页每一项下面写着它眼下的状态。
  *
  * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
- * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、导出和外观。
+ * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、编辑、导出和外观。
  * 最后是关于：版本号、隐私权政策、恢复默认设置（隐私权政策原先单独一行，恢复默认原先是一级页的最后一项，2026-10-11 都挪了进去）。
  * 关于上面是「语言」（2026-10-12 起），小字写着眼下的界面语言。
  * 在关于里连点版本号打开调试信息之后（[developer]），语言上面再多一项「开发者」，照着 Android 系统设置里开发者选项的样子。
@@ -51,6 +52,7 @@ fun SettingsScreen(
     modifier: Modifier = Modifier,
     developer: Boolean = false,
     language: AppLanguage = AppLanguage.SYSTEM,
+    restyleAll: Boolean = true,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -96,6 +98,13 @@ fun SettingsScreen(
                     icon = Icons.Outlined.AutoAwesome,
                     iconColors = SettingsIconColors.yellow,
                     onClick = { onOpen(SettingsPage.AI) },
+                )
+                NavigationRow(
+                    title = stringResource(R.string.settings_edit),
+                    summary = stringResource(if (restyleAll) R.string.restyle_all_on else R.string.restyle_all_off),
+                    icon = Icons.Outlined.Edit,
+                    iconColors = SettingsIconColors.purple,
+                    onClick = { onOpen(SettingsPage.EDIT) },
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_export),

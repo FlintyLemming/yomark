@@ -194,6 +194,7 @@
     <string name="settings_barcode">条码</string>
     <string name="settings_chat">聊天记录</string>
     <string name="settings_ai">AI</string>
+    <string name="settings_edit">编辑</string>
     <string name="settings_export">导出</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_developer">开发者</string>
@@ -203,6 +204,8 @@
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
     <string name="reminder_on">导出前提醒已开启</string>
     <string name="reminder_off">导出前提醒已关闭</string>
+    <string name="restyle_all_on">换样式时一起换</string>
+    <string name="restyle_all_off">换样式时只换选中的</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
     <string name="settings_developer_summary">调试信息、调试记录</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
@@ -304,6 +307,8 @@
     <!-- settings: export / appearance -->
     <string name="export_reminder">导出前提醒</string>
     <string name="export_reminder_summary">有圈出但未打码的内容时</string>
+    <string name="restyle_all">换样式时一起换掉已有的打码</string>
+    <string name="restyle_all_summary">色块、马赛克、模糊</string>
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>

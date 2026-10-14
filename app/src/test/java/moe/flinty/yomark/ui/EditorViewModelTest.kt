@@ -13,6 +13,7 @@ import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
@@ -319,8 +320,9 @@ class EditorViewModelTest {
     private fun EditorViewModel.looks() = state.value.plan.items.map { it.look.style }
 
     @Test
-    fun `a new style applies to the next mask, not to the ones already made`() = runTest(dispatcher) {
+    fun `with restyle-all off a new style applies to the next mask, not to the ones already made`() = runTest(dispatcher) {
         val vm = vm()
+        settings.setRestyleAllMasks(false)
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(box(10f, 10f, 90f, 90f))
         vm.clearSelection()
@@ -330,6 +332,46 @@ class EditorViewModelTest {
 
         vm.onManualBox(box(120f, 120f, 200f, 200f))
         assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.PIXELATE).inOrder()
+    }
+
+    @Test
+    fun `switching between redaction styles restyles every masked redaction in one step`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.replacePlanForTest(
+            vm.state.value.plan
+                .add(rule("a", 10f, 10f, 90f, 90f))
+                .add(rule("b", 120f, 10f, 200f, 90f).copy(state = MaskState.OUTLINED))
+                .add(manual("m", 10f, 120f, 90f, 200f).copy(look = MaskLook(MaskStyle.MARKER)))
+                .add(manual("s", 120f, 120f, 200f, 200f))
+        )
+        vm.setStyle(MaskStyle.PIXELATE)
+
+        val looks = vm.state.value.plan.items.associate { it.candidateId to it.look.style }
+        assertThat(looks).containsExactly(
+            "a", MaskStyle.PIXELATE, "b", MaskStyle.SOLID, "m", MaskStyle.MARKER, "s", MaskStyle.PIXELATE,
+        )
+        // 参数也一起改：图上不会出现两种粗细的马赛克
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(pixelBlockDivisor = 4)))
+        assertThat(vm.state.value.plan.find("s")!!.look.options.pixelBlockDivisor).isEqualTo(4)
+
+        vm.undo(); vm.undo()
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.SOLID, MaskStyle.MARKER, MaskStyle.SOLID).inOrder()
+    }
+
+    @Test
+    fun `switching to a stroke style leaves the masks already made`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(box(10f, 10f, 90f, 90f))
+        vm.clearSelection()
+
+        vm.setStyle(MaskStyle.MARKER)
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID)
+        assertThat(vm.state.value.canUndo).isTrue()                      // 只有画框那一步
+        vm.undo()
+        assertThat(vm.state.value.canUndo).isFalse()
     }
 
     @Test
@@ -378,6 +420,7 @@ class EditorViewModelTest {
     @Test
     fun `selecting a box shows its look without changing the brush`() = runTest(dispatcher) {
         val vm = vm()
+        settings.setRestyleAllMasks(false)
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(box(10f, 10f, 90f, 90f))
         vm.clearSelection()
@@ -642,7 +685,8 @@ class EditorViewModelTest {
         assertThat(vm.state.value.colorPick).isNull()
         assertThat(vm.state.value.brush.options.solidColor).isEqualTo(Color.rgb(0x20, 0x60, 0xA0))
         assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.MASKED)
-        assertThat(vm.state.value.canUndo).isFalse()
+        // 换样式时一起换（出厂开着）：已有的色块跟着换颜色
+        assertThat(vm.state.value.plan.find("rule")!!.look.options.solidColor).isEqualTo(Color.rgb(0x20, 0x60, 0xA0))
     }
 
     @Test

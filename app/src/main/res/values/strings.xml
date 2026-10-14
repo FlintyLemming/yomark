@@ -194,6 +194,7 @@
     <string name="settings_barcode">Barcodes</string>
     <string name="settings_chat">Chat screenshots</string>
     <string name="settings_ai">AI</string>
+    <string name="settings_edit">Editing</string>
     <string name="settings_export">Export</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_developer">Developer</string>
@@ -203,6 +204,8 @@
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
     <string name="reminder_on">Export reminder on</string>
     <string name="reminder_off">Export reminder off</string>
+    <string name="restyle_all_on">Switching style changes all masks</string>
+    <string name="restyle_all_off">Switching style changes the selected mask only</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
     <string name="settings_developer_summary">Debug info, debug log</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
@@ -304,6 +307,8 @@
     <!-- settings: export / appearance -->
     <string name="export_reminder">Ask before export</string>
     <string name="export_reminder_summary">When outlined content is still unmasked</string>
+    <string name="restyle_all">Change existing masks when switching style</string>
+    <string name="restyle_all_summary">Solid, mosaic and blur</string>
     <string name="watermark_style">Watermark style</string>
     <string name="watermark_style_option">Icon + %1$s</string>
     <string name="watermark_none">No watermark</string>

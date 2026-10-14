@@ -44,10 +44,12 @@ class SettingsActivity : YomarkActivity() {
             val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
             val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
             val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
+            val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
             val current = config
             val on = reminder
             val developer = debugTrace
-            if (current != null && on != null && developer != null) {
+            val restyle = restyleAll
+            if (current != null && on != null && developer != null && restyle != null) {
                 SettingsScreen(
                     config = current,
                     exportReminder = on,
@@ -56,6 +58,7 @@ class SettingsActivity : YomarkActivity() {
                     developer = developer,
                     // 改了语言 Activity 会重建，这里读一次就够
                     language = remember { AppLocale.current(this) },
+                    restyleAll = restyle,
                 )
             }
         }
@@ -114,6 +117,16 @@ class SettingsPageActivity : YomarkActivity() {
                 // 进页时问一次 AICore；只看不下，见 NanoStatus
                 val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
                 AiSettingsScreen(nano, onNavigateUp = ::finish)
+            }
+            SettingsPage.EDIT -> {
+                val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
+                restyleAll?.let { on ->
+                    EditSettingsScreen(
+                        restyleAll = on,
+                        onRestyleAllChange = { next -> lifecycleScope.launch { store.setRestyleAllMasks(next) } },
+                        onNavigateUp = ::finish,
+                    )
+                }
             }
             SettingsPage.EXPORT -> {
                 val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)

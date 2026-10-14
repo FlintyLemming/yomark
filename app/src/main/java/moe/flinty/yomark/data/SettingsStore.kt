@@ -159,6 +159,16 @@ class SettingsStore internal constructor(
     }
 
     /**
+     * 换打码样式时一起换掉已有的打码：一张图一般只用一种打码样式，出厂开着。
+     * 关掉时换样式只管选中的那一处和之后新打的码。
+     */
+    val restyleAllMasks: Flow<Boolean> = store.data.map { it[KEY_RESTYLE_ALL] ?: true }
+
+    suspend fun setRestyleAllMasks(on: Boolean) {
+        store.edit { it[KEY_RESTYLE_ALL] = on }
+    }
+
+    /**
      * 品牌水印的字样（见 BrandWatermarkStyle）。没选过就按**读的时候**的系统语言定，不在第一次读时写下：
      * 用户换了系统语言，没选过的人跟着换；选过一次之后就一直是那一版。
      * 认不出的值同没选过，理由与 lastStyle 一致。
@@ -293,6 +303,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_EXPORT_REMINDER)
+            it.remove(KEY_RESTYLE_ALL)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
         }
@@ -355,6 +366,7 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
+        val KEY_RESTYLE_ALL = booleanPreferencesKey("restyle_all_masks")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")

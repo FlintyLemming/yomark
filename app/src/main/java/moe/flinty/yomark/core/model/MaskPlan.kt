@@ -258,6 +258,14 @@ data class MaskPlan(
         items = items.map { if (it.candidateId == id) it.copy(look = look) else it }
     )
 
+    /**
+     * 换打码样式时一起换（设置「编辑」页的开关）：已打码、用的是盖住内容那三种样式的，都换成 [look]。
+     * 马克笔、画笔画的标注不动；圈出的也不动——它们打码时自然会用那时的画笔。
+     */
+    fun restyleRedactions(look: MaskLook): MaskPlan = copy(
+        items = items.map { if (it.state == MaskState.MASKED && it.look.style.redacts) it.copy(look = look) else it }
+    )
+
     /** 拦截对话框的「2 个网址、1 个 IP 地址」就是这个 map 渲染出来的。 */
     fun pendingByKind(): Map<SensitiveKind, Int> =
         items.filter { it.state == MaskState.OUTLINED }
