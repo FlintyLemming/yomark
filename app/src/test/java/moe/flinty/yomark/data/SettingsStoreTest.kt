@@ -1,6 +1,13 @@
 package moe.flinty.yomark.data
 
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.test.core.app.ApplicationProvider
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.export.BrandWatermarkStyle
@@ -13,7 +20,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import java.io.File
 import java.util.Locale
+import java.util.UUID
 
 @RunWith(RobolectricTestRunner::class)
 class SettingsStoreTest {
@@ -21,6 +30,21 @@ class SettingsStoreTest {
     private val context = ApplicationProvider.getApplicationContext<android.app.Application>()
 
     private fun store() = isolatedSettingsStore(context)
+
+    /** 10-12 之前动过画笔的安装里存着最弱一档的马赛克、模糊：换了键，读回来是新的出厂值（中间一档）。 */
+    @Test
+    fun `mosaic and blur saved under the old keys fall back to the middle step`() = runTest {
+        val data = PreferenceDataStoreFactory.create(
+            scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
+        ) { File(context.filesDir, "settings-test-${UUID.randomUUID()}.preferences_pb") }
+        data.edit {
+            it[intPreferencesKey("mask_pixel_divisor")] = MaskOptions.FINEST_PIXEL_DIVISOR
+            it[floatPreferencesKey("mask_blur_ratio")] = MaskOptions.WEAKEST_BLUR_RATIO
+        }
+        val options = SettingsStore(data).maskOptions.first()
+        assertThat(options.pixelBlockDivisor).isEqualTo(MaskOptions.DEFAULT_PIXEL_DIVISOR)
+        assertThat(options.blurRadiusRatio).isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
+    }
 
     @Test
     fun `default style is solid`() = runTest {
