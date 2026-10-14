@@ -201,11 +201,18 @@ fun EditorScreen(
     ) { padding ->
         // consumeWindowInsets：面板的 imePadding 只补输入法比导航栏多出来的那一截，不重复算导航栏
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
+            val batch = state.batch
+            val phone = layout == EditorLayout.PHONE
+            val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+            // 别的应用来要图时，导出就是把图交回去
+            val exportLabel = if (vm.forCaller) R.string.done else R.string.export
+            val canCompare = state.image != null &&
+                (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED })
             EditorTopBar(
                 canUndo = state.canUndo, canRedo = state.canRedo,
                 onUndo = vm::undo, onRedo = vm::redo,
-                // 手机竖着拿时用途水印在底栏的「编辑」里
-                onPurpose = if (layout == EditorLayout.PHONE) null else vm::showPurposeSheet,
+                // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角
+                onPurpose = if (phone) null else vm::showPurposeSheet,
                 purposeOn = state.purposeText != null,
                 // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                 onSettings = onSettings,
@@ -213,11 +220,12 @@ fun EditorScreen(
                 onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                 onNavigateUp = onNavigateUp,
                 onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
-                compare = compare,
-                canCompare = state.image != null &&
-                    (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED }),
+                compare = if (phone) null else compare,
+                canCompare = canCompare,
+                onExport = if (phone) onExport else null,
+                exportLabel = exportLabel,
+                exporting = state.exporting,
             )
-            val batch = state.batch
             // 吸管在等取色时，返回先收吸管；样式面板开着时，返回先收面板。都不拦的时候不常驻 BackHandler（见 EditorActivity）
             BackHandler(enabled = state.colorPick != null, onBack = vm::cancelColorPick)
             BackHandler(
@@ -228,7 +236,7 @@ fun EditorScreen(
             if (state.purposeSheetVisible) BackHandler(onBack = vm::dismissPurposeSheet)
             // 底栏展开着一组时，返回先收回去。上面几样开着时先收它们
             BackHandler(
-                enabled = layout == EditorLayout.PHONE && toolGroup != null && state.colorPick == null &&
+                enabled = phone && toolGroup != null && state.colorPick == null &&
                     !state.stylePanelOpen && !state.purposeSheetVisible,
                 onBack = { toolGroup = null },
             )
@@ -268,9 +276,6 @@ fun EditorScreen(
                     }
                 },
                 panel = {
-                    val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
-                    // 别的应用来要图时，导出就是把图交回去
-                    val exportLabel = if (vm.forCaller) R.string.done else R.string.export
                     val uris = remember(batch?.items) { batch?.items?.map { it.uri } }
                     val filmstrip: (@Composable (Modifier) -> Unit)? = if (batch != null && uris != null) {
                         { modifier ->
@@ -301,9 +306,8 @@ fun EditorScreen(
                             onToolGroup = { toolGroup = it },
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
-                            onExport = onExport,
-                            exportLabel = exportLabel,
-                            exporting = state.exporting,
+                            compare = compare,
+                            canCompare = canCompare,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
                             purposeOn = state.purposeText != null,

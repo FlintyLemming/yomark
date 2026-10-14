@@ -30,6 +30,7 @@
     <string name="purpose_watermark">Purpose watermark</string>
     <string name="purpose_watermark_on">Purpose watermark (on)</string>
     <string name="compare_original">Hold to compare with original</string>
+    <string name="compare_hold">Hold to compare</string>
     <string name="debug_info">Debug info</string>
     <string name="export">Export</string>
     <string name="exporting">Exporting…</string>

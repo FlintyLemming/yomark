@@ -2,7 +2,10 @@ package moe.flinty.yomark.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.foundation.interaction.Interaction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -19,6 +22,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
@@ -33,7 +37,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 手机底栏的工具那一行：收着时「打码」「编辑」两组，点一组展开它的工具，那一组变成返回。
+ * 手机底栏的工具那一行：收着时「打码」「编辑」两组、AI、按住对比，点一组展开它的工具，那一组变成返回。
  * 换样式、弹面板由 ViewModel 管（见 EditorViewModelTest），这里只看这一行发出什么。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -50,6 +54,9 @@ class EditorToolbarTest {
     private var open by mutableStateOf<ToolGroup?>(null)
     private var look by mutableStateOf(MaskLook())
     private var ai by mutableStateOf<AiReview>(AiReview.Hidden)
+    private var canCompare by mutableStateOf(true)
+    private val compare = MutableInteractionSource()
+    private val compareEvents = mutableListOf<Interaction>()
     private val opened = mutableListOf<ToolGroup?>()
     private var purposeClicks = 0
     private var aiClicks = 0
@@ -72,15 +79,18 @@ class EditorToolbarTest {
                         onPurpose = { purposeClicks++ },
                         aiReview = ai,
                         onAiReview = { aiClicks++ },
-                    ) { Text("导出") }
+                        compare = compare,
+                        canCompare = canCompare,
+                    )
+                    LaunchedEffect(compare) { compare.interactions.collect { compareEvents += it } }
                 }
             }
         }
     }
 
-    @Test fun collapsedItShowsTheTwoGroupsAndTheButtonsOnTheRight() {
+    @Test fun collapsedItShowsTheTwoGroupsAndCompare() {
         show()
-        listOf("打码", "编辑", "导出").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        listOf("打码", "编辑", "按住对比").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         listOf("色块", "马克笔", "水印").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
     }
 
@@ -113,7 +123,7 @@ class EditorToolbarTest {
         assertThat(opened).containsExactly(ToolGroup.REDACT)
         listOf("色块", "马赛克", "模糊").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         compose.onNodeWithText("色块").assertIsSelected()
-        listOf("马克笔", "编辑", "导出").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        listOf("马克笔", "编辑", "按住对比").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
         compose.onNodeWithText("抹除").assertDoesNotExist()      // 并进了色块，是色块的近似色
     }
 
@@ -131,7 +141,7 @@ class EditorToolbarTest {
         compose.onNodeWithText("打码").performClick()
         assertThat(opened).containsExactly(null)
         compose.onNodeWithText("色块").assertDoesNotExist()
-        listOf("编辑", "导出").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        listOf("编辑", "按住对比").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
     }
 
     /** 编辑：马克笔、画笔（还没做，点不动）、水印（点开用途水印）。 */
@@ -160,7 +170,7 @@ class EditorToolbarTest {
     @Test fun aiReviewIsNotOfferedWhereItCannotRun() {
         show()
         compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
-        compose.onNodeWithText("导出").assertIsDisplayed()
+        compose.onNodeWithText("按住对比").assertIsDisplayed()
     }
 
     /** 跑着、跑完了都点不动，结果写在字上；没跑成是另一句话，还能点。 */
@@ -187,6 +197,25 @@ class EditorToolbarTest {
 
     private fun clickLabelIs(text: String) = SemanticsMatcher("点击说的是「$text」") {
         it.config.getOrNull(SemanticsActions.OnClick)?.label == text
+    }
+
+    // ---------- 按住对比 ----------
+
+    /** 按下去就是在比，松手就回来；点一下没有别的动作。 */
+    @Test fun holdingComparePressesUntilLetGo() {
+        show()
+        compose.onNodeWithText("按住对比").performTouchInput { down(center) }
+        compose.waitForIdle()
+        assertThat(compareEvents.last()).isInstanceOf(PressInteraction.Press::class.java)
+        compose.onNodeWithText("按住对比").performTouchInput { up() }
+        compose.waitForIdle()
+        assertThat(compareEvents.last()).isInstanceOf(PressInteraction.Release::class.java)
+    }
+
+    @Test fun nothingToCompareGraysItOut() {
+        canCompare = false
+        show()
+        compose.onNodeWithText("按住对比").assertIsNotEnabled()
     }
 
     @Test fun theWatermarkSaysWhenItIsOn() {

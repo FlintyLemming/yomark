@@ -4,12 +4,13 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Edit
@@ -78,16 +80,19 @@ enum class ToolGroup(@StringRes val label: Int) {
 }
 
 /**
- * 手机底栏的工具那一行。收着时左边「打码」「编辑」两组，挨着它们是「AI 增强识别」，最右边是 [trailing]（导出）。
+ * 手机底栏的工具那一行。收着时是「打码」「编辑」两组、「AI 增强识别」、「按住对比」，等距排开。
+ * 导出不在这一行，在顶栏右上角（见 EditorTopBar）：这一行只放干活时反复用的，收尾那一下不和它们挤。
  *
  * 点一组，这一行换成这一组的工具：点的那一组变成返回，滑到最左边，工具在它右边一个个展开，
- * 另一组、AI、导出让开。点返回（或系统返回键，见 EditorScreen）收回来。
+ * 另一组、AI、对比让开。点返回（或系统返回键，见 EditorScreen）收回来。
  *
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种弹出调节面板（StyleSheet）。
  * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
+ * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一项
+ * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
  */
 @Composable
 fun EditorToolbar(
@@ -100,7 +105,8 @@ fun EditorToolbar(
     modifier: Modifier = Modifier,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
-    trailing: @Composable RowScope.() -> Unit = {},
+    compare: MutableInteractionSource? = null,
+    canCompare: Boolean = false,
 ) {
     val progress = animateFloatAsState(
         if (open != null) 1f else 0f,
@@ -146,7 +152,7 @@ fun EditorToolbar(
             }
             if (collapsedRow) {
                 if (aiReview != AiReview.Hidden) AiReviewItem(aiReview, onAiReview, Modifier.layoutId(Slot.AI))
-                Row(Modifier.layoutId(Slot.TRAILING), verticalAlignment = Alignment.CenterVertically, content = trailing)
+                if (compare != null) CompareItem(compare, canCompare, Modifier.layoutId(Slot.COMPARE))
             }
         },
         modifier = modifier.fillMaxWidth(),
@@ -162,33 +168,36 @@ fun EditorToolbar(
             Slot.DIVIDER -> divider = m.measure(Constraints())
             Slot.TOOL -> toolParts += m
         }
-        // 收着的那一排：两组之后是 AI（至少和一组一样宽，字长就再宽些），导出在最右边。先量导出，它总是完整的
-        val groupsEnd = groupWidth * ToolGroup.entries.size
-        val end = measurables.firstOrNull { it.layoutId == Slot.TRAILING }
-            ?.measure(Constraints(maxWidth = (width - groupsEnd).coerceAtLeast(0)))
-        val ai = measurables.firstOrNull { it.layoutId == Slot.AI }?.let {
-            val room = (width - groupsEnd - (end?.width ?: 0)).coerceAtLeast(0)
-            it.measure(Constraints(minWidth = groupWidth.coerceAtMost(room), maxWidth = room))
-        }
+        // AI、对比至少和一组一样宽，字长就再宽些。两组之外剩下的地方先尽着对比，AI 用余下的
+        val room = (width - groupWidth * ToolGroup.entries.size).coerceAtLeast(0)
+        fun Measurable.atLeastAGroup(max: Int) = measure(Constraints(minWidth = groupWidth.coerceAtMost(max), maxWidth = max))
+        val cmp = measurables.firstOrNull { it.layoutId == Slot.COMPARE }?.atLeastAGroup(room)
+        val ai = measurables.firstOrNull { it.layoutId == Slot.AI }?.atLeastAGroup((room - (cmp?.width ?: 0)).coerceAtLeast(0))
         val toolsStart = groupWidth + gap * 2 + (divider?.width ?: 0)
         val toolWidth = if (toolParts.isEmpty()) 0 else ((width - toolsStart) / toolParts.size).coerceAtLeast(0)
         val tools = toolParts.map { it.measure(Constraints.fixedWidth(toolWidth)) }
-        val all = groups.values + tools + listOfNotNull(divider, ai, end)
+        val all = groups.values + tools + listOfNotNull(divider, ai, cmp)
         val height = max(ROW_MIN_HEIGHT.roundToPx(), all.maxOfOrNull { it.height } ?: 0)
         val slide = SLIDE.roundToPx()
         fun Placeable.centerY() = (height - this.height) / 2
+        // 收着时各项的位置：项与项之间、两头留一样宽的空。展开停稳后这一排只剩返回，它在最左边，用不着这个位置
+        val row = listOfNotNull(groups[ToolGroup.REDACT], groups[ToolGroup.EDIT], ai, cmp)
+        val space = ((width - row.sumOf { it.width }) / (row.size + 1)).coerceAtLeast(0)
+        val rest = HashMap<Placeable, Int>()
+        row.fold(space) { x, item -> rest[item] = x; x + item.width + space }
 
         layout(width, height) {
             // 只在摆放时读进度：动画只重新摆、不重新量，更不重组
             val p = progress.value
             val fadeOut = span(p, 0f, FADE_OUT)
             // 展开的那一组变成返回，从它原来的位置滑到最左边
-            val backX = shown?.let { lerp(it.ordinal * groupWidth, 0, p) } ?: 0
+            val backX = shown?.let(groups::get)?.let { lerp(rest.getValue(it), 0, p) } ?: 0
             groups.forEach { (group, placeable) ->
                 if (group == shown) placeable.place(backX, placeable.centerY())
-                else placeable.placeWithLayer(group.ordinal * groupWidth, placeable.centerY()) { alpha = 1f - fadeOut }
+                else placeable.placeWithLayer(rest.getValue(placeable), placeable.centerY()) { alpha = 1f - fadeOut }
             }
-            ai?.let { it.placeWithLayer(groupsEnd, it.centerY()) { alpha = 1f - fadeOut } }
+            ai?.let { it.placeWithLayer(rest.getValue(it), it.centerY()) { alpha = 1f - fadeOut } }
+            cmp?.let { it.placeWithLayer(rest.getValue(it) + (fadeOut * slide).roundToInt(), it.centerY()) { alpha = 1f - fadeOut } }
             divider?.let { it.placeWithLayer(backX + groupWidth + gap, it.centerY()) { alpha = span(p, 0.2f, 0.6f) } }
             // 工具跟着返回一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走
             val stagger = if (tools.size > 1) (1f - TOOL_IN_START - TOOL_IN) / (tools.size - 1) else 0f
@@ -197,7 +206,6 @@ fun EditorToolbar(
                 val t = span(p, start, start + TOOL_IN)
                 tool.placeWithLayer(backX + toolsStart + i * toolWidth - ((1f - t) * slide).roundToInt(), tool.centerY()) { alpha = t }
             }
-            end?.let { it.placeWithLayer(width - it.width + (fadeOut * slide).roundToInt(), it.centerY()) { alpha = 1f - fadeOut } }
         }
     }
 }
@@ -207,7 +215,7 @@ private class LastOpen {
     var group: ToolGroup? = null
 }
 
-private enum class Slot { AI, DIVIDER, TOOL, TRAILING }
+private enum class Slot { AI, COMPARE, DIVIDER, TOOL }
 
 /** [p] 落在 [start]～[end] 这一段的哪儿，0～1。 */
 private fun span(p: Float, start: Float, end: Float) = ((p - start) / (end - start)).coerceIn(0f, 1f)
@@ -382,6 +390,40 @@ private fun AiReviewItem(state: AiReview, onClick: () -> Unit, modifier: Modifie
             label,
             style = MaterialTheme.typography.labelMedium,
             color = if (failed) colors.error else colors.onSurfaceVariant,
+            maxLines = 1,
+        )
+    }
+}
+
+/**
+ * 「按住对比」：按住时画布换成打码前的原图，松手回来（见 EditorScreen）。点一下没有动作——来回比的时候，
+ * 手一松就该回到打码后的样子，所以字上写着「按住」。没打码、也没设水印时没有可比的，灰掉。
+ */
+@Composable
+private fun CompareItem(interaction: MutableInteractionSource, enabled: Boolean, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    Column(
+        modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(
+                interactionSource = interaction,
+                indication = LocalIndication.current,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = {},
+            )
+            .padding(horizontal = 4.dp, vertical = 6.dp)
+            .alpha(if (enabled) 1f else DISABLED_ALPHA),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(Modifier.size(PILL_WIDTH, PILL_HEIGHT), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.Compare, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.compare_hold),
+            style = MaterialTheme.typography.labelMedium,
+            color = colors.onSurfaceVariant,
             maxLines = 1,
         )
     }

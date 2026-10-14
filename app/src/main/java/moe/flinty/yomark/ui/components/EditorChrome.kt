@@ -55,10 +55,18 @@ fun EditorTopBar(
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
-    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现。 */
+    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现：手机竖着拿时它在底栏。 */
     compare: MutableInteractionSource? = null,
     /** 有前后可比：打了码，或者设了用途水印。没有时「对比」灰掉。 */
     canCompare: Boolean = false,
+    /**
+     * 导出，在最右上角。手机竖着拿时在这儿：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，
+     * 展开着一组工具时也一直在。传 null 时不出现：宽屏的导出在样式列表那一块的最底下（见 [EditorActionRow]）。
+     */
+    onExport: (() -> Unit)? = null,
+    /** 导出按钮上的字（见 [EditorActionRow]）。 */
+    @StringRes exportLabel: Int = R.string.export,
+    exporting: Boolean = false,
 ) {
     Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
         // 向上回到首页，放在 Android 约定的左上角
@@ -88,14 +96,19 @@ fun EditorTopBar(
             IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
         }
         IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
+        if (onExport != null) {
+            Spacer(Modifier.width(4.dp))
+            Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
+        }
     }
 }
 
 /**
- * 手机的底栏：一行工具（见 [EditorToolbar]），「AI 增强识别」挨着两组，导出在最右边。
+ * 手机的底栏：一行工具（见 [EditorToolbar]）。导出在顶栏右上角（见 [EditorTopBar]）。
  * 批量时胶片条单独一行，在工具上面。
  *
  * @param toolGroup 展开着的那一组，收着时为 null
+ * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
  */
 @Composable
 fun EditorBottomBar(
@@ -103,11 +116,9 @@ fun EditorBottomBar(
     onToolGroup: (ToolGroup?) -> Unit,
     styleBar: StyleBarModel,
     styleActions: StyleBarActions,
-    onExport: () -> Unit,
-    exporting: Boolean,
+    compare: MutableInteractionSource,
+    canCompare: Boolean,
     modifier: Modifier = Modifier,
-    /** 导出按钮上的字（见 [EditorActionRow]）。 */
-    @StringRes exportLabel: Int = R.string.export,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
     /** 已设用途水印：「编辑」里的水印着主题色。 */
@@ -128,10 +139,10 @@ fun EditorBottomBar(
             onPurpose = onPurpose,
             aiReview = aiReview,
             onAiReview = onAiReview,
-            modifier = Modifier.padding(start = 8.dp, end = 12.dp),
-        ) {
-            Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
-        }
+            compare = compare,
+            canCompare = canCompare,
+            modifier = Modifier.padding(horizontal = 8.dp),
+        )
     }
     StyleSheet(styleBar, styleActions)
 }
