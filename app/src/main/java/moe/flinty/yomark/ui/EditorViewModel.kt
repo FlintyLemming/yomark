@@ -641,7 +641,7 @@ class EditorViewModel(
             val now = _state.value
             if (now.image !== image || analyzedWith != ranWith) return@launch
             if (extra == null) {
-                uiState = now.copy(aiReview = AiReview.Failed)
+                uiState = now.copy(aiReview = AiReview.Failed, aiReviewsFinished = now.aiReviewsFinished + 1)
                 return@launch
             }
             val known = now.plan.items.mapTo(HashSet()) { it.candidateId }
@@ -649,6 +649,7 @@ class EditorViewModel(
             if (added.isNotEmpty()) undoStack.push(now.plan)
             uiState = now.copy(
                 aiReview = AiReview.Done(found = added.size),
+                aiReviewsFinished = now.aiReviewsFinished + 1,
                 plan = now.plan.copy(items = now.plan.items + added),
             ).withHistoryFlags()
         }

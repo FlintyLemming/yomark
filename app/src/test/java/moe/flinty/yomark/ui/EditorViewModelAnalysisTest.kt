@@ -326,10 +326,12 @@ class EditorViewModelAnalysisTest {
         assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Failed)   // 不能说成「没有新发现」
         assertThat(vm.state.value.message).isNull()                      // 写在按钮上，不弹提示
         assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+        assertThat(vm.state.value.aiReviewsFinished).isEqualTo(1)        // 没跑成也算跑完一次：手机上要说一声
 
         nano.boom = false
         vm.runAiReview(); advanceUntilIdle()                             // 可以再点一次
         assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
+        assertThat(vm.state.value.aiReviewsFinished).isEqualTo(2)
     }
 
     @Test

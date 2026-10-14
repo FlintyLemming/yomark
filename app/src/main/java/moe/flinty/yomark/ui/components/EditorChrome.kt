@@ -1,7 +1,11 @@
 package moe.flinty.yomark.ui.components
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
@@ -30,9 +35,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
 import androidx.compose.ui.res.stringResource
@@ -104,7 +116,7 @@ fun EditorTopBar(
 }
 
 /**
- * 手机的底栏：一行工具（见 [EditorToolbar]）。导出在顶栏右上角（见 [EditorTopBar]）。
+ * 手机的底栏：一行浮着的工具（见 [EditorToolbar]），它自己留两边的空。导出在顶栏右上角（见 [EditorTopBar]）。
  * 批量时胶片条单独一行，在工具上面。
  *
  * @param toolGroup 展开着的那一组，收着时为 null
@@ -141,11 +153,53 @@ fun EditorBottomBar(
             onAiReview = onAiReview,
             compare = compare,
             canCompare = canCompare,
-            modifier = Modifier.padding(horizontal = 8.dp),
         )
     }
     StyleSheet(styleBar, styleActions)
 }
+
+/**
+ * 手机竖着拿时，AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：底栏的圆钮上写不下字（见 [EditorToolbar]）。
+ * 结果还留在圆钮上，新发现几处是角标，没跑成星星是红的。
+ * 只在 [finished]（跑完的次数，见 EditorUiState.aiReviewsFinished）变了时说：批量里换回跑过的图不再说一遍。
+ * 和识别中的提示条一样用 Box 画底色，不吃触摸。
+ */
+@Composable
+internal fun AiReviewResultPill(review: AiReview, finished: Int, modifier: Modifier = Modifier) {
+    var said by remember { mutableStateOf<AiReview?>(null) }
+    var visible by remember { mutableStateOf(false) }
+    var seen by remember { mutableIntStateOf(finished) }
+    LaunchedEffect(finished) {
+        // 换了一张图，计数从 0 重来：不说
+        val fresh = finished != seen && finished != 0
+        seen = finished
+        if (!fresh) return@LaunchedEffect
+        said = review
+        visible = true
+        delay(AI_RESULT_MS)
+        visible = false
+    }
+    // 又跑起来了，或者换了图（载入、识别时它先收起）：上一回的结果不再挂着
+    LaunchedEffect(review) { if (review == AiReview.Hidden || review == AiReview.Running) visible = false }
+    AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        val text = when (val result = said) {
+            is AiReview.Done ->
+                if (result.found == 0) stringResource(R.string.ai_review_result_none)
+                else stringResource(R.string.ai_review_result_found, result.found)
+            else -> stringResource(R.string.ai_review_result_failed)
+        }
+        Box(
+            Modifier
+                .background(MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f), RoundedCornerShape(50))
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.inverseOnSurface)
+        }
+    }
+}
+
+/** 跑完的结果在画布顶上停多久。 */
+private const val AI_RESULT_MS = 3_000L
 
 /**
  * 宽屏的样式列表那一块（WideEditorPanel）最底下那一行。手机上这两样都在工具那一行里（见 [EditorBottomBar]）。

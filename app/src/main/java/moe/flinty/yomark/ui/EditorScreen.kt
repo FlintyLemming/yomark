@@ -78,6 +78,7 @@ import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.batch.BatchThumbnails
 import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
+import moe.flinty.yomark.ui.components.AiReviewResultPill
 import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
@@ -271,6 +272,8 @@ fun EditorScreen(
                         ) {
                             OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
+                            // 宽屏的 AI 按钮上写着结果；手机底栏的圆钮上写不下，跑完在这儿说一声
+                            if (phone) AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
                     }
