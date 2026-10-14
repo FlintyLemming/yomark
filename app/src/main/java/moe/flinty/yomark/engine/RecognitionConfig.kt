@@ -57,6 +57,8 @@ data class RecognitionConfig(
     val face: FaceOption = FaceOption.FAST,
     /** 认出来的人脸怎么处理。OFF 时人脸检测根本不跑。 */
     val faceState: RuleState = RuleState.MASKED,
+    /** 聊天截图里的头像、昵称、聊天标题怎么处理（三类一起）。OFF 时版面分析根本不跑。 */
+    val chatState: RuleState = RuleState.MASKED,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
      * 没有旁证、只凭字面猜出的人名要不要圈出来。出厂不圈：HanLP 会把药名、品牌名、规格词都猜成人名，

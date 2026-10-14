@@ -232,6 +232,7 @@ class SettingsStore internal constructor(
             faceState = prefs[KEY_FACE_STATE].toEnum(
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
+            chatState = prefs[KEY_CHAT_STATE].toEnum(fallback.chatState),
             semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
             outlineUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.outlineUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
@@ -245,6 +246,7 @@ class SettingsStore internal constructor(
             it[KEY_BARCODE_STATE] = config.barcodeState.name
             it[KEY_FACE] = config.face.name
             it[KEY_FACE_STATE] = config.faceState.name
+            it[KEY_CHAT_STATE] = config.chatState.name
             it[KEY_SEMANTIC] = config.semantic.name
             it[KEY_UNANCHORED_NAMES] = config.outlineUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
@@ -267,6 +269,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_BARCODE_STATE)
             it.remove(KEY_FACE)
             it.remove(KEY_FACE_STATE)
+            it.remove(KEY_CHAT_STATE)
             it.remove(KEY_SEMANTIC)
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
@@ -345,6 +348,7 @@ class SettingsStore internal constructor(
         val KEY_BARCODE_STATE = stringPreferencesKey("recognition_barcode_state")
         val KEY_FACE = stringPreferencesKey("recognition_face")
         val KEY_FACE_STATE = stringPreferencesKey("recognition_face_state")
+        val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
