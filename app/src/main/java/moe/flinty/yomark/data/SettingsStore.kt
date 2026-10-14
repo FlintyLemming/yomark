@@ -352,8 +352,13 @@ class SettingsStore internal constructor(
         val KEY_STYLE = stringPreferencesKey("last_style")
         val KEY_SOLID_COLOR = intPreferencesKey("mask_solid_color")
         val KEY_SOLID_NEAR = booleanPreferencesKey("mask_solid_near")
-        val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor")
-        val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio")
+        /**
+         * v2：马赛克、模糊的出厂值从最弱一档改成了中间一档（2026-10-12）。setMaskOptions 每次都整份写入，
+         * 动过画笔任何一项的老安装里都存着最弱一档，沿用旧键就会一直透得太多。换键的理由同 KEY_TEXT_ENGINE。
+         */
+        val KEY_PIXEL_DIVISOR = intPreferencesKey("mask_pixel_divisor_v2")
+        /** v2：理由同 KEY_PIXEL_DIVISOR。 */
+        val KEY_BLUR_RATIO = floatPreferencesKey("mask_blur_ratio_v2")
         val KEY_MARKER_COLOR = intPreferencesKey("mask_marker_color")
         val KEY_MARKER_SHAPE = stringPreferencesKey("mask_marker_shape")
         val KEY_MARKER_WIDTH = floatPreferencesKey("mask_marker_width")
