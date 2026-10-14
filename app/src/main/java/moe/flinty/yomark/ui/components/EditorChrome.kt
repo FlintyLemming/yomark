@@ -21,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Compare
-import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Undo
@@ -92,7 +91,7 @@ fun EditorTopBar(
         if (onPurpose != null) {
             IconButton(onClick = onPurpose) {
                 Icon(
-                    Icons.Filled.Layers,
+                    PurposeWatermarkIcon,
                     stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
                     tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                 )

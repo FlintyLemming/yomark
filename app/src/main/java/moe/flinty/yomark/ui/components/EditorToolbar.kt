@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.outlined.BrandingWatermark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.ExpandLess
@@ -357,7 +356,7 @@ private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn:
         stateText = if (purposeOn) stringResource(R.string.tool_on) else null,
     ) {
         Icon(
-            Icons.AutoMirrored.Outlined.BrandingWatermark,
+            PurposeWatermarkIcon,
             contentDescription = null,
             modifier = Modifier.size(GLYPH_ICON),
             tint = if (purposeOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
