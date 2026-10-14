@@ -181,6 +181,9 @@ class EditorViewModel(
     /** 导出前提醒的开关。设置还没读到时按开着算——宁可多问一次。 */
     private var exportReminder = true
 
+    /** 设置里「换样式时一起换」。还没读到时按出厂的开着算。 */
+    private var restyleAll = true
+
     /** 品牌水印的字样。设置还没读到时按系统语言算，和设置页没选过时的默认一致。 */
     private var watermarkStyle = BrandWatermarkStyle.defaultFor(Locale.getDefault())
 
@@ -193,6 +196,7 @@ class EditorViewModel(
         restorePurposeStyle()
         observeRecognitionConfig()
         viewModelScope.launch { settings.pendingExportReminder.collect { exportReminder = it } }
+        viewModelScope.launch { settings.restyleAllMasks.collect { restyleAll = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
         viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
     }
@@ -801,10 +805,12 @@ class EditorViewModel(
     /**
      * 面板上改了样式或参数。
      *
-     * 改的是画笔：从下一次打码起生效，已经打好的码不变——这一版之前样式是全局的，一换整张图的码全跟着变。
-     * 选中了手动框时，那个框也一起换成改后的样子（刚画完的框就是选中的，画完再调颜色是最顺手的用法）。
+     * 改的是画笔：从下一次打码起生效。选中了手动框时，那个框也一起换成改后的样子（刚画完的框就是选中的，画完再调颜色是最顺手的用法）。
+     * 设置里开着「换样式时一起换」（出厂开着）、改后是盖住内容的样式时，已经打好的色块、马赛克、模糊也都跟着换：
+     * 一张图一般只用一种打码样式。参数也一起改，不然换成马赛克再调粗细，图上就是两种粗细的马赛克。
+     * 马克笔、画笔画的标注不跟着变，见 [MaskPlan.restyleRedactions]。
      *
-     * @param inProgress 滑条还没松手。拖动期间选中的框跟着变，但不压撤销栈，松手时由 [finishLookEdit] 补一次，
+     * @param inProgress 滑条还没松手。拖动期间码跟着变，但不压撤销栈，松手时由 [finishLookEdit] 补一次，
      *   与拖框的 previewSelectedQuad / commitDrag 同一个道理。
      */
     fun editLook(look: MaskLook, inProgress: Boolean = false) {
@@ -812,10 +818,12 @@ class EditorViewModel(
         if (_state.value.colorPick != null) _state.value = _state.value.copy(colorPick = null)
         setBrush(next)
         val s = _state.value
-        val item = s.selectedItem
-        if (item != null && item.look != next) {
+        var plan = s.plan
+        s.selectedItem?.let { plan = plan.restyle(it.candidateId, next) }
+        if (restyleAll && next.style.redacts) plan = plan.restyleRedactions(next)
+        if (plan != s.plan) {
             if (lookEditOrigin == null) lookEditOrigin = s.plan
-            uiState = s.copy(plan = s.plan.restyle(item.candidateId, next))
+            uiState = s.copy(plan = plan)
         }
         if (!inProgress) finishLookEdit()
     }
@@ -833,16 +841,6 @@ class EditorViewModel(
     fun resetLookOptions() {
         val bar = _state.value.barLook
         editLook(bar.copy(options = bar.options.resetFor(bar.style)))
-    }
-
-    /**
-     * 面板上的「应用到全部」：这张图上所有已打码的都换成样式栏上的样子，一步撤销得回来。
-     * 想要回原来「一换全换」的效果，就是这一下。圈出的不动，它们打码时自然用画笔。
-     */
-    fun applyLookToAll() {
-        val look = _state.value.barLook
-        setBrush(look)
-        mutate { it.restyleMasked(look) }
     }
 
     fun dismissStylePanel() {

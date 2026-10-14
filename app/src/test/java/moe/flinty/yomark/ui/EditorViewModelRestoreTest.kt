@@ -109,8 +109,7 @@ class EditorViewModelRestoreTest {
         val saved = SavedStateHandle()
         val first = vm(saved, CountingClassifier(listOf(candidate("a", true), candidate("b", false, l = 200f, t = 200f))))
         first.onImageChosen(sampleUri()); advanceUntilIdle()
-        first.setStyle(MaskStyle.PIXELATE)
-        first.applyLookToAll()                       // 打好的码换成马赛克：每块码的样式要跟着 plan 回来
+        first.setStyle(MaskStyle.PIXELATE)           // 打好的码换成马赛克：每块码的样式要跟着 plan 回来
         assertThat(first.state.value.plan.items).hasSize(2)
 
         // Activity 被销毁：ViewModel 清掉，SavedStateHandle 活下来

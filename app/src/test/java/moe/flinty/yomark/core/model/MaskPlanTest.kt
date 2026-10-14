@@ -95,10 +95,22 @@ class MaskPlanTest {
     }
 
     @Test
-    fun `restyle changes one item and restyleMasked every masked one`() {
+    fun `restyle changes one item`() {
         val p = plan(item("a", MaskState.MASKED), item("b", MaskState.MASKED), item("c", MaskState.OUTLINED))
         assertThat(p.restyle("a", marker).items.map { it.look }).containsExactly(marker, MaskLook(), MaskLook()).inOrder()
-        assertThat(p.restyleMasked(marker).items.map { it.look }).containsExactly(marker, marker, MaskLook()).inOrder()
+    }
+
+    @Test
+    fun `restyleRedactions changes masked redactions and leaves strokes and outlined ones`() {
+        val blur = MaskLook(MaskStyle.BLUR)
+        val p = plan(
+            item("a", MaskState.MASKED),
+            item("b", MaskState.MASKED).copy(look = MaskLook(MaskStyle.PIXELATE)),
+            item("m", MaskState.MASKED).copy(look = marker),
+            item("c", MaskState.OUTLINED),
+        )
+        assertThat(p.restyleRedactions(blur).items.map { it.look })
+            .containsExactly(blur, blur, marker, MaskLook()).inOrder()
     }
 
     @Test

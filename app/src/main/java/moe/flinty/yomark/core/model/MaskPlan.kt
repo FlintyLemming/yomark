@@ -14,7 +14,12 @@ enum class MaskState { MASKED, OUTLINED }
  * 还有一种「表情」，2026-10-12 去掉了。记着这两个名字的旧设置读回来认不出，落回色块。
  * 画笔（[PEN]）2026-10-14 加上：不透明的线，和马克笔一样只做标记，可以拉框也可以手画。
  */
-enum class MaskStyle { SOLID, PIXELATE, BLUR, MARKER, PEN }
+enum class MaskStyle {
+    SOLID, PIXELATE, BLUR, MARKER, PEN;
+
+    /** 盖住内容的三种。马克笔、画笔是画上去的标注，不算。 */
+    val redacts: Boolean get() = this == SOLID || this == PIXELATE || this == BLUR
+}
 
 /**
  * 各样式的参数。一份里装着全部五种样式的参数，每块码只读它自己那种样式的几项；
@@ -248,10 +253,11 @@ data class MaskPlan(
     )
 
     /**
-     * 「应用到全部」：所有已打码的换成 [look]。圈出的不动——它们打码时自然会用那时的画笔。
+     * 换打码样式时一起换（设置「编辑」页的开关）：已打码、用的是盖住内容那三种样式的，都换成 [look]。
+     * 马克笔、画笔画的标注不动；圈出的也不动——它们打码时自然会用那时的画笔。
      */
-    fun restyleMasked(look: MaskLook): MaskPlan = copy(
-        items = items.map { if (it.state == MaskState.MASKED) it.copy(look = look) else it }
+    fun restyleRedactions(look: MaskLook): MaskPlan = copy(
+        items = items.map { if (it.state == MaskState.MASKED && it.look.style.redacts) it.copy(look = look) else it }
     )
 
     /** 拦截对话框的「2 个网址、1 个 IP 地址」就是这个 map 渲染出来的。 */

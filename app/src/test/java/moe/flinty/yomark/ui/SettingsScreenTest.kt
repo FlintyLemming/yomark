@@ -33,6 +33,7 @@ import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
+import moe.flinty.yomark.ui.settings.EditSettingsScreen
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
@@ -591,7 +592,19 @@ class SettingsScreenTest {
         assertThat(opened).isTrue()
     }
 
-    // ---------- 导出、外观 ----------
+    // ---------- 编辑、导出、外观 ----------
+
+    @Test fun theEditRowSaysWhetherSwitchingRestylesAll() {
+        show { SettingsScreen(RecognitionConfig(), exportReminder = true, onOpen = {}, onNavigateUp = {}, restyleAll = false) }
+        compose.onNodeWithText("换样式时只换选中的").assertExists()
+    }
+
+    @Test fun theRestyleAllSwitchTurnsItOff() {
+        var latest: Boolean? = null
+        show { EditSettingsScreen(restyleAll = true, onRestyleAllChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNodeWithText("换样式时一起换掉已有的打码").performClick()
+        assertThat(latest).isFalse()
+    }
 
     @Test fun theExportReminderSwitchTurnsItOff() {
         var latest: Boolean? = null

@@ -237,13 +237,12 @@ class PlayScreenshots {
     }
 
     /**
-     * 换成马赛克、整张图「应用到全部」，再把调节面板收起来：面板开着时盖住下半截、压着暗幕，看不清码了。
+     * 换成马赛克（整张图的码一起换），再把调节面板收起来：面板开着时盖住下半截、压着暗幕，看不清码了。
      */
     @Test fun styles() {
         val vm = open(sample("/play/chat-page.png"))
         compose.runOnUiThread {
             vm.onStyleChipClick(MaskStyle.PIXELATE)
-            vm.applyLookToAll()
             vm.dismissStylePanel()
         }
         advance(1_000)

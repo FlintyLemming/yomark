@@ -60,13 +60,11 @@ class StyleBarTest {
         val looks = mutableListOf<Pair<MaskLook, Boolean>>()
         var finished = 0
         var resets = 0
-        var appliedToAll = 0
         var collapsed = 0
         val picks = mutableListOf<ColorTarget?>()
         override fun onLookChange(look: MaskLook, inProgress: Boolean) { looks += look to inProgress }
         override fun onLookChangeFinished() { finished++ }
         override fun onReset() { resets++ }
-        override fun onApplyToAll() { appliedToAll++ }
         override fun onCollapse() { collapsed++ }
         override fun onPickColor(target: ColorTarget?) { picks += target }
     }
@@ -238,18 +236,6 @@ class StyleBarTest {
         show(open(MaskStyle.SOLID, MaskOptions(solidColor = 0xFF000000.toInt())), actions)
         compose.onNodeWithText("恢复默认").assertIsEnabled().performClick()
         assertThat(actions.resets).isEqualTo(1)
-    }
-
-    @Test fun applyToAllSaysHowManyItWouldChange() {
-        val actions = Recorder()
-        show(open(MaskStyle.SOLID).copy(applicable = 3), actions)
-        compose.onNodeWithText("应用到全部 3 处").performClick()
-        assertThat(actions.appliedToAll).isEqualTo(1)
-    }
-
-    @Test fun applyToAllIsOffWhenThereIsNothingToChange() {
-        show(open(MaskStyle.SOLID))
-        compose.onNodeWithText("应用到全部").assertIsNotEnabled()
     }
 
     @Test fun theCollapseButtonFoldsThePanel() {
