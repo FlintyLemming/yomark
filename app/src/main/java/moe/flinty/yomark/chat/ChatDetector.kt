@@ -16,7 +16,7 @@ import kotlin.math.max
  *
  * 这里只做安卓这一层的转换：位图 → ARGB 数组，OCR 行 → 外接框，找到的框 → 候选。
  * 页面转了直角（竖着拍、倒着放）的不认：聊天截图都是正着的，转过的多半是拍的纸面。
- * 认出来的都打码；设置里关掉「聊天记录」时根本不建它。
+ * 认出来的都打码；设置 → 实验室里「聊天记录」关着时（出厂关着）根本不建它。
  */
 class ChatDetector : PageAnalyzer {
     override val id = "chat-layout"

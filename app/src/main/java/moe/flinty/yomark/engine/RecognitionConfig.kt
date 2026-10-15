@@ -67,8 +67,11 @@ data class RecognitionConfig(
     val face: FaceOption = FaceOption.FAST,
     /** 认出来的人脸怎么处理。OFF 时人脸检测根本不跑。 */
     val faceState: RuleState = RuleState.MASKED,
-    /** 聊天截图里的头像、昵称、聊天标题怎么处理（三类一起）。OFF 时版面分析根本不跑。 */
-    val chatState: RuleState = RuleState.MASKED,
+    /**
+     * 聊天截图里的头像、昵称、聊天标题怎么处理（三类一起）。OFF 时版面分析根本不跑。
+     * 出厂关着（2026-10-15 起）：开关挪进了设置里的「实验室」。
+     */
+    val chatState: RuleState = RuleState.OFF,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
      * 没有旁证、只凭字面猜出的人名要不要也打码。出厂不打：HanLP 会把药名、品牌名、规格词都猜成人名，

@@ -6,6 +6,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
@@ -36,6 +38,7 @@ import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
 import moe.flinty.yomark.ui.settings.EditSettingsScreen
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
+import moe.flinty.yomark.ui.settings.LabsSettingsScreen
 import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
 import moe.flinty.yomark.ui.settings.SettingsPage
@@ -80,7 +83,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "语言", "关于").forEach {
+        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "实验室", "语言", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -142,6 +145,24 @@ class SettingsScreenTest {
             .inOrder()
     }
 
+    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它。 */
+    @Test fun chatScreenshotsLiveInLabs() {
+        val opened = mutableListOf<SettingsPage>()
+        home(onOpen = { opened += it })
+        compose.onNodeWithText("聊天记录").assertIsDisplayed()
+        compose.onNodeWithText("实验室").performClick()
+        assertThat(opened).containsExactly(SettingsPage.LABS)
+    }
+
+    /** 实验室在开发者、语言上面。 */
+    @Test fun labsSitsAboveDeveloperAndLanguage() {
+        home(developer = true)
+        val tops = listOf("实验室", "开发者", "语言").map {
+            compose.onNodeWithText(it).fetchSemanticsNode().boundsInRoot.top
+        }
+        assertThat(tops).isInOrder()
+    }
+
     /** 开发者那一项平常用不着，连点版本号打开调试信息之后才出现。 */
     @Test fun theDeveloperTopicIsHiddenUntilDebugInfoIsOn() {
         home()
@@ -153,6 +174,23 @@ class SettingsScreenTest {
         home(developer = true, onOpen = { opened += it })
         compose.onNodeWithText("开发者").performClick()
         assertThat(opened).containsExactly(SettingsPage.DEVELOPER)
+    }
+
+    // ---------- 实验室 ----------
+
+    /** 聊天记录出厂关着；打开就是打码，关上就是不认。 */
+    @Test fun chatScreenshotsAreOffOutOfTheBoxAndCanBeTurnedOn() {
+        var latest: RecognitionConfig? = null
+        show { LabsSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNodeWithText("聊天记录").assertIsOff().performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig(chatState = RuleState.MASKED))
+    }
+
+    @Test fun chatScreenshotsCanBeTurnedOffAgain() {
+        var latest: RecognitionConfig? = null
+        show { LabsSettingsScreen(RecognitionConfig(chatState = RuleState.MASKED), onChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNodeWithText("聊天记录").assertIsOn().performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig())
     }
 
     // ---------- 语言 ----------
