@@ -393,7 +393,20 @@ class ChatLayoutTest {
         assertWithMessage("${bare.reasons}").that(bare.reasons.any { it.startsWith("行尾一列时间") }).isTrue()
     }
 
-    /** 深色 Telegram 群聊（照一张真截图的版面缩到 540 宽）：别人的消息四组，头像在每组旁边；自己的四条，三条的时间贴着右边。 */
+    /**
+     * 同一页上：自己气泡里引用的人名是白字，和被引用的话一个颜色，按引用的缩进认；
+     * 最后一条消息只露出彩色的名字，消息被输入栏挡住了，名字照样认。被引用的话、回复的话不是名字。
+     */
+    @Test fun `a quoted name in an own bubble and a name cut off by the input bar are found`() {
+        val r = telegramGroup(outgoingBubbles = true)
+        assertWithMessage("${r.names}").that(r.names.map { it.text }).containsExactly("Maple", "Akarin", "Maple", "Akarin", "Akarin", "Pudding")
+        assertWithMessage("${r.names}").that(r.names.any { it.text == "Akarin" && it.box.left > 200f && it.box.top in 690f..720f }).isTrue()
+    }
+
+    /**
+     * 深色 Telegram 群聊（照一张真截图的版面缩到 540 宽）：别人的消息五组，头像在每组旁边，最后一组只露出名字；
+     * 自己的四条，三条的时间贴着右边，最后一条引用了别人的话。
+     */
     private fun telegramGroup(outgoingBubbles: Boolean): ChatFindings {
         val px = canvas(540, 1170) { _, _ -> DARK }
         val lines = ArrayList<ChatLine>()
@@ -419,9 +432,21 @@ class ChatLayoutTest {
         outgoing(Box(390f, 490f, 526f, 524f), Box(400f, 498f, 516f, 516f) to "不带 15:57")
         outgoing(Box(215f, 532f, 526f, 566f), Box(230f, 540f, 516f, 558f) to "框架能实现但不是自带的 15:57")
         incoming(590f, "Maple", "看着挺基础的 15:57", AVATAR_COLORS[0])
-        outgoing(Box(215f, 680f, 526f, 740f), Box(232f, 690f, 413f, 710f) to "平板模式是扁平的", Box(470f, 718f, 516f, 730f) to "15:57")
-        incoming(760f, "Akarin", "能不展开就不用 15:57", AVATAR_COLORS[1])
-        px.fill(Box(10f, 1100f, 460f, 1150f), INCOMING)
+        // 引用回复：引用块比气泡浅一点，左边一道白竖条；回复的话比引用里的字靠左
+        outgoing(Box(196f, 680f, 526f, 784f))
+        if (outgoingBubbles) {
+            px.fill(Box(208f, 691f, 511f, 744f), QUOTE)
+            px.fill(Box(208f, 691f, 212f, 744f), WHITE)
+        }
+        text(Box(223f, 696f, 316f, 715f), "Akarin")
+        text(Box(224f, 718f, 499f, 740f), "我个人还是执着于扁平一点的操作")
+        text(Box(211f, 751f, 375f, 775f), "平板模式是扁平的")
+        text(Box(451f, 762f, 516f, 778f), "15:57")
+        incoming(800f, "Akarin", "能不展开就不用 15:57", AVATAR_COLORS[1])
+        // 最后一条只露出名字，下面的消息被输入栏挡住
+        px.fill(Box(70f, 1024f, 400f, 1075f), INCOMING)
+        text(Box(94f, 1032f, 192f, 1055f), "Pudding", PINK)
+        px.fill(Box(10f, 1075f, 460f, 1150f), INCOMING)
         text(Box(80f, 1115f, 170f, 1135f), "输入消息", GRAY)
         return ChatLayout.analyze(lines, px)
     }
@@ -474,4 +499,5 @@ class ChatLayoutTest {
     private val GRAY = 0xFF8E8E93.toInt()
     private val INCOMING = 0xFF2C3E50.toInt()
     private val OUTGOING = 0xFF7B5CD6.toInt()
+    private val QUOTE = 0xFF8F72DA.toInt()
 }

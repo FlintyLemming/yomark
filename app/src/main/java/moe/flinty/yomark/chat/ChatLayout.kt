@@ -985,7 +985,7 @@ internal object Avatars {
  *    在 OCR 行上看是一样的）：下面紧跟一行字号更大、左缘对齐的消息；
  * 2. 「名字 + 时间」的消息头（Discord、Slack）；
  * 3. 系统消息里的名字：「"张三" 撤回了一条消息」「Rob joined」；
- * 4. 被引用、被转发的人：微信消息下面的引用「方小禾：[图片]」，Telegram 的「转发自」。
+ * 4. 被引用、被转发的人：微信消息下面的引用「方小禾：[图片]」，Telegram、WhatsApp 气泡里的引用回复，Telegram 的「转发自」。
  */
 internal object Names {
 
@@ -1032,6 +1032,7 @@ internal object Names {
         val small = sameColumn(z, out).filterNot { saidBy(it) }
         out += colored.filter { c -> out.none { it.box == c.box } }
         out += small.filter { c -> out.none { it.box == c.box } }
+        out += quoteHeads(z).filter { c -> out.none { it.box == c.box } }
         out.replaceAll { joinRight(z, it) }
         out += headerRows(z).filter { r -> out.none { it.box == r.box } }
         out += forwarded(z, chroma).filter { r -> out.none { it.box == r.box } }
@@ -1106,8 +1107,8 @@ internal object Names {
 
     /**
      * 彩色的昵称：Telegram、WhatsApp 这类把名字写在气泡第一行，字号和消息一样，按颜色区分（每人一种颜色）；
-     * 引用回复里被引用的人名也是这样。靠左、像个名字、字是彩色的，下面紧跟着（左缘差不到 5% 屏宽）一行不是彩色的字。
-     * 彩色的网址、话题标签不算。
+     * 引用回复里被引用的人名也是这样。靠左、像个名字、字是彩色的，下面紧跟着（左缘差不到 5% 屏宽）一行不是彩色的字；
+     * 一段开头的名字贴着输入栏、下面那行被挡住的，没有这行也算。彩色的网址、话题标签不算。
      * 一段开头的（上面紧挨着没有别的字：气泡第一行的发送人、引用里的人名）放宽：名字后面可能跟着头衔、助力数（OCR 读成一行），
      * 用户名常带数字，长度、数字都放宽，整行都遮。消息中间的彩色字（链接、文档标题）照常认，不放宽。
      * 居中的也算：引用里带缩略图的那行往右挪了，宽了，可能正好落在屏幕正中。
@@ -1135,7 +1136,10 @@ internal object Names {
                 below = next(below)
                 hops++
             }
-            if (below == null || of(below) >= PLAIN) return@mapNotNull null
+            if (below == null) {
+                // 截图最后一条消息只露出名字，消息被输入栏挡住了：只认一段开头的、下面该有字的地方伸进了底栏的
+                if (!opens || l.box.bottom + 2f * l.box.height <= z.bottomTop) return@mapNotNull null
+            } else if (of(below) >= PLAIN) return@mapNotNull null
             ChatText(l.box, text)
         }
     }
@@ -1148,6 +1152,34 @@ internal object Names {
     private val PINNED = Regex("置顶|消息$|Pinned", RegexOption.IGNORE_CASE)
 
     private val LINK = Regex("https?://|www\\.|[A-Za-z0-9]\\.(?:com|net|org|cn|io|me|co)\\b|^#", RegexOption.IGNORE_CASE)
+
+    /**
+     * Telegram、WhatsApp 的引用回复：气泡里一块缩进的引用（左边一道竖条），第一行是被引用的人，下面是被引用的话；
+     * 引用下面是回复的话，比引用里的字靠左（缩进屏宽 1%–5%）。别人气泡里的人名是彩色的，[colored] 认得出；
+     * 自己的气泡里（深色主题的蓝、紫气泡）人名和被引用的话一样是白字，只能按这个缩进认。
+     * 只认引用的第一行：上面紧挨着没有缩进一样的行。
+     */
+    private fun quoteHeads(z: Zones): List<ChatText> {
+        val tol = 0.01f * z.w
+        fun aligned(a: ChatLine, b: ChatLine) = abs(a.box.left - b.box.left) < tol
+        return z.body.mapNotNull { l ->
+            val text = l.text.trim()
+            if (text.count { !it.isWhitespace() } < 2 || !plausible(text) || LINK.containsMatchIn(text) || PINNED.containsMatchIn(text)) {
+                return@mapNotNull null
+            }
+            if (z.body.any { it !== l && aligned(it, l) && directlyAbove(it.box, l.box, z.w) }) return@mapNotNull null
+            // 往下是引用里缩进一样的几行，再下面紧跟着往左突出的一行回复
+            var last = l
+            while (true) {
+                last = z.body.filter { it !== last && aligned(it, l) && directlyAbove(last.box, it.box, z.w) }.minByOrNull { it.box.top } ?: break
+            }
+            val reply = z.body.any {
+                it.box.top >= last.box.bottom - 0.3f * it.box.height && it.box.top - last.box.bottom < 1.2f * it.box.height &&
+                    l.box.left - it.box.left in 0.01f * z.w..0.05f * z.w
+            }
+            if (last !== l && reply) ChatText(l.box, text) else null
+        }
+    }
 
     /**
      * 已经认出两个以上昵称的页上，和它们左缘对齐（误差 1% 屏宽）、一样大小的短行也是昵称：
