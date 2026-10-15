@@ -47,7 +47,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 点没打码的字，打码它所在的那一整行（2026-10-14，spec §7.3 修订）：框是文字识别给的这一行，再点一下取消。
+ * 点没打码的字，打码它所在的那一行（2026-10-14，spec §7.3 修订）：框是文字识别给的这一行，再点一下取消。
+ * 2026-10-15 起是那一段（TextLine.segments）：同一排上拼成一行的几段各打各的。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -93,6 +94,24 @@ class EditorViewModelTapLineTest {
     private val upper = line(10f, 10f, 300f, 40f)
     private val lower = line(10f, 60f, 300f, 90f, text = "订单号 1234567890123456")
 
+    /** PP-OCR 把同一排上隔开的几段拼成的一行（RowGrouper）：[segments] 是拼之前各段的框。 */
+    private fun row(text: String, vararg segments: Quad): TextLine {
+        val quad = Quad.fromRect(RectF(segments[0].bounds()).apply { segments.forEach { union(it.bounds()) } })
+        return TextLine(quad, text, 0.95f, listOf(TextElement(quad, text, text.indices)), segments.toList())
+    }
+
+    /** 一排并排的三个按钮，拼成了一行：整行的框横跨三个按钮。 */
+    private val buttons = row(
+        "赠送好友 查看订单 再来一单",
+        rect(10f, 120f, 120f, 150f), rect(145f, 120f, 255f, 150f), rect(280f, 120f, 390f, 150f),
+    )
+
+    /** 商品缩略图上印着的字（10..90）和它右边的一排标签，拼成了一行：整行的框伸进了缩略图。 */
+    private val tags = row(
+        "双重美味 全周可用 免预约",
+        rect(10f, 200f, 90f, 215f), rect(150f, 200f, 260f, 230f), rect(280f, 200f, 370f, 230f),
+    )
+
     private lateinit var sink: CountingSink
     private lateinit var recognizer: Recognizer
 
@@ -100,9 +119,10 @@ class EditorViewModelTapLineTest {
         candidates: List<Candidate> = emptyList(),
         saved: SavedStateHandle = SavedStateHandle(),
         settings: SettingsStore = isolatedSettingsStore(context),
+        lines: List<TextLine> = listOf(upper, lower),
     ): EditorViewModel {
         sink = CountingSink()
-        recognizer = Recognizer(listOf(upper, lower))
+        recognizer = Recognizer(lines)
         return EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), sink),
@@ -163,6 +183,33 @@ class EditorViewModelTapLineTest {
 
         vm.onListItemClick(vm.items().single().candidateId)
         assertThat(vm.items()).isEmpty()
+    }
+
+    /**
+     * 一排三个按钮拼成了一行：点中间那个只打码它，不横跨三个按钮；按钮之间的空当谁也没点中。
+     * 开发者里的「显示识别框」画的也是这三段。
+     */
+    @Test fun `tapping one of three buttons joined into a row masks just that button`() = runTest(dispatcher) {
+        val vm = vm(lines = listOf(buttons))
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        assertThat(vm.textBoxes.value).containsExactlyElementsIn(buttons.segments).inOrder()
+
+        vm.onTap(PointF(200f, 135f))
+        assertThat(vm.items().single().quad).isEqualTo(buttons.segments[1])
+
+        vm.onTap(PointF(132f, 135f))
+        assertThat(vm.items()).hasSize(1)
+    }
+
+    /** 缩略图上印着的字和右边的一排标签拼成了一行：点一个标签，码盖不到缩略图上。 */
+    @Test fun `tapping a tag next to a thumbnail does not mask the thumbnail`() = runTest(dispatcher) {
+        val vm = vm(lines = listOf(tags))
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+
+        vm.onTap(PointF(200f, 215f))
+        val masked = vm.items().single().quad
+        assertThat(masked).isEqualTo(tags.segments[1])
+        assertThat(masked.bounds().left).isGreaterThan(tags.segments[0].bounds().right)
     }
 
     /** 认出来了、但不打码的（出厂关着的日期这一类原先只圈出）不进 plan：点它的字，打码的也是整行。 */

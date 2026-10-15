@@ -132,6 +132,16 @@ class PpOcrPostProcessTest {
         assertThat(joined.charBoxes.count { it == null }).isEqualTo(1)
     }
 
+    /** 拼成一行给规则看，拼之前各段的框还在：点字打码只打手指下的那一段，并排的几个按钮不一下全盖住。 */
+    @Test fun `a joined row keeps the box of each segment`() {
+        val label = line("取件码", 0f, 2f)
+        val code = line("1-58908", 100f, 0f)
+        val copy = line("复制", 280f, 1f)
+        val joined = RowGrouper.group(listOf(code, copy, label)).single()
+        assertThat(joined.segments).containsExactly(label.box, code.box, copy.box).inOrder()
+        assertThat(RowGrouper.group(listOf(label)).single().segments).containsExactly(label.box)
+    }
+
     @Test fun `different rows and far columns stay apart`() {
         assertThat(RowGrouper.group(listOf(line("上一行", 0f, 0f), line("下一行", 0f, 40f)))).hasSize(2)
         assertThat(RowGrouper.group(listOf(line("左栏", 0f, 0f), line("右栏", 500f, 0f)))).hasSize(2)

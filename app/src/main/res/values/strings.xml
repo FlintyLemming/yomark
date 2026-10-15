@@ -346,7 +346,7 @@
     <string name="debug_log">Debug log</string>
     <string name="debug_log_summary">Last %1$d runs</string>
     <string name="show_text_boxes">Show scan results</string>
-    <string name="show_text_boxes_summary">Outline every line text recognition found in the editor</string>
+    <string name="show_text_boxes_summary">Outline every piece of text recognition found in the editor</string>
     <string name="debug_off_footer">Log deleted; tap the version in About seven times to turn it back on</string>
     <string name="keep_runs">Runs to keep</string>
     <string name="runs_count">%1$d</string>

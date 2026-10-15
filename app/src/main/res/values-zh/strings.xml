@@ -346,7 +346,7 @@
     <string name="debug_log">调试记录</string>
     <string name="debug_log_summary">最近 %1$d 次识别</string>
     <string name="show_text_boxes">显示扫描结果</string>
-    <string name="show_text_boxes_summary">在编辑页框出文字识别认出的每一行</string>
+    <string name="show_text_boxes_summary">在编辑页框出文字识别认出的每一段字</string>
     <string name="debug_off_footer">记录已删除，在「关于」里连点版本号七下可再打开</string>
     <string name="keep_runs">保留最近几次识别</string>
     <string name="runs_count">%1$d 次</string>

@@ -38,12 +38,14 @@ data class Box(val tl: Pt, val tr: Pt, val br: Pt, val bl: Pt) {
  *
  * @param charBoxes 与 text 逐字对齐：text[i] 的框是 charBoxes[i]。
  *   空格是按像素间隙补出来的词界，没有框，对应位置为 null。
+ * @param segments 拼成这一行的那几段各自的框（RowGrouper 拼之前的，检测按间隙切开的一段一个），没拼过的就是 [box]。
  */
 data class OcrLine(
     val text: String,
     val confidence: Float,
     val box: Box,
     val charBoxes: List<Box?>,
+    val segments: List<Box> = listOf(box),
 ) {
     init {
         require(charBoxes.size == text.length) { "charBoxes 必须与 text 逐字对齐" }
