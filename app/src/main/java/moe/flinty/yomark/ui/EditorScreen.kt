@@ -114,6 +114,8 @@ fun EditorScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
     val debugTrace by vm.debugTrace.collectAsStateWithLifecycle()
+    val showTextBoxes by vm.showTextBoxes.collectAsStateWithLifecycle()
+    val textBoxes by vm.textBoxes.collectAsStateWithLifecycle()
     var debugSheetOpen by rememberSaveable { mutableStateOf(false) }
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
@@ -268,6 +270,7 @@ fun EditorScreen(
                             onDeleteSelected = vm::deleteSelected,
                             scanStyle = scanStyle,
                             showOriginal = comparing,
+                            textBoxes = if (showTextBoxes) textBoxes else emptyList(),
                         )
                         Column(
                             Modifier.align(Alignment.TopCenter).padding(top = 12.dp),

@@ -3,6 +3,7 @@ package moe.flinty.yomark.ui.settings
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.CropFree
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,7 +12,8 @@ import moe.flinty.yomark.R
 import moe.flinty.yomark.debug.TraceLog
 
 /**
- * 开发者：调试信息的开关、保留最近几次、查看调试记录（2026-10-11 从「关于」里挪出来，单独一页）。
+ * 开发者：调试信息的开关、保留最近几次、查看调试记录（2026-10-11 从「关于」里挪出来，单独一页），
+ * 和编辑页上显示扫描结果（文字识别认出的每一行的框）。
  *
  * 在「关于」里连点版本号七下打开之后，一级页才多出「开发者」这一项，照着 Android 系统设置里开发者选项的样子。
  * 开关拨回去时这一页不自己退出，只把下面几组收起来、记下的一并删掉；回到一级页，「开发者」这一项也跟着不见了。
@@ -24,6 +26,8 @@ fun DeveloperSettingsScreen(
     traceCapacity: Int = TraceLog.DEFAULT_CAPACITY,
     onTraceCapacityChange: (Int) -> Unit = {},
     onOpenTraceHistory: () -> Unit = {},
+    showTextBoxes: Boolean = false,
+    onShowTextBoxesChange: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_developer), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -42,6 +46,13 @@ fun DeveloperSettingsScreen(
                         summary = stringResource(R.string.debug_log_summary, traceCapacity),
                         icon = Icons.Outlined.History,
                         onClick = onOpenTraceHistory,
+                    )
+                    SwitchRow(
+                        title = stringResource(R.string.show_text_boxes),
+                        summary = stringResource(R.string.show_text_boxes_summary),
+                        icon = Icons.Outlined.CropFree,
+                        checked = showTextBoxes,
+                        onCheckedChange = onShowTextBoxesChange,
                     )
                 }
             }

@@ -190,9 +190,11 @@ class SettingsPageActivity : YomarkActivity() {
             SettingsPage.DEVELOPER -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
                 val capacity by store.debugTraceCapacity.collectAsStateWithLifecycle(initialValue = null)
+                val textBoxes by store.showTextBoxes.collectAsStateWithLifecycle(initialValue = null)
                 val on = debugTrace
                 val keep = capacity
-                if (on != null && keep != null) {
+                val boxes = textBoxes
+                if (on != null && keep != null && boxes != null) {
                     DeveloperSettingsScreen(
                         debugTrace = on,
                         onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
@@ -200,6 +202,8 @@ class SettingsPageActivity : YomarkActivity() {
                         traceCapacity = keep,
                         onTraceCapacityChange = { next -> lifecycleScope.launch { store.setDebugTraceCapacity(next) } },
                         onOpenTraceHistory = { startActivity(intent(this, SettingsPage.DEBUG_TRACE)) },
+                        showTextBoxes = boxes,
+                        onShowTextBoxesChange = { next -> lifecycleScope.launch { store.setShowTextBoxes(next) } },
                     )
                 }
             }
