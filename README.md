@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Android-10%2B-3ddc84?logo=android&logoColor=white" alt="Android 10+">
 </p>
 
-<p align="center">自动找出截图里的手机号、地址、人名、取件码、车牌、人脸、二维码等敏感信息并打码。<br>识别、编辑、导出全部在手机上完成，应用没有联网权限，也不申请任何运行期权限。</p>
+<p align="center">自动找出截图里的手机号、地址、人名、取件码、车牌、人脸、二维码等敏感信息并打码。<br>识别、编辑、导出全部在手机上完成，默认不联网，也不申请任何运行期权限。</p>
 
 ## 功能
 
@@ -74,7 +74,7 @@
 
 - 导出在原图分辨率上重新绘制、重新编码。EXIF 里的位置、机型、拍摄时间一律不保留。
 - 用途水印的颜色、角度、透明度和密度都可以调，带实时预览。
-- 开源版全功能免费。导出默认在右下角带一个「有码 Yomark」小水印（自动避开打码区域）；点首页或编辑器右上角的按钮，在弹窗里点「去除水印」就能免费去掉，之后在 设置 → 导出 里可以改回来。弹窗里另有打赏入口：点「打赏」会用系统浏览器打开 <https://pay.mitsea.com>，应用自己不发任何网络请求。
+- 开源版全功能免费。导出默认在右下角带一个「有码 Yomark」小水印（自动避开打码区域）；点首页或编辑器右上角的按钮，在弹窗里点「去除水印」就能免费去掉，之后在 设置 → 导出 里可以改回来。弹窗里另有打赏入口：点「打赏」会用系统浏览器打开 <https://pay.mitsea.com>，付款不经过应用。
 - 上架 Play 商店的是内购版：免费导出时同样带这个小水印，一次性买断可以去掉，之后在 设置 → 导出 里可以改回来。那也是唯一的付费项，其他功能不受限制。内购版没有打赏入口：Play 的付款政策不允许在应用里把用户引到 Play 结算以外的付款方式。
 
 ## 隐私与权限
@@ -82,8 +82,10 @@
 完整的[隐私权政策](https://yomark.flinty.moe/privacy/)（源文件 [site/privacy/index.html](site/privacy/index.html)，和落地页一起由 GitHub Pages 发布）也能在应用的「设置 → 关于」里打开。
 
 - 不申请任何运行期权限。选图通过系统的 Photo Picker 完成，应用只能拿到你选中的那几张图，读不到相册里的其他图片。
-- 没有网络权限。ML Kit 的依赖会把 `INTERNET` 和 `ACCESS_NETWORK_STATE` 带进 manifest，构建时会把这两条移除，系统层面就不会给这个进程开网络。
-- 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面三条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
+- 默认不联网。`INTERNET` 只给实验室里的「外部模型」用（出厂关着）：打开并填好接口后，点「AI 增强识别」时把识别出的文字发到你自己填的接口，规则已认出的号码先换成占位符，图片不发。除此之外应用不发任何网络请求。
+- ML Kit 带着向 Google 回传使用统计的组件，构建时把它的上报后端摘掉，`ACCESS_NETWORK_STATE` 也一并移除。
+- 构建任务 `assertDebugNoRuntimePermissions` 会检查合并后的 manifest。除了下面四条不涉及数据访问的声明，多出任何一条权限都会让构建失败：
+    - `android.permission.INTERNET`：实验室里的外部模型。普通权限，安装时授予，不弹授权框。
     - `com.android.vending.BILLING`：Play 内购，购买在 Play 商店的进程里进行。开源版不连 Play Billing，留给以后上架的版本。
     - `com.google.android.apps.aicore.service.BIND_SERVICE`：「AI 增强识别」绑定系统的 AICore，模型在本机运行。
     - `moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`：androidx 自动生成的 signature 级权限，其他应用无法获取。
@@ -95,6 +97,7 @@
 - **人脸与条码**：ML Kit 的 bundled 版本，模型同样随包分发。
 - **聊天截图**：不用模型，按 OCR 行的排法和像素找（`chat/ChatLayout.kt`）。规则在合成的聊天页上调过（`tools/model-eval/make_chat_samples.py`），调研和实测见 [docs/chat-layout-research.md](docs/chat-layout-research.md)。
 - **AI 增强识别**：在支持 AICore 的机型上，编辑器里会多出这个按钮。点击后由本机的 Gemini Nano 把整页文字再读一遍，新找到的直接打码。本机有没有 Gemini Nano、是哪一版（nano-v2、nano-v3 等），可以在设置的「AI」里看到。
+- **外部模型（实验室）**：在设置的「实验室」里打开后，「AI」里填一个 OpenAI 兼容的接口，AI 增强识别就改用它，没有 Gemini Nano 的手机也能用。只发文字，原文由 PP-OCR 的字级框定位；四种接法的实测对比见 [设计文档](docs/superpowers/specs/2026-10-15-yomark-lab-external-model-design.md)。
 
 ## 下载
 

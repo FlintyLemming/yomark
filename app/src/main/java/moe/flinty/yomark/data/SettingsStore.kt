@@ -19,11 +19,13 @@ import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.theme.ThemeColor
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
@@ -32,7 +34,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 /**
  * 本地设置（spec §12 M5 的「记住上次样式」）。
  *
- * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。
+ * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。唯一的凭据是用户自己填的外部模型 API Key。
  * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
  * 编辑器里「打码」上次选的样式存枚举名，画笔里各样式（连马克笔、画笔）的参数逐项存；每块码自己的样式只活在 MaskPlan 里。
  */
@@ -228,6 +230,33 @@ class SettingsStore internal constructor(
         store.edit { it[KEY_DEBUG_TRACE_CAPACITY] = count }
     }
 
+    /**
+     * 实验室里的外部模型：开关，和 AI 页上填的接口地址、API Key、模型（见 ExternalModelSettings）。
+     * 不进 [recognitionConfig]：改一个字编辑器不用重跑识别，它每次用时现读。
+     * 只在这几项变了时才发出新值：编辑器收到要重新探测一次「AI 增强识别」能不能用。
+     *
+     * key 和别的设置一样存在应用私有目录里；manifest 里 allowBackup="false"，不进备份。
+     */
+    val externalModel: Flow<ExternalModelSettings> = store.data.map(::readExternalModel).distinctUntilChanged()
+
+    /** 改外部模型的设置。读、改、写在一次 edit 里，两处同时改不会互相盖掉。 */
+    suspend fun updateExternalModel(change: (ExternalModelSettings) -> ExternalModelSettings) {
+        store.edit {
+            val next = change(readExternalModel(it))
+            it[KEY_EXTERNAL_ON] = next.enabled
+            it[KEY_EXTERNAL_URL] = next.baseUrl.trim()
+            it[KEY_EXTERNAL_KEY] = next.apiKey.trim()
+            it[KEY_EXTERNAL_MODEL] = next.model.trim()
+        }
+    }
+
+    private fun readExternalModel(prefs: Preferences) = ExternalModelSettings(
+        enabled = prefs[KEY_EXTERNAL_ON] ?: false,
+        baseUrl = prefs[KEY_EXTERNAL_URL].orEmpty(),
+        apiKey = prefs[KEY_EXTERNAL_KEY].orEmpty(),
+        model = prefs[KEY_EXTERNAL_MODEL].orEmpty(),
+    )
+
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -276,7 +305,7 @@ class SettingsStore internal constructor(
      * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
-     * 调试信息的开关在「开发者」里自己关。
+     * 调试信息的开关在「开发者」里自己关。实验室里的外部模型关掉，填过的接口地址、key、模型留着，再打开不用重填。
      *
      * 做法是删掉这些键，而不是写一份当下的出厂值：读的时候缺省就是出厂值，和新装一样，
      * 出厂值以后再改也不会被这一下冻住（与 RecognitionConfig.ruleOverrides 只存差异同一条理由）。
@@ -295,6 +324,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_RESTYLE_ALL)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
+            it.remove(KEY_EXTERNAL_ON)
         }
     }
 
@@ -400,6 +430,10 @@ class SettingsStore internal constructor(
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
+        val KEY_EXTERNAL_ON = booleanPreferencesKey("external_model_enabled")
+        val KEY_EXTERNAL_URL = stringPreferencesKey("external_model_base_url")
+        val KEY_EXTERNAL_KEY = stringPreferencesKey("external_model_api_key")
+        val KEY_EXTERNAL_MODEL = stringPreferencesKey("external_model_name")
 
         /** 人脸、条码的识别模式里原先那个「关」。只在读老安装时认它，见 recognitionConfig。 */
         const val LEGACY_OFF = "OFF"

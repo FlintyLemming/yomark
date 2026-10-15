@@ -21,6 +21,7 @@ import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.rules.RuleCatalog
+import moe.flinty.yomark.engine.genai.ExternalModelClient
 import moe.flinty.yomark.engine.genai.NanoClient
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
@@ -28,6 +29,7 @@ import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -110,7 +112,17 @@ class SettingsPageActivity : YomarkActivity() {
             SettingsPage.AI -> {
                 // 进页时问一次 AICore；只看不下，见 NanoStatus
                 val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
-                AiSettingsScreen(nano, onNavigateUp = ::finish)
+                val external by store.externalModel.collectAsStateWithLifecycle(initialValue = null)
+                external?.let { ext ->
+                    AiSettingsScreen(
+                        nano = nano,
+                        onNavigateUp = ::finish,
+                        external = ext.takeIf { it.enabled },
+                        onExternalChange = { change -> lifecycleScope.launch { store.updateExternalModel(change) } },
+                        // 测的是眼下存着的设置，不是画面上那一份：弹框保存之后才算数
+                        onTestExternal = { ExternalModelClient.check(store.externalModel.first()) },
+                    )
+                }
             }
             SettingsPage.EDIT -> {
                 val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
@@ -159,8 +171,21 @@ class SettingsPageActivity : YomarkActivity() {
                     )
                 }
             }
-            SettingsPage.LABS -> WithRecognitionConfig(store) { config, onChange ->
-                LabsSettingsScreen(config, onChange, onNavigateUp = ::finish)
+            SettingsPage.LABS -> {
+                val external by store.externalModel.collectAsStateWithLifecycle(initialValue = null)
+                WithRecognitionConfig(store) { config, onChange ->
+                    external?.let { ext ->
+                        LabsSettingsScreen(
+                            config = config,
+                            onChange = onChange,
+                            onNavigateUp = ::finish,
+                            externalModel = ext.enabled,
+                            onExternalModelChange = { on ->
+                                lifecycleScope.launch { store.updateExternalModel { it.copy(enabled = on) } }
+                            },
+                        )
+                    }
+                }
             }
             SettingsPage.DEVELOPER -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)

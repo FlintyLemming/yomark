@@ -8,8 +8,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>有码 Yomark：截图自动打码，本机识别、不联网</title>
-  <meta name="description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。识别、编辑、导出都在手机上完成，应用没有联网权限。开源，全功能免费。">
+  <title>有码 Yomark：截图自动打码，本机识别</title>
+  <meta name="description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。识别、编辑、导出都在手机上完成，默认不联网。开源，全功能免费。">
   <meta name="color-scheme" content="only light">
   <meta name="theme-color" content="#f5f7fa">
   <!-- 下面几个绝对地址部署时会换成 Pages 的实际地址（见 pages.yml） -->
@@ -18,7 +18,7 @@
   <meta property="og:site_name" content="有码 Yomark">
   <meta property="og:locale" content="zh_CN">
   <meta property="og:title" content="有码：截图里的敏感信息，发出去之前先遮住">
-  <meta property="og:description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。本机识别，应用没有联网权限。">
+  <meta property="og:description" content="自动找出截图里的手机号、地址、人名、取件码、人脸和二维码并打码。本机识别，默认不联网。">
   <meta property="og:url" content="https://yomark.flinty.moe/">
   <meta property="og:image" content="https://yomark.flinty.moe/og.png">
   <meta property="og:image:width" content="2560">
@@ -84,11 +84,11 @@
         <div class="hero-copy">
           <ul class="pills">
             <li>本机识别</li>
-            <li>不联网</li>
+            <li>默认不联网</li>
             <li>零权限</li>
           </ul>
           <h1>截图里的敏感信息，<br>发出去之前<span class="hl">先遮住</span>。</h1>
-          <p class="lead">自动找出截图里的手机号、地址、人名、取件码、人脸和二维码，直接打上码。识别、编辑、导出全在手机上完成，应用没有联网权限。</p>
+          <p class="lead">自动找出截图里的手机号、地址、人名、取件码、人脸和二维码，直接打上码。识别、编辑、导出全在手机上完成，默认不联网。</p>
           <div class="cta">
             <a class="btn btn-ink btn-lg" href="https://github.com/FlintyLemming/yomark/releases/latest" data-apk>
               <svg class="i" aria-hidden="true"><use href="#i-download"/></svg>下载 APK
@@ -245,14 +245,14 @@
       <div class="wrap">
         <header class="sec-head">
           <p class="eyebrow">隐私</p>
-          <h2 id="privacy-title">没有联网权限。</h2>
-          <p class="lead">不是承诺「不上传」，而是在系统层面就不给这个进程开网络。识别、编辑、导出全在手机上完成，开着飞行模式也照常工作。</p>
+          <h2 id="privacy-title">默认不联网。</h2>
+          <p class="lead">识别、编辑、导出全在手机上完成，开着飞行模式也照常工作。只有你在实验室里打开「外部模型」，AI 增强识别才会把识别出的文字发到你自己填的接口。</p>
         </header>
         <div class="privacy">
           <ul class="facts">
             <li>
               <svg class="i" aria-hidden="true"><use href="#i-wifi-off"/></svg>
-              <div><h3>摘掉联网权限</h3><p>ML Kit 的依赖会把 <code>INTERNET</code> 和 <code>ACCESS_NETWORK_STATE</code> 带进 manifest，构建时把这两条移除。没有这条权限，进程就拿不到网络。</p></div>
+              <div><h3>堵上遥测</h3><p>ML Kit 带着向 Google 回传使用统计的组件，构建时把它的上报后端摘掉。应用自己只在你用外部模型时联网，图片从不发出。</p></div>
             </li>
             <li>
               <svg class="i" aria-hidden="true"><use href="#i-lock"/></svg>
@@ -260,7 +260,7 @@
             </li>
             <li>
               <svg class="i" aria-hidden="true"><use href="#i-shield"/></svg>
-              <div><h3>构建时把关</h3><p>构建任务会检查合并后的 manifest。除了清单里三条不涉及数据访问的声明，多出任何一条权限，构建直接失败。</p></div>
+              <div><h3>构建时把关</h3><p>构建任务会检查合并后的 manifest。除了清单里四条不涉及数据访问的声明，多出任何一条权限，构建直接失败。</p></div>
             </li>
             <li>
               <svg class="i" aria-hidden="true"><use href="#i-pin-off"/></svg>
@@ -270,6 +270,7 @@
           <div class="manifest">
             <p class="manifest-title">合并后 manifest 里的全部权限</p>
             <ul>
+              <li><code>android.permission.INTERNET</code><span>只给实验室里的「外部模型」用，出厂关着。打开后发的是识别出的文字，规则已认出的号码先换成占位符。</span></li>
               <li><code>com.android.vending.BILLING</code><span>Play 内购，留给以后上架的版本。购买在 Play 商店的进程里进行，开源版不连 Play Billing。</span></li>
               <li><code>com.google.android.apps.aicore.service.BIND_SERVICE</code><span>「AI 增强识别」绑定系统的 AICore，模型在本机运行。</span></li>
               <li><code>moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION</code><span>androidx 自动生成的 signature 级权限，其他应用无法获取。</span></li>
@@ -342,7 +343,7 @@
             <p class="eyebrow">开源</p>
             <h2 id="oss-title">开源，全功能免费。</h2>
             <p>导出的图片不带水印，所有功能直接用。源代码、设计文档、模型评测和上架验收记录都在 GitHub 上。</p>
-            <p>如果有码帮到了你，欢迎打赏支持后续开发。应用里的打赏入口交给系统浏览器打开，应用本身仍然不联网。</p>
+            <p>如果有码帮到了你，欢迎打赏支持后续开发。应用里的打赏入口交给系统浏览器打开，付款不经过应用。</p>
             <div class="cta">
               <a class="btn btn-ink" href="https://pay.mitsea.com"><svg class="i" aria-hidden="true"><use href="#i-heart"/></svg>打赏支持</a>
               <a class="btn btn-ghost" href="https://github.com/FlintyLemming/yomark"><svg class="i i-solid" aria-hidden="true"><use href="#i-github"/></svg>GitHub 仓库</a>
@@ -386,7 +387,7 @@
           </details>
           <details>
             <summary>图片会被上传吗？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
-            <p>不会。应用没有联网权限，图片只在手机上处理，导出的图片存进相册。详见<a href="privacy/">隐私权政策</a>。</p>
+            <p>不会。图片只在手机上处理，导出的图片存进相册。实验室里的「外部模型」打开后，AI 增强识别会把识别出的文字（不是图片）发到你自己填的接口。详见<a href="privacy/">隐私权政策</a>。</p>
           </details>
           <details>
             <summary>以后会收费吗？<svg class="i" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
