@@ -154,6 +154,19 @@ fun ImageCanvas(
     }
     val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
+    // 点一下打码、取消打码的那一下（见 MaskToggles）。plan 一变就在重组里比一比，这样新码在它上屏的第一帧之前就登记好了；
+    // 时钟只在绘制里读，走起来只重画
+    val toggles = remember(image) { MaskToggles() }
+    val togglePaints = remember { TogglePaints() }
+    var toggleClock by remember(image) { mutableLongStateOf(0L) }
+    remember(toggles, state.plan.items) { toggles.sync(state.plan.items, animate = !scanning && !animating) }
+    LaunchedEffect(toggles, state.plan.items) {
+        while (toggles.active) withFrameMillis {
+            toggles.advance(it)
+            toggleClock = it
+        }
+    }
+
     // pointerInput 的 block 只在 key 变化时重启，捕获的是重启那一刻的 state。
     // 手势循环里必须读这个「永远最新」的引用，否则点选手动框后立刻拖手柄，
     // 循环里看到的 selectedManualId 还是 null，于是拖出来一个新框而不是改选中框。
@@ -365,7 +378,11 @@ fun ImageCanvas(
                     ScanStyle.SWEEP -> ScanLook.Sweep
                     ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
                 }
-                drawScene(canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite)
+                val toggle = if (toggles.active) toggles.frame(toggleClock) else null
+                drawScene(
+                    canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite,
+                    toggle, togglePaints,
+                )
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
                 state.purposeText?.let {
@@ -560,6 +577,7 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
  * @param time 动效时间轴上的这一帧（见 ScanEffect、FrostEffect）；null 表示静止，照常画全部遮罩
  * @param look 按哪种样式画这一帧
  * @param composite 读像素的码压在别的码上时，从这里取合成好的样子；跨帧复用才有缓存
+ * @param toggle 点一下打码、取消打码的这一帧（见 MaskToggles）；只在 [time] 为 null 时画
  */
 internal fun drawScene(
     canvas: android.graphics.Canvas,
@@ -572,6 +590,8 @@ internal fun drawScene(
     paints: ScanPaints,
     look: ScanLook = ScanLook.Sweep,
     composite: MaskComposite = MaskComposite(),
+    toggle: ToggleFrame? = null,
+    togglePaints: TogglePaints = TogglePaints(),
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
@@ -579,12 +599,29 @@ internal fun drawScene(
     val sorted = MaskOrder.forDrawing(plan.items)
     val composed = composite.of(image, sorted, registry)
     val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
+    val dp = density / scale
     if (time == null) {
-        drawItems(sorted)
+        if (toggle == null) {
+            drawItems(sorted)
+            return
+        }
+        // 正在抹上的码画完其余的再单独画，只留抹过的那部分；揭开的码已经不在合成图里，照它自己的样式画
+        val (laying, settled) = sorted.partition { it.candidateId in toggle.appearing }
+        drawItems(settled)
+        val feather = MaskToggle.FEATHER_DP * dp
+        laying.forEach { item ->
+            drawWiped(canvas, item, toggle.appearing.getValue(item.candidateId), laying = true, feather, togglePaints) {
+                drawItems(listOf(item))
+            }
+        }
+        toggle.vanishing.forEach { (item, progress) ->
+            drawWiped(canvas, item, progress, laying = false, feather, togglePaints) {
+                drawItems(canvas, listOf(item), image, registry, null)
+            }
+        }
         return
     }
 
-    val dp = density / scale
     if (look is ScanLook.Frost) {
         val (manual, detected) = sorted.partition { it.byUser }
         drawFrostScene(
