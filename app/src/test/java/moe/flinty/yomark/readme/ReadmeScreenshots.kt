@@ -36,7 +36,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * README 里六种打码样式对照图（docs/readme/styles.png）用的截图。不是测试，平时跳过；要重拍时：
+ * 样式对照图（docs/readme/styles.png，落地页的样式小图从它裁）用的截图。不是测试，平时跳过；要重拍时：
  *
  *     YOMARK_SHOTS_DIR=$PWD/docs/readme/shots ./gradlew :app:testDebugUnitTest --tests '*ReadmeScreenshots*'
  *     node docs/readme/src/render.cjs styles

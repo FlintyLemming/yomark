@@ -1,4 +1,4 @@
-"""把 README 的样式对照图 docs/readme/styles.png 裁成六张小图，给落地页（site/）用。
+"""把 README 的样式对照图 docs/readme/styles.png 裁成五张小图，给落地页（site/）用。
 
     python3 tools/site/crop_style_tiles.py   # 需要 Pillow
 
@@ -22,8 +22,8 @@ ROW_GAP, COL_GAP = 30, 56
 LEFT, TOP = 64, 54           # body 的 padding
 INSET = 4                    # 往里收几个像素，去掉卡片的描边和抗锯齿
 
-# 网格按列排：左列色块、表情、抹除，右列马赛克、模糊、马克笔
-COLUMNS = [['solid', 'emoji', 'erase'], ['pixelate', 'blur', 'marker']]
+# 网格按列排：左列色块、马赛克、模糊（「打码」），右列马克笔、画笔（「编辑」）
+COLUMNS = [['solid', 'pixelate', 'blur'], ['marker', 'pen']]
 
 
 def main():
