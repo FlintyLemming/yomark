@@ -56,17 +56,8 @@ data class Viewport(val scale: Float, val offsetX: Float, val offsetY: Float) {
         return Viewport(s, ox, oy)
     }
 
-    /** 双击：在「适配屏幕」与 fit 的 2 倍之间切换（spec §7.3）。 */
-    fun doubleTapTarget(pivot: PointF, imageW: Int, imageH: Int, viewW: Int, viewH: Int): Viewport {
-        val fit = fit(imageW, imageH, viewW, viewH)
-        val zoomedIn = scale > fit.scale * 1.05f
-        return if (zoomedIn) fit
-        else zoomAround(pivot, DOUBLE_TAP_FACTOR).clamped(imageW, imageH, viewW, viewH, fit.scale)
-    }
-
     companion object {
         const val MAX_SCALE_FACTOR = 8f
-        const val DOUBLE_TAP_FACTOR = 2f
 
         fun fit(imageW: Int, imageH: Int, viewW: Int, viewH: Int): Viewport {
             if (imageW <= 0 || imageH <= 0 || viewW <= 0 || viewH <= 0) return Viewport(1f, 0f, 0f)
