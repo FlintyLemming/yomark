@@ -165,7 +165,7 @@ class EditorCompareTest {
 
     @Test fun `a purpose watermark alone is worth comparing`() {
         val vm = open(MaskPlan.empty())
-        compose.runOnUiThread { vm.setPurposeText("仅供测试使用") }
+        compose.runOnUiThread { vm.setPurposeText("仅供测试使用"); vm.setPurposeOn(true) }
         frames(SETTLE_FRAMES)
         compareButton.assertIsEnabled()
     }
