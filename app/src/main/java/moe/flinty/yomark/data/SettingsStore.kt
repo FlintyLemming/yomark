@@ -281,7 +281,6 @@ class SettingsStore internal constructor(
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
             chatState = prefs[KEY_CHAT_STATE].toRuleState(fallback.chatState),
-            semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
             maskUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.maskUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
@@ -295,7 +294,6 @@ class SettingsStore internal constructor(
             it[KEY_FACE] = config.face.name
             it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_CHAT_STATE] = config.chatState.name
-            it[KEY_SEMANTIC] = config.semantic.name
             it[KEY_UNANCHORED_NAMES] = config.maskUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
         }
@@ -318,7 +316,6 @@ class SettingsStore internal constructor(
             it.remove(KEY_FACE)
             it.remove(KEY_FACE_STATE)
             it.remove(KEY_CHAT_STATE)
-            it.remove(KEY_SEMANTIC)
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
@@ -428,7 +425,6 @@ class SettingsStore internal constructor(
         /** v2：出厂从打码改成关着（挪进实验室），换键的理由同 KEY_TEXT_ENGINE。 */
         val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state_v2")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
-        val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
         val KEY_EXTERNAL_ON = booleanPreferencesKey("external_model_enabled")
         val KEY_EXTERNAL_URL = stringPreferencesKey("external_model_base_url")

@@ -32,8 +32,6 @@ import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.outlined.Edit
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -655,7 +653,8 @@ internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = 
 private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.04f))
 
 /**
- * 「AI 增强识别」：三颗星。跑的时候三颗星转着；跑完了换成对勾、点不动，新发现几处是角标上的数；没跑成星星是红的、还能点。
+ * 「AI 增强识别」：三颗星。跑的时候三颗星转着；跑完了换成对勾、点不动；没跑成星星是红的、还能点。
+ * 对勾上不挂数量角标（2026-10-15 去掉）：新发现几处，画布顶上已经说过一声。
  * 圆钮上没有字，读屏念的是宽屏按钮上那句（见 [AiReviewButton]）；跑完那一下画布顶上会说一声（见 [AiReviewResultPill]）。
  */
 @Composable
@@ -668,14 +667,12 @@ private fun AiReviewCircle(state: AiReview, onClick: () -> Unit, modifier: Modif
             .fillMaxSize()
             .clip(CircleShape)
             .semantics { contentDescription = label }
-            // 跑着、跑完了都点不动；对勾和角标是结果，不灰掉
+            // 跑着、跑完了都点不动；对勾是结果，不灰掉
             .clickable(enabled = state == AiReview.Ready || failed, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (state is AiReview.Done) {
-            BadgedBox(badge = { if (state.found > 0) Badge { Text("${state.found}") } }) {
-                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(CIRCLE_ICON), tint = colors.onSurfaceVariant)
-            }
+            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(CIRCLE_ICON), tint = colors.onSurfaceVariant)
         } else {
             SparkleIcon(
                 animating = state == AiReview.Running,

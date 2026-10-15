@@ -23,7 +23,6 @@ import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
-import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.engine.genai.ExternalModelException
@@ -37,10 +36,9 @@ import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
-import moe.flinty.yomark.ui.settings.EditSettingsScreen
 import moe.flinty.yomark.ui.settings.ExternalField
-import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
+import moe.flinty.yomark.ui.settings.GeneralSettingsScreen
 import moe.flinty.yomark.ui.settings.LabsSettingsScreen
 import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
@@ -86,7 +84,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "导出", "外观", "实验室", "语言", "关于").forEach {
+        listOf("文字", "人脸", "条码", "AI", "通用", "外观", "实验室", "语言", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -107,7 +105,7 @@ class SettingsScreenTest {
     @Test fun theAboutRowSaysTheVersionAndWhatMovedIn() {
         home()
         compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置").assertIsDisplayed()
-        compose.onNode(hasText("yomark.flinty.moe/privacy/")).assertDoesNotExist()
+        compose.onNode(hasText("yomark.flinty.moe", substring = true)).assertDoesNotExist()
     }
 
     /** 一级页不直接摆选项：原先铺在这里的识别模式、引擎都收进了二级页。 */
@@ -123,13 +121,12 @@ class SettingsScreenTest {
             config = RecognitionConfig(
                 face = FaceOption.ACCURATE,
                 barcodeState = RuleState.OFF,
-                semantic = SemanticOption.OFF,
                 ruleOverrides = mapOf("url" to RuleState.MASKED),
             ),
         )
         compose.onNodeWithText("打码 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("水印样式").assertIsDisplayed()
+        compose.onNodeWithText("编辑、水印样式").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
         val off = RuleCatalog.all.size - masked
         compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类 · PP-OCR").assertIsDisplayed()
@@ -148,11 +145,21 @@ class SettingsScreenTest {
             .inOrder()
     }
 
+    /** 「编辑」「导出」两页各只有一项，并成了「通用」：一级页上不再有这两行。 */
+    @Test fun editAndExportAreFoldedIntoGeneral() {
+        val opened = mutableListOf<SettingsPage>()
+        home(onOpen = { opened += it })
+        compose.onNodeWithText("编辑").assertDoesNotExist()
+        compose.onNodeWithText("导出").assertDoesNotExist()
+        compose.onNodeWithText("通用").performClick()
+        assertThat(opened).containsExactly(SettingsPage.GENERAL)
+    }
+
     /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它（和外部模型）。 */
     @Test fun chatScreenshotsLiveInLabs() {
         val opened = mutableListOf<SettingsPage>()
         home(onOpen = { opened += it })
-        compose.onNodeWithText("聊天记录、外部模型").assertIsDisplayed()
+        compose.onNodeWithText("识别聊天记录、外部模型").assertIsDisplayed()
         compose.onNodeWithText("实验室").performClick()
         assertThat(opened).containsExactly(SettingsPage.LABS)
     }
@@ -185,14 +192,20 @@ class SettingsScreenTest {
     @Test fun chatScreenshotsAreOffOutOfTheBoxAndCanBeTurnedOn() {
         var latest: RecognitionConfig? = null
         show { LabsSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("聊天记录").assertIsOff().performClick()
+        compose.onNodeWithText("识别聊天记录").assertIsOff().performClick()
         assertThat(latest).isEqualTo(RecognitionConfig(chatState = RuleState.MASKED))
+    }
+
+    /** 页脚只说遮什么，加一句局限。 */
+    @Test fun theChatFooterSaysWhatItCoversAndThatItCanMiss() {
+        show { LabsSettingsScreen(RecognitionConfig(), onChange = {}, onNavigateUp = {}) }
+        compose.onNodeWithText("遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确").assertIsDisplayed()
     }
 
     @Test fun chatScreenshotsCanBeTurnedOffAgain() {
         var latest: RecognitionConfig? = null
         show { LabsSettingsScreen(RecognitionConfig(chatState = RuleState.MASKED), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("聊天记录").assertIsOn().performClick()
+        compose.onNodeWithText("识别聊天记录").assertIsOn().performClick()
         assertThat(latest).isEqualTo(RecognitionConfig())
     }
 
@@ -294,11 +307,11 @@ class SettingsScreenTest {
         onOpenRule: (String) -> Unit = {},
     ) = show { TextSettingsScreen(config, onChange, onOpenEngine, onOpenRule, onNavigateUp = {}) }
 
-    /** 认字的两项在上面，下面是各类；每类一行，小字是它眼下怎么处理。 */
+    /** 识别引擎在上面，下面是各类；每类一行，小字是它眼下怎么处理。AI 增强识别没有开关了，总是开着。 */
     @Test fun theTextPageReadsTextAndListsEveryKind() {
         textPage()
         compose.onNodeWithText("识别引擎").assertIsDisplayed()
-        compose.onNodeWithText("AI 增强识别").assertIsDisplayed()
+        compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
         compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
@@ -334,19 +347,11 @@ class SettingsScreenTest {
         assertThat(opened).isEqualTo("url")
     }
 
-    @Test fun theAiReviewSwitchTurnsItOff() {
-        var latest: RecognitionConfig? = null
-        textPage(onChange = { latest = it })
-        compose.onNodeWithText("AI 增强识别").performClick()
-        assertThat(latest?.semantic).isEqualTo(SemanticOption.OFF)
-    }
-
-    /** 恢复默认管这一页和它下面的各页：引擎、AI 增强识别、各类、人名的开关。人脸、条码不动。 */
+    /** 恢复默认管这一页和它下面的各页：引擎、各类、人名的开关。人脸、条码不动。 */
     @Test fun resettingTheTextPageKeepsFacesAndBarcodes() {
         var latest: RecognitionConfig? = null
         val config = RecognitionConfig(
             textEngine = TextEngineOption.LATIN,
-            semantic = SemanticOption.OFF,
             faceState = RuleState.OFF,
             barcodeState = RuleState.OFF,
             maskUnanchoredNames = true,
@@ -490,7 +495,7 @@ class SettingsScreenTest {
     @Test fun theAiPageSaysItIsStillChecking() {
         ai(nano = null)
         compose.onNodeWithText("正在检测…").assertIsDisplayed()
-        compose.onNodeWithText("本机没有").assertDoesNotExist()
+        compose.onNodeWithText("不可用").assertDoesNotExist()
     }
 
     @Test fun theAiPageSaysWhichNanoThisPhoneHas() {
@@ -499,23 +504,25 @@ class SettingsScreenTest {
         compose.onNodeWithText("nano-v3 · 已就绪").assertIsDisplayed()
     }
 
+    /** 卡片下面是一段话，不换行、不带句号：先说它是什么，接着指去看哪些机型有。 */
     @Test fun theAiPageSaysWhenThisPhoneHasNoNano() {
         ai(NanoStatus.Unavailable())
-        compose.onNodeWithText("本机没有").assertIsDisplayed()
-        compose.onNodeWithText("官方文档", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("不可用").assertIsDisplayed()
+        compose.onNodeWithText("Google 的端侧大模型，支持设备列表参考官方文档").assertIsDisplayed()
     }
 
     /** AICore 报了错就把错误码写出来，真机上排查时用得上。 */
     @Test fun theAiPageShowsTheAicoreErrorCode() {
         ai(NanoStatus.Unavailable(errorCode = 606))
-        compose.onNodeWithText("本机没有").assertIsDisplayed()
-        compose.onNodeWithText("错误码 606", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("不可用").assertIsDisplayed()
+        compose.onNodeWithText("Google 的端侧大模型，支持设备列表参考官方文档，AICore 返回错误码 606").assertIsDisplayed()
     }
 
     /** 模型还没下到本机时也报版本：版本是机型定的，不是下载定的。 */
     @Test fun aNanoNotYetDownloadedStillShowsItsVersion() {
         ai(NanoStatus.Present("nano-v2", NanoStatus.Model.NOT_DOWNLOADED))
         compose.onNodeWithText("nano-v2 · 未下载").assertIsDisplayed()
+        compose.onNodeWithText("Google 的端侧大模型，打开图片时由系统下载").assertIsDisplayed()
     }
 
     @Test fun aNanoWhoseVersionCannotBeReadSaysSo() {
@@ -553,6 +560,7 @@ class SettingsScreenTest {
         onReset: () -> Unit = {},
         openUrl: (String) -> Unit = {},
         notify: (String) -> Unit = {},
+        play: Boolean = false,
     ) = show {
         AboutSettingsScreen(
             debugTrace = debugTrace,
@@ -560,6 +568,7 @@ class SettingsScreenTest {
             onReset = onReset,
             onNavigateUp = {},
             version = "0.11.1 (19)",
+            play = play,
             openUrl = openUrl,
             notify = notify,
         )
@@ -571,11 +580,17 @@ class SettingsScreenTest {
         compose.onNodeWithText("0.11.1 (19)").assertIsDisplayed()
     }
 
-    /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里。 */
+    /** 上架 Play 的内购版在版本号后面写明，和 GitHub 上发的开源版分得开。 */
+    @Test fun thePlayEditionSaysSoAfterTheVersion() {
+        about(play = true)
+        compose.onNodeWithText("0.11.1 (19) · Play 版").assertIsDisplayed()
+    }
+
+    /** Play 要求应用内能打开隐私权政策：交给浏览器，网址同时写在摘要里（带 https://，末尾不带斜杠）。 */
     @Test fun privacyPolicyOpensInTheBrowser() {
         var opened: String? = null
         about(openUrl = { opened = it })
-        compose.onNodeWithText("yomark.flinty.moe/privacy/").assertIsDisplayed()
+        compose.onNodeWithText("https://yomark.flinty.moe/privacy").assertIsDisplayed()
         compose.onNodeWithText("隐私权政策").performClick()
         assertThat(opened).isEqualTo(PRIVACY_POLICY_URL)
     }
@@ -695,55 +710,52 @@ class SettingsScreenTest {
         assertThat(opened).isTrue()
     }
 
-    // ---------- 编辑、导出、外观 ----------
+    // ---------- 通用、外观 ----------
 
-    @Test fun theEditRowSaysWhetherSwitchingRestylesAll() {
-        show { SettingsScreen(RecognitionConfig(), onOpen = {}, onNavigateUp = {}, restyleAll = false) }
-        compose.onNodeWithText("换样式时只换选中的").assertExists()
+    private fun general(
+        restyleAll: Boolean = true,
+        onRestyleAllChange: (Boolean) -> Unit = {},
+        watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
+        onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
+        watermarkUnlocked: Boolean = false,
+        watermarkOff: Boolean = false,
+        onWatermarkOff: () -> Unit = {},
+    ) = show {
+        GeneralSettingsScreen(
+            restyleAll = restyleAll, onRestyleAllChange = onRestyleAllChange,
+            watermarkStyle = watermarkStyle, onWatermarkStyleChange = onWatermarkStyleChange,
+            watermarkUnlocked = watermarkUnlocked, watermarkOff = watermarkOff, onWatermarkOff = onWatermarkOff,
+            onNavigateUp = {},
+        )
+    }
+
+    /** 原先「编辑」「导出」两页的项，一项一组；导出前提醒和「圈出」一起去掉了。 */
+    @Test fun theGeneralPageHoldsWhatEditAndExportHad() {
+        general()
+        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "水印样式", "图标 + 有码 Yomark").map {
+            compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
+        }
+        assertThat(tops).isInOrder()
+        compose.onNodeWithText("导出前提醒").assertDoesNotExist()
     }
 
     @Test fun theRestyleAllSwitchTurnsItOff() {
         var latest: Boolean? = null
-        show { EditSettingsScreen(restyleAll = true, onRestyleAllChange = { latest = it }, onNavigateUp = {}) }
+        general(restyleAll = true, onRestyleAllChange = { latest = it })
         compose.onNodeWithText("换样式时一起换掉已有的打码").performClick()
         assertThat(latest).isFalse()
     }
 
-    /** 导出前提醒和「圈出」一起去掉了：导出页上只有水印样式。 */
-    @Test fun theExportPageNoLongerHasAReminder() {
-        show {
-            ExportSettingsScreen(
-                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
-                watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
-                onNavigateUp = {},
-            )
-        }
-        compose.onNodeWithText("导出前提醒").assertDoesNotExist()
-        compose.onNodeWithText("水印样式").assertIsDisplayed()
-    }
-
     @Test fun pickingTheWatermarkWithoutChineseEmitsIt() {
         var latest: BrandWatermarkStyle? = null
-        show {
-            ExportSettingsScreen(
-                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
-                watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
-                onNavigateUp = {},
-            )
-        }
+        general(onWatermarkStyleChange = { latest = it })
         compose.onNodeWithText("图标 + 有码 Yomark").assertIsSelected()
         compose.onNodeWithText("图标 + Yomark").performClick()
         assertThat(latest).isEqualTo(BrandWatermarkStyle.ICON_EN)
     }
 
     @Test fun noWatermarkIsOfferedOnlyOnceUnlocked() {
-        show {
-            ExportSettingsScreen(
-                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
-                watermarkUnlocked = false, watermarkOff = true, onWatermarkOff = {},
-                onNavigateUp = {},
-            )
-        }
+        general(watermarkUnlocked = false, watermarkOff = true)
         compose.onNodeWithText("无水印").assertDoesNotExist()
         // 没解锁时「无水印」不算数，照样选中一个字样
         compose.onNodeWithText("图标 + 有码 Yomark").assertIsSelected()
@@ -751,13 +763,7 @@ class SettingsScreenTest {
 
     @Test fun unlockedAndOffSelectsNoWatermarkAndPickingAStyleEmitsIt() {
         var latest: BrandWatermarkStyle? = null
-        show {
-            ExportSettingsScreen(
-                watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
-                watermarkUnlocked = true, watermarkOff = true, onWatermarkOff = {},
-                onNavigateUp = {},
-            )
-        }
+        general(onWatermarkStyleChange = { latest = it }, watermarkUnlocked = true, watermarkOff = true)
         compose.onNodeWithText("无水印").assertIsSelected()
         compose.onNodeWithText("图标 + 有码 Yomark").assertIsNotSelected()
         compose.onNodeWithText("图标 + 有码 Yomark").performClick()
@@ -766,13 +772,7 @@ class SettingsScreenTest {
 
     @Test fun pickingNoWatermarkEmitsIt() {
         var off = false
-        show {
-            ExportSettingsScreen(
-                watermarkStyle = BrandWatermarkStyle.ICON_EN, onWatermarkStyleChange = {},
-                watermarkUnlocked = true, watermarkOff = false, onWatermarkOff = { off = true },
-                onNavigateUp = {},
-            )
-        }
+        general(watermarkStyle = BrandWatermarkStyle.ICON_EN, watermarkUnlocked = true, onWatermarkOff = { off = true })
         compose.onNodeWithText("图标 + Yomark").assertIsSelected()
         compose.onNodeWithText("无水印").performClick()
         assertThat(off).isTrue()
