@@ -221,7 +221,7 @@ data class MaskPlan(
 ) : Parcelable {
     /**
      * 拿掉一块码：点一下识别出的码、点上的一行，手动框选中后点「删除」。
-     * 识别出的拿掉了也找得回来：撤销，或者点它的字再打一次码（打上的是整行，见 GestureRules.tapTarget）。
+     * 识别出的拿掉了也找得回来：撤销，或者原地再点一下（见 GestureRules.tapTarget）。
      */
     fun remove(id: String): MaskPlan = copy(items = items.filterNot { it.candidateId == id })
 

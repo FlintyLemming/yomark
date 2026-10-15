@@ -89,6 +89,17 @@ class GestureRulesTest {
             .isEqualTo(GestureRules.TapTarget.Line(row))
     }
 
+    /** 点掉过的码排在行前面：原地再点是原来那块；点在它外面才是行。 */
+    @Test
+    fun `a dismissed mask comes before its line`() {
+        val phone = detected("phone", 60f, 10f, 120f, 30f)
+        val row = line(10f, 8f, 300f, 32f)
+        assertThat(GestureRules.tapTarget(emptyList(), listOf(row), PointF(80f, 20f), dismissed = listOf(phone)))
+            .isEqualTo(GestureRules.TapTarget.Dismissed(phone))
+        assertThat(GestureRules.tapTarget(emptyList(), listOf(row), PointF(200f, 20f), dismissed = listOf(phone)))
+            .isEqualTo(GestureRules.TapTarget.Line(row))
+    }
+
     /** 没打码的字上点：这一行；在一块码上点：那块码，哪怕底下也是一行字。 */
     @Test
     fun `a tap on unmasked text takes its whole line`() {
