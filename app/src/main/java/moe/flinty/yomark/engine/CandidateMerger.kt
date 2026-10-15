@@ -112,7 +112,7 @@ class CandidateMerger(
             id = "${a.id}+${b.id}",
             quad = if (frame.isUpright) Quad.fromRect(r) else frame.toImage(r),
             confidence = max(a.confidence, b.confidence),
-            // 取「或」：合并绝不把默认打码的降级成仅圈出
+            // 取「或」：合并绝不把要打码的降成不打码
             enabledByDefault = a.enabledByDefault || b.enabledByDefault,
         )
     }

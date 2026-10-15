@@ -14,7 +14,6 @@ import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextElement
@@ -48,8 +47,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 点没打码的字，打码它所在的那一整行（2026-10-14，spec §7.3 修订）：框是文字识别给的这一行，
- * 再点一下取消；画布上不画圈出的，行里认出的圈出项被这一行盖住，导出前也就不再提醒。
+ * 点没打码的字，打码它所在的那一整行（2026-10-14，spec §7.3 修订）：框是文字识别给的这一行，再点一下取消。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -139,7 +137,6 @@ class EditorViewModelTapLineTest {
         val item = vm.items().single()
         assertThat(item.source).isEqualTo(DetectorSource.LINE)
         assertThat(item.quad).isEqualTo(upper.quad)
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
         assertThat(item.look.style).isEqualTo(MaskStyle.PIXELATE)        // 画笔只做标记，不拿来打码
         assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PEN)
         assertThat(vm.state.value.selectedManualId).isNull()             // 不像手动框那样进选中态
@@ -168,30 +165,30 @@ class EditorViewModelTapLineTest {
         assertThat(vm.items()).isEmpty()
     }
 
-    @Test fun `a line over an outlined date covers it, so export does not ask about it`() = runTest(dispatcher) {
+    /** 认出来了、但不打码的（出厂关着的日期这一类原先只圈出）不进 plan：点它的字，打码的也是整行。 */
+    @Test fun `a date that is not masked is just text, a tap masks its whole line`() = runTest(dispatcher) {
         val date = candidate("date", rect(90f, 10f, 250f, 40f), SensitiveKind.DATETIME, masked = false)
         val vm = vm(listOf(date))
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
+        assertThat(vm.items()).isEmpty()
 
-        vm.onTap(PointF(150f, 25f))                                      // 点在日期上，打码的也是整行
-        assertThat(vm.items().single { it.source == DetectorSource.LINE }.quad).isEqualTo(upper.quad)
-        assertThat(vm.state.value.plan.find("date")!!.state).isEqualTo(MaskState.OUTLINED)
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(0)
+        vm.onTap(PointF(150f, 25f))
+        assertThat(vm.items().single().quad).isEqualTo(upper.quad)
 
         vm.requestExport(); advanceUntilIdle()
-        assertThat(vm.state.value.pendingDialogVisible).isFalse()
         assertThat(sink.writes).isEqualTo(1)
     }
 
-    @Test fun `tapping a detected mask unmasks just that mask, not its line`() = runTest(dispatcher) {
+    /** 点识别出的码拿掉的是那一块，不是它那一行；再点那里，打上的是整行（撤销才回得到原来那块）。 */
+    @Test fun `tapping a detected mask takes off just that mask, a second tap masks the line`() = runTest(dispatcher) {
         val phone = candidate("phone", rect(150f, 60f, 290f, 90f), SensitiveKind.PHONE, masked = true)
         val vm = vm(listOf(phone))
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
         vm.onTap(PointF(200f, 75f))
-        assertThat(vm.items().map { it.candidateId }).containsExactly("phone")
-        assertThat(vm.state.value.plan.find("phone")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.items()).isEmpty()
+        vm.onTap(PointF(200f, 75f))
+        assertThat(vm.items().single().quad).isEqualTo(lower.quad)
     }
 
     @Test fun `a tap in the gap takes the nearer line within reach, blank space takes nothing`() = runTest(dispatcher) {

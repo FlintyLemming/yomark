@@ -15,7 +15,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.image.SourceImage
@@ -108,8 +107,8 @@ class EditorViewModelTest {
         return f.toUri()
     }
 
-    private fun manual(id: String, l: Float, t: Float, r: Float, b: Float, state: MaskState = MaskState.MASKED) =
-        MaskItem(id, Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL, state)
+    private fun manual(id: String, l: Float, t: Float, r: Float, b: Float) =
+        MaskItem(id, Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL)
 
     @Test
     fun `loading an image populates state and clears history`() = runTest(dispatcher) {
@@ -129,7 +128,6 @@ class EditorViewModelTest {
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
 
         val item = vm.state.value.plan.items.single()
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
         assertThat(item.kind).isEqualTo(SensitiveKind.MANUAL)
         assertThat(item.source).isEqualTo(DetectorSource.MANUAL)
     }
@@ -145,7 +143,6 @@ class EditorViewModelTest {
         val item = vm.state.value.plan.items.single()
         assertThat(item.look.style).isEqualTo(MaskStyle.PEN)
         assertThat(item.ink!!.points).hasSize(3)
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
         assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
         val box = item.quad.bounds()
         assertThat(box.left).isLessThan(20f)
@@ -171,14 +168,17 @@ class EditorViewModelTest {
     private fun rule(id: String, l: Float, t: Float, r: Float, b: Float) =
         manual(id, l, t, r, b).copy(source = DetectorSource.RULE, kind = SensitiveKind.URL)
 
+    /** 2026-10-14 起没有「圈出」：点一下识别出的码就是拿掉它，撤销能回来。 */
     @Test
-    fun `tapping a detected mask toggles it to outlined`() = runTest(dispatcher) {
+    fun `tapping a detected mask takes it off, and undo brings it back`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f)))
         vm.onTap(PointF(50f, 50f))
 
-        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.items).isEmpty()
+        vm.undo()
+        assertThat(vm.state.value.plan.items.single().candidateId).isEqualTo("rule")
     }
 
     @Test
@@ -192,12 +192,11 @@ class EditorViewModelTest {
         vm.onTap(PointF(50f, 50f))
         val item = vm.state.value.plan.items.single()
         assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
 
-        // 选中时再点一下，还是选中、还是打码
+        // 选中时再点一下，还是选中、码还在
         vm.onTap(PointF(50f, 50f))
         assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
-        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.items.single()).isEqualTo(item)
     }
 
     @Test
@@ -212,7 +211,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `tapping a detected box toggles it and clears the selection`() = runTest(dispatcher) {
+    fun `tapping a detected box takes it off and clears the selection`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
@@ -221,30 +220,27 @@ class EditorViewModelTest {
 
         vm.onTap(PointF(250f, 250f))
         assertThat(vm.state.value.selectedManualId).isNull()
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.find("rule")).isNull()
     }
 
     // ---------- 宽屏的框列表 ----------
 
     @Test
-    fun `a list tap toggles a detected box like a tap on the canvas`() = runTest(dispatcher) {
+    fun `a list tap takes a detected box off like a tap on the canvas`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
 
         vm.onListItemClick("rule")
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.find("rule")).isNull()
         assertThat(vm.state.value.selectedManualId).isNull()       // 点了别处，选中态收起
-
-        vm.onListItemClick("rule")
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.MASKED)
         vm.undo()
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.find("rule")).isNotNull()
     }
 
     @Test
-    fun `a list tap on a manual box selects it and keeps it masked`() = runTest(dispatcher) {
+    fun `a list tap on a manual box selects it and keeps it`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
@@ -253,12 +249,12 @@ class EditorViewModelTest {
 
         vm.onListItemClick(id)
         assertThat(vm.state.value.selectedManualId).isEqualTo(id)
-        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.items.single().candidateId).isEqualTo(id)
     }
 
-    /** 吸管在等着取色时点了列表：点的不是图，收起吸管，这一下照常切换。 */
+    /** 吸管在等着取色时点了列表：点的不是图，收起吸管，这一下照常算数。 */
     @Test
-    fun `a list tap puts the eyedropper away and still toggles`() = runTest(dispatcher) {
+    fun `a list tap puts the eyedropper away and still takes the box off`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 200f, 200f, 300f, 300f)))
@@ -266,7 +262,7 @@ class EditorViewModelTest {
 
         vm.onListItemClick("rule")
         assertThat(vm.state.value.colorPick).isNull()
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.find("rule")).isNull()
     }
 
     @Test
@@ -296,7 +292,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `deleting works for a manual box and is a no-op for a rule candidate`() = runTest(dispatcher) {
+    fun `deleting works for a manual box, a rule candidate is never selected and a tap takes it off`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
@@ -305,12 +301,11 @@ class EditorViewModelTest {
         vm.deleteSelected()
         assertThat(vm.state.value.plan.items).isEmpty()
 
-        // 塞进一个规则候选：点它进不了选中态，删除也就删不掉它
+        // 塞进一个规则候选：点它进不了选中态，点一下就拿掉了
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f)))
         vm.onTap(PointF(50f, 50f))
         assertThat(vm.state.value.selectedManualId).isNull()
-        vm.deleteSelected()
-        assertThat(vm.state.value.plan.items).hasSize(1)
+        assertThat(vm.state.value.plan.items).isEmpty()
     }
 
     // ---------- 样式：每块码有自己的样式，样式栏是画笔（spec §7.5 修订） ----------
@@ -341,23 +336,20 @@ class EditorViewModelTest {
         vm.replacePlanForTest(
             vm.state.value.plan
                 .add(rule("a", 10f, 10f, 90f, 90f))
-                .add(rule("b", 120f, 10f, 200f, 90f).copy(state = MaskState.OUTLINED))
                 .add(manual("m", 10f, 120f, 90f, 200f).copy(look = MaskLook(MaskStyle.MARKER)))
                 .add(manual("s", 120f, 120f, 200f, 200f))
         )
         vm.setStyle(MaskStyle.PIXELATE)
 
         val looks = vm.state.value.plan.items.associate { it.candidateId to it.look.style }
-        assertThat(looks).containsExactly(
-            "a", MaskStyle.PIXELATE, "b", MaskStyle.SOLID, "m", MaskStyle.MARKER, "s", MaskStyle.PIXELATE,
-        )
+        assertThat(looks).containsExactly("a", MaskStyle.PIXELATE, "m", MaskStyle.MARKER, "s", MaskStyle.PIXELATE)
         // 参数也一起改：图上不会出现两种粗细的马赛克
         val bar = vm.state.value.barLook
         vm.editLook(bar.copy(options = bar.options.copy(pixelBlockDivisor = 4)))
         assertThat(vm.state.value.plan.find("s")!!.look.options.pixelBlockDivisor).isEqualTo(4)
 
         vm.undo(); vm.undo()
-        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.SOLID, MaskStyle.MARKER, MaskStyle.SOLID).inOrder()
+        assertThat(vm.looks()).containsExactly(MaskStyle.SOLID, MaskStyle.MARKER, MaskStyle.SOLID).inOrder()
     }
 
     @Test
@@ -372,19 +364,6 @@ class EditorViewModelTest {
         assertThat(vm.state.value.canUndo).isTrue()                      // 只有画框那一步
         vm.undo()
         assertThat(vm.state.value.canUndo).isFalse()
-    }
-
-    @Test
-    fun `tapping an outlined candidate masks it with the current style`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED)))
-        vm.setStyle(MaskStyle.PIXELATE)
-
-        vm.onTap(PointF(50f, 50f))
-        val item = vm.state.value.plan.items.single()
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
-        assertThat(item.look.style).isEqualTo(MaskStyle.PIXELATE)
     }
 
     @Test
@@ -474,40 +453,6 @@ class EditorViewModelTest {
     }
 
     // ---------- 马克笔、画笔不拿来打码，打码用「打码」里上次选的样式（2026-10-14） ----------
-
-    @Test
-    fun `with the marker or the pen in hand an outlined item is masked in the last redact style`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(
-            vm.state.value.plan
-                .add(rule("a", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED))
-                .add(rule("b", 120f, 10f, 200f, 90f).copy(state = MaskState.OUTLINED))
-        )
-        vm.setStyle(MaskStyle.BLUR)
-        vm.setStyle(MaskStyle.MARKER)
-        vm.onTap(PointF(50f, 50f))
-        vm.setStyle(MaskStyle.PEN)
-        vm.onTap(PointF(160f, 50f))
-
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(0)
-        assertThat(vm.looks()).containsExactly(MaskStyle.BLUR, MaskStyle.BLUR)
-        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PEN)        // 手里还是画笔
-    }
-
-    @Test
-    fun `mask all at export uses the last redact style, not the pen`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(rule("p", 10f, 10f, 90f, 90f).copy(state = MaskState.OUTLINED)))
-        vm.setStyle(MaskStyle.PIXELATE)
-        vm.setStyle(MaskStyle.PEN)
-        vm.requestExport(); advanceUntilIdle()
-
-        vm.confirmMaskAllAndExport(); advanceUntilIdle()
-        assertThat(vm.looks()).containsExactly(MaskStyle.PIXELATE)
-        assertThat(sink.writes).isEqualTo(1)
-    }
 
     /** 马克笔不往打码的框上用：选着一个色块框换成马克笔，框不变、选中收起，之后画的才是马克笔。 */
     @Test
@@ -672,7 +617,7 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `the eyedropper takes the color under the tap and toggles nothing`() = runTest(dispatcher) {
+    fun `the eyedropper takes the color under the tap and takes nothing off`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(twoToneUri("eyedropper.png")); advanceUntilIdle()
         vm.replacePlanForTest(vm.state.value.plan.add(rule("rule", 250f, 250f, 350f, 350f)))
@@ -681,10 +626,10 @@ class EditorViewModelTest {
         vm.onTap(PointF(-20f, 100f))                                       // 点在图外：接着等
         assertThat(vm.state.value.colorPick).isEqualTo(ColorTarget.SOLID)
 
-        vm.onTap(PointF(300f, 300f))                                       // 点在一块码上：只取色，不切换
+        vm.onTap(PointF(300f, 300f))                                       // 点在一块码上：只取色，不拿掉
         assertThat(vm.state.value.colorPick).isNull()
         assertThat(vm.state.value.brush.options.solidColor).isEqualTo(Color.rgb(0x20, 0x60, 0xA0))
-        assertThat(vm.state.value.plan.find("rule")!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.find("rule")).isNotNull()
         // 换样式时一起换（出厂开着）：已有的色块跟着换颜色
         assertThat(vm.state.value.plan.find("rule")!!.look.options.solidColor).isEqualTo(Color.rgb(0x20, 0x60, 0xA0))
     }
@@ -702,87 +647,17 @@ class EditorViewModelTest {
         assertThat(after.markerAlpha).isWithin(0.01f).of(before)
     }
 
+    /** 2026-10-14 起没有「圈出」，导出前也就不再拦一下：图上是什么样就导出什么样。 */
     @Test
-    fun `export with no pending items writes immediately`() = runTest(dispatcher) {
+    fun `export writes immediately`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 90f, 90f)))
         vm.requestExport()
         advanceUntilIdle()
 
-        assertThat(vm.state.value.pendingDialogVisible).isFalse()
         assertThat(sink.writes).isEqualTo(1)
         assertThat(vm.state.value.message).isInstanceOf(EditorMessage.Exported::class.java)
-    }
-
-    @Test
-    fun `export with pending items opens the interception dialog and writes nothing`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-
-        vm.requestExport()
-        advanceUntilIdle()
-
-        assertThat(vm.state.value.pendingDialogVisible).isTrue()
-        assertThat(sink.writes).isEqualTo(0)
-    }
-
-    @Test
-    fun `mask all then export clears pending and writes once`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-        vm.requestExport(); advanceUntilIdle()
-
-        vm.confirmMaskAllAndExport(); advanceUntilIdle()
-
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(0)
-        assertThat(vm.state.value.pendingDialogVisible).isFalse()
-        assertThat(sink.writes).isEqualTo(1)
-    }
-
-    @Test
-    fun `export anyway writes without masking the pending items`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-        vm.requestExport(); advanceUntilIdle()
-
-        vm.confirmExportAnyway(); advanceUntilIdle()
-
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
-        assertThat(sink.writes).isEqualTo(1)
-    }
-
-    @Test
-    fun `do not show again exports this time and skips the dialog next time`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-        vm.requestExport(); advanceUntilIdle()
-
-        vm.confirmExportAnyway(stopReminding = true); advanceUntilIdle()
-        assertThat(sink.writes).isEqualTo(1)
-        assertThat(settings.pendingExportReminder.first()).isFalse()
-
-        vm.requestExport(); advanceUntilIdle()
-        assertThat(vm.state.value.pendingDialogVisible).isFalse()
-        assertThat(sink.writes).isEqualTo(2)
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
-    }
-
-    @Test
-    fun `with the reminder turned off in settings pending items export without asking`() = runTest(dispatcher) {
-        val vm = vm()
-        settings.setPendingExportReminder(false)
-        vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        vm.replacePlanForTest(vm.state.value.plan.add(manual("p", 10f, 10f, 90f, 90f, MaskState.OUTLINED)))
-
-        vm.requestExport(); advanceUntilIdle()
-
-        assertThat(vm.state.value.pendingDialogVisible).isFalse()
-        assertThat(sink.writes).isEqualTo(1)
     }
 
     @Test

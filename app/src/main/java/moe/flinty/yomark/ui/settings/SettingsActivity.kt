@@ -42,17 +42,14 @@ class SettingsActivity : YomarkActivity() {
         val store = SettingsStore(applicationContext)
         setSettingsContent(store) {
             val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
-            val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
             val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
             val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
             val current = config
-            val on = reminder
             val developer = debugTrace
             val restyle = restyleAll
-            if (current != null && on != null && developer != null && restyle != null) {
+            if (current != null && developer != null && restyle != null) {
                 SettingsScreen(
                     config = current,
-                    exportReminder = on,
                     onOpen = { page -> startActivity(SettingsPageActivity.intent(this, page)) },
                     onNavigateUp = ::finish,
                     developer = developer,
@@ -129,7 +126,6 @@ class SettingsPageActivity : YomarkActivity() {
                 }
             }
             SettingsPage.EXPORT -> {
-                val reminder by store.pendingExportReminder.collectAsStateWithLifecycle(initialValue = null)
                 // 三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
                 val watermark by remember {
                     combine(
@@ -138,12 +134,8 @@ class SettingsPageActivity : YomarkActivity() {
                         PurchaseStore(applicationContext).unlocked(Edition.isFree),
                     ) { style, off, unlocked -> BrandWatermarkSetting(style, unlocked, !brandWatermarkApplies(unlocked, off)) }
                 }.collectAsStateWithLifecycle(initialValue = null)
-                val on = reminder
-                val mark = watermark
-                if (on != null && mark != null) {
+                watermark?.let { mark ->
                     ExportSettingsScreen(
-                        exportReminder = on,
-                        onExportReminderChange = { next -> lifecycleScope.launch { store.setPendingExportReminder(next) } },
                         watermarkStyle = mark.style,
                         onWatermarkStyleChange = { next ->
                             lifecycleScope.launch { store.setBrandWatermarkStyle(next, mark.unlocked) }

@@ -6,13 +6,6 @@ import kotlinx.parcelize.Parcelize
 import kotlin.math.roundToInt
 
 /**
- * 未圈出的区域根本不在 plan 里，因此只有两个枚举值。
- * 圈出（OUTLINED）是识别到了、没打码。2026-10-14 起画布上不画它（没有虚线框，也没有类型小标签），
- * 只在导出前提醒（[MaskPlan.pending]）、在宽屏的框列表里列出来。
- */
-enum class MaskState { MASKED, OUTLINED }
-
-/**
  * 枚举名是持久化格式的一部分（SettingsStore 记着画笔的样式名）。
  * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）；
  * 还有一种「表情」，2026-10-12 去掉了。记着这两个名字的旧设置读回来认不出，落回色块。
@@ -23,7 +16,7 @@ enum class MaskStyle {
 
     /**
      * 拿来打码的：色块、马赛克、模糊，底栏的「打码」。马克笔、画笔只在图上做标记（「编辑」），
-     * 识别出来直接打的码、点一下打上的码、导出前的「全部打码」都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
+     * 识别出来直接打的码、点一下打上的码都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
      */
     val redacts: Boolean get() = this != MARKER && this != PEN
 }
@@ -196,17 +189,17 @@ data class MaskLook(
     fun normalized(): MaskLook = copy(options = options.normalized())
 }
 
+/**
+ * 图上的一块码。plan 里的每一项都打着码：识别结果要么直接打码，要么不打码、根本不进 plan（2026-10-14 起没有「圈出」）；
+ * 点一下识别出的码就是把它从 plan 里拿掉，撤销能回来。
+ */
 @Parcelize
 data class MaskItem(
     val candidateId: String,
     val quad: Quad,                   // 降采样坐标系；导出时按 1/scale 反算
     val kind: SensitiveKind,
     val source: DetectorSource,
-    val state: MaskState,
-    /**
-     * 这块码打上时用的样子。圈出的项也带着一份，但不画；它再被打上码时换成当时「打码」里的样式，
-     * 而不是沿用上一次的——用户换了样式再点它，要的就是新样式。
-     */
+    /** 这块码的样子：用户加的用打上那一刻的画笔或「打码」里的样式，识别出来的用结果到达时「打码」里的样式。 */
     val look: MaskLook = MaskLook(),
     /**
      * 手画的一笔（马克笔、画笔手画时）：[quad] 是它的外接框，渲染器照着这条线画，不填满框。
@@ -217,7 +210,7 @@ data class MaskItem(
 
     /**
      * 用户自己加的：拉的框、手画的线，点一行字打上的码（见 [DetectorSource]）。
-     * 按加上的先后叠在识别出的码上面（MaskOrder），换方案重跑时留着，删得掉（[MaskPlan.remove]）。
+     * 按加上的先后叠在识别出的码上面（MaskOrder），换方案重跑时留着。
      */
     val byUser: Boolean get() = source == DetectorSource.MANUAL || source == DetectorSource.LINE
 }
@@ -227,42 +220,10 @@ data class MaskPlan(
     val items: List<MaskItem>,
 ) : Parcelable {
     /**
-     * 识别到了、还没打码的，除去已经被别的码整个盖住的（点了它所在的那一行、拉了个框盖住）。
-     * 导出拦截（spec §7.4）提醒的、宽屏列表上列着的「未打码」都是这些：画布上不画圈出的，
-     * 图上明明遮住了还提醒，用户找不到还有什么没打。马克笔、画笔透得过去，不算盖住。
+     * 拿掉一块码：点一下识别出的码、点上的一行，手动框选中后点「删除」。
+     * 识别出的拿掉了也找得回来：撤销，或者点它的字再打一次码（打上的是整行，见 GestureRules.tapTarget）。
      */
-    val pending: List<MaskItem>
-        get() {
-            val covers = items.filter { it.state == MaskState.MASKED && it.look.style.redacts }.map { it.quad }
-            return items.filter { it.state == MaskState.OUTLINED && !it.quad.hiddenBy(covers) }
-        }
-
-    /** 导出拦截的触发条件。 */
-    val pendingCount: Int get() = pending.size
-
-    /**
-     * 点一下：已打码的退回圈出；圈出的打上码，样子用 [look]（编辑器「打码」里眼下的样式）。
-     * 退回圈出时 look 原样留着，反正不画。
-     */
-    fun toggle(id: String, look: MaskLook): MaskPlan = copy(
-        items = items.map {
-            when {
-                it.candidateId != id -> it
-                it.state == MaskState.MASKED -> it.copy(state = MaskState.OUTLINED)
-                else -> it.copy(state = MaskState.MASKED, look = look)
-            }
-        }
-    )
-
-    /**
-     * 只有用户自己加的（[MaskItem.byUser]）可以被彻底删除（spec §4.2 的不对称规则）。
-     * 规则/人脸/条码命中的候选永不从 plan 里消失——候选一旦消失，导出前就提醒不到它，用户也再找不回来。
-     */
-    fun remove(id: String): MaskPlan {
-        val target = items.firstOrNull { it.candidateId == id } ?: return this
-        if (!target.byUser) return this
-        return copy(items = items.filterNot { it.candidateId == id })
-    }
+    fun remove(id: String): MaskPlan = copy(items = items.filterNot { it.candidateId == id })
 
     fun add(item: MaskItem): MaskPlan = copy(items = items + item)
 
@@ -270,30 +231,18 @@ data class MaskPlan(
         items = items.map { if (it.candidateId == item.candidateId) item else it }
     )
 
-    /**
-     * 导出拦截里的「全部打码」：待打码的（[pending]）一律用 [look] 打上码。已经打了码的保持原样，
-     * 被别的码盖住的也不动：再叠一块码，模糊、马赛克在那儿就糊了两遍。
-     */
-    fun maskAll(look: MaskLook): MaskPlan {
-        val ids = pending.mapTo(HashSet()) { it.candidateId }
-        return copy(items = items.map { if (it.candidateId in ids) it.copy(state = MaskState.MASKED, look = look) else it })
-    }
-
     /** 换掉一块码的样子（选中的手动框跟着样式栏改）。 */
     fun restyle(id: String, look: MaskLook): MaskPlan = copy(
         items = items.map { if (it.candidateId == id) it.copy(look = look) else it }
     )
 
     /**
-     * 换打码样式时一起换（设置「编辑」页的开关）：已打码、用的是盖住内容那三种样式的，都换成 [look]。
-     * 马克笔、画笔画的标注不动；圈出的也不动——它们打码时自然会用那时的画笔。
+     * 换打码样式时一起换（设置「编辑」页的开关）：用的是盖住内容那三种样式的码，都换成 [look]。
+     * 马克笔、画笔画的标注不动。
      */
     fun restyleRedactions(look: MaskLook): MaskPlan = copy(
-        items = items.map { if (it.state == MaskState.MASKED && it.look.style.redacts) it.copy(look = look) else it }
+        items = items.map { if (it.look.style.redacts) it.copy(look = look) else it }
     )
-
-    /** 拦截对话框的「2 个网址、1 个 IP 地址」就是这个 map 渲染出来的。 */
-    fun pendingByKind(): Map<SensitiveKind, Int> = pending.groupingBy { it.kind }.eachCount()
 
     fun find(id: String): MaskItem? = items.firstOrNull { it.candidateId == id }
 
@@ -301,13 +250,3 @@ data class MaskPlan(
         fun empty() = MaskPlan(emptyList())
     }
 }
-
-/**
- * 这一块整个落在 [covers] 里：块里取一组格点（离边一两成，贴着边的那一圈不算），每一点都有一块码盖着。
- * 按点算而不按面积加：两块码拼起来盖住的照样算，两块码叠在同一半上凑不成「盖满」。
- */
-private fun Quad.hiddenBy(covers: List<Quad>): Boolean =
-    covers.isNotEmpty() && COVER_SAMPLES.all { (u, v) -> at(u, v).let { p -> covers.any { it.contains(p) } } }
-
-/** 沿阅读方向五个、横着三个：一行字的框又扁又长，竖着取多了也没用。 */
-private val COVER_SAMPLES = listOf(0.1f, 0.3f, 0.5f, 0.7f, 0.9f).flatMap { u -> listOf(0.2f, 0.5f, 0.8f).map { v -> u to v } }

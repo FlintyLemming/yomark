@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.annotation.StringRes
 import moe.flinty.yomark.R
 
-/** 类型的显示名。宽屏的框列表与导出拦截对话框共用同一套措辞。 */
+/** 类型的显示名。宽屏的框列表、设置页共用同一套措辞。 */
 object SensitiveKindLabels {
 
     @StringRes
@@ -50,16 +50,6 @@ object SensitiveKindLabels {
         else -> display(res, item.kind)
     }
 
-    /**
-     * 「2 个网址」「1 个 IP 地址」：中文里名字以字母开头的补一个空格（kind_count_latin），纯中文名不补。
-     * spec §7.4 的例子就是这么排的，拦截对话框逐字用它。
-     */
-    fun plural(res: Resources, kind: SensitiveKind, count: Int): String {
-        val name = display(res, kind)
-        val format = if (name.first().code < CJK_START) R.string.kind_count_latin else R.string.kind_count
-        return res.getString(format, count, name)
-    }
-
     /** 调试记录里的类型名，固定中文、不随系统语言变：记录面向排查，不面向用户（见 debug/Trace.kt）。 */
     fun debugName(kind: SensitiveKind): String = when (kind) {
         SensitiveKind.PHONE -> "电话"
@@ -90,7 +80,4 @@ object SensitiveKindLabels {
         SensitiveKind.BARCODE -> "条码"
         SensitiveKind.MANUAL -> "手动"
     }
-
-    /** CJK 部首补充区的起点。低于它的都按拉丁字符处理。 */
-    private const val CJK_START = 0x2E80
 }

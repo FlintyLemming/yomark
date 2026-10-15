@@ -94,13 +94,6 @@ data class Quad(val p0: PointF, val p1: PointF, val p2: PointF, val p3: PointF) 
         return inside || distanceTo(p) < 1e-3f
     }
 
-    /** 四边形里的一点：u 沿 p0→p1、v 沿 p0→p3，都按 0..1 取（双线性插值，斜着的、不规整的四边形也对）。 */
-    fun at(u: Float, v: Float): PointF {
-        val top = PointF(p0.x + (p1.x - p0.x) * u, p0.y + (p1.y - p0.y) * u)
-        val bottom = PointF(p3.x + (p2.x - p3.x) * u, p3.y + (p2.y - p3.y) * u)
-        return PointF(top.x + (bottom.x - top.x) * v, top.y + (bottom.y - top.y) * v)
-    }
-
     /** 点到四边形边界的最短距离。0 表示在边上。 */
     fun distanceTo(p: PointF): Float {
         val v = points()

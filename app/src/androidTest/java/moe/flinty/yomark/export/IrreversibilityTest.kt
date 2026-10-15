@@ -18,7 +18,6 @@ import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.engine.mlkit.MlKitTextRecognizer
@@ -74,7 +73,7 @@ class IrreversibilityTest {
                     rect.left * image.scale, rect.top * image.scale,
                     rect.right * image.scale, rect.bottom * image.scale,
                 )),
-                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED,
+                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE,
                 MaskLook(style, options),
             )),
         )

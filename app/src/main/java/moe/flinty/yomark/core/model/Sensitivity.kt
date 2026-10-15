@@ -4,10 +4,10 @@ enum class SensitiveKind {
     PHONE, EMAIL, PAYMENT_CARD, IBAN, SSN, PASSPORT,
     TRACKING_NO, IP_ADDR, MAC_ADDR, URL, API_KEY,
 
-    /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。默认仅圈出。 */
+    /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。出厂关着。 */
     LONG_NUMBER,
 
-    /** 日期与时间。出厂仅圈出——时间在截图里无处不在，默认打码会打扰所有人。 */
+    /** 日期与时间。出厂关着——时间在截图里无处不在，默认打码会打扰所有人。 */
     DATETIME,
 
     /**

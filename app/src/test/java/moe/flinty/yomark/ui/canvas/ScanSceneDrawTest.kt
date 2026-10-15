@@ -10,7 +10,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
@@ -43,7 +42,7 @@ class ScanSceneDrawTest {
     private fun block(id: String, y: Float, source: DetectorSource) = MaskItem(
         id, Quad.fromRect(RectF(10f, y, 110f, y + 30f)),
         if (source == DetectorSource.MANUAL) SensitiveKind.MANUAL else SensitiveKind.PHONE,
-        source, MaskState.MASKED,
+        source,
     )
 
     private fun image(paint: (Bitmap) -> Unit = { it.eraseColor(Color.WHITE) }) =
@@ -128,20 +127,16 @@ class ScanSceneDrawTest {
         listOf(top, manual, bottom).forEach { assertThat(frame.at(it)).isEqualTo(MaskOptions.SKY_BLUE) }
     }
 
-    /** 圈出没打码的什么都不画（2026-10-14 起没有虚线框和类型小标签）；点一行字打上的码和手动框一样，识别中也一直在。 */
+    /** 点一行字打上的码和手动框一样是用户自己加的：识别中（换方案重跑）也一直在，浮在光上面。 */
     @Test
-    fun `an outlined box draws nothing, a tapped line stays through recognition`() {
-        val outlined = block("url", 300f, DetectorSource.RULE).copy(kind = SensitiveKind.URL, state = MaskState.OUTLINED)
+    fun `a tapped line stays through recognition`() {
         val line = block("line", 600f, DetectorSource.LINE).copy(kind = SensitiveKind.MANUAL)
         val source = image()
-        fun frame(time: ScanTime?) = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also {
-            drawScene(Canvas(it), source, MaskPlan(listOf(outlined, line)), RendererRegistry.default(), scale, density, time, ScanPaints())
+        val frame = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also {
+            drawScene(Canvas(it), source, MaskPlan(listOf(top, line)), RendererRegistry.default(), scale, density, ScanTime.START, ScanPaints())
         }
-        val settled = frame(null)
-        // 框四周连同上方原先放类型标签的地方，一个像素都没动
-        for (y in 270 until 340) for (x in 0 until 120) assertThat(settled.getPixel(x, y)).isEqualTo(Color.WHITE)
-        assertThat(settled.at(line)).isEqualTo(MaskOptions.SKY_BLUE)
-        assertThat(frame(ScanTime.START).at(line)).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(frame.at(top)).isEqualTo(Color.WHITE)
+        assertThat(frame.at(line)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test

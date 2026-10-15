@@ -13,7 +13,7 @@ enum class HandleCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_RIGHT, BOTTOM_LEFT }
  * 手动框的选中态（spec §7.3）：四角手柄 + 框上方的「删除」工具条，拖框体移动、拖手柄调整大小。
  *
  * 只对手动框出现。规则命中的候选进不了选中态——
- * 它们不可删也不可改，能做的只有 MASKED ⇄ OUTLINED 切换（spec §4.2 的不对称规则）。
+ * 它们不可改，点一下就拿掉（spec §4.2 的不对称规则，2026-10-14 修订）。
  *
  * 手动框一律是轴对齐的（GestureRules.quadFromDrag 保证），所以这里用 bounds 运算是安全的。
  */

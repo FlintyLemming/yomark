@@ -288,12 +288,12 @@ fun describeLine(index: Int, line: TextLine): String =
     String.format(Locale.ROOT, "%3d  %.2f  %s  %s", index + 1, line.confidence, line.quad.describe(), line.text)
 
 /**
- * 一个候选：类型、进编辑器时打码还是圈出、置信度、框，给了 [lines] 的话再加框里压着的字，
+ * 一个候选：类型、打不打码、置信度、框，给了 [lines] 的话再加框里压着的字，
  * 最后是它的 id——从 id 看得出是哪条规则、哪个检测器出的。
  */
 fun describeCandidate(candidate: Candidate, lines: List<TextLine> = emptyList()): String = buildString {
     append(SensitiveKindLabels.debugName(candidate.kind))
-    append("  ").append(if (candidate.enabledByDefault) "打码" else "圈出")
+    append("  ").append(if (candidate.enabledByDefault) "打码" else "不打码")
     append("  ").append(String.format(Locale.ROOT, "%.2f", candidate.confidence))
     append("  ").append(candidate.quad.describe())
     val text = textUnder(candidate.quad, lines)

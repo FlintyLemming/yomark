@@ -31,19 +31,18 @@ import kotlin.math.max
 object BarcodeCandidates {
 
     /**
+     * 报上来的都打码。
+     *
      * @param decodable 内容解得出来，或者紧挨着一个解得出的同样大小的码（[BarcodeHits.besideDecoded]）。
-     *   其余解不出的（potential）多半只是布料印花、格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的。
-     *   彩色照片在进这里之前已经被 [TwoInks] 筛掉；剩下的仍然报出来（漏检是事故），
-     *   但只圈不打码，交给导出拦截兜底。
-     * @param masked 设置里条码的处理方式是「打码」。设成「仅圈出」时解得出的也只圈出。
+     *   其余解不出的（potential）只有宽松模式才报：多半只是布料印花、格纹这类有规律的纹理——真机上商品图就是这么被整块涂黑的，
+     *   彩色照片在进这里之前已经被 [TwoInks] 筛掉，剩下的照样打码，宽松模式要的就是宁可多遮。置信度低一档。
      */
-    fun from(index: Int, quad: Quad, decodable: Boolean, masked: Boolean = true) = Candidate(
+    fun from(index: Int, quad: Quad, decodable: Boolean) = Candidate(
         id = "barcode-$index",
         quad = quad.expand(marginFor(quad)),
         kind = SensitiveKind.BARCODE,
         source = DetectorSource.BARCODE,
         confidence = if (decodable) CONFIDENCE_DECODED else CONFIDENCE_POTENTIAL,
-        enabledByDefault = decodable && masked,
     )
 
     /**
@@ -74,8 +73,6 @@ object BarcodeCandidates {
  */
 class MlKitBarcodeDetector(
     private val strategy: BarcodeOption = BarcodeOption.LOOSE,
-    /** 解得出内容的条码一进编辑器就打码（true），还是只圈出（false）。 */
-    private val masked: Boolean = true,
 ) : RegionDetector {
 
     override val id = "mlkit-barcode-${strategy.name.lowercase()}"
@@ -96,7 +93,7 @@ class MlKitBarcodeDetector(
      * potential 决定「匹配上了但校验没过要不要报」。
      *
      * 严格模式也放宽：解不出的码挨着一个解出来的码时要认（[BarcodeHits.besideDecoded]），
-     * 不放宽就根本拿不到它。其余解不出的严格模式丢掉，宽松模式过一道像素判断（[TwoInks]）后只圈出：
+     * 不放宽就根本拿不到它。其余解不出的严格模式丢掉，宽松模式过一道像素判断（[TwoInks]）后也打码：
      * 放宽之后 ML Kit 会把彩色照片（真机上是一张酒店缩略图）也当疑似条码报上来。
      */
     private val client by lazy {
@@ -128,7 +125,7 @@ class MlKitBarcodeDetector(
                         return@mapIndexedNotNull null
                     }
                 }
-                BarcodeCandidates.from(i, hit.quad, real, masked)
+                BarcodeCandidates.from(i, hit.quad, real)
             }
         }
     }

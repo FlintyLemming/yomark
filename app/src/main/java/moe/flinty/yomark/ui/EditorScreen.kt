@@ -72,7 +72,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.billing.RestoreResult
 import moe.flinty.yomark.core.model.MaskLook
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.RendererRegistry
@@ -90,7 +89,6 @@ import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.MaskItemList
 import moe.flinty.yomark.ui.components.PanelTop
 import moe.flinty.yomark.ui.components.PaywallDialog
-import moe.flinty.yomark.ui.components.PendingExportDialog
 import moe.flinty.yomark.ui.components.PurposePanelActions
 import moe.flinty.yomark.ui.components.PurposePanelModel
 import moe.flinty.yomark.ui.components.StyleBarActions
@@ -158,24 +156,6 @@ fun EditorScreen(
         }
     }
 
-    if (state.pendingDialogVisible) {
-        // 批量下拦截看的是全部图片的汇总，不是当前这一张（spec §7.6）。
-        val batchWithCurrent = state.liveBatch
-        val pending = batchWithCurrent?.totalPending ?: state.plan.pendingCount
-        val byKind = batchWithCurrent?.items?.mapNotNull { it.plan }
-            ?.flatMap { it.pendingByKind().entries }
-            ?.groupBy({ it.key }, { it.value })
-            ?.mapValues { (_, counts) -> counts.sum() }
-            ?: state.plan.pendingByKind()
-        PendingExportDialog(
-            pendingCount = pending,
-            byKind = byKind,
-            onMaskAll = vm::confirmMaskAllAndExport,
-            onExportAnyway = vm::confirmExportAnyway,
-            onDismiss = vm::dismissDialog,
-        )
-    }
-
     if (state.paywallVisible && Edition.isFree) {
         FreeEditionDialog(unlocked = state.isPro, onUnlock = onUnlockFree, onDismiss = vm::dismissPaywall)
     } else if (state.paywallVisible) {
@@ -211,7 +191,7 @@ fun EditorScreen(
             // 别的应用来要图时，导出就是把图交回去
             val exportLabel = if (vm.forCaller) R.string.done else R.string.export
             val canCompare = state.image != null &&
-                (state.purposeText != null || state.plan.items.any { it.state == MaskState.MASKED })
+                (state.purposeText != null || state.plan.items.isNotEmpty())
             val onToolGroup: (ToolGroup?) -> Unit = {
                 // 收起这一组，从它长出来的调节面板（样式的、用途水印的）也一起收
                 if (it == null && state.stylePanelOpen) vm.dismissStylePanel()

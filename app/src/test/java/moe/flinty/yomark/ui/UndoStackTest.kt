@@ -6,7 +6,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import com.google.common.truth.Truth.assertThat
@@ -22,7 +21,7 @@ class UndoStackTest {
         listOf(
             MaskItem(
                 "m", Quad.fromRect(RectF(0f, 0f, 10f, 10f)), SensitiveKind.MANUAL,
-                DetectorSource.MANUAL, MaskState.MASKED, MaskLook(style),
+                DetectorSource.MANUAL, MaskLook(style),
             )
         )
     )

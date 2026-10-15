@@ -26,8 +26,7 @@ import kotlin.math.min
  */
 object FaceCandidates {
 
-    /** @param masked 一进编辑器就打码（true），还是只圈出（false）。来自设置里人脸的处理方式。 */
-    fun from(index: Int, trackingId: Int?, box: RectF, imageWidth: Int, imageHeight: Int, masked: Boolean): Candidate {
+    fun from(index: Int, trackingId: Int?, box: RectF, imageWidth: Int, imageHeight: Int): Candidate {
         val pad = min(box.width(), box.height()) * EXPAND_RATIO
         val expanded = RectF(
             (box.left - pad).coerceAtLeast(0f),
@@ -41,7 +40,6 @@ object FaceCandidates {
             kind = SensitiveKind.FACE,
             source = DetectorSource.FACE,
             confidence = CONFIDENCE,
-            enabledByDefault = masked,
         )
     }
 
@@ -50,10 +48,10 @@ object FaceCandidates {
      * [imageWidth]、[imageHeight] 是原图的；id 带上转了几个直角，不和原图上那一遍的撞。
      */
     fun fromUpright(
-        index: Int, trackingId: Int?, box: RectF, imageWidth: Int, imageHeight: Int, turns: Int, masked: Boolean,
+        index: Int, trackingId: Int?, box: RectF, imageWidth: Int, imageHeight: Int, turns: Int,
     ): Candidate {
         val (w, h) = if (Math.floorMod(turns, 2) == 0) imageWidth to imageHeight else imageHeight to imageWidth
-        val c = from(index, trackingId, box, w, h, masked)
+        val c = from(index, trackingId, box, w, h)
         return c.copy(id = "${c.id}-turn$turns", quad = Quad.fromRect(Upright.toSource(c.quad.bounds(), imageWidth, imageHeight, turns)))
     }
 
@@ -64,14 +62,13 @@ object FaceCandidates {
 /**
  * 人脸检测（bundled）。
  *
- * 人脸不经过规则表的误报率分层（spec §6 末尾）：出厂打码，设置里可以改成仅圈出（[masked]）。
+ * 人脸不经过规则表的误报率分层（spec §6 末尾）：认出来就打码。设置里关掉人脸时根本不建它。
  *
  * ML Kit 认不出横躺着的脸：竖着拍的身份证上人像是横的。引擎看文字的方向知道页面转了几个直角，
  * 再让它在转正的图上看一遍（[needsUpright]）。
  */
 class MlKitFaceDetector(
     private val mode: FaceOption = FaceOption.FAST,
-    private val masked: Boolean = true,
 ) : RegionDetector {
 
     override val id = "mlkit-face-${mode.name.lowercase()}"
@@ -96,7 +93,7 @@ class MlKitFaceDetector(
         val input = InputImage.fromBitmap(image.bitmap, 0)
         val faces = client.process(input).await()
         return faces.mapIndexed { i, face ->
-            FaceCandidates.from(i, face.trackingId, RectF(face.boundingBox), image.width, image.height, masked)
+            FaceCandidates.from(i, face.trackingId, RectF(face.boundingBox), image.width, image.height)
         }
     }
 
@@ -113,7 +110,7 @@ class MlKitFaceDetector(
         // 等 ML Kit 用完再回收：识别被取消时 await 当场返回，ML Kit 可能还在读这张位图
         task.addOnCompleteListener(Executor { it.run() }) { if (upright !== src) upright.recycle() }
         return task.await().mapIndexed { i, face ->
-            FaceCandidates.fromUpright(i, face.trackingId, RectF(face.boundingBox), src.width, src.height, turns, masked)
+            FaceCandidates.fromUpright(i, face.trackingId, RectF(face.boundingBox), src.width, src.height, turns)
         }
     }
 

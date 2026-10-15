@@ -148,17 +148,6 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 导出前提醒：还有圈出但没打码的内容时先弹对话框。出厂开着。
-     *
-     * 不放进 RecognitionConfig：它不影响识别，放进去的话一拨开关编辑器就会重跑识别。
-     */
-    val pendingExportReminder: Flow<Boolean> = store.data.map { it[KEY_EXPORT_REMINDER] ?: true }
-
-    suspend fun setPendingExportReminder(on: Boolean) {
-        store.edit { it[KEY_EXPORT_REMINDER] = on }
-    }
-
-    /**
      * 换打码样式时一起换掉已有的打码：一张图一般只用一种打码样式，出厂开着。
      * 关掉时换样式只管选中的那一处和之后新打的码。
      */
@@ -248,22 +237,23 @@ class SettingsStore internal constructor(
      * 人脸、条码的「关」原先是识别模式里的一个选项（存在 KEY_FACE / KEY_BARCODE 里的 OFF），
      * 现在挪到了各自的处理方式。老安装里存着 OFF、还没有处理方式这一项的，读成「关」，
      * 识别模式退回出厂值——不迁的话，关掉过人脸的用户升级后会突然又被打码。
+     * 处理方式里存着已经去掉的「仅圈出」的，同样读成「关」（见 RuleState.fromName），不落回出厂的打码。
      */
     val recognitionConfig: Flow<RecognitionConfig> = store.data.map { prefs ->
         val fallback = RecognitionConfig()
         RecognitionConfig(
             textEngine = prefs[KEY_TEXT_ENGINE].toEnum(fallback.textEngine),
             barcode = prefs[KEY_BARCODE].toEnum(fallback.barcode),
-            barcodeState = prefs[KEY_BARCODE_STATE].toEnum(
+            barcodeState = prefs[KEY_BARCODE_STATE].toRuleState(
                 if (prefs[KEY_BARCODE] == LEGACY_OFF) RuleState.OFF else fallback.barcodeState,
             ),
             face = prefs[KEY_FACE].toEnum(fallback.face),
-            faceState = prefs[KEY_FACE_STATE].toEnum(
+            faceState = prefs[KEY_FACE_STATE].toRuleState(
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
-            chatState = prefs[KEY_CHAT_STATE].toEnum(fallback.chatState),
+            chatState = prefs[KEY_CHAT_STATE].toRuleState(fallback.chatState),
             semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
-            outlineUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.outlineUnanchoredNames,
+            maskUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.maskUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
     }
@@ -277,13 +267,13 @@ class SettingsStore internal constructor(
             it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_CHAT_STATE] = config.chatState.name
             it[KEY_SEMANTIC] = config.semantic.name
-            it[KEY_UNANCHORED_NAMES] = config.outlineUnanchoredNames
+            it[KEY_UNANCHORED_NAMES] = config.maskUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
         }
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的两项（导出前提醒、水印样式）回到出厂值。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。
@@ -302,7 +292,6 @@ class SettingsStore internal constructor(
             it.remove(KEY_SEMANTIC)
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
-            it.remove(KEY_EXPORT_REMINDER)
             it.remove(KEY_RESTYLE_ALL)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
@@ -311,6 +300,8 @@ class SettingsStore internal constructor(
 
     private inline fun <reified T : Enum<T>> String?.toEnum(fallback: T): T =
         this?.let { runCatching { enumValueOf<T>(it) }.getOrNull() } ?: fallback
+
+    private fun String?.toRuleState(fallback: RuleState): RuleState = this?.let { RuleState.fromName(it) } ?: fallback
 
     @VisibleForTesting
     internal suspend fun writeRawTextEngineForTest(raw: String) {
@@ -325,6 +316,16 @@ class SettingsStore internal constructor(
             if (barcode != null) it[KEY_BARCODE] = barcode
             it.remove(KEY_FACE_STATE)
             it.remove(KEY_BARCODE_STATE)
+        }
+    }
+
+    /** 模拟老安装：处理方式里存着一个原样的名字（比如去掉了的 OUTLINED）。 */
+    @VisibleForTesting
+    internal suspend fun writeRawHandlingForTest(face: String, chat: String, rules: String) {
+        store.edit {
+            it[KEY_FACE_STATE] = face
+            it[KEY_CHAT_STATE] = chat
+            it[KEY_RULES] = rules
         }
     }
 
@@ -370,7 +371,6 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
-        val KEY_EXPORT_REMINDER = booleanPreferencesKey("pending_export_reminder")
         val KEY_RESTYLE_ALL = booleanPreferencesKey("restyle_all_masks")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")

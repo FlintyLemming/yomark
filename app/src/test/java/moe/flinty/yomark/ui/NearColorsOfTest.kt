@@ -10,7 +10,6 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.ui.components.nearColorsOf
 import com.google.common.truth.Truth.assertThat
@@ -43,7 +42,7 @@ class NearColorsOfTest {
     }
 
     private fun box(id: String, l: Float, t: Float, r: Float, b: Float) = MaskItem(
-        id, Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
+        id, Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL,
     )
 
     private val onCard1 = box("card-1", 60f, 50f, 300f, 90f)

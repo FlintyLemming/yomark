@@ -25,7 +25,7 @@ sealed interface EditorMessage {
  * 「AI 增强识别」（Gemini Nano 第二遍）在当前这张图上的状态。
  *
  * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
- * 还会在画面上冒出一批不打码的框。现在是用户点了才跑。
+ * 还会在画面上冒出一批码。现在是用户点了才跑，找到的直接打码。
  * 跑的结果就写在按钮上，不另弹提示。手机底栏的圆钮上写不下字，跑完那一下在画布顶上说一声（见 [EditorUiState.aiReviewsFinished]）。
  */
 sealed interface AiReview {
@@ -34,7 +34,7 @@ sealed interface AiReview {
     data object Ready : AiReview
     data object Running : AiReview
 
-    /** 这张图已经增强识别过，新圈出了 [found] 处（0 就是没有新发现）。再跑一遍结果一样（温度 0），按钮就不再可点。 */
+    /** 这张图已经增强识别过，新打上了 [found] 处码（0 就是没有新发现）。再跑一遍结果一样（温度 0），按钮就不再可点。 */
     data class Done(val found: Int) : AiReview
 
     /** 没跑成。和「跑了没发现」分开：不能让用户以为这一页是干净的。按钮还能点，再试一次。 */
@@ -52,7 +52,7 @@ data class EditorUiState(
     val loading: Boolean = false,
     /** 识别进行中。画布此时仍可交互——用户可以先手动画框。 */
     val analyzing: Boolean = false,
-    /** 端侧大模型的第二遍。只在用户点了之后跑，结果追加进 plan，只圈出。 */
+    /** 端侧大模型的第二遍。只在用户点了之后跑，找到的打上码追加进 plan。 */
     val aiReview: AiReview = AiReview.Hidden,
     /**
      * AI 增强识别跑完了几次，成没成都算。手机上画布顶上那一声结果看它变没变（见 AiReviewResultPill），
@@ -77,7 +77,6 @@ data class EditorUiState(
     val stylePanelOpen: Boolean = false,
     /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
     val colorPick: ColorTarget? = null,
-    val pendingDialogVisible: Boolean = false,
     /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
     val unopenedDialogVisible: Boolean = false,
     /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
@@ -114,7 +113,7 @@ data class EditorUiState(
     val barLook: MaskLook get() = selectedItem?.look ?: brush
 
     /**
-     * 打码用的样子：识别出来直接打的码、点一下打上的码、导出前的「全部打码」都用它。
+     * 打码用的样子：识别出来直接打的码、AI 增强识别找到的、点一下打上的码都用它。
      * 样式是「打码」里上次选的那一种，参数是画笔里调好的；马克笔、画笔只做标记，不拿来打码（2026-10-14）。
      */
     val maskLook: MaskLook get() = MaskLook(maskStyle, brush.options)

@@ -18,7 +18,6 @@ import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskPlanFactory
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -178,9 +177,6 @@ class EditorViewModel(
     /** 这次会话里最后一次非空的用途水印文案。只在内存里，不落盘。 */
     private var lastPurposeText: String? = null
 
-    /** 导出前提醒的开关。设置还没读到时按开着算——宁可多问一次。 */
-    private var exportReminder = true
-
     /** 设置里「换样式时一起换」。还没读到时按出厂的开着算。 */
     private var restyleAll = true
 
@@ -195,7 +191,6 @@ class EditorViewModel(
         brushRestored = restoreBrush()
         restorePurposeStyle()
         observeRecognitionConfig()
-        viewModelScope.launch { settings.pendingExportReminder.collect { exportReminder = it } }
         viewModelScope.launch { settings.restyleAllMasks.collect { restyleAll = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
         viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
@@ -228,8 +223,8 @@ class EditorViewModel(
      * 换方案后的重跑。整次重跑压**一个**快照，用户不满意按一下撤销就回到切换前，
      * 这就是「切着看」这件事成立的全部依据。
      *
-     * 丢掉的是用户对规则候选做过的三态切换：新方案产出的候选和旧的不是同一批，
-     * 把旧的状态往新候选上贴没有正确答案。手动框、点一行字打上的码留着——那是用户自己加的。
+     * 丢掉的是用户对识别出的码做过的取消：新方案产出的候选和旧的不是同一批，
+     * 把旧的取消往新候选上贴没有正确答案。手动框、点一行字打上的码留着——那是用户自己加的。
      */
     private fun reanalyze(image: SourceImage) {
         undoStack.push(_state.value.plan)
@@ -649,7 +644,7 @@ class EditorViewModel(
 
     /**
      * 用户点了「AI 增强识别」：端侧大模型（Gemini Nano）把整页文字再看一遍，
-     * 新发现的追加进 plan，只圈出、标「AI」。
+     * 新发现的直接打上码追加进 plan（宽屏列表上标「AI」），用「打码」里眼下的样式。
      *
      * 是用户点出来的，所以进撤销栈——不想要这批框，撤销一下就整批拿掉。
      * 这期间换了图、换了方案，这一批就作废。
@@ -692,13 +687,12 @@ class EditorViewModel(
 
     /**
      * 点一下（spec §7.3，2026-10-14 修订；点中了什么见 GestureRules.tapTarget）：
-     * - 打了码的：识别出的取消打码（退回圈出，画布上不画）；点一行字打上的码拿掉；
-     * - 没打码的字：它所在的那一整行打上码，框是文字识别给的这一行。圈出的人脸、条码、头像打码它整块；
-     * - 手动框：不切换，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
+     * - 识别出的码、点一行字打上的码：拿掉。撤销能回来，再点那行字打上的是整行；
+     * - 没打码的字：它所在的那一整行打上码，框是文字识别给的这一行，用「打码」里眼下的样式（[EditorUiState.maskLook]）。
+     *   手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码；
+     * - 手动框：不拿掉，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
      *   点它要是把码去掉了，「点一下再调一调」就成了「点一下码没了」。
      *
-     * 点上的码用的是「打码」里眼下的样式（[EditorUiState.maskLook]），圈出的候选也不沿用它上一次打码时的样子：
-     * 换了样式再点，要的就是新样式。手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码。
      * 吸管在等着取色时，这一下只取颜色。
      *
      * @param reach 点没落在任何一行字里时，离一行多近也算点中它（图像像素）
@@ -720,7 +714,7 @@ class EditorViewModel(
     }
 
     /**
-     * 宽屏的列表上点了一行：和在画布上点那一块一样，识别出的切换打码、手动框选中。
+     * 宽屏的列表上点了一行：和在画布上点那一块一样，识别出的、点上的拿掉，手动框选中。
      * 吸管在等着取色时点的是列表不是图，先收起吸管，这一下照常算数。
      */
     fun onListItemClick(id: String) {
@@ -735,10 +729,8 @@ class EditorViewModel(
             uiState = _state.value.copy(selectedManualId = item.candidateId)
             return
         }
-        // 点上的一行再点就拿掉，不在 plan 里留一行看不见的「没打码」；识别出的在打码、圈出之间切换。
         // 点它们也算点了别处：选中态收起
-        if (item.source == DetectorSource.LINE) mutate { it.remove(item.candidateId) }
-        else mutate { it.toggle(item.candidateId, _state.value.maskLook) }
+        mutate { it.remove(item.candidateId) }
         finishLookEdit()
         uiState = _state.value.copy(selectedManualId = null)
     }
@@ -750,7 +742,6 @@ class EditorViewModel(
             quad = quad,
             kind = SensitiveKind.MANUAL,
             source = DetectorSource.LINE,
-            state = MaskState.MASKED,
             look = _state.value.maskLook,
         )
         mutate { it.add(item) }
@@ -763,8 +754,7 @@ class EditorViewModel(
             quad = quadInImageSpace,
             kind = SensitiveKind.MANUAL,
             source = DetectorSource.MANUAL,
-            state = MaskState.MASKED,          // 落笔即打码
-            look = _state.value.brush,          // 用画笔：样式栏上选的就是这一笔的样子
+            look = _state.value.brush,          // 落笔即打码，用画笔：样式栏上选的就是这一笔的样子
         )
         mutate { it.add(item) }
         // 画完直接进选中态：手柄就在手边，不用再点一下才能调大小；面板上接着调，改的就是这个框
@@ -787,7 +777,6 @@ class EditorViewModel(
             quad = quad,
             kind = SensitiveKind.MANUAL,
             source = DetectorSource.MANUAL,
-            state = MaskState.MASKED,
             look = brush,
             ink = ink,
         )
@@ -975,14 +964,9 @@ class EditorViewModel(
     // ---------- 导出 ----------
 
     /**
-     * 导出拦截（spec §7.4）：pendingCount > 0 时先弹对话框。
-     * 用户可以在对话框里勾「不再提示」，或在规则页关掉；关了就直接导出，圈出的照原样留着。
+     * 导出。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
      */
     fun requestExport() {
-        if (exportReminder && _state.value.plan.pendingCount > 0) {
-            uiState = _state.value.copy(pendingDialogVisible = true)
-            return
-        }
         runExport(_state.value.plan)
     }
 
@@ -993,8 +977,6 @@ class EditorViewModel(
      * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」。
      *
      * 还有没打开过的图时先问一句（[reviewUnopened] / [exportOpenedOnly]）：没打开过的图没识别、也没人看过，不能替用户导出。
-     * 拦截按**全部图片**的待打码数之和判定，不是只看当前这张——
-     * 只看当前这张的话，别的几张里被放过的 OUTLINED 就永远没有第二次机会了。
      */
     fun exportBatch() {
         if (_state.value.batch == null || _state.value.exporting) return
@@ -1009,17 +991,8 @@ class EditorViewModel(
             }
             uiState = _state.value.copy(batch = batch, exporting = false)
             if (batch.unopened > 0) uiState = _state.value.copy(unopenedDialogVisible = true)
-            else exportOpened(batch)
+            else runBatchExport(batch)
         }
-    }
-
-    /** 没打开过的问过了（或者本来就没有）：照常走待打码拦截，再导出看过的那些。 */
-    private fun exportOpened(batch: BatchSession) {
-        if (exportReminder && batch.totalPending > 0) {
-            uiState = _state.value.copy(pendingDialogVisible = true)
-            return
-        }
-        runBatchExport(batch)
     }
 
     /** 等批量里还在跑的载入和识别都跑完。等的时候又切出去打开了新的一张，就接着等它。 */
@@ -1039,44 +1012,10 @@ class EditorViewModel(
         selectImage(first)
     }
 
-    /** 「还有几张没看过」里的「只导出看过的」：没打开过的不导出，看过的照常走待打码拦截。 */
+    /** 「还有几张没看过」里的「只导出看过的」：没打开过的不导出，看过的照常导出。 */
     fun exportOpenedOnly() {
         uiState = _state.value.copy(unopenedDialogVisible = false)
-        exportOpened(_state.value.liveBatch ?: return)
-    }
-
-    /** @param stopReminding 对话框里勾了「不再提示」。 */
-    fun confirmMaskAllAndExport(stopReminding: Boolean = false) {
-        if (stopReminding) stopExportReminder()
-        uiState = _state.value.copy(pendingDialogVisible = false)
-        val batch = _state.value.liveBatch
-        val look = _state.value.maskLook
-        if (batch != null) {
-            val cleared = batch.maskAllEverywhere(look)
-            val s = _state.value
-            uiState = s.copy(
-                batch = cleared,
-                plan = if (s.image != null) cleared.current.plan ?: s.plan.maskAll(look) else s.plan,
-            )
-            runBatchExport(cleared)
-        } else {
-            mutate { it.maskAll(look) }
-            runExport(_state.value.plan)
-        }
-    }
-
-    fun confirmExportAnyway(stopReminding: Boolean = false) {
-        if (stopReminding) stopExportReminder()
-        uiState = _state.value.copy(pendingDialogVisible = false)
-        val batch = _state.value.liveBatch
-        if (batch != null) runBatchExport(batch)
-        else runExport(_state.value.plan)
-    }
-
-    /** 本地先改掉，不等 DataStore 回流：紧接着的下一次导出就不该再问。 */
-    private fun stopExportReminder() {
-        exportReminder = false
-        viewModelScope.launch { settings.setPendingExportReminder(false) }
+        runBatchExport(_state.value.liveBatch ?: return)
     }
 
     /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
@@ -1148,7 +1087,7 @@ class EditorViewModel(
     fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
-        uiState = _state.value.copy(pendingDialogVisible = false, unopenedDialogVisible = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false)
     }
 
     fun consumeMessage() {

@@ -149,7 +149,7 @@ class PlayScreenshots {
         compose.runOnUiThread { before(vm) }
         if (samples.size == 1) vm.onImageChosen(samples.single()) else vm.onImagesChosen(samples.toList())
         waitFor(vm) { it.image != null && !it.analyzing && it.plan.items.isNotEmpty() }
-        println("识别结果：" + vm.state.value.plan.items.joinToString { "${it.kind}/${it.state}" })
+        println("识别结果：" + vm.state.value.plan.items.joinToString { "${it.kind}/${it.source}" })
         advance(SETTLE_MS)
         return vm
     }

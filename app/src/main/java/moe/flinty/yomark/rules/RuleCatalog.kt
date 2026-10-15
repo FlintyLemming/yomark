@@ -11,7 +11,7 @@ import moe.flinty.yomark.R
  * 规则表的可配置视图（2026-09-04 增补设计 §2）。
  *
  * `DefaultRuleSet` 仍然是唯一的规则清单与出厂分层；本对象只负责按
- * RecognitionConfig 把某几条摘掉、把另几条的初始状态改掉。规则的匹配行为
+ * RecognitionConfig 把关掉的几条摘掉、把出厂关着又被打开的几条改成打码。规则的匹配行为
  * 一个字都不动——覆写只换 `enabledByDefault`。
  */
 object RuleCatalog {
@@ -27,11 +27,12 @@ object RuleCatalog {
         "url", "longnum", "birthdate", "passport", "vin", "apikey", "ip", "mac", "iban", "ssn",
     ).map { id -> all.first { it.id == id } }
 
-    /** 出厂态由规则自己的 `enabledByDefault` 决定，不另立一张表——两处会走散。 */
+    /**
+     * 出厂态由规则自己的 `enabledByDefault` 决定，不另立一张表——两处会走散。
+     * 不打码的就是关着：误报率高的那几类（网址、日期时间……）原先出厂只圈出，2026-10-14 起没有这一档，出厂关着。
+     */
     fun factoryState(id: String): RuleState =
-        all.firstOrNull { it.id == id }
-            ?.let { if (it.enabledByDefault) RuleState.MASKED else RuleState.OUTLINED }
-            ?: RuleState.OFF
+        if (all.firstOrNull { it.id == id }?.enabledByDefault == true) RuleState.MASKED else RuleState.OFF
 
     fun stateOf(config: RecognitionConfig, id: String): RuleState =
         config.ruleOverrides[id] ?: factoryState(id)
@@ -39,8 +40,7 @@ object RuleCatalog {
     fun rulesFor(config: RecognitionConfig): List<Rule> = all.mapNotNull { rule ->
         when (stateOf(config, rule.id)) {
             RuleState.OFF -> null
-            RuleState.MASKED -> rule.withDefaultState(true)
-            RuleState.OUTLINED -> rule.withDefaultState(false)
+            RuleState.MASKED -> rule.masked()
         }
     }
 
@@ -96,17 +96,15 @@ object RuleCatalog {
         return res.getString(R.string.anchor_note, parts.joinToString(res.getString(R.string.anchor_or)))
     }
 
-    private fun Rule.withDefaultState(masked: Boolean): Rule =
-        if (enabledByDefault == masked) this else StateOverride(this, masked)
+    /** 出厂关着、用户打开了的那几类，命中也打码。 */
+    private fun Rule.masked(): Rule = if (enabledByDefault) this else StateOverride(this)
 
     /**
-     * 只改初始状态的透明包装。其余原样转发，规则的行为不受配置影响——
-     * 漏转 findOnPage 的话，用户改过状态的那一类就只剩逐行的认法，字段名在上、值在下的全认不出。
+     * 只改打不打码的透明包装。其余原样转发，规则的行为不受配置影响——
+     * 漏转 findOnPage 的话，用户打开的那一类就只剩逐行的认法，字段名在上、值在下的全认不出。
      */
-    private class StateOverride(
-        private val delegate: Rule,
-        override val enabledByDefault: Boolean,
-    ) : Rule {
+    private class StateOverride(private val delegate: Rule) : Rule {
+        override val enabledByDefault = true
         override val id get() = delegate.id
         override val kind get() = delegate.kind
         override val yieldsTo get() = delegate.yieldsTo

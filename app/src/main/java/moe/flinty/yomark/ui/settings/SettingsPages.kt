@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.AlternateEmail
@@ -179,8 +178,8 @@ fun TextEngineSettingsScreen(
 }
 
 /**
- * 文字里的一类，样子和人脸、条码的页一样：先是「识别到时」打码 / 仅圈出 / 关闭，再是这一类怎么认的。
- * 人名多一组：没有旁证、只凭字面猜出的名字要不要也圈出。
+ * 文字里的一类，样子和人脸、条码的页一样：先是「识别到时」打码 / 关闭，再是这一类怎么认的。
+ * 人名多一组：没有旁证、只凭字面猜出的名字要不要也打码。
  */
 @Composable
 fun TextRuleSettingsScreen(
@@ -206,12 +205,12 @@ fun TextRuleSettingsScreen(
                 SectionHeader(stringResource(R.string.guessed_names))
                 SettingsGroup {
                     SwitchRow(
-                        title = stringResource(R.string.outline_unanchored),
-                        summary = stringResource(R.string.outline_unanchored_summary),
+                        title = stringResource(R.string.mask_unanchored),
+                        summary = stringResource(R.string.mask_unanchored_summary),
                         icon = Icons.Outlined.PersonSearch,
-                        checked = config.outlineUnanchoredNames,
+                        checked = config.maskUnanchoredNames,
                         enabled = state != RuleState.OFF,
-                        onCheckedChange = { onChange(config.copy(outlineUnanchoredNames = it)) },
+                        onCheckedChange = { onChange(config.copy(maskUnanchoredNames = it)) },
                         modifier = Modifier.testTag("unanchored-names"),
                     )
                 }
@@ -250,7 +249,7 @@ fun FaceSettingsScreen(
     }
 }
 
-/** 条码：同人脸。解不出内容的疑似条码（宽松模式才有）不管怎么设都只圈出。 */
+/** 条码：同人脸。宽松模式下解不出内容的疑似条码也打码。 */
 @Composable
 fun BarcodeSettingsScreen(
     config: RecognitionConfig,
@@ -395,17 +394,14 @@ fun EditSettingsScreen(
 }
 
 /**
- * 导出：导出前提醒和品牌水印的样式。
+ * 导出：品牌水印的样式。原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
  *
- * 导出前提醒兜的正是「圈出」这一态——关掉它，圈出的内容导出时就没人再问了。
  * 水印样式是导出时角落那个品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
  * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
- * 两项都不在识别方案里：改它们编辑器不重跑识别。
+ * 不在识别方案里：改它编辑器不重跑识别。
  */
 @Composable
 fun ExportSettingsScreen(
-    exportReminder: Boolean,
-    onExportReminderChange: (Boolean) -> Unit,
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     /** 能不能去水印。false 时没有「无水印」这一项。 */
@@ -419,19 +415,7 @@ fun ExportSettingsScreen(
     val none = watermarkUnlocked && watermarkOff
     SettingsScaffold(title = stringResource(R.string.settings_export), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            PageTopSpacer()
-            SettingsGroup {
-                SwitchRow(
-                    title = stringResource(R.string.export_reminder),
-                    summary = stringResource(R.string.export_reminder_summary),
-                    icon = Icons.AutoMirrored.Outlined.FactCheck,
-                    checked = exportReminder,
-                    onCheckedChange = onExportReminderChange,
-                )
-            }
-        }
-        item {
-            SectionHeader(stringResource(R.string.watermark_style))
+            SectionHeader(stringResource(R.string.watermark_style), first = true)
             SettingsGroup(Modifier.selectableGroup()) {
                 BrandWatermarkStyle.entries.forEach { style ->
                     RadioRow(
@@ -514,14 +498,13 @@ fun AppearanceSettingsScreen(
     }
 }
 
-/** 人脸、条码、文字的各类共用：打码 / 仅圈出 / 关闭，打码排第一。 */
+/** 人脸、条码、文字的各类共用：打码 / 关闭，打码排第一。 */
 @Composable
 private fun HandlingGroup(selected: RuleState, onSelect: (RuleState) -> Unit) {
     SettingsGroup(Modifier.selectableGroup()) {
-        listOf(RuleState.MASKED, RuleState.OUTLINED, RuleState.OFF).forEach { state ->
+        listOf(RuleState.MASKED, RuleState.OFF).forEach { state ->
             RadioRow(
                 title = handlingLabel(state),
-                summary = if (state == RuleState.OUTLINED) stringResource(R.string.handling_outlined_summary) else null,
                 selected = selected == state,
                 onClick = { onSelect(state) },
             )
@@ -565,14 +548,14 @@ private const val NAME_RULE = "name"
 
 /**
  * 「文字」页上一类的小字：怎么处理。人名再写上没有旁证的那些怎么办——
- * 不写的话，聊天里的人名不圈了，用户只看得到「打码」两个字。
+ * 不写的话，聊天里的人名不打了，用户只看得到「打码」两个字。
  */
 @Composable
 internal fun ruleSummary(config: RecognitionConfig, ruleId: String): String {
     val state = RuleCatalog.stateOf(config, ruleId)
     val handling = handlingLabel(state)
     if (ruleId != NAME_RULE || state == RuleState.OFF) return handling
-    return handling + stringResource(if (config.outlineUnanchoredNames) R.string.name_summary_outline else R.string.name_summary_skip)
+    return handling + stringResource(if (config.maskUnanchoredNames) R.string.name_summary_mask else R.string.name_summary_skip)
 }
 
 /**
@@ -584,17 +567,16 @@ internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
     return copy(
         textEngine = factory.textEngine,
         semantic = factory.semantic,
-        outlineUnanchoredNames = factory.outlineUnanchoredNames,
+        maskUnanchoredNames = factory.maskUnanchoredNames,
         ruleOverrides = emptyMap(),
     )
 }
 
-/** 打码 / 仅圈出 / 关闭。人脸、条码、文字的各类共用。 */
+/** 打码 / 关闭。人脸、条码、文字的各类共用。 */
 @Composable
 internal fun handlingLabel(state: RuleState): String = stringResource(
     when (state) {
         RuleState.MASKED -> R.string.handling_masked
-        RuleState.OUTLINED -> R.string.handling_outlined
         RuleState.OFF -> R.string.handling_off
     },
 )

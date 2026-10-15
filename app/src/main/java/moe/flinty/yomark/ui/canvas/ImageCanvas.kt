@@ -58,7 +58,6 @@ import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.PurposeWatermarkDrawer
 import moe.flinty.yomark.render.MaskOrder
@@ -75,10 +74,9 @@ import moe.flinty.yomark.R
 /**
  * 画布：图像 + 遮罩 + 叠层 + 手势。
  *
- * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。只画打了码的：圈出没打码的不画（2026-10-14 起
- * 没有虚线框和类型小标签），点它的字就打上码。
+ * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
  * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）、
- * 点码取消、点没打码的字打码那一行（见 EditorViewModel.onTap）。
+ * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。
  * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
@@ -577,8 +575,8 @@ internal fun drawScene(
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
-    // 识别出的在底下，用户加的后加的盖在先加的上面——与导出同一个顺序（见 MaskOrder）。圈出没打码的不画
-    val sorted = MaskOrder.forDrawing(plan.items.filter { it.state == MaskState.MASKED })
+    // 识别出的在底下，用户加的后加的盖在先加的上面——与导出同一个顺序（见 MaskOrder）
+    val sorted = MaskOrder.forDrawing(plan.items)
     val composed = composite.of(image, sorted, registry)
     val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
     if (time == null) {
@@ -631,7 +629,7 @@ internal fun drawScene(
 }
 
 /**
- * 画打了码的那几块（[items] 只有打了码的，已经按 MaskOrder 排好了），每块码按它自己的样式画。
+ * 画 [items] 这几块码（已经按 MaskOrder 排好了），每块码按它自己的样式画。
  * 有 [composite]（见 MaskComposite）时，码所在的地方直接从合成好的图上取。
  */
 private fun drawItems(

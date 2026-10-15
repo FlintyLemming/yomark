@@ -4,9 +4,9 @@ import android.graphics.Bitmap
 import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.RectF
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,29 +17,22 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.Role
@@ -50,7 +43,6 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -61,15 +53,13 @@ import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
 /**
- * 宽屏的框列表：图上打了码的每一块（识别出来的、点上的、手动画的）和识别到了还没打码的每一处，
- * 按从上到下、从左到右排成一列，每一行是这一块在原图上的缩略图、类型和状态；打了码的那几行整行灰下去。
- * 没打码的只列导出前会提醒的那些（MaskPlan.pending）：被别的码整个盖住的，图上看着已经遮住了，不另列一行。
+ * 宽屏的框列表：图上的每一块码——识别出来的、点一行字打上的、手动画的——按从上到下、从左到右排成一列，
+ * 每一行是这一块在原图上的缩略图和类型。
  *
- * 点识别出的一行就是打码 / 取消打码，和在画布上点它一样；点上的一行再点就拿掉了；
- * 点手动框那一行是选中它（手动框不切换，spec §7.3），选中后照常在图上拖、在样式面板上改、点「删除」。
+ * 点识别出的、点上的一行就是把这块码拿掉，和在画布上点它一样（撤销能回来）；
+ * 点手动框那一行是选中它（手动框不拿掉，spec §7.3），选中后照常在图上拖、在样式面板上改、点「删除」。
  *
- * 缩略图截的是原图，已经打了码的也是：在这儿就看得见码底下原来是什么，不用先取消打码再看。
- * 列表的顺序只看位置，不看状态：点过的那一行不会跳走。
+ * 缩略图截的是原图：在这儿就看得见码底下原来是什么，不用先取消打码再看。
  *
  * @param analyzing 识别结果还没出来（载入中、识别中、换方案重跑）：只列用户自己加的
  * @param selectedId 选中的手动框
@@ -85,10 +75,7 @@ fun MaskItemList(
 ) {
     // 识别中（含换方案重跑）识别出的块在画布上不画，这里也先不列：这时点了也会被新结果整批换掉
     val items = remember(plan, analyzing) {
-        MaskListOrder.of(
-            if (analyzing) plan.items.filter { it.byUser }
-            else plan.items.filter { it.state == MaskState.MASKED } + plan.pending,
-        )
+        MaskListOrder.of(if (analyzing) plan.items.filter { it.byUser } else plan.items)
     }
     val listState = rememberLazyListState()
     // 选中了手动框（刚在图上画完的那个也是选中的）：那一行不在眼前就滚过去，看得见它进了列表
@@ -126,39 +113,18 @@ fun MaskItemList(
     }
 }
 
-/** 列表上方一行：一共几处、还有几处没打码。没打码的那几处也是导出前会被提醒的那几处（spec §7.4）。 */
+/** 列表上方一行：一共几处。 */
 @Composable
 private fun ListSummary(items: List<MaskItem>, analyzing: Boolean) {
-    val pending = items.count { it.state == MaskState.OUTLINED }
-    Row(
-        Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(
-            when {
-                analyzing -> stringResource(R.string.analyzing)
-                items.isEmpty() -> stringResource(R.string.list_title)
-                else -> stringResource(R.string.list_count, items.size)
-            },
-            style = MaterialTheme.typography.titleSmall,
-        )
-        Spacer(Modifier.weight(1f))
-        if (pending > 0) {
-            Box(Modifier.size(8.dp).background(OutlineAmber, CircleShape))
-            Spacer(Modifier.width(6.dp))
-            Text(
-                stringResource(R.string.list_pending, pending),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        } else if (!analyzing && items.isNotEmpty()) {
-            Text(
-                stringResource(R.string.list_all_masked),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
+    Text(
+        when {
+            analyzing -> stringResource(R.string.analyzing)
+            items.isEmpty() -> stringResource(R.string.list_title)
+            else -> stringResource(R.string.list_count, items.size)
+        },
+        style = MaterialTheme.typography.titleSmall,
+        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+    )
 }
 
 @Composable
@@ -178,69 +144,41 @@ private fun EmptyHint() {
 }
 
 /**
- * 一行：缩略图、类型、状态，整行都是点击区。不另放开关：打没打码直接看这一行的样子。
- *
- * 打了码的整行灰下去——缩略图褪成灰、变淡，底色退到和面板差不多：这一处已经处理好了。
- * 圈出没打码的保持彩色，描一道琥珀色的边，状态前一个琥珀色圆点：
- * 一眼看得出还剩哪几处要拿主意，导出前会被提醒的也正是这几处。画布上不画它们（2026-10-14），只有这里看得见。
- * 灰下去的缩略图还认得出字，码底下原来是什么照样看得见。
+ * 一行：缩略图、类型，手动框再写一句它的状态，整行都是点击区。
+ * 识别出的、点上的一行，点了就拿掉（读屏念的动作是「取消打码」）；手动框点了是选中。
  */
 @Composable
 private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, onClick: () -> Unit) {
     val colors = MaterialTheme.colorScheme
     val manual = item.source == DetectorSource.MANUAL
-    val masked = item.state == MaskState.MASKED
     val shape = RoundedCornerShape(16.dp)
     val interaction = if (manual) {
         Modifier.selectable(selected = selected, role = Role.Button, onClick = onClick)
     } else {
-        // 没有开关可看，打没打码照样作为开关的状态报给读屏
-        Modifier.toggleable(value = masked, role = Role.Switch, onValueChange = { onClick() })
+        Modifier.clickable(onClickLabel = stringResource(R.string.item_unmask), role = Role.Button, onClick = onClick)
     }
     Row(
         Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(
-                when {
-                    selected -> colors.secondaryContainer
-                    masked -> colors.surfaceContainer
-                    else -> colors.surfaceContainerHighest
-                },
-            )
-            .then(
-                when {
-                    selected -> Modifier.border(2.dp, colors.primary, shape)
-                    !masked -> Modifier.border(1.5.dp, OutlineAmber, shape)
-                    else -> Modifier
-                },
-            )
+            .background(if (selected) colors.secondaryContainer else colors.surfaceContainerHighest)
+            .then(if (selected) Modifier.border(2.dp, colors.primary, shape) else Modifier)
             .then(interaction)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ItemThumbnail(image, item.quad, faded = masked, Modifier.weight(1f).height(THUMB_HEIGHT))
+        ItemThumbnail(image, item.quad, Modifier.weight(1f).height(THUMB_HEIGHT))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.widthIn(min = 56.dp, max = 112.dp)) {
             Text(
                 SensitiveKindLabels.display(LocalContext.current.resources, item),
                 style = MaterialTheme.typography.labelLarge,
-                color = if (masked && !selected) colors.onSurfaceVariant else colors.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!masked) {
-                    Box(Modifier.size(6.dp).background(OutlineAmber, CircleShape))
-                    Spacer(Modifier.width(4.dp))
-                }
+            if (manual) {
                 Text(
-                    when {
-                        manual && selected -> stringResource(R.string.item_selected)
-                        manual -> stringResource(R.string.item_manual)
-                        masked -> stringResource(R.string.item_masked)
-                        else -> stringResource(R.string.item_unmasked)
-                    },
+                    stringResource(if (selected) R.string.item_selected else R.string.item_manual),
                     style = MaterialTheme.typography.labelMedium,
                     color = colors.onSurfaceVariant,
                     maxLines = 1,
@@ -250,15 +188,11 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
     }
 }
 
-/**
- * 这一块在原图上的样子。截不到（手动框整个拖出了图外）就只留底色。
- * [faded]（打了码）时褪成灰、变淡；打码、取消打码时褪色和回彩有一个过渡，不是一下子跳过去。
- */
+/** 这一块在原图上的样子。截不到（手动框整个拖出了图外）就只留底色。 */
 @Composable
-private fun ItemThumbnail(image: SourceImage?, quad: Quad, faded: Boolean, modifier: Modifier) {
+private fun ItemThumbnail(image: SourceImage?, quad: Quad, modifier: Modifier) {
     val bitmap = image?.bitmap
     val thumb = remember(bitmap, quad) { bitmap?.let { ItemThumbnails.crop(it, quad) }?.asImageBitmap() }
-    val color by animateFloatAsState(if (faded) 0f else 1f, label = "thumbnailColor")
     Box(
         modifier
             .clip(RoundedCornerShape(8.dp))
@@ -266,32 +200,18 @@ private fun ItemThumbnail(image: SourceImage?, quad: Quad, faded: Boolean, modif
         contentAlignment = Alignment.Center,
     ) {
         if (thumb != null) {
-            Image(
-                thumb,
-                contentDescription = null,
-                contentScale = ContentScale.Fit,
-                alpha = FADED_ALPHA + (1f - FADED_ALPHA) * color,
-                colorFilter = if (color < 1f) ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(color) }) else null,
-                modifier = Modifier.fillMaxSize(),
-            )
+            Image(thumb, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
         }
     }
 }
 
-/** 打了码的缩略图淡到这么多：还认得出字，又一眼看得出是灰下去的。 */
-private const val FADED_ALPHA = 0.45f
-
 private val THUMB_HEIGHT = 44.dp
-
-/** 圈出没打码的琥珀色（spec §7.2），和应用图标上那个虚线框同一个颜色。 */
-private val OutlineAmber = Color(0xFFFFB300)
 
 /**
  * 列表的顺序：先按行、再按左右，和读这一页的顺序一样。
  *
  * 「同一行」要两块互相盖得住对方的竖直中点：同一行字的几段（人名和后面的电话）高矮差不多，一定算一行；
  * 左边一张大头像和右边的几行字，只有中点挨着头像中点的那一行和它算一行，其余照样一行一行往下排。
- * 只看位置，打码、取消打码都不改顺序。
  */
 internal object MaskListOrder {
 

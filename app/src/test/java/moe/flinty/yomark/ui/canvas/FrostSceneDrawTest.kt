@@ -13,7 +13,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.RendererRegistry
 import org.junit.Test
@@ -45,7 +44,7 @@ class FrostSceneDrawTest {
     private fun block(id: String, l: Float, t: Float, r: Float, b: Float, source: DetectorSource) = MaskItem(
         id, Quad.fromRect(RectF(l, t, r, b)),
         if (source == DetectorSource.MANUAL) SensitiveKind.MANUAL else SensitiveKind.PHONE,
-        source, MaskState.MASKED,
+        source,
     )
 
     private fun image(paint: (Bitmap) -> Unit = { it.eraseColor(Color.WHITE) }) =

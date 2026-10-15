@@ -25,22 +25,18 @@ import moe.flinty.yomark.rules.RuleClassifier
 fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig()) = RedactionEngine(
     recognizer = textRecognizerFor(context, config.textEngine).traced(),
     regionDetectors = buildList {
-        if (config.faceState != RuleState.OFF) {
-            add(MlKitFaceDetector(config.face, masked = config.faceState == RuleState.MASKED))
-        }
-        if (config.barcodeState != RuleState.OFF) {
-            add(MlKitBarcodeDetector(config.barcode, masked = config.barcodeState == RuleState.MASKED))
-        }
+        if (config.faceState != RuleState.OFF) add(MlKitFaceDetector(config.face))
+        if (config.barcodeState != RuleState.OFF) add(MlKitBarcodeDetector(config.barcode))
     }.map { it.traced() },
     classifiers = listOf(
-        RuleClassifier(RuleCatalog.rulesFor(config), keepUnanchored = config.outlineUnanchoredNames).traced(),
+        RuleClassifier(RuleCatalog.rulesFor(config), maskUnanchored = config.maskUnanchoredNames).traced(),
     ),
     refiners = when (config.semantic) {
         SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier().traced())
         SemanticOption.OFF -> emptyList()
     },
     pageAnalyzers = if (config.chatState == RuleState.OFF) emptyList() else {
-        listOf(ChatDetector(masked = config.chatState == RuleState.MASKED).traced())
+        listOf(ChatDetector().traced())
     },
 )
 

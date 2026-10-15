@@ -39,7 +39,6 @@ import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -104,11 +103,11 @@ class EditorScreenLayoutTest {
         CandidateMerger(),
     )
 
-    private fun item(id: String, top: Float, kind: SensitiveKind, state: MaskState) =
-        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE, state)
+    private fun item(id: String, top: Float, kind: SensitiveKind) =
+        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE)
 
-    private val phone = item("phone", 40f, SensitiveKind.PHONE, MaskState.MASKED)
-    private val url = item("url", 120f, SensitiveKind.URL, MaskState.OUTLINED)
+    private val phone = item("phone", 40f, SensitiveKind.PHONE)
+    private val url = item("url", 120f, SensitiveKind.URL)
 
     /** 打开一张白图，识别（什么也没有）跑完后把 [phone]、[url] 两块放进去，等动效走完。 */
     private fun open(): EditorViewModel {
@@ -375,10 +374,10 @@ class EditorScreenLayoutTest {
         compose.onNodeWithText("马赛克").assertDoesNotExist()
         compose.onNodeWithText("打码").assertIsDisplayed()
 
-        // 先打一块码，撤销点得动
+        // 先拿掉一块码，撤销点得动
         compose.runOnUiThread { vm.onTap(PointF(160f, 135f)) }
         frames(SETTLE_FRAMES)
-        assertThat(vm.state.value.plan.items.single { it.candidateId == url.candidateId }.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.find(url.candidateId)).isNull()
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("恢复默认").assertIsDisplayed()
@@ -386,7 +385,7 @@ class EditorScreenLayoutTest {
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         compose.onNodeWithText("马赛克").assertDoesNotExist()
-        assertThat(vm.state.value.plan.items.single { it.candidateId == url.candidateId }.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.find(url.candidateId)).isNull()       // 只收起，没撤销
     }
 
     /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */
@@ -435,7 +434,7 @@ class EditorScreenLayoutTest {
     @Test fun `an upright tablet lists the boxes below the image`() {
         open()
         compose.onNodeWithText("导出").assertExists()
-        compose.onNodeWithText("1 处未打码").assertExists()
+        compose.onNodeWithText("框出 2 处").assertExists()
         val list = listBounds()
         val screen = screenBounds()
         assertThat(list.top).isGreaterThan(screen.bottom * 0.6f)
@@ -468,12 +467,12 @@ class EditorScreenLayoutTest {
     }
 
     @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
-    @Test fun `tapping a row masks or unmasks that box`() {
+    @Test fun `tapping a row takes that mask off`() {
         val vm = open()
         compose.onNodeWithText("网址").performClick()
-        assertThat(vm.state.value.plan.find("url")!!.state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.find("url")).isNull()
         compose.onNodeWithText("电话").performClick()
-        assertThat(vm.state.value.plan.find("phone")!!.state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.items).isEmpty()
         assertThat(vm.state.value.canUndo).isTrue()
     }
 

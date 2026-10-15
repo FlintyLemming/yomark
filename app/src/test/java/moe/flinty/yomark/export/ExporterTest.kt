@@ -13,7 +13,6 @@ import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.RendererRegistry
@@ -73,8 +72,8 @@ class ExporterTest {
 
     private fun planWith(vararg items: MaskItem) = MaskPlan(items.toList())
 
-    private fun maskedItem(l: Float, t: Float, r: Float, b: Float, state: MaskState = MaskState.MASKED) =
-        MaskItem("i-$l", Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL, state)
+    private fun maskedItem(l: Float, t: Float, r: Float, b: Float) =
+        MaskItem("i-$l", Quad.fromRect(RectF(l, t, r, b)), SensitiveKind.MANUAL, DetectorSource.MANUAL)
 
     private fun exporter(sink: ImageSink) =
         Exporter(RendererRegistry.default(), WatermarkDrawer(), sink)
@@ -151,16 +150,6 @@ class ExporterTest {
         // 糊开的是色块：偏蓝，比原来的天蓝淡
         assertThat(Color.blue(c)).isGreaterThan(Color.red(c))
         assertThat(Color.red(c)).isGreaterThan(Color.red(MaskOptions.SKY_BLUE))
-    }
-
-    @Test
-    fun `outlined items are not drawn`() = runTest {
-        val sink = FakeSink()
-        val src = writeSource("outlined.jpg", 400, 400)
-        exporter(sink).export(
-            ExportRequest(src, "image/jpeg", planWith(maskedItem(50f, 50f, 150f, 150f, MaskState.OUTLINED)), 1f, false)
-        )
-        assertThat(sink.bitmap!!.getPixel(100, 100)).isNotEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test

@@ -10,7 +10,7 @@ import kotlin.math.min
  * - [CHINA]、[DISTINCT] 写法独特的：中国大陆（省份简称 + 发牌机关字母）、日本（地名 + 分类号 + 假名）、英国、法国意大利、巴西、
  *   俄罗斯、乌克兰保加利亚、印度、新加坡（校验字母）、比利时、荷兰、爱尔兰、越南。一行里哪儿都认，打码；
  * - [ALONE] 写法不够独特的：德国、西班牙、「ABC-1234」……一句话里出现的多半是型号、航班号、金额，
- *   只认照片上孤零零的一行（[LonePlate]），只圈出；
+ *   只认照片上孤零零的一行（[LonePlate]），认了也不打码；
  * - 字段名后面的（[PlateLabel]）：「车牌号」「License plate」「Kennzeichen」后面的，哪国写法都行，打码。
  *
  * 上下两行的牌子（大车尾牌、摩托、日本的牌子、方牌）OCR 读成两行，见 [TwoRowPlate]。
@@ -237,7 +237,7 @@ internal object Plates {
 
     // ---------- 写法不够独特的：只认照片上孤零零的一行 ----------
 
-    /** 照片上孤零零一行才认、认了只圈出的写法（[LonePlate]）。整行对得上才算。 */
+    /** 照片上孤零零一行才认、认了也不打码的写法（[LonePlate]）。整行对得上才算。 */
     val ALONE: List<PlateShape> = listOf(
         // 德国：B MW 1234，地区码和字母之间贴着年检标，OCR 读成「:」或空格。数字至少两位：「BMW X5」「LG C3」是型号
         PlateShape("([A-ZÄÖÜ]{1,3})[ \\-·•・.:]{1,3}([A-Z]{1,2})[ \\-·•・.]?[1-9][0-9]{1,3}[EH]?") { _, m ->
@@ -282,7 +282,7 @@ internal object Plates {
     )
 
     /**
-     * 上下两行拼起来、写法不够独特的，只圈出：越南的「51F」/「123.45」、意大利摩托的「AB」/「12345」、香港方牌，
+     * 上下两行拼起来、写法不够独特的，认了也不打码：越南的「51F」/「123.45」、意大利摩托的「AB」/「12345」、香港方牌，
      * 日本牌假名和补位的点都读丢了的「品川 300」/「12」。不收三个字母压四位数字（巴西旧摩托牌）：表格里「PIN」下面是「1234」。
      */
     val TWO_ROW_LOOSE: List<PlateShape> = listOf(
@@ -546,7 +546,7 @@ class PlateLabel(private val confidence: Float) : Finder {
  * - 整行就是一块牌。牌上的别的东西常和号码读进同一行：欧盟蓝条上的国别字母（「F AB-123-CD」，一圈星星读成「O」：
  *   「OE 1234 BCD」）、法国右边的省份号（「… 75」）、意大利的省份贴（「… RM」）。行首至多去掉两段、行尾至多去掉一段再对；
  * - 附近没有别的字：上下左右两个字高以内没有别的行，牌上的小字（州名、国别、「RUS」）不算。
- * 认了只圈出。
+ * 认了也不打码。
  *
  * 欧盟蓝条的国别字母粘在号码上、去掉它是写法独特的一种的（「PAB-123-CD」，见 [gluedBand]），也要孤零零一行才认，认了打码：
  * 去掉头一个字母就像法国的牌，截图里、规格表里的型号多的是（「HDX-500-WH」「MSR-150-BK」「DHL-123-AB」）。
@@ -665,7 +665,7 @@ class LonePlate(private val confidence: Float) : PageFinder {
  * 日本牌下一行的假名比数字矮一半以上，常常自成一段，同一排挨着的几段拼在一起。
  *
  * 两行拼成一行（中间一个空格）再对写法：对上 [Plates.TWO_ROW] 或 [Plates.DISTINCT] 的打码；
- * 对上 [Plates.TWO_ROW_LOOSE] 或 [Plates.ALONE] 的要附近没有别的字（同 [LonePlate]），只圈出。两行合成一个框（PageMatch.also）。
+ * 对上 [Plates.TWO_ROW_LOOSE] 或 [Plates.ALONE] 的要附近没有别的字（同 [LonePlate]），认了也不打码。两行合成一个框（PageMatch.also）。
  */
 class TwoRowPlate(private val confidence: Float) : PageFinder {
 

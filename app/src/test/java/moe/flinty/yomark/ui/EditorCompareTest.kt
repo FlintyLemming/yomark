@@ -26,7 +26,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.isolatedSettingsStore
@@ -82,12 +81,11 @@ class EditorCompareTest {
         CandidateMerger(),
     )
 
-    private fun item(id: String, top: Float, kind: SensitiveKind, state: MaskState) =
-        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE, state)
+    private fun item(id: String, top: Float, kind: SensitiveKind) =
+        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE)
 
     /** 默认样式是天蓝色块。 */
-    private val phone = item("phone", 40f, SensitiveKind.PHONE, MaskState.MASKED)
-    private val url = item("url", 120f, SensitiveKind.URL, MaskState.OUTLINED)
+    private val phone = item("phone", 40f, SensitiveKind.PHONE)
 
     /** 打开一张白图，识别（什么也没有）跑完后换上 [plan]，等动效走完。 */
     private fun open(plan: MaskPlan): EditorViewModel {
@@ -143,10 +141,8 @@ class EditorCompareTest {
     private val compareButton get() = compose.onNodeWithContentDescription("按住对比")
 
     @Test fun `holding compare shows the image before masking, letting go brings the masks back`() {
-        open(MaskPlan(listOf(phone, url)))
+        open(MaskPlan(listOf(phone)))
         val masked = window()
-        // 圈出没打码的网址不画：画布上没有琥珀色的虚线框和类型标签（2026-10-14）
-        assertThat(masked.count(Color.rgb(0xFF, 0xB3, 0x00))).isEqualTo(0)
 
         compareButton.assertIsEnabled().performTouchInput { down(center) }
         frames(SETTLE_FRAMES)
@@ -163,12 +159,12 @@ class EditorCompareTest {
     }
 
     @Test fun `nothing masked yet, nothing to compare`() {
-        open(MaskPlan(listOf(url)))
+        open(MaskPlan.empty())
         compareButton.assertIsNotEnabled()
     }
 
     @Test fun `a purpose watermark alone is worth comparing`() {
-        val vm = open(MaskPlan(listOf(url)))
+        val vm = open(MaskPlan.empty())
         compose.runOnUiThread { vm.setPurposeText("仅供测试使用") }
         frames(SETTLE_FRAMES)
         compareButton.assertIsEnabled()

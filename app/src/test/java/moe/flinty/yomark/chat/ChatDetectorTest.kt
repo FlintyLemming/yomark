@@ -37,9 +37,9 @@ class ChatDetectorTest {
         image to runBlocking { PaddleTextRecognizer(ApplicationProvider.getApplicationContext()).recognize(image) }
     }
 
-    private fun detect(res: String, masked: Boolean = true): List<Candidate> {
+    private fun detect(res: String): List<Candidate> {
         val (image, lines) = read(res)
-        return runBlocking { ChatDetector(masked).analyze(image, lines) }
+        return runBlocking { ChatDetector().analyze(image, lines) }
     }
 
     private fun List<Candidate>.of(kind: SensitiveKind) = filter { it.kind == kind }
@@ -58,10 +58,6 @@ class ChatDetectorTest {
         // 单聊页上没有昵称；消息里的字一个都不该被当成昵称
         assertThat(found.of(SensitiveKind.CHAT_NAME)).isEmpty()
         assertThat(found.all { it.enabledByDefault }).isTrue()
-    }
-
-    @Test fun `outlined setting only outlines`() {
-        assertThat(detect("/play/chat-page.png", masked = false).none { it.enabledByDefault }).isTrue()
     }
 
     /** 不是聊天的页（订单页、物流页）上什么都不出。 */
@@ -96,7 +92,7 @@ class ChatDetectorTest {
         assertThat(image.scale).isEqualTo(1f)
         assertThat(image.bitmap.width to image.bitmap.height).isEqualTo(1080 to 5148)
         val lines = runBlocking { PaddleTextRecognizer(ApplicationProvider.getApplicationContext()).recognize(image) }
-        val found = runBlocking { ChatDetector(true).analyze(image, lines) }
+        val found = runBlocking { ChatDetector().analyze(image, lines) }
 
         val title = found.of(SensitiveKind.CHAT_TITLE).single().box()
         assertWithMessage("标题 $title").that(ChatFixtures.matches(title, fx.title!!.box)).isTrue()

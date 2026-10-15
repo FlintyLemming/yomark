@@ -94,14 +94,14 @@ class MlKitBarcodeDetectorTest {
     }
 
     /**
-     * 手画的条纹 ML Kit 认得出是条码、解不出内容：宽松模式只圈出，严格模式不报。
-     * 疑似条码的 rawValue 是空串，以前按 != null 判，它被当成解出来的，默认打码。
+     * 手画的条纹 ML Kit 认得出是条码、解不出内容：宽松模式报出来（2026-10-14 起没有「圈出」，报出来就打码），严格模式不报。
+     * 疑似条码的 rawValue 是空串，以前按 != null 判，它被当成解出来的；现在置信度低一档，看得出是疑似的。
      */
     @Test
-    fun an_undecodable_code_is_only_outlined() = runTest {
+    fun an_undecodable_code_is_reported_only_in_loose_mode() = runTest {
         val loose = MlKitBarcodeDetector(BarcodeOption.LOOSE).detect(barcodeImage())
         assertThat(loose).isNotEmpty()
-        loose.forEach { assertThat(it.enabledByDefault).isFalse() }
+        loose.forEach { assertThat(it.confidence).isLessThan(0.9f) }
         assertThat(MlKitBarcodeDetector(BarcodeOption.STRICT).detect(barcodeImage())).isEmpty()
     }
 

@@ -14,7 +14,6 @@ import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -92,35 +91,27 @@ class EditorViewModelAnalysisTest {
         return f.toUri()
     }
 
+    /** 2026-10-14 起没有「圈出」：要打码的进 plan，不打码的认出来了也不进。 */
     @Test
-    fun `analysis fills the plan with tri-state items`() = runTest(dispatcher) {
+    fun `analysis masks what should be masked and leaves out the rest`() = runTest(dispatcher) {
         val vm = vm(listOf(
             candidate("hi", enabled = true, 10f, 10f, 60f, 30f),
             candidate("lo", enabled = false, 100f, 10f, 160f, 30f),
         ))
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
-        val states = vm.state.value.plan.items.associate { it.candidateId to it.state }
-        assertThat(states["hi"]).isEqualTo(MaskState.MASKED)
-        assertThat(states["lo"]).isEqualTo(MaskState.OUTLINED)
-        assertThat(vm.state.value.plan.pendingCount).isEqualTo(1)
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("hi")
     }
 
     /** 手里拿着画笔打开一张图：识别出来直接打的码用「打码」里上次选的样式，画笔只做标记。 */
     @Test
     fun `detected masks take the last redact style even with the pen in hand`() = runTest(dispatcher) {
-        val vm = vm(listOf(
-            candidate("hi", enabled = true, 10f, 10f, 60f, 30f),
-            candidate("lo", enabled = false, 100f, 10f, 160f, 30f),
-        ))
+        val vm = vm(listOf(candidate("hi", enabled = true, 10f, 10f, 60f, 30f)))
         vm.setStyle(MaskStyle.PIXELATE)
         vm.setStyle(MaskStyle.PEN)
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.find("hi")!!.look.style).isEqualTo(MaskStyle.PIXELATE)
-        vm.onTap(PointF(130f, 20f))                                        // 圈出的那一处点成打码
-        assertThat(vm.state.value.plan.find("lo")!!.state).isEqualTo(MaskState.MASKED)
-        assertThat(vm.state.value.plan.find("lo")!!.look.style).isEqualTo(MaskStyle.PIXELATE)
         assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.PEN)
     }
 
@@ -145,11 +136,11 @@ class EditorViewModelAnalysisTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
         vm.onTap(PointF(30f, 20f))
-        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.OUTLINED)
+        assertThat(vm.state.value.plan.items).isEmpty()
         assertThat(vm.state.value.canUndo).isTrue()
 
         vm.undo()
-        assertThat(vm.state.value.plan.items.single().state).isEqualTo(MaskState.MASKED)
+        assertThat(vm.state.value.plan.items.single().candidateId).isEqualTo("x")
     }
 
     @Test
@@ -230,7 +221,7 @@ class EditorViewModelAnalysisTest {
         var boom: Boolean = false,
         private val out: List<Candidate> = listOf(
             Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
-                SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f, enabledByDefault = false)
+                SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f)
         ),
     ) : SensitivityClassifier {
         override val id = "nano"
@@ -271,9 +262,10 @@ class EditorViewModelAnalysisTest {
     }
 
     @Test
-    fun `asking for an ai review appends outlined AI items and one undo removes them`() = runTest(dispatcher) {
+    fun `asking for an ai review masks what it finds and one undo removes them`() = runTest(dispatcher) {
         val nano = Nano()
         val vm = vmWithNano(nano)
+        vm.setStyle(MaskStyle.BLUR)
         vm.onImageChosen(sampleUri("nano-run.jpg")); advanceUntilIdle()
 
         vm.runAiReview(); advanceUntilIdle()
@@ -281,7 +273,7 @@ class EditorViewModelAnalysisTest {
         val items = vm.state.value.plan.items.associateBy { it.candidateId }
         assertThat(nano.calls).isEqualTo(1)
         assertThat(items.keys).containsExactly("rule", "llm")
-        assertThat(items.getValue("llm").state).isEqualTo(MaskState.OUTLINED)   // 只圈出，不打码
+        assertThat(items.getValue("llm").look.style).isEqualTo(MaskStyle.BLUR)    // 直接打码，用「打码」里的样式
         assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
         assertThat(vm.state.value.message).isNull()                            // 结果写在按钮上，不弹提示
 

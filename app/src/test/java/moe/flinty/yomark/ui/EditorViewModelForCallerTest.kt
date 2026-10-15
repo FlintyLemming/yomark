@@ -15,7 +15,6 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.isolatedSettingsStore
@@ -122,24 +121,6 @@ class EditorViewModelForCallerTest {
         assertThat(vm.state.value.message).isEqualTo(EditorMessage.HandedOver(listOf(Uri.parse("content://fake/1"))))
         // 编辑器马上就关，按钮不再放开
         assertThat(vm.state.value.exporting).isTrue()
-    }
-
-    @Test
-    fun `pending items are still asked about before handing back`() = runTest(dispatcher) {
-        val vm = vm()
-        vm.onImageChosen(sampleUri("c2.jpg")); advanceUntilIdle()
-        vm.replacePlanForTest(
-            vm.state.value.plan.add(
-                MaskItem("p", box, SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.OUTLINED),
-            ),
-        )
-
-        vm.requestExport(); advanceUntilIdle()
-        assertThat(vm.state.value.pendingDialogVisible).isTrue()
-        assertThat(sink.writes).isEqualTo(0)
-
-        vm.confirmMaskAllAndExport(); advanceUntilIdle()
-        assertThat(vm.state.value.message).isInstanceOf(EditorMessage.HandedOver::class.java)
     }
 
     @Test

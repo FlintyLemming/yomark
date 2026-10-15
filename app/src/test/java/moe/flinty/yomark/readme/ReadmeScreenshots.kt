@@ -11,7 +11,6 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import moe.flinty.yomark.core.image.ImageIntake
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.data.isolatedSettingsStore
 import moe.flinty.yomark.engine.CandidateMerger
@@ -97,7 +96,7 @@ class ReadmeScreenshots {
             shadowOf(Looper.getMainLooper()).idle()
             Thread.sleep(20)
         }
-        println("识别结果：" + vm.state.value.plan.items.joinToString { "${it.kind}/${it.state}" })
+        println("识别结果：" + vm.state.value.plan.items.joinToString { "${it.kind}/${it.source}" })
         settle()
         return vm
     }
@@ -133,7 +132,7 @@ class ReadmeScreenshots {
                 vm.setStyle(style)
                 val look = vm.state.value.brush
                 val plan = vm.state.value.plan
-                vm.replacePlanForTest(plan.copy(items = plan.items.map { if (it.state == MaskState.MASKED) it.copy(look = look) else it }))
+                vm.replacePlanForTest(plan.copy(items = plan.items.map { it.copy(look = look) }))
             }
             settle()
             shoot("editor-${style.name.lowercase()}")

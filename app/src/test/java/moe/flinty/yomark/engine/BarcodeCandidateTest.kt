@@ -13,7 +13,8 @@ import org.robolectric.RobolectricTestRunner
 
 /**
  * 真机上商品图的印花被判成条码并**默认打码**，把整块图涂黑。
- * 修法不是关掉宽松模式（那会丢掉倾斜的收款码），而是让解不出内容的那部分只圈不打码。
+ * 修法不是关掉宽松模式（那会丢掉倾斜的收款码），而是让解不出内容的那部分只圈不打码；
+ * 2026-10-14 起没有「圈出」，严格模式（出厂）干脆不报解不出的，宽松模式报出来的照样打码。
  */
 @RunWith(RobolectricTestRunner::class)
 class BarcodeCandidateTest {
@@ -27,19 +28,9 @@ class BarcodeCandidateTest {
         assertThat(c.source).isEqualTo(DetectorSource.BARCODE)
     }
 
-    /** 解不出内容 = 可能只是布料纹理。圈出来，交给导出拦截兜底。 */
-    @Test fun `undecodable barcode is only outlined`() {
-        assertThat(BarcodeCandidates.from(0, quad, decodable = false).enabledByDefault).isFalse()
-    }
-
-    /** 设置里条码设成「仅圈出」：解得出内容的也只圈出。 */
-    @Test fun `decodable barcode is only outlined when barcodes are set to outline`() {
-        assertThat(BarcodeCandidates.from(0, quad, decodable = true, masked = false).enabledByDefault).isFalse()
-    }
-
-    /** 反过来不成立：设成「打码」也不会把解不出内容的疑似条码打上码。 */
-    @Test fun `undecodable barcode stays outlined even when barcodes are set to mask`() {
-        assertThat(BarcodeCandidates.from(0, quad, decodable = false, masked = true).enabledByDefault).isFalse()
+    /** 宽松模式才报解不出内容的：用户要的就是宁可多遮，照样打码。 */
+    @Test fun `undecodable barcode is masked too`() {
+        assertThat(BarcodeCandidates.from(0, quad, decodable = false).enabledByDefault).isTrue()
     }
 
     @Test fun `undecodable barcode carries lower confidence`() {

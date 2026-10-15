@@ -6,7 +6,6 @@ import android.graphics.RectF
 import android.net.Uri
 import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.render.MaskOrder
 import moe.flinty.yomark.render.RendererRegistry
 import kotlinx.coroutines.CoroutineDispatcher
@@ -70,7 +69,7 @@ class Exporter(
             // 每块码按它自己的样式画（spec §7.5 修订），顺序与预览一致（见 MaskOrder）。
             // 近似色先在还没画码的原图上全部取好，再一块块地画：后画的模糊、马赛克读的是底下已经画上去的码。
             val maskedBounds = ArrayList<RectF>()
-            MaskOrder.forDrawing(request.plan.items.filter { it.state == MaskState.MASKED })
+            MaskOrder.forDrawing(request.plan.items)
                 .map { item ->
                     val quad = item.quad.scaled(factor)
                     val options = item.look.options.copy(renderScale = renderScale)

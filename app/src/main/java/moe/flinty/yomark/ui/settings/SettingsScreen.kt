@@ -46,7 +46,6 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, CHAT, AI,
 @Composable
 fun SettingsScreen(
     config: RecognitionConfig,
-    exportReminder: Boolean,
     onOpen: (SettingsPage) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -108,7 +107,7 @@ fun SettingsScreen(
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_export),
-                    summary = stringResource(if (exportReminder) R.string.reminder_on else R.string.reminder_off),
+                    summary = stringResource(R.string.watermark_style),
                     icon = Icons.Outlined.IosShare,
                     iconColors = SettingsIconColors.teal,
                     onClick = { onOpen(SettingsPage.EXPORT) },
@@ -154,13 +153,12 @@ fun SettingsScreen(
     }
 }
 
-/** 「打码 11 类 · 圈出 5 类 · PP-OCR」：有关掉的再加一段「关闭 1 类」，最后是识别引擎。 */
+/** 「打码 15 类 · 关闭 5 类 · PP-OCR」：没有关掉的就只写打码几类，最后是识别引擎。 */
 @Composable
 internal fun textSummary(config: RecognitionConfig): String {
     val counts = RuleCatalog.all.groupingBy { RuleCatalog.stateOf(config, it.id) }.eachCount()
     val parts = listOf(
         RuleState.MASKED to R.string.summary_masked,
-        RuleState.OUTLINED to R.string.summary_outlined,
         RuleState.OFF to R.string.summary_off,
     ).mapNotNull { (state, label) ->
         counts[state]?.let { stringResource(R.string.count_kinds, it, stringResource(label)) }

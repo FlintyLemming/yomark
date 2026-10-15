@@ -8,7 +8,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import com.google.common.truth.Truth.assertThat
@@ -31,7 +30,7 @@ class MaskOrderTest {
     ) = MaskItem(
         id, Quad.fromRect(RectF(0f, 0f, size, size)),
         if (source == DetectorSource.MANUAL) SensitiveKind.MANUAL else SensitiveKind.PHONE,
-        source, MaskState.MASKED, MaskLook(style, MaskOptions(solidNear = near)),
+        source, MaskLook(style, MaskOptions(solidNear = near)),
     )
 
     @Test fun `manual boxes stack in the order they were drawn, whatever their style`() {

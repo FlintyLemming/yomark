@@ -15,20 +15,16 @@ class FaceCandidateTest {
 
     private val box = RectF(100f, 100f, 200f, 220f)
 
-    @Test fun `a face is masked when faces are set to mask`() {
-        val c = FaceCandidates.from(0, trackingId = null, box, 1000, 1000, masked = true)
+    @Test fun `a face is masked`() {
+        val c = FaceCandidates.from(0, trackingId = null, box, 1000, 1000)
         assertThat(c.enabledByDefault).isTrue()
         assertThat(c.kind).isEqualTo(SensitiveKind.FACE)
         assertThat(c.source).isEqualTo(DetectorSource.FACE)
     }
 
-    @Test fun `a face is only outlined when faces are set to outline`() {
-        assertThat(FaceCandidates.from(0, null, box, 1000, 1000, masked = false).enabledByDefault).isFalse()
-    }
-
     /** ML Kit 的框只包住五官，发际线和下巴在外面：四边都得往外扩，上边扩得最多。 */
     @Test fun `the box grows past the features, most of all upwards`() {
-        val r = FaceCandidates.from(0, null, box, 1000, 1000, masked = true).quad.bounds()
+        val r = FaceCandidates.from(0, null, box, 1000, 1000).quad.bounds()
         assertThat(r.left).isLessThan(box.left)
         assertThat(r.right).isGreaterThan(box.right)
         assertThat(r.bottom).isGreaterThan(box.bottom)
@@ -40,7 +36,7 @@ class FaceCandidateTest {
      * 原图 600×1000，转正的图 1000×600；转正的图上的 (u, v) 是原图上的 (600 − v, u)。
      */
     @Test fun `a face found upright maps back onto the original with the hairline side kept`() {
-        val c = FaceCandidates.fromUpright(0, null, box, imageWidth = 600, imageHeight = 1000, turns = 1, masked = true)
+        val c = FaceCandidates.fromUpright(0, null, box, imageWidth = 600, imageHeight = 1000, turns = 1)
         val r = c.quad.bounds()
         val face = RectF(380f, 100f, 500f, 200f)
         assertThat(r.contains(face)).isTrue()
@@ -50,7 +46,7 @@ class FaceCandidateTest {
     }
 
     @Test fun `the box never leaves the image`() {
-        val r = FaceCandidates.from(0, null, RectF(0f, 0f, 100f, 100f), 100, 100, masked = true).quad.bounds()
+        val r = FaceCandidates.from(0, null, RectF(0f, 0f, 100f, 100f), 100, 100).quad.bounds()
         assertThat(r.left).isAtLeast(0f)
         assertThat(r.top).isAtLeast(0f)
         assertThat(r.right).isAtMost(100f)
