@@ -2,7 +2,6 @@ package moe.flinty.yomark.render
 
 import android.graphics.Bitmap
 import moe.flinty.yomark.core.geometry.Quad
-import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
@@ -11,7 +10,8 @@ import moe.flinty.yomark.core.model.MaskStyle
 /**
  * 码的绘制顺序。预览（ImageCanvas）与导出（Exporter）共用，所见即所得靠它。
  *
- * 后来的盖在先来的上面：识别出的在底下（同一批里大的先画、小的盖在上面），手动框按画的先后叠上去。
+ * 后来的盖在先来的上面：识别出的在底下（同一批里大的先画、小的盖在上面），用户自己加的（手动框、点一行字打上的码）
+ * 按加的先后叠上去。
  * 在色块上再拉一个模糊框，模糊就该在色块上面——早先读像素的样式一律先画，模糊反倒被压在色块底下。
  *
  * 读像素的样式（马赛克、模糊）读的是画到它这一层时底下的样子：导出本来就在同一张位图上一块接一块地画，
@@ -29,8 +29,8 @@ object MaskOrder {
     }
 
     fun forDrawing(items: List<MaskItem>): List<MaskItem> {
-        val (detected, manual) = items.partition { it.source != DetectorSource.MANUAL }
-        return detected.sortedByDescending { it.quad.area() } + manual
+        val (byUser, detected) = items.partition { it.byUser }
+        return detected.sortedByDescending { it.quad.area() } + byUser
     }
 
     /**

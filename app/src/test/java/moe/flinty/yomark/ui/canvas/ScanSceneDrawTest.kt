@@ -10,7 +10,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
@@ -43,7 +42,7 @@ class ScanSceneDrawTest {
     private fun block(id: String, y: Float, source: DetectorSource) = MaskItem(
         id, Quad.fromRect(RectF(10f, y, 110f, y + 30f)),
         if (source == DetectorSource.MANUAL) SensitiveKind.MANUAL else SensitiveKind.PHONE,
-        source, MaskState.MASKED,
+        source,
     )
 
     private fun image(paint: (Bitmap) -> Unit = { it.eraseColor(Color.WHITE) }) =
@@ -126,6 +125,18 @@ class ScanSceneDrawTest {
     fun `once settled every block is drawn as usual`() {
         val frame = render(null)
         listOf(top, manual, bottom).forEach { assertThat(frame.at(it)).isEqualTo(MaskOptions.SKY_BLUE) }
+    }
+
+    /** 点一行字打上的码和手动框一样是用户自己加的：识别中（换方案重跑）也一直在，浮在光上面。 */
+    @Test
+    fun `a tapped line stays through recognition`() {
+        val line = block("line", 600f, DetectorSource.LINE).copy(kind = SensitiveKind.MANUAL)
+        val source = image()
+        val frame = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888).also {
+            drawScene(Canvas(it), source, MaskPlan(listOf(top, line)), RendererRegistry.default(), scale, density, ScanTime.START, ScanPaints())
+        }
+        assertThat(frame.at(top)).isEqualTo(Color.WHITE)
+        assertThat(frame.at(line)).isEqualTo(MaskOptions.SKY_BLUE)
     }
 
     @Test

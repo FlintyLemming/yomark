@@ -85,8 +85,8 @@ class RuleClassifierTest {
     private suspend fun attached(vararg lines: TextLine) =
         RuleClassifier(listOf(guess), anchors = attachedAnchors).classify(lines.toList())
 
-    private suspend fun guesses(vararg lines: TextLine, keepUnanchored: Boolean = false) =
-        RuleClassifier(listOf(guess), keepUnanchored = keepUnanchored, anchors = digitAnchors).classify(lines.toList())
+    private suspend fun guesses(vararg lines: TextLine, maskUnanchored: Boolean = false) =
+        RuleClassifier(listOf(guess), maskUnanchored = maskUnanchored, anchors = digitAnchors).classify(lines.toList())
 
     /** 同一行有旁证：照规则的设置打码。 */
     @Test
@@ -117,11 +117,11 @@ class RuleClassifierTest {
         assertThat(guesses(line("abc xyz"))).isEmpty()
     }
 
-    /** 设置 › 文字 › 人名里打开「没有旁证的也圈出」：留下来，但只圈不打码。 */
+    /** 设置 › 文字 › 人名里打开「没有旁证的也打码」：留下来，照样打码。 */
     @Test
-    fun `an unanchored guess is outlined when the setting keeps it`() = runTest {
-        val out = guesses(line("abc"), keepUnanchored = true)
-        assertThat(out.single().enabledByDefault).isFalse()
+    fun `an unanchored guess is masked when the setting asks for it`() = runTest {
+        val out = guesses(line("abc"), maskUnanchored = true)
+        assertThat(out.single().enabledByDefault).isTrue()
     }
 
     /** 猜测落在旁证里面：旁证撑不住它自己里面的那一截。 */
@@ -132,9 +132,9 @@ class RuleClassifierTest {
         assertThat(out).isEmpty()
     }
 
-    /** 规则选的「圈出」照样管有旁证的猜测：旁证只决定留不留，不把圈出升成打码。 */
+    /** 规则本身不打码，有旁证的猜测也不打：旁证只决定留不留，不把不打码升成打码。 */
     @Test
-    fun `an anchored guess in an outlined rule stays outlined`() = runTest {
+    fun `an anchored guess in a rule that does not mask is not masked`() = runTest {
         val outlined = CompositeRule(
             id = "guess", kind = SensitiveKind.PERSON_NAME, enabledByDefault = false,
             NeedsAnchor(Finder { t -> Regex("""[a-z]{3}""").findAll(t).map { RuleMatch(it.range, 0.6f) }.toList() }),

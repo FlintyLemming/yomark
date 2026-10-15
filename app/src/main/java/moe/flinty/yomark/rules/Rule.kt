@@ -5,7 +5,7 @@ import moe.flinty.yomark.core.model.SensitiveKind
 /**
  * @param needsAnchor 这一处只是猜测：要页面上附近有电话、证件号、地址或「收货人」这类字段才算数。
  *   见 [NeedsAnchor]。
- * @param outlineOnly 这一处只圈不打码，不管这一类设的是打码还是仅圈出：误报率高出一截、又找不到旁证可要的认法，
+ * @param outlineOnly 这一处认出来也不打码，不管这一类开没开（名字沿用原先「只圈出」的时候）：误报率高出一截、又找不到旁证可要的认法，
  *   比如照片上孤零零一行的德国车牌（LonePlate）。这一类设成「关闭」时它也跟着关；
  *   同一处别的类型认出了东西，它让开（RuleClassifier）。
  */
@@ -26,8 +26,8 @@ fun interface Finder {
  * 它与其余认法合在一条规则里、共用设置页上的一行，跟着那一行开关。
  *
  * 一行文字看不出旁证在哪，所以由 RuleClassifier 看整页再定：有旁证（旁证表见 DefaultRuleSet.nameAnchors：
- * 紧挨着的称呼，或者同一行、上下相邻一行的电话、证件号……）的，照这一行的设置打码或圈出；没有的，出厂丢掉，
- * 设置 › 文字 › 人名里打开「没有旁证的也圈出」才只圈不打码。
+ * 紧挨着的称呼，或者同一行、上下相邻一行的电话、证件号……）的，照这一行的设置打码；没有的，出厂丢掉，
+ * 设置 › 文字 › 人名里打开「没有旁证的也打码」才照样打码。
  */
 class NeedsAnchor(private val finder: Finder) : Finder {
     override fun findIn(text: String): List<RuleMatch> =

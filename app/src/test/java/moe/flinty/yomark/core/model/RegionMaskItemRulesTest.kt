@@ -12,7 +12,7 @@ import org.robolectric.RobolectricTestRunner
  *
  * 这几条本来写成实机人工走查。`MaskPlanFactory` 与 `MaskPlan.remove` 都是
  * 与 kind 无关的纯逻辑，把它们钉在单测里，实机那一趟就只剩「肉眼看一下」，
- * 不再是唯一的验证手段。
+ * 不再是唯一的验证手段。2026-10-14 起没有「圈出」：点一下就是拿掉，撤销能回来。
  */
 @RunWith(RobolectricTestRunner::class)
 class RegionMaskItemRulesTest {
@@ -26,48 +26,15 @@ class RegionMaskItemRulesTest {
     private fun planOf(vararg c: Candidate) = MaskPlan(MaskPlanFactory.itemsFrom(c.toList()))
 
     @Test
-    fun `faces and barcodes enter the editor already masked`() {
-        val plan = planOf(face, barcode)
-        assertThat(plan.items.map { it.state })
-            .containsExactly(MaskState.MASKED, MaskState.MASKED)
-        assertThat(plan.pendingCount).isEqualTo(0)
+    fun `faces and barcodes enter the editor masked`() {
+        assertThat(planOf(face, barcode).items.map { it.candidateId }).containsExactly(face.id, barcode.id).inOrder()
     }
 
     @Test
-    fun `tapping a face toggles between masked and outlined, both ways`() {
-        val plan = planOf(face)
-        val once = plan.toggle(face.id, MaskLook())
-        assertThat(once.find(face.id)!!.state).isEqualTo(MaskState.OUTLINED)
-        assertThat(once.toggle(face.id, MaskLook()).find(face.id)!!.state).isEqualTo(MaskState.MASKED)
-    }
-
-    @Test
-    fun `tapping a barcode toggles between masked and outlined, both ways`() {
-        val plan = planOf(barcode)
-        val once = plan.toggle(barcode.id, MaskLook())
-        assertThat(once.find(barcode.id)!!.state).isEqualTo(MaskState.OUTLINED)
-        assertThat(once.toggle(barcode.id, MaskLook()).find(barcode.id)!!.state).isEqualTo(MaskState.MASKED)
-    }
-
-    @Test
-    fun `neither a face nor a barcode can be deleted`() {
-        val plan = planOf(face, barcode)
-        assertThat(plan.remove(face.id).items).hasSize(2)
-        assertThat(plan.remove(barcode.id).items).hasSize(2)
-    }
-
-    @Test
-    fun `an outlined face still cannot be deleted and still blocks export`() {
-        val plan = planOf(face).toggle(face.id, MaskLook())
-        assertThat(plan.pendingCount).isEqualTo(1)
-        assertThat(plan.remove(face.id).items).hasSize(1)
-    }
-
-    @Test
-    fun `only the manual box next to them is removable`() {
+    fun `a face or a barcode taken off leaves the rest`() {
         val manual = region("m-1", SensitiveKind.MANUAL, DetectorSource.MANUAL)
         val plan = planOf(face, barcode, manual)
-        assertThat(plan.remove(manual.id).items.map { it.candidateId })
-            .containsExactly(face.id, barcode.id).inOrder()
+        assertThat(plan.remove(face.id).items.map { it.candidateId }).containsExactly(barcode.id, manual.id).inOrder()
+        assertThat(plan.remove(barcode.id).items.map { it.candidateId }).containsExactly(face.id, manual.id).inOrder()
     }
 }

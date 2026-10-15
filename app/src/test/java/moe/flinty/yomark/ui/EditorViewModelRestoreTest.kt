@@ -13,7 +13,6 @@ import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -107,7 +106,7 @@ class EditorViewModelRestoreTest {
     @Test
     fun `the image and the plan come back after recreation`() = runTest(dispatcher) {
         val saved = SavedStateHandle()
-        val first = vm(saved, CountingClassifier(listOf(candidate("a", true), candidate("b", false, l = 200f, t = 200f))))
+        val first = vm(saved, CountingClassifier(listOf(candidate("a", true), candidate("b", true, l = 200f, t = 200f))))
         first.setStyle(MaskStyle.PIXELATE)           // 识别出来的码打成马赛克：每块码的样式要跟着 plan 回来
         first.onImageChosen(sampleUri()); advanceUntilIdle()
         assertThat(first.state.value.plan.items).hasSize(2)
@@ -121,7 +120,6 @@ class EditorViewModelRestoreTest {
         assertThat(second.state.value.plan.items.map { it.candidateId })
             .containsExactly("a", "b").inOrder()
         assertThat(second.state.value.plan.find("a")!!.look.style).isEqualTo(MaskStyle.PIXELATE)
-        assertThat(second.state.value.plan.pendingCount).isEqualTo(1)
     }
 
     @Test
@@ -146,9 +144,8 @@ class EditorViewModelRestoreTest {
 
         val second = vm(saved, CountingClassifier(emptyList()))
         advanceUntilIdle()
-        assertThat(second.state.value.plan.items).hasSize(2)
-        assertThat(second.state.value.plan.items.map { it.state })
-            .containsExactly(MaskState.MASKED, MaskState.MASKED)
+        assertThat(second.state.value.plan.items.map { it.source })
+            .containsExactly(DetectorSource.RULE, DetectorSource.MANUAL).inOrder()
     }
 
     @Test

@@ -17,7 +17,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
@@ -67,7 +66,7 @@ class EndToEndManualRedactionTest {
             items = listOf(
                 MaskItem(
                     "e2e", Quad.fromRect(RectF(400f * f, 400f * f, 800f * f, 600f * f)),
-                    SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
+                    SensitiveKind.MANUAL, DetectorSource.MANUAL,
                 )
             ),
         )

@@ -26,10 +26,10 @@ class NameAnchorPageTest {
 
     private suspend fun names(
         lines: List<TextLine>,
-        keepUnanchored: Boolean = false,
+        maskUnanchored: Boolean = false,
         anchors: List<NameAnchor> = DefaultRuleSet.nameAnchors,
     ): List<Candidate> =
-        RuleClassifier(DefaultRuleSet.rules, keepUnanchored = keepUnanchored, anchors = anchors).classify(lines)
+        RuleClassifier(DefaultRuleSet.rules, maskUnanchored = maskUnanchored, anchors = anchors).classify(lines)
             .filter { it.kind == SensitiveKind.PERSON_NAME }
 
     private fun Candidate.text(lines: List<TextLine>): String = textIn(lines)
@@ -77,13 +77,13 @@ class NameAnchorPageTest {
         assertThat(names(lines)).isEmpty()
     }
 
-    /** 聊天里随口提到的人名，附近没有旁证：出厂不圈；设置里打开后只圈不打码。 */
-    @Test fun `a name in a chat sentence is dropped unless the setting keeps it`() = runTest {
+    /** 聊天里随口提到的人名，附近没有旁证：出厂不打；设置里打开「没有旁证的也打码」后照样打码。 */
+    @Test fun `a name in a chat sentence is dropped unless the setting masks it`() = runTest {
         val lines = page("对了，转告周振宇周三的会", "好的")
         assertThat(names(lines)).isEmpty()
-        val kept = names(lines, keepUnanchored = true).single()
+        val kept = names(lines, maskUnanchored = true).single()
         assertThat(kept.text(lines)).isEqualTo("周振宇")
-        assertThat(kept.enabledByDefault).isFalse()
+        assertThat(kept.enabledByDefault).isTrue()
     }
 
     /** 字段名、电话锚定的名字本来就不要旁证，照常打码。 */

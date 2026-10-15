@@ -7,11 +7,11 @@ package moe.flinty.yomark.engine
 enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
 
 /**
- * 条码的识别模式。认出来之后打码、仅圈出还是干脆不认，由 [RecognitionConfig.barcodeState] 管。
+ * 条码的识别模式。认出来之后打不打码，由 [RecognitionConfig.barcodeState] 管。
  *
  * LOOSE 连解不出内容的疑似条码也报（`enableAllPotentialBarcodes`），倾斜的收款码不会被
  * 静默丢掉（STRICT 在自造 36 张评测图里丢 6 张）。代价是布料印花、格纹这类有规律纹理
- * 会被判成疑似条码。彩色照片在像素上就筛掉了（`TwoInks`：不是两种墨色印出来的），剩下的只圈不打码。
+ * 会被判成疑似条码。彩色照片在像素上就筛掉了（`TwoInks`：不是两种墨色印出来的），剩下的照样打码。
  *
  * 声明顺序就是设置页上的排列顺序，出厂项排第一；持久化存的是名字，调换顺序不影响老安装。
  * 原先还有一个 OFF，2026-10-07 起「关」挪到了 barcodeState，老安装存着的 OFF 由 SettingsStore 迁过去。
@@ -25,15 +25,28 @@ enum class FaceOption { FAST, ACCURATE }
  * 语义判定（设置页上叫「AI 增强识别」）：让端侧大模型把整页文字再看一遍（spec §14 的 Gemini Nano 接口位）。
  *
  * GEMINI_NANO 不是「每张图都自动跑」，而是「编辑器里给一个 AI 增强识别按钮」——用户点了才跑。
- * 只在支持 AICore 的机型上出现；结果只圈出、不自动打码。枚举名是持久化格式，语义变了名字不改。
+ * 只在支持 AICore 的机型上出现；找到的直接打码。枚举名是持久化格式，语义变了名字不改。
  */
 enum class SemanticOption { GEMINI_NANO, OFF }
 
 /**
- * 一条规则的三态。OFF 的规则根本不进引擎，另两态决定候选的初始 MaskState。
- * 人脸、条码用的也是这三态（[RecognitionConfig.faceState]、[RecognitionConfig.barcodeState]）。
+ * 一类识别结果怎么处理：打码，或者关掉（不认）。OFF 的规则根本不进引擎。
+ * 人脸、条码、聊天记录用的也是它（[RecognitionConfig.faceState]、[RecognitionConfig.barcodeState]、[RecognitionConfig.chatState]）。
+ *
+ * 原先中间还有一档「仅圈出」（OUTLINED），2026-10-14 去掉了：识别结果要么直接打码，要么不打码。
+ * 存着它的老设置读成 OFF（[fromName]）——仅圈出本来就不打码。
  */
-enum class RuleState { OFF, OUTLINED, MASKED }
+enum class RuleState {
+    OFF, MASKED;
+
+    companion object {
+        /** 持久化的名字读回来。认不出的为 null，由调用方退回出厂值。 */
+        fun fromName(name: String): RuleState? =
+            if (name == LEGACY_OUTLINED) OFF else entries.firstOrNull { it.name == name }
+
+        private const val LEGACY_OUTLINED = "OUTLINED"
+    }
+}
 
 /**
  * 识别方案（本文件对应 2026-09-04 的增补设计 §1）。
@@ -49,10 +62,7 @@ data class RecognitionConfig(
     val textEngine: TextEngineOption = TextEngineOption.PADDLE,
     /** 出厂是 STRICT（2026-10-04 起）：不误圈花纹，代价是歪斜、模糊的码可能漏掉。 */
     val barcode: BarcodeOption = BarcodeOption.STRICT,
-    /**
-     * 认出来的条码怎么处理，和文字规则同样的三态。OFF 时条码检测根本不跑。
-     * MASKED 只管解得出内容的那些：解不出的疑似条码（LOOSE 才有）无论如何只圈出。
-     */
+    /** 认出来的条码打不打码，和文字规则一样。OFF 时条码检测根本不跑。 */
     val barcodeState: RuleState = RuleState.MASKED,
     val face: FaceOption = FaceOption.FAST,
     /** 认出来的人脸怎么处理。OFF 时人脸检测根本不跑。 */
@@ -61,11 +71,11 @@ data class RecognitionConfig(
     val chatState: RuleState = RuleState.MASKED,
     val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
-     * 没有旁证、只凭字面猜出的人名要不要圈出来。出厂不圈：HanLP 会把药名、品牌名、规格词都猜成人名，
+     * 没有旁证、只凭字面猜出的人名要不要也打码。出厂不打：HanLP 会把药名、品牌名、规格词都猜成人名，
      * 附近没有电话、证件号、地址、「收货人」这类字段的，十有八九不是人（见 RuleClassifier）。
-     * 打开后这些也圈出，但不打码。人名一行选「关」时它不起作用。
+     * 人名一行选「关」时它不起作用。原先打开后这些只圈出，存档的键沿用那时的。
      */
-    val outlineUnanchoredNames: Boolean = false,
+    val maskUnanchoredNames: Boolean = false,
     /**
      * **只存与出厂默认不同的项。** 存全表的话，出厂默认改了之后老安装会读到
      * 一份冻结的旧全表，变成一个需要迁移的问题；只存差异则新规则天然继承新默认。
@@ -102,7 +112,7 @@ data class RecognitionConfig(
             raw.split(SEP).mapNotNull { entry ->
                 val parts = entry.split(KV)
                 if (parts.size != 2 || parts[0].isBlank()) return@mapNotNull null
-                val state = runCatching { RuleState.valueOf(parts[1]) }.getOrNull() ?: return@mapNotNull null
+                val state = RuleState.fromName(parts[1]) ?: return@mapNotNull null
                 parts[0] to state
             }.toMap()
     }

@@ -5,9 +5,6 @@ import moe.flinty.yomark.core.geometry.Quad
 import kotlinx.parcelize.Parcelize
 import kotlin.math.roundToInt
 
-/** 未圈出的区域根本不在 plan 里，因此只有两个枚举值。 */
-enum class MaskState { MASKED, OUTLINED }
-
 /**
  * 枚举名是持久化格式的一部分（SettingsStore 记着画笔的样式名）。
  * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）；
@@ -19,7 +16,7 @@ enum class MaskStyle {
 
     /**
      * 拿来打码的：色块、马赛克、模糊，底栏的「打码」。马克笔、画笔只在图上做标记（「编辑」），
-     * 识别出来直接打的码、点了打码的虚线框、导出前的「全部打码」都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
+     * 识别出来直接打的码、点一下打上的码都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
      */
     val redacts: Boolean get() = this != MARKER && this != PEN
 }
@@ -182,7 +179,7 @@ data class MaskOptions(
  *
  * 每块码各自记着自己的（2026-10-07 修订，spec §7.5）：换样式不再把整张图的码一起换掉，
  * 而是从下一次打码起生效。编辑器手里那一份叫「画笔」（EditorUiState.brush），新画的框、手画的线用它；
- * 点了打码的虚线框、识别出来直接打码的用「打码」里上次选的那一种（EditorUiState.maskLook）。
+ * 点一下打上的码、识别出来直接打码的用「打码」里上次选的那一种（EditorUiState.maskLook）。
  */
 @Parcelize
 data class MaskLook(
@@ -192,65 +189,46 @@ data class MaskLook(
     fun normalized(): MaskLook = copy(options = options.normalized())
 }
 
+/**
+ * 图上的一块码。plan 里的每一项都打着码：识别结果要么直接打码，要么不打码、根本不进 plan（2026-10-14 起没有「圈出」）；
+ * 点一下识别出的码就是把它从 plan 里拿掉，撤销能回来。
+ */
 @Parcelize
 data class MaskItem(
     val candidateId: String,
     val quad: Quad,                   // 降采样坐标系；导出时按 1/scale 反算
     val kind: SensitiveKind,
     val source: DetectorSource,
-    val state: MaskState,
-    /**
-     * 这块码打上时用的样子。圈出的项也带着一份，但不画；它再被打上码时换成当时「打码」里的样式，
-     * 而不是沿用上一次的——用户换了样式再点虚线框，要的就是新样式。
-     */
+    /** 这块码的样子：用户加的用打上那一刻的画笔或「打码」里的样式，识别出来的用结果到达时「打码」里的样式。 */
     val look: MaskLook = MaskLook(),
     /**
      * 手画的一笔（马克笔、画笔手画时）：[quad] 是它的外接框，渲染器照着这条线画，不填满框。
      * null 是拉的框。手画的那一笔换成打码的样式时盖住整个外接框，宁可多盖。
      */
     val ink: InkPath? = null,
-) : Parcelable
+) : Parcelable {
+
+    /**
+     * 用户自己加的：拉的框、手画的线，点一行字打上的码（见 [DetectorSource]）。
+     * 按加上的先后叠在识别出的码上面（MaskOrder），换方案重跑时留着。
+     */
+    val byUser: Boolean get() = source == DetectorSource.MANUAL || source == DetectorSource.LINE
+}
 
 @Parcelize
 data class MaskPlan(
     val items: List<MaskItem>,
 ) : Parcelable {
-    /** 已识别但尚未打码的数量。导出拦截（spec §7.4）的触发条件。 */
-    val pendingCount: Int get() = items.count { it.state == MaskState.OUTLINED }
-
     /**
-     * 点一下：已打码的退回圈出；圈出的打上码，样子用 [look]（编辑器「打码」里眼下的样式）。
-     * 退回圈出时 look 原样留着，反正不画。
+     * 拿掉一块码：点一下识别出的码、点上的一行，手动框选中后点「删除」。
+     * 识别出的拿掉了也找得回来：撤销，或者点它的字再打一次码（打上的是整行，见 GestureRules.tapTarget）。
      */
-    fun toggle(id: String, look: MaskLook): MaskPlan = copy(
-        items = items.map {
-            when {
-                it.candidateId != id -> it
-                it.state == MaskState.MASKED -> it.copy(state = MaskState.OUTLINED)
-                else -> it.copy(state = MaskState.MASKED, look = look)
-            }
-        }
-    )
-
-    /**
-     * 只有手动框可以被彻底删除（spec §4.2 的不对称规则）。
-     * 规则/人脸/条码命中的候选永不从画面消失——候选一旦消失用户就再也找不回来。
-     */
-    fun remove(id: String): MaskPlan {
-        val target = items.firstOrNull { it.candidateId == id } ?: return this
-        if (target.source != DetectorSource.MANUAL) return this
-        return copy(items = items.filterNot { it.candidateId == id })
-    }
+    fun remove(id: String): MaskPlan = copy(items = items.filterNot { it.candidateId == id })
 
     fun add(item: MaskItem): MaskPlan = copy(items = items + item)
 
     fun replace(item: MaskItem): MaskPlan = copy(
         items = items.map { if (it.candidateId == item.candidateId) item else it }
-    )
-
-    /** 导出拦截里的「全部打码」：圈出的一律用 [look] 打上码，已经打了码的保持原样。 */
-    fun maskAll(look: MaskLook): MaskPlan = copy(
-        items = items.map { if (it.state == MaskState.OUTLINED) it.copy(state = MaskState.MASKED, look = look) else it }
     )
 
     /** 换掉一块码的样子（选中的手动框跟着样式栏改）。 */
@@ -259,18 +237,12 @@ data class MaskPlan(
     )
 
     /**
-     * 换打码样式时一起换（设置「编辑」页的开关）：已打码、用的是盖住内容那三种样式的，都换成 [look]。
-     * 马克笔、画笔画的标注不动；圈出的也不动——它们打码时自然会用那时的画笔。
+     * 换打码样式时一起换（设置「编辑」页的开关）：用的是盖住内容那三种样式的码，都换成 [look]。
+     * 马克笔、画笔画的标注不动。
      */
     fun restyleRedactions(look: MaskLook): MaskPlan = copy(
-        items = items.map { if (it.state == MaskState.MASKED && it.look.style.redacts) it.copy(look = look) else it }
+        items = items.map { if (it.look.style.redacts) it.copy(look = look) else it }
     )
-
-    /** 拦截对话框的「2 个网址、1 个 IP 地址」就是这个 map 渲染出来的。 */
-    fun pendingByKind(): Map<SensitiveKind, Int> =
-        items.filter { it.state == MaskState.OUTLINED }
-            .groupingBy { it.kind }
-            .eachCount()
 
     fun find(id: String): MaskItem? = items.firstOrNull { it.candidateId == id }
 

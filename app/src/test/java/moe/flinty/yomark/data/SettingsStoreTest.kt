@@ -214,14 +214,6 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `export reminder is on by default and remembers being turned off`() = runTest {
-        val store = store()
-        assertThat(store.pendingExportReminder.first()).isTrue()
-        store.setPendingExportReminder(false)
-        assertThat(store.pendingExportReminder.first()).isFalse()
-    }
-
-    @Test
     fun `brand watermark defaults to the chinese style on a chinese system`() = runTest {
         assertThat(isolatedSettingsStore(context) { Locale.SIMPLIFIED_CHINESE }.brandWatermarkStyle.first())
             .isEqualTo(BrandWatermarkStyle.ICON_ZH_EN)

@@ -26,7 +26,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.isolatedSettingsStore
@@ -48,7 +47,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 「按住对比」（手机竖着拿时是底栏胶囊旁边的圆钮）：按住时画布只剩打码前的原图（打码块、圈出框都不画），松手回到打码后。
+ * 「按住对比」（手机竖着拿时是底栏胶囊旁边的圆钮）：按住时画布只剩打码前的原图（打码块都不画），松手回到打码后。
  * 什么都还没打码时没有可比的，按钮灰掉。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -82,12 +81,11 @@ class EditorCompareTest {
         CandidateMerger(),
     )
 
-    private fun item(id: String, top: Float, kind: SensitiveKind, state: MaskState) =
-        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE, state)
+    private fun item(id: String, top: Float, kind: SensitiveKind) =
+        MaskItem(id, Quad.fromRect(RectF(20f, top, 300f, top + 30f)), kind, DetectorSource.RULE)
 
     /** 默认样式是天蓝色块。 */
-    private val phone = item("phone", 40f, SensitiveKind.PHONE, MaskState.MASKED)
-    private val url = item("url", 120f, SensitiveKind.URL, MaskState.OUTLINED)
+    private val phone = item("phone", 40f, SensitiveKind.PHONE)
 
     /** 打开一张白图，识别（什么也没有）跑完后换上 [plan]，等动效走完。 */
     private fun open(plan: MaskPlan): EditorViewModel {
@@ -143,10 +141,8 @@ class EditorCompareTest {
     private val compareButton get() = compose.onNodeWithContentDescription("按住对比")
 
     @Test fun `holding compare shows the image before masking, letting go brings the masks back`() {
-        open(MaskPlan(listOf(phone, url)))
+        open(MaskPlan(listOf(phone)))
         val masked = window()
-        val amber = Color.rgb(0xFF, 0xB3, 0x00)
-        assertThat(masked.count(amber)).isGreaterThan(0)
 
         compareButton.assertIsEnabled().performTouchInput { down(center) }
         frames(SETTLE_FRAMES)
@@ -154,30 +150,28 @@ class EditorCompareTest {
         val original = window()
         // 打码块（天蓝）没了：样式栏上的小样也是天蓝，只看少了多少——至少是图上那一块
         assertThat(masked.count(MaskOptions.SKY_BLUE) - original.count(MaskOptions.SKY_BLUE)).isGreaterThan(10_000)
-        assertThat(original.count(amber)).isEqualTo(0)
 
         compareButton.performTouchInput { up() }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("原图").assertDoesNotExist()
         val back = window()
         assertThat(back.count(MaskOptions.SKY_BLUE)).isEqualTo(masked.count(MaskOptions.SKY_BLUE))
-        assertThat(back.count(amber)).isEqualTo(masked.count(amber))
     }
 
     @Test fun `nothing masked yet, nothing to compare`() {
-        open(MaskPlan(listOf(url)))
+        open(MaskPlan.empty())
         compareButton.assertIsNotEnabled()
     }
 
     @Test fun `a purpose watermark alone is worth comparing`() {
-        val vm = open(MaskPlan(listOf(url)))
+        val vm = open(MaskPlan.empty())
         compose.runOnUiThread { vm.setPurposeText("仅供测试使用") }
         frames(SETTLE_FRAMES)
         compareButton.assertIsEnabled()
     }
 
     private companion object {
-        /** 落码那一遍和标签的淡入淡出都走完。 */
+        /** 落码那一遍走完。 */
         const val SETTLE_FRAMES = 400
     }
 }

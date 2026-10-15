@@ -16,10 +16,9 @@ import kotlin.math.max
  *
  * 这里只做安卓这一层的转换：位图 → ARGB 数组，OCR 行 → 外接框，找到的框 → 候选。
  * 页面转了直角（竖着拍、倒着放）的不认：聊天截图都是正着的，转过的多半是拍的纸面。
- *
- * @param masked 设置里「聊天记录」一项是打码还是仅圈出。
+ * 认出来的都打码；设置里关掉「聊天记录」时根本不建它。
  */
-class ChatDetector(private val masked: Boolean) : PageAnalyzer {
+class ChatDetector : PageAnalyzer {
     override val id = "chat-layout"
 
     override suspend fun analyze(image: SourceImage, lines: List<TextLine>): List<Candidate> {
@@ -38,7 +37,7 @@ class ChatDetector(private val masked: Boolean) : PageAnalyzer {
         }
         val found = ChatLayout.analyze(chatLines, Pixels(bmp.width, bmp.height, argb))
         if (!found.isChat) return emptyList()
-        return candidates(found, masked)
+        return candidates(found)
     }
 
     companion object {
@@ -48,22 +47,21 @@ class ChatDetector(private val masked: Boolean) : PageAnalyzer {
          * 找到的框 → 候选。头像四周放宽一点（边长的 6%）：圆头像抗锯齿的那一圈、阴影，按框遮不全。
          * 昵称、标题放宽两个像素，和文字规则的框一样贴字。
          */
-        fun candidates(found: ChatFindings, masked: Boolean): List<Candidate> = buildList {
+        fun candidates(found: ChatFindings): List<Candidate> = buildList {
             found.avatars.forEachIndexed { i, b ->
                 val pad = max(2f, 0.06f * b.width)
-                add(candidate("chat-avatar-$i", b, pad, SensitiveKind.CHAT_AVATAR, masked))
+                add(candidate("chat-avatar-$i", b, pad, SensitiveKind.CHAT_AVATAR))
             }
-            found.names.forEachIndexed { i, n -> add(candidate("chat-name-$i", n.box, 2f, SensitiveKind.CHAT_NAME, masked)) }
-            found.title?.let { add(candidate("chat-title", it.box, 2f, SensitiveKind.CHAT_TITLE, masked)) }
+            found.names.forEachIndexed { i, n -> add(candidate("chat-name-$i", n.box, 2f, SensitiveKind.CHAT_NAME)) }
+            found.title?.let { add(candidate("chat-title", it.box, 2f, SensitiveKind.CHAT_TITLE)) }
         }
 
-        private fun candidate(id: String, b: Box, pad: Float, kind: SensitiveKind, masked: Boolean) = Candidate(
+        private fun candidate(id: String, b: Box, pad: Float, kind: SensitiveKind) = Candidate(
             id = id,
             quad = Quad.fromRect(RectF(b.left - pad, b.top - pad, b.right + pad, b.bottom + pad)),
             kind = kind,
             source = DetectorSource.RULE,
             confidence = CONFIDENCE,
-            enabledByDefault = masked,
         )
     }
 }

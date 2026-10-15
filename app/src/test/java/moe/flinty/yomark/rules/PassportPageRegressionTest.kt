@@ -126,30 +126,29 @@ class PassportPageRegressionTest {
         assertThat(found(textLines(perWord = true))).containsExactlyElementsIn(expected)
     }
 
-    /** 生日、姓名、护照号、出生地、机读码默认打码；签发日期、有效期只圈出。 */
-    @Test fun `what is masked and what is only outlined`() = runTest {
+    /** 生日、姓名、护照号、出生地、机读码默认打码；签发日期、有效期是日期时间，不打码。 */
+    @Test fun `what is masked and what is not`() = runTest {
         val lines = textLines(perWord = false)
         val out = RuleClassifier(DefaultRuleSet.rules).classify(lines)
         assertThat(out.filter { !it.enabledByDefault }.map { it.text(lines) }).containsExactly("15 OCT 2020", "14 OCT 2030")
     }
 
     /**
-     * 用户在设置里改过某一类的状态，规则被包了一层：包装要把整页的认法也转过去，
-     * 不然「Surname」下面的名字就只剩逐行的认法，一个也认不出。
+     * 用户在设置里打开了出厂关着的一类（日期时间），规则被包了一层：包装要把让位（yieldsTo）、整页的认法都转过去，
+     * 不然「Date of birth」下面的生日又被另打一个日期时间的码。
      */
-    @Test fun `a rule whose state the user changed still looks at the whole page`() = runTest {
-        val config = RecognitionConfig(ruleOverrides = mapOf("name" to RuleState.OUTLINED, "birthdate" to RuleState.OUTLINED))
+    @Test fun `a rule the user turned on masks and still yields like the original`() = runTest {
+        val config = RecognitionConfig(ruleOverrides = mapOf("datetime" to RuleState.MASKED))
         val lines = textLines(perWord = false)
         val out = RuleClassifier(RuleCatalog.rulesFor(config)).classify(lines)
-        assertThat(out.filter { it.kind == PERSON_NAME }.map { it.text(lines) to it.enabledByDefault })
-            .containsExactly("TRAVELER" to false, "HAPPY" to false)
-        // 出生日期只圈出了，同一处也不再另出一个日期时间
-        assertThat(out.filter { it.kind == DATETIME }.map { it.text(lines) }).containsExactly("15 OCT 2020", "14 OCT 2030")
+        assertThat(out.filter { it.kind == DATETIME }.map { it.text(lines) to it.enabledByDefault })
+            .containsExactly("15 OCT 2020" to true, "14 OCT 2030" to true)
+        assertThat(out.filter { it.kind == PERSON_NAME }.map { it.text(lines) }).containsExactly("TRAVELER", "HAPPY")
     }
 
-    /** 出生日期一类关掉：生日回到日期时间，只圈出。 */
+    /** 出生日期一类关掉、日期时间打开：生日回到日期时间。 */
     @Test fun `with birth dates off the date of birth is an ordinary date`() = runTest {
-        val config = RecognitionConfig(ruleOverrides = mapOf("birthdate" to RuleState.OFF))
+        val config = RecognitionConfig(ruleOverrides = mapOf("birthdate" to RuleState.OFF, "datetime" to RuleState.MASKED))
         val lines = textLines(perWord = false)
         val dates = RuleClassifier(RuleCatalog.rulesFor(config)).classify(lines).filter { it.kind == DATETIME }
         assertThat(dates.map { it.text(lines) }).containsExactly("05 FEB 1965", "15 OCT 2020", "14 OCT 2030")

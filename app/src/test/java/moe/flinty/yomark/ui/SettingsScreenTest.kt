@@ -54,7 +54,7 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 
 /**
- * 设置的一级页只是目录，选项都在二级页里；人脸、条码和文字规则一样能设成打码、仅圈出或关闭。
+ * 设置的一级页只是目录，选项都在二级页里；人脸、条码和文字规则一样能设成打码或关闭。
  * 各页改动即时发出新值（写 DataStore 由 Activity 管，这里只看发出了什么）。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -72,10 +72,9 @@ class SettingsScreenTest {
 
     private fun home(
         config: RecognitionConfig = RecognitionConfig(),
-        exportReminder: Boolean = true,
         onOpen: (SettingsPage) -> Unit = {},
         developer: Boolean = false,
-    ) = show { SettingsScreen(config, exportReminder, onOpen, onNavigateUp = {}, developer = developer) }
+    ) = show { SettingsScreen(config, onOpen, onNavigateUp = {}, developer = developer) }
 
     // ---------- 一级页 ----------
 
@@ -116,20 +115,18 @@ class SettingsScreenTest {
     @Test fun eachTopicSaysWhereItStands() {
         home(
             config = RecognitionConfig(
-                faceState = RuleState.OUTLINED,
                 face = FaceOption.ACCURATE,
                 barcodeState = RuleState.OFF,
                 semantic = SemanticOption.OFF,
-                ruleOverrides = mapOf("ip" to RuleState.OFF),
+                ruleOverrides = mapOf("url" to RuleState.MASKED),
             ),
-            exportReminder = false,
         )
-        compose.onNodeWithText("仅圈出 · 精确").assertIsDisplayed()
+        compose.onNodeWithText("打码 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("导出前提醒已关闭").assertIsDisplayed()
-        val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED }
-        val outlined = RuleCatalog.all.size - masked - 1
-        compose.onNodeWithText("打码 $masked 类 · 圈出 $outlined 类 · 关闭 1 类 · PP-OCR").assertIsDisplayed()
+        compose.onNodeWithText("水印样式").assertIsDisplayed()
+        val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
+        val off = RuleCatalog.all.size - masked
+        compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类 · PP-OCR").assertIsDisplayed()
     }
 
     @Test fun tappingATopicOpensItsPage() {
@@ -164,7 +161,7 @@ class SettingsScreenTest {
     @Test fun theLanguageRowSitsAboveAboutAndSaysTheCurrentLanguage() {
         val opened = mutableListOf<SettingsPage>()
         show {
-            SettingsScreen(RecognitionConfig(), true, { opened += it }, onNavigateUp = {}, language = AppLanguage.ENGLISH)
+            SettingsScreen(RecognitionConfig(), { opened += it }, onNavigateUp = {}, language = AppLanguage.ENGLISH)
         }
         compose.onNodeWithText("English").assertIsDisplayed()
         val language = compose.onNodeWithText("语言").fetchSemanticsNode().boundsInRoot
@@ -200,12 +197,12 @@ class SettingsScreenTest {
 
     // ---------- 人脸 ----------
 
-    @Test fun facesCanBeSetToOutlineOnly() {
-        var latest: RecognitionConfig? = null
-        show { FaceSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
+    /** 2026-10-14 起只有打码、关闭两项，没有「仅圈出」。 */
+    @Test fun facesAreEitherMaskedOrOff() {
+        show { FaceSettingsScreen(RecognitionConfig(), onChange = {}, onNavigateUp = {}) }
         compose.onNodeWithText("打码").assertIsSelected()
-        compose.onNodeWithText("仅圈出").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OUTLINED))
+        compose.onNodeWithText("关闭").assertIsNotSelected()
+        compose.onNodeWithText("仅圈出").assertDoesNotExist()
     }
 
     @Test fun facesCanBeTurnedOff() {
@@ -233,11 +230,11 @@ class SettingsScreenTest {
 
     // ---------- 条码 ----------
 
-    @Test fun barcodesCanBeSetToOutlineOnly() {
+    @Test fun barcodesCanBeTurnedOff() {
         var latest: RecognitionConfig? = null
         show { BarcodeSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("仅圈出").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(barcodeState = RuleState.OUTLINED))
+        compose.onNodeWithText("关闭").performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig(barcodeState = RuleState.OFF))
     }
 
     @Test fun pickingABarcodeStrategyEmitsIt() {
@@ -264,7 +261,7 @@ class SettingsScreenTest {
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
         compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("url")
-        compose.onNode(hasTestTag("rule-url") and hasText("仅圈出")).assertExists()
+        compose.onNode(hasTestTag("rule-url") and hasText("关闭")).assertExists()
     }
 
     /** 设置页上常见的几类打头，规则表里的每一类都在、只出现一次。 */
@@ -274,11 +271,11 @@ class SettingsScreenTest {
             .containsExactly("name", "phone", "address", "pickup").inOrder()
     }
 
-    /** 人名那一行把没有旁证的那些怎么办也写出来：不写的话，聊天里的人名不圈了，用户只看得到「打码」。 */
+    /** 人名那一行把没有旁证的那些怎么办也写出来：不写的话，聊天里的人名不打了，用户只看得到「打码」。 */
     @Test fun theNameRowSaysWhatHappensWithoutEvidence() {
         textPage()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("name")
-        compose.onNode(hasTestTag("rule-name") and hasText("打码 · 没有旁证的不圈")).assertExists()
+        compose.onNode(hasTestTag("rule-name") and hasText("打码 · 没有旁证的不打码")).assertExists()
     }
 
     @Test fun tappingTheEngineOpensItsPage() {
@@ -309,13 +306,13 @@ class SettingsScreenTest {
         val config = RecognitionConfig(
             textEngine = TextEngineOption.LATIN,
             semantic = SemanticOption.OFF,
-            faceState = RuleState.OUTLINED,
+            faceState = RuleState.OFF,
             barcodeState = RuleState.OFF,
-            outlineUnanchoredNames = true,
+            maskUnanchoredNames = true,
         ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
         textPage(config, onChange = { latest = it })
         compose.onNodeWithText("恢复默认").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OUTLINED, barcodeState = RuleState.OFF))
+        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OFF, barcodeState = RuleState.OFF))
     }
 
     @Test fun resetIsDisabledWhenTheTextPageIsAtFactory() {
@@ -340,7 +337,7 @@ class SettingsScreenTest {
     @Test fun aKindPageShowsHandlingAndHowItIsFound() {
         rulePage("url")
         compose.onNodeWithText("识别到网址时").assertIsDisplayed()
-        compose.onNodeWithText("仅圈出").assertIsSelected()
+        compose.onNodeWithText("关闭").assertIsSelected()
         compose.onNodeWithText(context.getString(RuleCatalog.description(RuleCatalog.all.first { it.id == "url" }))).assertIsDisplayed()
     }
 
@@ -354,9 +351,9 @@ class SettingsScreenTest {
     /** 改回出厂值不留覆盖。 */
     @Test fun pickingTheFactoryHandlingClearsTheOverride() {
         var latest: RecognitionConfig? = null
-        val config = RecognitionConfig().withRule("url", RuleState.OFF, RuleCatalog.factoryState("url"))
+        val config = RecognitionConfig().withRule("url", RuleState.MASKED, RuleCatalog.factoryState("url"))
         rulePage("url", config, onChange = { latest = it })
-        compose.onNodeWithText("仅圈出").performClick()
+        compose.onNodeWithText("关闭").performClick()
         assertThat(latest?.ruleOverrides).isEmpty()
     }
 
@@ -369,8 +366,8 @@ class SettingsScreenTest {
     @Test fun theUnanchoredNamesSwitchTurnsItOn() {
         var latest: RecognitionConfig? = null
         rulePage("name", onChange = { latest = it })
-        compose.onNodeWithText("没有旁证的也圈出").performClick()
-        assertThat(latest?.outlineUnanchoredNames).isTrue()
+        compose.onNodeWithText("没有旁证的也打码").performClick()
+        assertThat(latest?.maskUnanchoredNames).isTrue()
     }
 
     /** 人名选了「关闭」，这个开关管不到任何东西，灰掉。 */
@@ -595,7 +592,7 @@ class SettingsScreenTest {
     // ---------- 编辑、导出、外观 ----------
 
     @Test fun theEditRowSaysWhetherSwitchingRestylesAll() {
-        show { SettingsScreen(RecognitionConfig(), exportReminder = true, onOpen = {}, onNavigateUp = {}, restyleAll = false) }
+        show { SettingsScreen(RecognitionConfig(), onOpen = {}, onNavigateUp = {}, restyleAll = false) }
         compose.onNodeWithText("换样式时只换选中的").assertExists()
     }
 
@@ -606,25 +603,23 @@ class SettingsScreenTest {
         assertThat(latest).isFalse()
     }
 
-    @Test fun theExportReminderSwitchTurnsItOff() {
-        var latest: Boolean? = null
+    /** 导出前提醒和「圈出」一起去掉了：导出页上只有水印样式。 */
+    @Test fun theExportPageNoLongerHasAReminder() {
         show {
             ExportSettingsScreen(
-                exportReminder = true, onExportReminderChange = { latest = it },
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
                 watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
                 onNavigateUp = {},
             )
         }
-        compose.onNodeWithText("导出前提醒").performClick()
-        assertThat(latest).isFalse()
+        compose.onNodeWithText("导出前提醒").assertDoesNotExist()
+        compose.onNodeWithText("水印样式").assertIsDisplayed()
     }
 
     @Test fun pickingTheWatermarkWithoutChineseEmitsIt() {
         var latest: BrandWatermarkStyle? = null
         show {
             ExportSettingsScreen(
-                exportReminder = true, onExportReminderChange = {},
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
                 watermarkUnlocked = false, watermarkOff = false, onWatermarkOff = {},
                 onNavigateUp = {},
@@ -638,7 +633,6 @@ class SettingsScreenTest {
     @Test fun noWatermarkIsOfferedOnlyOnceUnlocked() {
         show {
             ExportSettingsScreen(
-                exportReminder = true, onExportReminderChange = {},
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = {},
                 watermarkUnlocked = false, watermarkOff = true, onWatermarkOff = {},
                 onNavigateUp = {},
@@ -653,7 +647,6 @@ class SettingsScreenTest {
         var latest: BrandWatermarkStyle? = null
         show {
             ExportSettingsScreen(
-                exportReminder = true, onExportReminderChange = {},
                 watermarkStyle = BrandWatermarkStyle.ICON_ZH_EN, onWatermarkStyleChange = { latest = it },
                 watermarkUnlocked = true, watermarkOff = true, onWatermarkOff = {},
                 onNavigateUp = {},
@@ -669,7 +662,6 @@ class SettingsScreenTest {
         var off = false
         show {
             ExportSettingsScreen(
-                exportReminder = true, onExportReminderChange = {},
                 watermarkStyle = BrandWatermarkStyle.ICON_EN, onWatermarkStyleChange = {},
                 watermarkUnlocked = true, watermarkOff = false, onWatermarkOff = { off = true },
                 onNavigateUp = {},

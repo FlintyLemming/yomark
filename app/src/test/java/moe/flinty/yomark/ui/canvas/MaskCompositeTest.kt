@@ -12,7 +12,6 @@ import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.MaskOrder
@@ -42,7 +41,7 @@ class MaskCompositeTest {
     )
 
     private fun manual(id: String, rect: RectF, look: MaskLook = MaskLook(MaskStyle.SOLID)) = MaskItem(
-        id, Quad.fromRect(rect), SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED, look,
+        id, Quad.fromRect(rect), SensitiveKind.MANUAL, DetectorSource.MANUAL, look,
     )
 
     private val bar = manual("bar", RectF(30f, 90f, 170f, 110f))

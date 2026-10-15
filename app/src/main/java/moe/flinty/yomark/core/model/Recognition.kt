@@ -29,9 +29,9 @@ data class Candidate(
     val source: DetectorSource,
     val confidence: Float,
     /**
-     * 进编辑器时的初始状态。true → MASKED，false → OUTLINED。
-     * 由规则表逐条指定（spec §6），不是由 confidence 阈值算出来的；
-     * 同一条规则里误报率高出一截的认法，命中要靠页面上的旁证坐实，没有旁证又被设置留下来的只圈出（见 NeedsAnchor）。
+     * 打不打码。true 进编辑器就是一块码；false 是认出来了、但不打码，编辑器不收它（见 MaskPlanFactory），
+     * 只在调试信息里看得到。由规则表逐条指定（spec §6），不是由 confidence 阈值算出来的；
+     * 同一条规则里误报率高出一截、又找不到旁证可要的认法（RuleMatch.outlineOnly）是 false。
      */
     val enabledByDefault: Boolean = true,
     /**

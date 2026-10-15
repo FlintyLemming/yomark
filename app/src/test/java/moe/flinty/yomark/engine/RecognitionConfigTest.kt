@@ -26,14 +26,15 @@ class RecognitionConfigTest {
         assertThat(RecognitionConfig().ruleOverrides).isEmpty()
     }
 
-    // ---------- 规则三态 ----------
+    // ---------- 规则：打码或关闭 ----------
 
-    @Test fun `no override yields the catalog factory states`() {
+    /** 出厂打码的那几类进引擎，出厂关着的（误报率高，原先只圈出）不进。 */
+    @Test fun `no override runs exactly the rules that mask out of the box`() {
         val rules = RuleCatalog.rulesFor(RecognitionConfig())
-        assertThat(rules.map { it.id }).containsExactlyElementsIn(RuleCatalog.all.map { it.id })
-        rules.forEach { r ->
-            assertThat(r.enabledByDefault).isEqualTo(RuleCatalog.factoryState(r.id) == RuleState.MASKED)
-        }
+        assertThat(rules.map { it.id })
+            .containsExactlyElementsIn(RuleCatalog.all.filter { it.enabledByDefault }.map { it.id })
+        assertThat(rules.all { it.enabledByDefault }).isTrue()
+        assertThat(rules.map { it.id }).containsNoneOf("url", "ip", "tracking", "longnum", "datetime")
     }
 
     @Test fun `OFF removes the rule from the engine entirely`() {
@@ -41,34 +42,30 @@ class RecognitionConfigTest {
         assertThat(RuleCatalog.rulesFor(cfg).map { it.id }).doesNotContain("longnum")
     }
 
-    @Test fun `MASKED promotes an outlined-by-default rule`() {
+    @Test fun `MASKED turns on a rule that is off out of the box, and it masks`() {
         val cfg = RecognitionConfig(ruleOverrides = mapOf("url" to RuleState.MASKED))
         val url = RuleCatalog.rulesFor(cfg).single { it.id == "url" }
         assertThat(url.enabledByDefault).isTrue()
     }
 
-    @Test fun `OUTLINED demotes a masked-by-default rule`() {
-        val cfg = RecognitionConfig(ruleOverrides = mapOf("card" to RuleState.OUTLINED))
-        val card = RuleCatalog.rulesFor(cfg).single { it.id == "card" }
-        assertThat(card.enabledByDefault).isFalse()
-    }
-
-    /** 覆写只换状态，绝不能换掉规则本身的匹配行为。 */
+    /** 覆写只换打不打码，绝不能换掉规则本身的匹配行为。 */
     @Test fun `override preserves matching behaviour`() {
-        val cfg = RecognitionConfig(ruleOverrides = mapOf("card" to RuleState.OUTLINED))
-        val card = RuleCatalog.rulesFor(cfg).single { it.id == "card" }
-        assertThat(card.findIn("4111 1111 1111 1111")).hasSize(1)
-        assertThat(card.kind).isEqualTo(RuleCatalog.all.single { it.id == "card" }.kind)
+        val cfg = RecognitionConfig(ruleOverrides = mapOf("url" to RuleState.MASKED))
+        val url = RuleCatalog.rulesFor(cfg).single { it.id == "url" }
+        val factory = RuleCatalog.all.single { it.id == "url" }
+        assertThat(url.findIn("see https://example.com/a/b?c=1")).isEqualTo(factory.findIn("see https://example.com/a/b?c=1"))
+        assertThat(url.findIn("see https://example.com/a/b?c=1")).isNotEmpty()
+        assertThat(url.kind).isEqualTo(factory.kind)
     }
 
     @Test fun `unknown rule id in overrides is ignored`() {
         val cfg = RecognitionConfig(ruleOverrides = mapOf("no-such-rule" to RuleState.MASKED))
-        assertThat(RuleCatalog.rulesFor(cfg)).hasSize(RuleCatalog.all.size)
+        assertThat(RuleCatalog.rulesFor(cfg)).hasSize(RuleCatalog.rulesFor(RecognitionConfig()).size)
     }
 
-    @Test fun `datetime ships in the catalog and starts outlined`() {
+    @Test fun `datetime ships in the catalog and starts off`() {
         assertThat(RuleCatalog.all.map { it.id }).contains("datetime")
-        assertThat(RuleCatalog.factoryState("datetime")).isEqualTo(RuleState.OUTLINED)
+        assertThat(RuleCatalog.factoryState("datetime")).isEqualTo(RuleState.OFF)
     }
 
     // ---------- 覆盖表只存差异 ----------
@@ -111,5 +108,13 @@ class RecognitionConfigTest {
     @Test fun `garbage in the persisted overrides is dropped, not thrown`() {
         val parsed = RecognitionConfig.parseOverrides("url:MASKED;garbage;card:NOT_A_STATE;longnum:OFF")
         assertThat(parsed).containsExactly("url", RuleState.MASKED, "longnum", RuleState.OFF)
+    }
+
+    /** 去掉了的「仅圈出」读成关闭：它本来就不打码。 */
+    @Test fun `a persisted outline-only override reads as off`() {
+        assertThat(RecognitionConfig.parseOverrides("card:OUTLINED")).containsExactly("card", RuleState.OFF)
+        assertThat(RuleState.fromName("OUTLINED")).isEqualTo(RuleState.OFF)
+        assertThat(RuleState.fromName("MASKED")).isEqualTo(RuleState.MASKED)
+        assertThat(RuleState.fromName("NOT_A_STATE")).isNull()
     }
 }

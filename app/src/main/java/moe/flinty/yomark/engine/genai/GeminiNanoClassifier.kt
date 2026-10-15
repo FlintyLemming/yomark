@@ -35,8 +35,8 @@ import kotlin.coroutines.cancellation.CancellationException
  * 让它把规则漏掉的人名、地址指出来。
  *
  * - **全程在本机**：推理在 AICore 里跑，本应用不联网、不加 INTERNET 权限；
- * - **只圈出不打码**：模型会猜错，按 §6「按误报率划线」归到仅圈出，导出拦截兜底；
- *   UI 上标「AI」，与规则命中区分开（spec §3 DetectorSource 的本意）；
+ * - **找到的直接打码**（2026-10-14 起没有「圈出」）：是用户点了才跑的，模型猜错的点一下就拿掉，整批不要撤销一下；
+ *   宽屏列表上标「AI」，与规则命中区分开（spec §3 DetectorSource 的本意）；
  * - **只加不减**：它不能撤销规则的结果。漏检是事故，让模型否决规则等于让它制造漏检；
  * - **不支持就跳过**：只有 AICore 支持的机型（Pixel 9 及以后等）有 Nano，
  *   isAvailable() 探测不到就整层不跑，其余识别照常。
@@ -88,7 +88,6 @@ class GeminiNanoClassifier(
                     kind = f.kind,
                     source = DetectorSource.LLM,
                     confidence = CONFIDENCE,
-                    enabledByDefault = false,
                     readingDegrees = directions[f.lineIndex],
                 )
             }

@@ -14,15 +14,14 @@ class MaskPlanFactoryTest {
         Candidate(id, Quad.fromRect(RectF(0f, 0f, 10f, 10f)), kind, DetectorSource.RULE, 0.9f, enabled)
 
     @Test
-    fun `enabledByDefault true becomes MASKED`() {
-        val item = MaskPlanFactory.itemsFrom(listOf(candidate("a", true))).single()
-        assertThat(item.state).isEqualTo(MaskState.MASKED)
+    fun `enabledByDefault true becomes a mask`() {
+        assertThat(MaskPlanFactory.itemsFrom(listOf(candidate("a", true))).map { it.candidateId }).containsExactly("a")
     }
 
+    /** 2026-10-14 起没有「圈出」：认出来了、但不打码的不进 plan。 */
     @Test
-    fun `enabledByDefault false becomes OUTLINED`() {
-        val item = MaskPlanFactory.itemsFrom(listOf(candidate("b", false))).single()
-        assertThat(item.state).isEqualTo(MaskState.OUTLINED)
+    fun `enabledByDefault false is left out`() {
+        assertThat(MaskPlanFactory.itemsFrom(listOf(candidate("b", false)))).isEmpty()
     }
 
     @Test
@@ -37,14 +36,14 @@ class MaskPlanFactoryTest {
 
     @Test
     fun `order is preserved so big regions stay first`() {
-        val items = MaskPlanFactory.itemsFrom(listOf(candidate("1", true), candidate("2", false)))
-        assertThat(items.map { it.candidateId }).containsExactly("1", "2").inOrder()
+        val items = MaskPlanFactory.itemsFrom(listOf(candidate("1", true), candidate("2", false), candidate("3", true)))
+        assertThat(items.map { it.candidateId }).containsExactly("1", "3").inOrder()
     }
 
     @Test
     fun `every item carries the look it was given`() {
         val look = MaskLook(MaskStyle.BLUR, MaskOptions(blurRadiusRatio = 0.2f))
-        val items = MaskPlanFactory.itemsFrom(listOf(candidate("1", true), candidate("2", false)), look)
+        val items = MaskPlanFactory.itemsFrom(listOf(candidate("1", true), candidate("2", true)), look)
         assertThat(items.map { it.look }).containsExactly(look, look)
     }
 

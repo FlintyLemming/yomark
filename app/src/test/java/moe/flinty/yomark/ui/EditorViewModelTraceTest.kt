@@ -128,7 +128,7 @@ class EditorViewModelTraceTest {
             TraceStage.INPUT, TraceStage.TEXT, TraceStage.CLASSIFY, TraceStage.RESULT,
         ).inOrder()
         assertThat(run.sections.first().summary).contains("image/jpeg")
-        assertThat(run.sections.last().summary).isEqualTo("合并后 1 处：打码 1 · 圈出 0")
+        assertThat(run.sections.last().summary).isEqualTo("合并后 1 处：打码 1 · 不打码 0")
     }
 
     @Test

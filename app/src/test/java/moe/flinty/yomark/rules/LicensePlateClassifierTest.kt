@@ -46,24 +46,22 @@ class LicensePlateClassifierTest {
         }
     }
 
-    @Test fun `plates of a distinctive format are masked and the rest only outlined`() = runTest {
+    @Test fun `plates of a distinctive format are masked and the rest are not`() = runTest {
         val out = plates(listOf(line("苏B·ILE22", 100f, 100f, 40f), line("B MW 1234", 100f, 300f, 40f)))
         assertThat(out.map { it.enabledByDefault }).containsExactly(true, false).inOrder()
     }
 
-    /** 设成仅圈出，连写法独特的也只圈；设成关闭，一个都不出。 */
+    /** 设成关闭，一个都不出。 */
     @Test fun `the settings row governs every plate`() = runTest {
         val lines = listOf(line("苏B·ILE22", 100f, 100f, 40f), line("B MW 1234", 100f, 300f, 40f))
-        val outlined = plates(lines, RecognitionConfig(ruleOverrides = mapOf("plate" to RuleState.OUTLINED)))
-        assertThat(outlined.map { it.enabledByDefault }).containsExactly(false, false)
         assertThat(plates(lines, RecognitionConfig(ruleOverrides = mapOf("plate" to RuleState.OFF)))).isEmpty()
     }
 
     /**
      * 「苏A12345D」（大型新能源，点读丢了）在桌面 JVM 上长得像爱尔兰邮编：地址让给车牌，一处只有一个框。
-     * 「M WA 1234」像澳洲的州加邮编，那边打码；只圈出的车牌反过来让给地址，不把打了码的降成只圈出。
+     * 「M WA 1234」像澳洲的州加邮编，那边打码；不打码的车牌反过来让给地址，不把打了码的降成不打码。
      */
-    @Test fun `addresses yield to masked plates and outlined plates yield to addresses`() = runTest {
+    @Test fun `addresses yield to masked plates and plates that are not masked yield to addresses`() = runTest {
         val out = plates(listOf(line("苏A12345D", 100f, 100f, 40f), line("M WA 1234", 100f, 300f, 40f)))
         assertThat(out.map { it.kind to it.enabledByDefault })
             .containsExactly(SensitiveKind.LICENSE_PLATE to true, SensitiveKind.POSTAL_ADDRESS to true)

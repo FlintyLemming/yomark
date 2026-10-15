@@ -7,9 +7,13 @@ import android.graphics.Rect
 import android.graphics.RectF
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -19,7 +23,6 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.ui.components.ItemThumbnails
 import moe.flinty.yomark.ui.components.MaskItemList
@@ -42,9 +45,8 @@ class MaskItemListTest {
     private fun item(
         id: String, l: Float, t: Float, r: Float, b: Float,
         kind: SensitiveKind = SensitiveKind.PHONE,
-        state: MaskState = MaskState.MASKED,
         source: DetectorSource = DetectorSource.RULE,
-    ) = MaskItem(id, Quad.fromRect(RectF(l, t, r, b)), kind, source, state)
+    ) = MaskItem(id, Quad.fromRect(RectF(l, t, r, b)), kind, source)
 
     private fun ids(items: List<MaskItem>) = MaskListOrder.of(items).map { it.candidateId }
 
@@ -73,12 +75,6 @@ class MaskItemListTest {
             item("bottom", 325f, 330f, 600f, 360f),
         )
         assertThat(ids(items)).containsExactly("top", "face", "middle", "bottom").inOrder()
-    }
-
-    @Test fun `masking or unmasking does not move an item`() {
-        val items = listOf(item("a", 10f, 100f, 200f, 130f), item("b", 10f, 200f, 200f, 230f), item("c", 300f, 100f, 400f, 130f))
-        val toggled = items.map { if (it.candidateId == "a") it.copy(state = MaskState.OUTLINED) else it }
-        assertThat(ids(toggled)).isEqualTo(ids(items))
     }
 
     // ---------- 缩略图 ----------
@@ -137,21 +133,21 @@ class MaskItemListTest {
     private val plan = MaskPlan(
         listOf(
             item("phone", 10f, 10f, 200f, 40f),
-            item("url", 10f, 100f, 300f, 130f, kind = SensitiveKind.URL, state = MaskState.OUTLINED),
+            item("url", 10f, 100f, 300f, 130f, kind = SensitiveKind.URL),
             item("manual", 50f, 200f, 150f, 260f, kind = SensitiveKind.MANUAL, source = DetectorSource.MANUAL),
         ),
     )
 
-    /** 没有开关：打没打码写在行里（打了码的整行灰下去），读屏照样把它当开关报。 */
-    @Test fun `every box is listed with its kind and state`() {
+    /** 每一行都是一块码：识别出的点了就取消打码（读屏念的就是这个动作），手动框写着是手动画的。 */
+    @Test fun `every box is listed with its kind`() {
         show(plan)
-        compose.onNodeWithText("电话").assertIsOn()
-        compose.onNodeWithText("已打码").assertIsOn()
-        compose.onNodeWithText("网址").assertIsOff()
-        compose.onNodeWithText("未打码").assertIsOff()
+        compose.onNode(hasText("电话") and hasClickAction()).assert(
+            SemanticsMatcher("点了是取消打码") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "取消打码" },
+        )
+        compose.onNodeWithText("网址").assertExists()
         compose.onNodeWithText("手动").assertExists()
+        compose.onNodeWithText("手动画的框").assertExists()
         compose.onNodeWithText("框出 3 处").assertExists()
-        compose.onNodeWithText("1 处未打码").assertExists()
     }
 
     @Test fun `tapping a row reports that box`() {
@@ -171,6 +167,14 @@ class MaskItemListTest {
     @Test fun `results from the model say so`() {
         show(MaskPlan(listOf(item("ai", 10f, 10f, 200f, 40f, kind = SensitiveKind.URL, source = DetectorSource.LLM))))
         compose.onNodeWithText("网址 · AI").assertExists()
+    }
+
+    /** 点一行字打上的码说不上是哪一类，列作「文字」。 */
+    @Test fun `a tapped line is listed as text`() {
+        val line = item("line", 10f, 8f, 300f, 32f, kind = SensitiveKind.MANUAL, source = DetectorSource.LINE)
+        show(MaskPlan(listOf(line)))
+        compose.onNodeWithText("文字").assertExists()
+        compose.onNodeWithText("框出 1 处").assertExists()
     }
 
     /** 识别中（换方案重跑时也是）只列手动框：识别出的块这时在画布上也不画。 */

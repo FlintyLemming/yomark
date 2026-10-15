@@ -31,11 +31,12 @@ class RecognitionConfigStoreTest {
         val cfg = RecognitionConfig(
             textEngine = TextEngineOption.CHINESE,
             barcode = BarcodeOption.LOOSE,
-            barcodeState = RuleState.OUTLINED,
+            barcodeState = RuleState.OFF,
             face = FaceOption.ACCURATE,
             faceState = RuleState.OFF,
+            chatState = RuleState.OFF,
             semantic = SemanticOption.OFF,
-            outlineUnanchoredNames = true,
+            maskUnanchoredNames = true,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )
         store.setRecognitionConfig(cfg)
@@ -84,29 +85,40 @@ class RecognitionConfigStoreTest {
     /** 迁移只看还没存过处理方式的老数据：存过之后以处理方式为准。 */
     @Test fun `a stored handling state wins over the legacy mode`() = runTest {
         val store = store()
-        store.setRecognitionConfig(RecognitionConfig(faceState = RuleState.OUTLINED))
-        assertThat(store.recognitionConfig.first().faceState).isEqualTo(RuleState.OUTLINED)
+        store.setRecognitionConfig(RecognitionConfig(faceState = RuleState.OFF))
+        assertThat(store.recognitionConfig.first().faceState).isEqualTo(RuleState.OFF)
+    }
+
+    /**
+     * 「仅圈出」2026-10-14 去掉了。存着它的老设置读成关闭——仅圈出本来就不打码，
+     * 不能落回出厂的打码：选过仅圈出的用户，升级后不该突然被打码。
+     */
+    @Test fun `a stored outline-only reads as off, not as the factory mask`() = runTest {
+        val store = store()
+        store.writeRawHandlingForTest(face = "OUTLINED", chat = "OUTLINED", rules = "card:OUTLINED;url:MASKED")
+        val read = store.recognitionConfig.first()
+        assertThat(read.faceState).isEqualTo(RuleState.OFF)
+        assertThat(read.chatState).isEqualTo(RuleState.OFF)
+        assertThat(read.ruleOverrides).containsExactly("card", RuleState.OFF, "url", RuleState.MASKED)
     }
 
     // ---------- 设置页的「恢复默认设置」 ----------
 
-    @Test fun `reset puts recognition and the export reminder back to factory`() = runTest {
+    @Test fun `reset puts recognition back to factory`() = runTest {
         val store = store()
         store.setRecognitionConfig(
             RecognitionConfig(
                 textEngine = TextEngineOption.LATIN,
-                faceState = RuleState.OUTLINED,
+                faceState = RuleState.OFF,
                 barcodeState = RuleState.OFF,
-                outlineUnanchoredNames = true,
-                ruleOverrides = mapOf("ip" to RuleState.OFF),
+                maskUnanchoredNames = true,
+                ruleOverrides = mapOf("ip" to RuleState.MASKED),
             ),
         )
-        store.setPendingExportReminder(false)
 
         store.resetSettings()
 
         assertThat(store.recognitionConfig.first()).isEqualTo(RecognitionConfig())
-        assertThat(store.pendingExportReminder.first()).isTrue()
     }
 
     /** 外观不归「恢复默认设置」管。 */

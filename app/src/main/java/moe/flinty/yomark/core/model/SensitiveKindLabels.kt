@@ -4,7 +4,7 @@ import android.content.res.Resources
 import androidx.annotation.StringRes
 import moe.flinty.yomark.R
 
-/** 类型的显示名。画布小标签、宽屏的框列表与导出拦截对话框共用同一套措辞。 */
+/** 类型的显示名。宽屏的框列表、设置页共用同一套措辞。 */
 object SensitiveKindLabels {
 
     @StringRes
@@ -40,18 +40,14 @@ object SensitiveKindLabels {
 
     fun display(res: Resources, kind: SensitiveKind): String = res.getString(nameRes(kind))
 
-    /** 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。 */
-    fun display(res: Resources, item: MaskItem): String =
-        display(res, item.kind) + if (item.source == DetectorSource.LLM) " · AI" else ""
-
     /**
-     * 「2 个网址」「1 个 IP 地址」：中文里名字以字母开头的补一个空格（kind_count_latin），纯中文名不补。
-     * spec §7.4 的例子就是这么排的，拦截对话框逐字用它。
+     * 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。
+     * 点一行字打上的码说不上是哪一类，就叫「文字」。
      */
-    fun plural(res: Resources, kind: SensitiveKind, count: Int): String {
-        val name = display(res, kind)
-        val format = if (name.first().code < CJK_START) R.string.kind_count_latin else R.string.kind_count
-        return res.getString(format, count, name)
+    fun display(res: Resources, item: MaskItem): String = when (item.source) {
+        DetectorSource.LINE -> res.getString(R.string.kind_line)
+        DetectorSource.LLM -> display(res, item.kind) + " · AI"
+        else -> display(res, item.kind)
     }
 
     /** 调试记录里的类型名，固定中文、不随系统语言变：记录面向排查，不面向用户（见 debug/Trace.kt）。 */
@@ -84,7 +80,4 @@ object SensitiveKindLabels {
         SensitiveKind.BARCODE -> "条码"
         SensitiveKind.MANUAL -> "手动"
     }
-
-    /** CJK 部首补充区的起点。低于它的都按拉丁字符处理。 */
-    private const val CJK_START = 0x2E80
 }

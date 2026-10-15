@@ -4,10 +4,10 @@ enum class SensitiveKind {
     PHONE, EMAIL, PAYMENT_CARD, IBAN, SSN, PASSPORT,
     TRACKING_NO, IP_ADDR, MAC_ADDR, URL, API_KEY,
 
-    /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。默认仅圈出。 */
+    /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。出厂关着。 */
     LONG_NUMBER,
 
-    /** 日期与时间。出厂仅圈出——时间在截图里无处不在，默认打码会打扰所有人。 */
+    /** 日期与时间。出厂关着——时间在截图里无处不在，默认打码会打扰所有人。 */
     DATETIME,
 
     /**
@@ -47,5 +47,9 @@ enum class SensitiveKind {
     FACE, BARCODE, MANUAL,
 }
 
-/** 候选是谁提出来的。UI 上区分「规则命中」和「模型猜的」，后者标为实验性。 */
-enum class DetectorSource { RULE, ENTITY_MODEL, LLM, FACE, BARCODE, MANUAL }
+/**
+ * 候选是谁提出来的。UI 上区分「规则命中」和「模型猜的」，后者标为实验性。
+ * 最后两个不是识别出来的，是用户自己加的：MANUAL 是拉的框、手画的线，LINE 是点一行没打码的字打上的码，
+ * 框是文字识别给的这一行（TextLine.quad）。
+ */
+enum class DetectorSource { RULE, ENTITY_MODEL, LLM, FACE, BARCODE, MANUAL, LINE }

@@ -47,11 +47,11 @@ class EngineFactoryTest {
         assertThat(result.candidates.map { it.kind }).contains(SensitiveKind.EMAIL)
     }
 
+    /** 网址出厂关着（误报率高，原先只圈出）：默认的引擎里没有它。 */
     @Test
-    fun a_url_comes_back_outlined_by_default() = runTest {
+    fun a_url_is_not_looked_for_by_default() = runTest {
         val result = buildEngine(context).analyze(render("open https://app.com/r/AbCdEf123"))
-        val url = result.candidates.firstOrNull { it.kind == SensitiveKind.URL }
-        if (url != null) assertThat(url.enabledByDefault).isFalse()
+        assertThat(result.candidates.none { it.kind == SensitiveKind.URL }).isTrue()
     }
 
     @Test

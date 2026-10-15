@@ -21,18 +21,18 @@ import kotlin.math.roundToInt
  * 规则永远在 classifiers 列表的第一位且永不缺席——它是全部识别能力的地基。
  *
  * 规则大多逐行认；整页交给它们（[Page]），看整页的认法（PageFinder：字段名在上、值在下，机读码对照）自己去看。
- * 只圈不打码的命中（RuleMatch.outlineOnly，照片上孤零零一行的德国车牌这类）照这一类的开关出，出来一律只圈出。
+ * 不打码的命中（RuleMatch.outlineOnly，照片上孤零零一行的德国车牌这类）照这一类的开关出，出来一律不打码（编辑器不收）。
  * 「要旁证的猜测」（[NeedsAnchor]，目前是从字面猜出的人名）在这里看整页：
  * 有旁证（[anchors]：紧挨着的称呼，或者同一行、同一排、上下相邻一行的电话、证件号……）的照规则的设置出；
- * 没有的，按 [keepUnanchored] 丢掉或只圈出。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
+ * 没有的，按 [maskUnanchored] 丢掉或照样打码。一行文字里看不出它下面那行是不是打了星的证件号，OCR 的框看得出。
  */
 class RuleClassifier(
     private val rules: List<Rule>,
     /**
-     * 附近没有旁证的猜测怎么办：false 丢掉（出厂），true 只圈不打码。
-     * 设置 › 文字 › 人名的页上「没有旁证的也圈出」那个开关。
+     * 附近没有旁证的猜测怎么办：false 丢掉（出厂），true 和有旁证的一样打码。
+     * 设置 › 文字 › 人名的页上「没有旁证的也打码」那个开关。
      */
-    private val keepUnanchored: Boolean = false,
+    private val maskUnanchored: Boolean = false,
     /** 什么算旁证、多近才算。见 DefaultRuleSet.nameAnchors。 */
     private val anchors: List<NameAnchor> = DefaultRuleSet.nameAnchors,
     /**
@@ -93,7 +93,7 @@ class RuleClassifier(
                 val quad = line.quadForRange(m.range)
                 val anchored = !m.needsAnchor ||
                     anchorsOnPage.any { it.supports(line.text, lineIndex, m.range, frame.bounds(quad)) }
-                if (!anchored && !keepUnanchored) return@forEachIndexed
+                if (!anchored && !maskUnanchored) return@forEachIndexed
                 out += lineIndex to Candidate(
                     id = "rule-${rule.id}-$lineIndex-${m.range.first}-$n",
                     // 落在几行上的（上下两行的车牌）合成一个框
@@ -102,8 +102,8 @@ class RuleClassifier(
                     kind = rule.kind,
                     source = DetectorSource.RULE,
                     confidence = m.confidence,
-                    // 有旁证的猜测照规则的设置打码；没有旁证、又被设置留下来的只圈出
-                    enabledByDefault = rule.enabledByDefault && anchored && !m.outlineOnly,
+                    // 猜测有旁证、或者设置让没旁证的也打码，就照规则的设置打码
+                    enabledByDefault = rule.enabledByDefault && !m.outlineOnly,
                     // 落在几行上的按头一行的方向
                     readingDegrees = group.own[pm.line].degrees,
                 )
@@ -114,13 +114,13 @@ class RuleClassifier(
 
     /**
      * [rule] 的命中 [m] 让给同一处的另一类之后还剩下的，null 是整个让掉。要让的：那一类在 Rule.yieldsTo 里；
-     * 或者 [m] 只是只圈不打码的一档，同一处别的类型认出了东西。只让给那边有把握的命中（不是只圈出的、不是要旁证的猜测）：
-     * 地址让给车牌，让给一个只圈出的车牌就是把打了码的降成只圈出。
+     * 或者 [m] 只是不打码的一档，同一处别的类型认出了东西。只让给那边有把握的命中（不是不打码的、不是要旁证的猜测）：
+     * 地址让给车牌，让给一个不打码的车牌就是把打了码的降成不打码。
      *
      * 那边只占了 [m] 的后半截（地址取到行尾，「地址：南京市玄武区中山路1号 车牌：苏A12345」）：截到它前面为止，
      * 夹在中间的车牌字段名（「车牌：」「号牌号码 Plate No.」）和空格标点一起去掉。别的字段名（「车辆：」「车位：」「Vehicle:」）
      * 认不全，跟着冒号的、隔着空格或逗号的末一段（没有数字：「1号：」是地址）也当字段名去掉。剩下不到两个字的，或者那边占了 [m] 的大半
-     * （「苏A12345D」像爱尔兰邮编），整个让掉；只圈出的、落在几行上的（上下两行的车牌）也整个让掉。
+     * （「苏A12345D」像爱尔兰邮编），整个让掉；不打码的、落在几行上的（上下两行的车牌）也整个让掉。
      */
     private fun yielded(rule: Rule, m: PageMatch, found: List<List<PageMatch>>, texts: List<String>): PageMatch? {
         if (rule.yieldsTo.isEmpty() && !m.match.outlineOnly) return m

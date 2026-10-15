@@ -381,7 +381,7 @@ private const val REFERENCE_SHORT_SIDE = 1080
 /**
  * 「近似色」那一颗和色块的小样子上画的颜色：这张图上真取到的近似色，最多三种，块数多的排前面。
  *
- * 选中了框时只取它的——面板改的就是它。否则取图上每一块的（打了码的、圈出的都算，画笔下一笔多半落在它们身上），
+ * 选中了框时只取它的——面板改的就是它。否则取图上每一块码的（画笔下一笔多半落在它们身上），
  * 相近的并成一种。一块也没有时取整张图上占地最多的颜色，多半就是页面的底色，下一块多半也画在它上面。
  */
 internal fun nearColorsOf(image: SourceImage?, plan: MaskPlan, selected: MaskItem?): List<Int> {

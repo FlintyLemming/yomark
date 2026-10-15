@@ -57,16 +57,11 @@
     <!-- box list -->
     <string name="list_title">Boxes</string>
     <string name="list_count">%1$d boxes</string>
-    <string name="list_pending">%1$d unmasked</string>
-    <string name="list_all_masked">All masked</string>
     <string name="list_empty">Nothing sensitive found</string>
     <string name="list_empty_hint">Missed something? Drag a box on the image with one finger</string>
     <string name="item_selected">Selected</string>
     <string name="item_manual">Drawn by hand</string>
-    <string name="item_masked">Masked</string>
-    <string name="item_unmasked">Not masked</string>
-    <string name="kind_count">%2$s: %1$d</string>
-    <string name="kind_count_latin">%2$s: %1$d</string>
+    <string name="item_unmask">Unmask</string>
 
     <!-- kinds -->
     <string name="kind_phone">Phone</string>
@@ -92,6 +87,7 @@
     <string name="kind_vin">VIN</string>
     <string name="kind_face">Face</string>
     <string name="kind_barcode">Barcode</string>
+    <string name="kind_line">Text</string>
     <string name="kind_manual">Manual</string>
     <string name="kind_chat_avatar">Avatar</string>
     <string name="kind_chat_name">Display name</string>
@@ -161,11 +157,6 @@
     <string name="density_dense">Dense</string>
 
     <!-- dialogs -->
-    <string name="pending_title">%1$d still unmasked</string>
-    <string name="stop_reminding">Don\'t ask again</string>
-    <string name="stop_reminding_hint">Turn back on in Settings › Export</string>
-    <string name="mask_all">Mask all</string>
-    <string name="export_anyway">Export anyway</string>
     <string name="unopened_title">%1$d images not opened yet</string>
     <string name="unopened_text">Unopened images haven\'t been analyzed and will be skipped.</string>
     <string name="review">Review</string>
@@ -202,8 +193,6 @@
     <string name="settings_language_system">System default</string>
     <string name="settings_about">About</string>
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
-    <string name="reminder_on">Export reminder on</string>
-    <string name="reminder_off">Export reminder off</string>
     <string name="restyle_all_on">Switching style changes all masks</string>
     <string name="restyle_all_off">Switching style changes the selected mask only</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
@@ -211,12 +200,9 @@
     <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
     <string name="summary_masked">masked</string>
-    <string name="summary_outlined">outlined</string>
     <string name="summary_off">off</string>
     <string name="handling_masked">Mask</string>
-    <string name="handling_outlined">Outline only</string>
     <string name="handling_off">Off</string>
-    <string name="handling_outlined_summary">Dashed box only, tap to mask</string>
 
     <!-- settings: text -->
     <string name="text_recognition">Text recognition</string>
@@ -232,9 +218,9 @@
     <string name="engine_both_summary">Runs both models, slowest</string>
     <string name="when_found">When %1$s is found</string>
     <string name="guessed_names">Names guessed from text</string>
-    <string name="outline_unanchored">Outline those without evidence</string>
-    <string name="outline_unanchored_summary">Also catches drug and brand names</string>
-    <string name="name_summary_outline">" · no evidence: outline"</string>
+    <string name="mask_unanchored">Mask those without evidence too</string>
+    <string name="mask_unanchored_summary">Also catches drug and brand names</string>
+    <string name="name_summary_mask">" · no evidence: masked too"</string>
     <string name="name_summary_skip">" · no evidence: skip"</string>
     <string name="anchor_note">Evidence: %1$s.</string>
     <string name="anchor_attached">%1$s next to the name</string>
@@ -277,7 +263,7 @@
     <string name="barcode_strict">Strict</string>
     <string name="barcode_loose">Loose</string>
     <string name="barcode_strict_summary">Only codes that decode, and similar codes right beside them</string>
-    <string name="barcode_loose_summary">Also outlines likely codes that don\'t decode; may be wrong</string>
+    <string name="barcode_loose_summary">Also masks likely codes that don\'t decode; may be wrong</string>
     <string name="barcode_footer">QR codes and barcodes.</string>
     <string name="chat_when_found">When a chat screenshot is found</string>
     <string name="chat_footer">Once a screenshot is recognized as a chat, covers every sender\'s avatar and display name, plus the chat title at the top (the other person\'s name or the group name). It goes by the layout, not by the app, so it works for WeChat, QQ, Telegram, WhatsApp, iMessage, LINE, Messenger, Discord and the like. Phone numbers, addresses and other details inside messages are still handled under Text.</string>
@@ -305,8 +291,6 @@
     <string name="mlkit_text_versions">%1$s (Latin) / %2$s (Chinese)</string>
 
     <!-- settings: export / appearance -->
-    <string name="export_reminder">Ask before export</string>
-    <string name="export_reminder_summary">When outlined content is still unmasked</string>
     <string name="restyle_all">Change existing masks when switching style</string>
     <string name="restyle_all_summary">Solid, mosaic and blur</string>
     <string name="watermark_style">Watermark style</string>

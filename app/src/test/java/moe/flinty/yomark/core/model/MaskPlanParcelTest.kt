@@ -31,10 +31,10 @@ class MaskPlanParcelTest {
     private fun plan() = MaskPlan(
         items = listOf(
             MaskItem("rule-card-0-0-0", Quad.fromRect(RectF(1f, 2f, 3f, 4f)),
-                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE, MaskState.MASKED,
+                SensitiveKind.PAYMENT_CARD, DetectorSource.RULE,
                 MaskLook(MaskStyle.PIXELATE, MaskOptions(solidColor = 0x11223344, pixelBlockDivisor = 6))),
             MaskItem("manual-abc", Quad.fromRect(RectF(5f, 6f, 7f, 8f)),
-                SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.OUTLINED,
+                SensitiveKind.MANUAL, DetectorSource.MANUAL,
                 MaskLook(MaskStyle.MARKER, MaskOptions(markerColor = MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f)))),
         ),
     )
@@ -46,13 +46,12 @@ class MaskPlanParcelTest {
     }
 
     @Test
-    fun `tri-state and kinds survive`() {
+    fun `kinds and sources survive`() {
         val restored = roundTrip(plan())
-        assertThat(restored.items.map { it.state })
-            .containsExactly(MaskState.MASKED, MaskState.OUTLINED).inOrder()
         assertThat(restored.items.map { it.kind })
             .containsExactly(SensitiveKind.PAYMENT_CARD, SensitiveKind.MANUAL).inOrder()
-        assertThat(restored.pendingCount).isEqualTo(1)
+        assertThat(restored.items.map { it.source })
+            .containsExactly(DetectorSource.RULE, DetectorSource.MANUAL).inOrder()
     }
 
     @Test

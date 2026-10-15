@@ -22,23 +22,9 @@ class SensitiveKindLabelsTest {
     }
 
     @Test
-    fun `display names are distinct so the dialog never says the same thing twice`() {
+    fun `display names are distinct so the list never says the same thing twice`() {
         val names = SensitiveKind.entries.map { SensitiveKindLabels.display(res, it) }
         assertThat(names.toSet()).hasSize(names.size)
     }
 
-    @Test
-    fun `plural reads like the spec example`() {
-        // spec §7.4：「2 个网址、1 个 IP 地址」
-        assertThat(SensitiveKindLabels.plural(res, SensitiveKind.URL, 2)).isEqualTo("2 个网址")
-        assertThat(SensitiveKindLabels.plural(res, SensitiveKind.IP_ADDR, 1)).isEqualTo("1 个 IP 地址")
-    }
-
-    /** 英文里名字在前、数字在后，「IP address: 1」，不套中文的「个」。 */
-    @Test
-    @Config(qualifiers = "en-rUS")
-    fun `english counts put the name first`() {
-        val en = ApplicationProvider.getApplicationContext<Context>().resources
-        assertThat(SensitiveKindLabels.plural(en, SensitiveKind.IP_ADDR, 1)).isEqualTo("IP address: 1")
-    }
 }

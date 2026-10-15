@@ -13,7 +13,6 @@ import moe.flinty.yomark.core.image.SourceImageLoader
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskPlan
-import moe.flinty.yomark.core.model.MaskState
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
@@ -72,7 +71,7 @@ class LargeImageExportTest {
             items = listOf(
                 MaskItem(
                     "m1", Quad.fromRect(RectF(100f, 100f, 2000f, 900f)),
-                    SensitiveKind.MANUAL, DetectorSource.MANUAL, MaskState.MASKED,
+                    SensitiveKind.MANUAL, DetectorSource.MANUAL,
                 )
             ),
         )

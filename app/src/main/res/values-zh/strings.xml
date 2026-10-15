@@ -57,16 +57,11 @@
     <!-- box list -->
     <string name="list_title">框出的内容</string>
     <string name="list_count">框出 %1$d 处</string>
-    <string name="list_pending">%1$d 处未打码</string>
-    <string name="list_all_masked">都已打码</string>
     <string name="list_empty">没有识别到敏感信息</string>
     <string name="list_empty_hint">有漏掉的地方，在图上用一根手指拖出一个框</string>
     <string name="item_selected">已选中</string>
     <string name="item_manual">手动画的框</string>
-    <string name="item_masked">已打码</string>
-    <string name="item_unmasked">未打码</string>
-    <string name="kind_count">%1$d 个%2$s</string>
-    <string name="kind_count_latin">%1$d 个 %2$s</string>
+    <string name="item_unmask">取消打码</string>
 
     <!-- kinds -->
     <string name="kind_phone">电话</string>
@@ -92,6 +87,7 @@
     <string name="kind_vin">车架号</string>
     <string name="kind_face">人脸</string>
     <string name="kind_barcode">条码</string>
+    <string name="kind_line">文字</string>
     <string name="kind_manual">手动</string>
     <string name="kind_chat_avatar">头像</string>
     <string name="kind_chat_name">昵称</string>
@@ -161,11 +157,6 @@
     <string name="density_dense">密集</string>
 
     <!-- dialogs -->
-    <string name="pending_title">还有 %1$d 处没打码</string>
-    <string name="stop_reminding">不再提示</string>
-    <string name="stop_reminding_hint">可在 设置 › 导出 里重新打开</string>
-    <string name="mask_all">全部打码</string>
-    <string name="export_anyway">仍然导出</string>
     <string name="unopened_title">还有 %1$d 张没看过</string>
     <string name="unopened_text">没打开过的图片还没识别，导出时会跳过。</string>
     <string name="review">去看看</string>
@@ -202,8 +193,6 @@
     <string name="settings_language_system">跟随系统</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
-    <string name="reminder_on">导出前提醒已开启</string>
-    <string name="reminder_off">导出前提醒已关闭</string>
     <string name="restyle_all_on">换样式时一起换</string>
     <string name="restyle_all_off">换样式时只换选中的</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
@@ -211,12 +200,9 @@
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
     <string name="summary_masked">打码</string>
-    <string name="summary_outlined">圈出</string>
     <string name="summary_off">关闭</string>
     <string name="handling_masked">打码</string>
-    <string name="handling_outlined">仅圈出</string>
     <string name="handling_off">关闭</string>
-    <string name="handling_outlined_summary">只画虚线框，点一下才打码</string>
 
     <!-- settings: text -->
     <string name="text_recognition">文字识别</string>
@@ -232,10 +218,10 @@
     <string name="engine_both_summary">两个模型一起跑，最慢</string>
     <string name="when_found">识别到%1$s时</string>
     <string name="guessed_names">从字面猜出的人名</string>
-    <string name="outline_unanchored">没有旁证的也圈出</string>
-    <string name="outline_unanchored_summary">会多圈到药名、品牌名</string>
-    <string name="name_summary_outline">" · 没有旁证的只圈出"</string>
-    <string name="name_summary_skip">" · 没有旁证的不圈"</string>
+    <string name="mask_unanchored">没有旁证的也打码</string>
+    <string name="mask_unanchored_summary">会多遮到药名、品牌名</string>
+    <string name="name_summary_mask">" · 没有旁证的也打码"</string>
+    <string name="name_summary_skip">" · 没有旁证的不打码"</string>
     <string name="anchor_note">旁证是%1$s。</string>
     <string name="anchor_attached">紧挨着名字的%1$s</string>
     <string name="anchor_nearby">同一行、上下相邻一行的%1$s</string>
@@ -277,7 +263,7 @@
     <string name="barcode_strict">严格</string>
     <string name="barcode_loose">宽松</string>
     <string name="barcode_strict_summary">只认能解码的条码，和紧挨着的同款码</string>
-    <string name="barcode_loose_summary">解不出的疑似条码也圈出，可能误圈</string>
+    <string name="barcode_loose_summary">解不出的疑似条码也打码，可能误遮</string>
     <string name="barcode_footer">包括二维码和条形码。</string>
     <string name="chat_when_found">识别到聊天记录时</string>
     <string name="chat_footer">认出是聊天记录截图后，遮住每个发言者的头像和昵称，以及顶栏的聊天标题（对方名字或群名）。按版面认，不分是哪个应用：微信、QQ、Telegram、WhatsApp、iMessage、LINE、Messenger、Discord 等都适用。消息里的电话、地址等仍按「文字」里的各类处理。</string>
@@ -305,8 +291,6 @@
     <string name="mlkit_text_versions">%1$s（英文）/ %2$s（中文）</string>
 
     <!-- settings: export / appearance -->
-    <string name="export_reminder">导出前提醒</string>
-    <string name="export_reminder_summary">有圈出但未打码的内容时</string>
     <string name="restyle_all">换样式时一起换掉已有的打码</string>
     <string name="restyle_all_summary">色块、马赛克、模糊</string>
     <string name="watermark_style">水印样式</string>

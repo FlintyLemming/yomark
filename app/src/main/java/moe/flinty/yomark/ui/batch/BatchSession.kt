@@ -1,7 +1,6 @@
 package moe.flinty.yomark.ui.batch
 
 import android.net.Uri
-import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
 import java.io.File
 
@@ -25,9 +24,8 @@ data class BatchItem(
  * **不做无人值守批量。** 每一张都在同一个编辑器里过一遍，底栏的胶片条上点哪张、滑到哪张就看哪张，
  * 不必按顺序；一张图第一次被打开时才识别。看完统一导出，还有没打开过的图时先问一句。
  *
- * 理由：三态模型的全部价值在于人眼过一遍那些仅圈出的候选。无人值守批量只能二选一——
- * 要么把 OUTLINED 全部打码（等于取消分层，回到过度遮挡），要么全部不打码（静默漏检）。
- * 两个都不可接受，所以这个功能形态本身不成立。
+ * 理由：识别会漏，也会打错，每一张都得有人看一眼：漏掉的点一下那行字补上，打错的点一下拿掉。
+ * 无人值守批量就是替用户认了这一张图上的全部判断，所以这个功能形态本身不成立。
  */
 data class BatchSession(val items: List<BatchItem>, val index: Int) {
 
@@ -41,9 +39,6 @@ data class BatchSession(val items: List<BatchItem>, val index: Int) {
 
     /** 第一张还没打开过的，没有时为 null。 */
     val firstUnopened: Int? get() = items.indexOfFirst { !it.opened && !it.failed }.takeIf { it >= 0 }
-
-    /** 导出拦截在批量下看**全部**图片的待打码数之和，不是只看当前这张。 */
-    val totalPending: Int get() = items.sumOf { it.plan?.pendingCount ?: 0 }
 
     fun select(i: Int): BatchSession = copy(index = i.coerceIn(items.indices))
 
@@ -68,10 +63,6 @@ data class BatchSession(val items: List<BatchItem>, val index: Int) {
     }
 
     fun withFailed(i: Int): BatchSession = update(i) { it.copy(failed = true) }
-
-    /** 拦截对话框的「全部打码」：每一张的圈出项都用 [look]（编辑器「打码」里眼下的样式）打上码。 */
-    fun maskAllEverywhere(look: MaskLook): BatchSession =
-        copy(items = items.map { it.copy(plan = it.plan?.maskAll(look)) })
 
     private inline fun update(i: Int, transform: (BatchItem) -> BatchItem): BatchSession =
         copy(items = items.mapIndexed { j, item -> if (j == i) transform(item) else item })
