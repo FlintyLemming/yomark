@@ -116,6 +116,8 @@ object ChatLayout {
         if (left >= 1 && right >= 1 && left + right >= 3) add(2, "左右两列消息")
         if (z.body.count { z.isRightEdgeTime(it) } >= 3) add(-3, "行尾一列时间（会话列表）")
         if (Names.headerRows(z).size >= 2) add(2, "名字加时间的消息头")
+        // 微信群里只有别人说话的一屏：输入栏没有占位字，也没有靠右的消息，剩下的只有头像和头像旁的昵称
+        if (Names.besideAvatars(z, avatars.body) >= 3) add(2, "头像旁的昵称")
         when {
             avatars.mirrored -> add(3, "左右两列头像")
             avatars.body.size >= 2 -> add(2, "一列头像")
@@ -1061,7 +1063,19 @@ internal object Names {
         }
     }
 
-    private fun aboveMessages(z: Zones, avatars: List<Box>): List<ChatText> {
+    /**
+     * 有几个头像旁边写着昵称：顶边和头像对齐的一行小字，下面紧跟一行字号更大的消息（微信、QQ、LINE 的群聊）。
+     * 只数下面有消息的：发图片、表情的那种下面没有字，通讯录、设置页上一个图标一行字也像。
+     * 会话列表正相反，名字比下面那行预览大。
+     */
+    fun besideAvatars(z: Zones, avatars: List<Box>): Int {
+        val names = aboveMessages(z, avatars, needMessage = true)
+        return avatars.count { a ->
+            names.any { n -> a.right <= n.box.left + 0.01f * z.w && n.box.left - a.right < 0.12f * z.w && abs(a.top - n.box.top) < 0.4f * a.height }
+        }
+    }
+
+    private fun aboveMessages(z: Zones, avatars: List<Box>, needMessage: Boolean = false): List<ChatText> {
         val body = z.body.filter { !z.isCentered(it) }
         val typical = typicalHeight(body)
         return body.mapNotNull { l ->
@@ -1081,6 +1095,7 @@ internal object Names {
                 // 和这页消息的字高也比一比：下面那行要是网址、邮箱这种全是字母的，OCR 的框比同字号的汉字高一截
                 if (l.box.height > SMALLER * below.box.height || l.box.height > SMALLER_THAN_TYPICAL * typical) return@mapNotNull null
             } else {
+                if (needMessage) return@mapNotNull null
                 // 下面没有字的：发的是图片、表情。名字顶边和左边的头像顶边对齐、字号比这页的消息小，也是昵称
                 val small = l.box.height < SMALLER * typical
                 val topAligned = avatars.any { a ->
