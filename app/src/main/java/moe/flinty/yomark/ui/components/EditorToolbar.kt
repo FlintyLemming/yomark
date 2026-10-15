@@ -867,11 +867,11 @@ private const val EXPAND_MS = 350
 private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /**
- * 收回去比展开快，曲线也更陡：Material 3 的 emphasized decelerate，九成在头 100 ms 里走完。
- * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速（2026-10-15）。
+ * 收回去比展开快一点，曲线是 ease-out cubic：起步快，尾巴不像标准曲线那样拖。
+ * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）。
  */
-private const val COLLAPSE_MS = 250
-private val COLLAPSE_EASING = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+private const val COLLAPSE_MS = 300
+private val COLLAPSE_EASING = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
 
 /** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
 internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
