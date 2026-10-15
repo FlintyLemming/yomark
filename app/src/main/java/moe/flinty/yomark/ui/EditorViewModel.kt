@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
@@ -101,6 +102,18 @@ class EditorViewModel(
     val debugTrace: StateFlow<Boolean> = settings.debugTrace
         .onEach { on -> if (!on) traceLog.clear() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * 开发者里的「显示识别框」：画布上叠出 [textBoxes]。调试信息关着时一律不画。
+     * 不进 EditorUiState，理由同 [scanStyle]。
+     */
+    val showTextBoxes: StateFlow<Boolean> = combine(debugTrace, settings.showTextBoxes) { debug, on -> debug && on }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val _textBoxes = MutableStateFlow<List<Quad>>(emptyList())
+
+    /** 画布上这张图识别出的每一行的框，就是 [lines]（init 里恢复时就要写它，所以放在前面）。开发者里打开「显示识别框」时画出来。 */
+    val textBoxes: StateFlow<List<Quad>> = _textBoxes.asStateFlow()
 
     /**
      * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——
@@ -624,6 +637,7 @@ class EditorViewModel(
         set(value) {
             field = value
             savedState[KEY_LINES] = packQuads(value)
+            _textBoxes.value = value
         }
 
     /**

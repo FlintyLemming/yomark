@@ -87,6 +87,7 @@ import moe.flinty.yomark.R
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
  * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一行多远还算点中它（图像像素）
  * @param onInk 手画完一笔：手指走过的点，图像坐标
+ * @param textBoxes 开发者里打开「显示识别框」时，文字识别认出的每一行的框；空的就不画
  */
 @Composable
 fun ImageCanvas(
@@ -101,6 +102,7 @@ fun ImageCanvas(
     scanStyle: ScanStyle = ScanStyle.SWEEP,
     showOriginal: Boolean = false,
     onInk: (List<PointF>) -> Unit = {},
+    textBoxes: List<Quad> = emptyList(),
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
@@ -424,6 +426,7 @@ fun ImageCanvas(
                     purposeWatermark.draw(canvas, image.width, image.height, it, state.purposeStyle)
                 }
                 val dp = density.density / viewport.scale
+                if (textBoxes.isNotEmpty()) drawTextBoxes(canvas, textBoxes, dp)
                 state.selectedManualId?.let { id ->
                     state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp) }
                 }
@@ -586,6 +589,22 @@ private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: S
         canvas.drawCircle(p.x, p.y, (HANDLE_DP / 2f - HANDLE_RING_DP) * dp, dot)
     }
 }
+
+/**
+ * 开发者里的「显示识别框」：识别出的每一行一个框，盖在码上面，打了码的那几行也看得到。
+ * 用固定的品红，不跟主题色：要和选中框、草稿框分得开，在哪种图上都扎眼。
+ */
+private fun drawTextBoxes(canvas: android.graphics.Canvas, boxes: List<Quad>, dp: Float) {
+    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        color = TEXT_BOX_COLOR
+        strokeWidth = TEXT_BOX_LINE_DP * dp
+    }
+    boxes.forEach { canvas.drawPath(it.toPath(), paint) }
+}
+
+private const val TEXT_BOX_COLOR = 0xFFFF00FF.toInt()
+private const val TEXT_BOX_LINE_DP = 1f
 
 /** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
 private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {

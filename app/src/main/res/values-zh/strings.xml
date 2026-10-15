@@ -197,7 +197,7 @@
     <string name="settings_general_summary">编辑、水印样式</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录、外部模型</string>
-    <string name="settings_developer_summary">调试信息、调试记录</string>
+    <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
     <string name="summary_masked">打码</string>
@@ -345,6 +345,8 @@
     <string name="debug_taps_left">再点 %1$d 次即可打开调试信息</string>
     <string name="debug_log">调试记录</string>
     <string name="debug_log_summary">最近 %1$d 次识别</string>
+    <string name="show_text_boxes">显示扫描结果</string>
+    <string name="show_text_boxes_summary">在编辑页框出文字识别认出的每一行</string>
     <string name="debug_off_footer">记录已删除，在「关于」里连点版本号七下可再打开</string>
     <string name="keep_runs">保留最近几次识别</string>
     <string name="runs_count">%1$d 次</string>

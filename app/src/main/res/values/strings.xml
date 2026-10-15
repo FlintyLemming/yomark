@@ -197,7 +197,7 @@
     <string name="settings_general_summary">Editing, watermark style</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
     <string name="settings_labs_summary">Detect chat screenshots, external model</string>
-    <string name="settings_developer_summary">Debug info, debug log</string>
+    <string name="settings_developer_summary">Debug info, debug log, scan results</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
     <string name="summary_masked">masked</string>
@@ -345,6 +345,8 @@
     <string name="debug_taps_left">%1$d more taps to turn on debug info</string>
     <string name="debug_log">Debug log</string>
     <string name="debug_log_summary">Last %1$d runs</string>
+    <string name="show_text_boxes">Show scan results</string>
+    <string name="show_text_boxes_summary">Outline every line text recognition found in the editor</string>
     <string name="debug_off_footer">Log deleted; tap the version in About seven times to turn it back on</string>
     <string name="keep_runs">Runs to keep</string>
     <string name="runs_count">%1$d</string>
