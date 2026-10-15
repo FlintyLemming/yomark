@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
+import com.google.common.collect.Range
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
@@ -50,12 +51,41 @@ class FrostSceneDrawTest {
     private fun image(paint: (Bitmap) -> Unit = { it.eraseColor(Color.WHITE) }) =
         SourceImage(Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888).also(paint), 1f, w, h, "image/png")
 
-    private fun render(time: ScanTime?, source: SourceImage = image(), prepared: Boolean = true): Bitmap {
+    /** 左半黑、右半白：清晰时交界处一边纯黑一边纯白，糊过之后交界两侧是一片过渡。 */
+    private fun halves() = image { bmp ->
+        bmp.eraseColor(Color.WHITE)
+        Canvas(bmp).drawRect(0f, 0f, 200f, 700f, Paint().apply { color = Color.BLACK })
+    }
+
+    /**
+     * 磨砂这一帧要的东西，和画布上一样按一 dp 合 [pxPerDp] 个图像像素准备。[prepared] 为 false 时模糊图、光点都还没好；
+     * [arrivedAt] 是它们在识别开始后多久才好的。
+     */
+    private fun look(
+        source: SourceImage,
+        pxPerDp: Float = density / scale,
+        prepared: Boolean = true,
+        arrivedAt: Long = 0L,
+        layer: FrostLayer? = if (prepared) FrostLayer.prepare(source.bitmap, pxPerDp) else null,
+    ) = ScanLook.Frost(
+        blurred = if (prepared) FrostLayer.blur(source.bitmap, FrostEffect.BLUR_DP * pxPerDp) else null,
+        layer = layer,
+        origin = origin,
+        cover = FrostLayer.averageColor(source.bitmap),
+        blurAt = arrivedAt,
+        layerAt = arrivedAt,
+    )
+
+    private fun render(
+        time: ScanTime?,
+        source: SourceImage = image(),
+        prepared: Boolean = true,
+        arrivedAt: Long = 0L,
+    ): Bitmap {
         val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val layer = if (prepared) FrostLayer.prepare(source.bitmap, density / scale) else null
         drawScene(
             Canvas(out), source, plan, RendererRegistry.default(), scale, density, time, ScanPaints(),
-            ScanLook.Frost(layer, origin),
+            look(source, prepared = prepared, arrivedAt = arrivedAt),
         )
         return out
     }
@@ -102,7 +132,7 @@ class FrostSceneDrawTest {
     }
 
     @Test
-    fun `the frost fades in instead of snapping on`() {
+    fun `the dimming fades in instead of snapping on`() {
         assertThat(render(ScanTime.START).getPixel(60, 500)).isEqualTo(Color.WHITE)
         val early = render(scanning(FrostEffect.FADE_IN_MS / 6)).meanRed(60, 500)
         val full = render(scanning()).meanRed(60, 500)
@@ -110,30 +140,47 @@ class FrostSceneDrawTest {
         assertThat(early).isGreaterThan(full)
     }
 
-    @Test
-    fun `the page is blurred under the frost`() {
-        // 左半黑、右半白：清晰时交界处一边纯黑一边纯白，磨砂之后交界两侧糊成一片过渡
-        val source = image { bmp ->
-            bmp.eraseColor(Color.WHITE)
-            Canvas(bmp).drawRect(0f, 0f, 200f, 700f, Paint().apply { color = Color.BLACK })
-        }
-        val frame = render(scanning(), source)
-        val deepBlack = frame.meanRed(60, 500)
-        val nearEdgeBlack = frame.meanRed(193, 500, r = 2)
-        val nearEdgeWhite = frame.meanRed(207, 500, r = 2)
-        val deepWhite = frame.meanRed(340, 500)
-        assertThat(nearEdgeBlack - deepBlack).isGreaterThan(15.0)
-        assertThat(deepWhite - nearEdgeWhite).isGreaterThan(15.0)
+    /** 交界两侧糊开了：离交界几像素处已经不是纯黑、纯白。 */
+    private fun Bitmap.blurredAcrossTheEdge(): Boolean {
+        val deepBlack = meanRed(60, 500)
+        val nearEdgeBlack = meanRed(193, 500, r = 2)
+        val nearEdgeWhite = meanRed(207, 500, r = 2)
+        val deepWhite = meanRed(340, 500)
+        return nearEdgeBlack - deepBlack > 15.0 && deepWhite - nearEdgeWhite > 15.0
     }
 
     @Test
-    fun `before the blur is ready the page is only dimmed`() {
-        val frame = render(scanning(), prepared = false)
-        val dimmed = frame.getPixel(60, 500)
-        assertThat(Color.red(dimmed)).isLessThan(200)
-        // 没有模糊图、没有光点，整页一样暗
-        assertThat(frame.getPixel(300, 100)).isEqualTo(dimmed)
-        assertThat(frame.at(manual)).isEqualTo(MaskOptions.SKY_BLUE)
+    fun `the page is blurred under the frost`() {
+        assertThat(render(scanning(), halves()).blurredAcrossTheEdge()).isTrue()
+    }
+
+    @Test
+    fun `the very first frame is already blurred, not the sharp page`() {
+        val frame = render(ScanTime.START, halves())
+        assertThat(frame.blurredAcrossTheEdge()).isTrue()
+    }
+
+    @Test
+    fun `before the blur is ready the page is covered in its average colour`() {
+        listOf(ScanTime.START, scanning()).forEach { time ->
+            val frame = render(time, halves(), prepared = false)
+            // 黑白各半，盖上去的是一整块灰，看不出原来的黑白
+            val covered = frame.getPixel(60, 500)
+            assertThat(frame.getPixel(340, 500)).isEqualTo(covered)
+            assertThat(frame.getPixel(199, 100)).isEqualTo(covered)
+            assertThat(Color.red(covered)).isIn(Range.open(10, 245))
+            assertThat(frame.at(manual)).isEqualTo(MaskOptions.SKY_BLUE)
+        }
+    }
+
+    @Test
+    fun `a blur that is ready late fades in over the cover`() {
+        val at = 1_000L
+        val arriving = render(scanning(at), halves(), arrivedAt = at)
+        assertThat(arriving.getPixel(340, 500)).isEqualTo(arriving.getPixel(60, 500))
+        // 备好之后，平均色的那一整块换成了模糊的黑白两半
+        val arrived = render(scanning(at + FrostEffect.ARRIVAL_MS), halves(), arrivedAt = at)
+        assertThat(arrived.meanRed(340, 500) - arrived.meanRed(60, 500)).isGreaterThan(60.0)
     }
 
     @Test
@@ -151,7 +198,7 @@ class FrostSceneDrawTest {
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             drawScene(
                 Canvas(out), source, plan, RendererRegistry.default(), scale, dense, scanning(ms), ScanPaints(),
-                ScanLook.Frost(layer, origin),
+                look(source, dense / scale, layer = layer),
             )
             val pixels = IntArray(w * h).also { out.getPixels(it, 0, w, 0, 0, w, h) }
             val reds = pixels.map { Color.red(it) }
@@ -171,11 +218,10 @@ class FrostSceneDrawTest {
     @Test
     fun `the frost stays on the image and never touches the canvas around it`() {
         val source = image()
-        val layer = FrostLayer.prepare(source.bitmap, density / scale)
         val out = Bitmap.createBitmap(w + 80, h, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.GRAY) }
         val canvas = Canvas(out)
         canvas.translate(40f, 0f)
-        drawScene(canvas, source, plan, RendererRegistry.default(), scale, density, scanning(), ScanPaints(), ScanLook.Frost(layer, origin))
+        drawScene(canvas, source, plan, RendererRegistry.default(), scale, density, scanning(), ScanPaints(), look(source))
         for (y in 0 until h step 7) {
             assertThat(out.getPixel(20, y)).isEqualTo(Color.GRAY)
             assertThat(out.getPixel(w + 60, y)).isEqualTo(Color.GRAY)
@@ -203,13 +249,12 @@ class FrostSceneDrawTest {
         // 画布上的画笔是跨帧复用的。散开刚开始那几帧，磨砂还没有哪里完全揭开，块一律不画；
         // 之后的帧里块照样要落下来，不能被前几帧留在画笔上的状态吞掉
         val source = image()
-        val layer = FrostLayer.prepare(source.bitmap, density / scale)
+        val frost = look(source)
         val paints = ScanPaints()
         fun frame(since: Long): Bitmap {
             val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
             drawScene(
-                Canvas(out), source, plan, RendererRegistry.default(), scale, density, revealing(since), paints,
-                ScanLook.Frost(layer, origin),
+                Canvas(out), source, plan, RendererRegistry.default(), scale, density, revealing(since), paints, frost,
             )
             return out
         }
