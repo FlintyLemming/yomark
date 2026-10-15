@@ -200,47 +200,42 @@
       <div class="wrap">
         <header class="sec-head">
           <p class="eyebrow">打码样式</p>
-          <h2 id="styles-title">六种样式，每一块码各用各的。</h2>
-          <p class="lead">预览和导出用同一套渲染器，导出的就是你看到的。下面六张图裁自应用在样图上的真实渲染。</p>
+          <h2 id="styles-title">五种样式，每一块码各用各的。</h2>
+          <p class="lead">预览和导出用同一套渲染器，导出的就是你看到的。下面五张图裁自应用在样图上的真实渲染。</p>
         </header>
         <!-- 小图由 tools/site/crop_style_tiles.py 从 docs/readme/styles.png 裁出 -->
         <ul class="tiles">
           <li class="tile">
             <div class="tile-head"><h3>色块</h3><span class="badge badge-safe">不可还原</span></div>
             <img src="img/style-solid.webp" width="1089" height="235" loading="lazy" decoding="async" alt="色块样式：地址、人名和电话被不透明的天蓝色块盖住">
-            <p>默认样式。颜色可以选预设、自定义，也能用吸管从图上取。</p>
-          </li>
-          <li class="tile">
-            <div class="tile-head"><h3>表情</h3><span class="badge badge-safe">不可还原</span></div>
-            <img src="img/style-emoji.webp" width="1089" height="235" loading="lazy" decoding="async" alt="表情样式：深色底块上放着笑脸表情">
-            <p>20 个表情，底色可调，放一个或者排满一行。</p>
-          </li>
-          <li class="tile">
-            <div class="tile-head"><h3>抹除</h3><span class="badge badge-safe">不可还原</span></div>
-            <img src="img/style-erase.webp" width="1089" height="236" loading="lazy" decoding="async" alt="抹除样式：文字所在的区域被周围的白色填平，看不出原来有字">
-            <p>用周围的颜色把区域填平。背景太复杂时改用色块。</p>
+            <p>默认样式。颜色可以选预设、自定义、用吸管从图上取，或者取周围的近似色。</p>
           </li>
           <li class="tile">
             <div class="tile-head"><h3>马赛克</h3><span class="badge badge-warn">可能被还原</span></div>
             <img src="img/style-pixelate.webp" width="1089" height="235" loading="lazy" decoding="async" alt="马赛克样式：文字被像素化成色块">
-            <p>颗粒粗细可调，只能比默认更粗。</p>
+            <p>颗粒粗细可调。</p>
           </li>
           <li class="tile">
             <div class="tile-head"><h3>模糊</h3><span class="badge badge-warn">可能被还原</span></div>
-            <img src="img/style-blur.webp" width="1089" height="235" loading="lazy" decoding="async" alt="模糊样式：文字被高斯模糊，仍能看出大致轮廓">
-            <p>高斯模糊，强度只能比默认更强。</p>
+            <img src="img/style-blur.webp" width="1089" height="236" loading="lazy" decoding="async" alt="模糊样式：文字被高斯模糊，仍能看出大致轮廓">
+            <p>高斯模糊，强度可调。</p>
           </li>
           <li class="tile">
             <div class="tile-head"><h3>马克笔</h3><span class="badge badge-warn">不遮盖内容</span></div>
-            <img src="img/style-marker.webp" width="1089" height="236" loading="lazy" decoding="async" alt="马克笔样式：文字上盖着半透明的黄色高亮，内容仍然清楚可读">
-            <p>半透明高亮，只做标记。颜色可调，浓淡最高 70%。</p>
+            <img src="img/style-marker.webp" width="1089" height="235" loading="lazy" decoding="async" alt="马克笔样式：文字上盖着半透明的黄色高亮，内容仍然清楚可读">
+            <p>半透明高亮，只做标记。颜色、粗细可调，浓淡最高 70%。</p>
+          </li>
+          <li class="tile">
+            <div class="tile-head"><h3>画笔</h3><span class="badge badge-warn">不遮盖内容</span></div>
+            <img src="img/style-pen.webp" width="1089" height="235" loading="lazy" decoding="async" alt="画笔样式：地址、人名和电话各被一圈不透明的红线框住，内容仍然清楚可读">
+            <p>不透明的线，只做标记。手画或拉框，颜色、粗细可调。</p>
           </li>
         </ul>
         <aside class="callout">
           <svg class="i" aria-hidden="true"><use href="#i-alert"/></svg>
           <div>
             <h3>马赛克和模糊不等于安全</h3>
-            <p>截图的字体固定、背景干净，马赛克可以被逐字还原。需要真正隐藏信息时，请用色块、表情或抹除；选了后三种时，应用里也会提示。<a href="https://github.com/FlintyLemming/yomark/blob/main/docs/release-checklist.md">看实测记录</a></p>
+            <p>截图的字体固定、背景干净，马赛克可以被逐字还原。需要真正隐藏信息时，请用色块。<a href="https://github.com/FlintyLemming/yomark/blob/main/docs/release-checklist.md">看实测记录</a></p>
           </div>
         </aside>
       </div>
