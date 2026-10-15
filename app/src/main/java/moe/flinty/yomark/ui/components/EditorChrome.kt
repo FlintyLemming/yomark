@@ -44,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.runtime.derivedStateOf
@@ -179,7 +178,7 @@ fun EditorBottomBar(
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val wanted = (styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null
-    val grow = animateFloatAsState(if (wanted) 1f else 0f, tween(EXPAND_MS, easing = EASING), label = "stylePanel")
+    val grow = animateFloatAsState(if (wanted) 1f else 0f, foldSpec(wanted), label = "stylePanel")
     val shown by remember { derivedStateOf { grow.value > 0f } }
     val panelShown = wanted || shown
     // 收回去的半路上两样都已经关了，刚才开着的那一个还要接着画完

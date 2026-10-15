@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui.components
 
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
@@ -162,11 +163,7 @@ fun EditorToolbar(
     compare: MutableInteractionSource? = null,
     canCompare: Boolean = false,
 ) {
-    val progress = animateFloatAsState(
-        if (open != null) 1f else 0f,
-        tween(EXPAND_MS, easing = EASING),
-        label = "toolGroup",
-    )
+    val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
     // 收回去的半路上 open 已经是 null，那一组的工具还要接着画完
     val last = remember { LastOpen() }
     if (open != null) last.group = open
@@ -864,10 +861,21 @@ private fun ToolItem(
     }
 }
 
-internal const val EXPAND_MS = 350
+private const val EXPAND_MS = 350
 
-/** Material 3 的标准曲线：起步快、落地缓，展开收起都用它。 */
-internal val EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+/** Material 3 的标准曲线：起步快、落地缓。 */
+private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+/**
+ * 收回去比展开快，曲线也更陡：Material 3 的 emphasized decelerate，九成在头 100 ms 里走完。
+ * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速（2026-10-15）。
+ */
+private const val COLLAPSE_MS = 250
+private val COLLAPSE_EASING = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)
+
+/** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
+internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) tween(EXPAND_MS, easing = EXPAND_EASING) else tween(COLLAPSE_MS, easing = COLLAPSE_EASING)
 
 /** 收着的那一排（两组、圆钮）在前半程让开。 */
 private const val FADE_OUT = 0.5f
