@@ -1,4 +1,4 @@
-/* 有码落地页。配色照 README 头图和编辑器：墨色 #101014，打码色块天蓝 #87CEEB，圈出的虚线框琥珀 #FFB300。
+/* 有码落地页。配色照 README 头图和编辑器：墨色 #101014，打码色块天蓝 #87CEEB。
    应用只有浅色界面，页面也只做浅色。字体用系统自带的，不加载网络字体。 */
 
 :root {
@@ -18,7 +18,6 @@
   --sky: #87ceeb;
   --sky-soft: #e4f3fa;
   --sky-ink: #0b4f6c;
-  --amber: #ffb300;
   --warn: #b45309;
   --warn-soft: #fff5e8;
   --safe: #166534;
@@ -662,7 +661,7 @@ img {
 }
 
 /* 识别出来的一处。四周留 8×4 px 的点按余量（用负外边距抵掉，不影响排版）；
-   色块和虚线框画在 ::after 上，类型标签画在 ::before 上，透明度都跟着 --a 走，落码动画靠它渐显。 */
+   色块画在 ::after 上，透明度跟着 --a 走，落码动画靠它渐显。没打码的（off）不画，指上去才淡淡地显出来。 */
 .m {
   --a: 1;
   position: relative;
@@ -690,46 +689,19 @@ img {
   content: "";
   position: absolute;
   inset: 5px 1px;
-  border: 2px dashed transparent;
   border-radius: 2px;
   background: var(--sky);
   opacity: var(--a);
   pointer-events: none;
-  transition: inset 0.18s, background-color 0.18s, border-color 0.18s;
+  transition: background-color 0.18s;
 }
 
-.m[data-state="outlined"]::after {
-  inset: 3px -1px;
-  border-color: var(--amber);
+.m[data-state="off"]::after {
   background: transparent;
 }
 
-.m[data-state="outlined"]:hover::after {
-  background: rgba(255, 179, 0, 0.12);
-}
-
-.m::before {
-  content: attr(data-kind);
-  position: absolute;
-  z-index: 1;
-  left: -1px;
-  bottom: calc(100% - 3px);
-  padding: 1px 4px;
-  border-radius: 2px 2px 0 0;
-  background: var(--amber);
-  color: #000;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  line-height: 12px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s;
-}
-
-.m[data-state="outlined"]::before {
-  opacity: var(--a);
+.m[data-state="off"]:hover::after {
+  background: rgba(135, 206, 235, 0.25);
 }
 
 .m:focus-visible {
@@ -832,8 +804,8 @@ img {
   background: var(--sky);
 }
 
-.sw-outline {
-  border: 1.5px dashed var(--amber);
+.sw-off {
+  border: 1.5px solid var(--faint);
 }
 
 .replay {
@@ -971,11 +943,6 @@ img {
   background: rgba(135, 206, 235, 0.55);
 }
 
-.key-outline {
-  outline: 1.5px dashed var(--amber);
-  outline-offset: -1.5px;
-}
-
 /* ---------- 识别范围 ---------- */
 
 .scope {
@@ -1032,10 +999,10 @@ img {
   color: #0d3445;
 }
 
-.chips-outline li {
+.chips-off li {
   background: #fff;
-  outline: 1.5px dashed var(--amber);
-  outline-offset: -1.5px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--text-2);
 }
 
 .scope-note {
