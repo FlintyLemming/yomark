@@ -14,9 +14,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,6 +33,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.export.PurposeWatermarkStyle
@@ -40,8 +45,10 @@ import moe.flinty.yomark.R
 /** 用途水印的调节面板要显示的东西。 */
 @Immutable
 data class PurposePanelModel(
-    /** 文案；null 是图上没有用途水印（没设过、打字时清空了，或者移除了）。 */
-    val text: String? = null,
+    /** 输入框里的文字。 */
+    val text: String = "",
+    /** 「应用」开关开着：文字画在图上。 */
+    val on: Boolean = false,
     val style: PurposeWatermarkStyle = PurposeWatermarkStyle(),
     /** 面板开着。和样式的调节面板是同一块地方，一次只开一个（见 EditorViewModel.showPurposeSheet）。 */
     val open: Boolean = false,
@@ -57,8 +64,8 @@ interface PurposePanelActions {
     fun onStyleChange(style: PurposeWatermarkStyle) {}
     fun onReset() {}
 
-    /** 移除水印，面板一起收起。 */
-    fun onRemove() {}
+    /** 「应用」开关：加上（true）或去掉（false）图上的水印。 */
+    fun onApply(on: Boolean) {}
     fun onCollapse() {}
 
     /** 开吸管（true）或收起吸管（false）。 */
@@ -66,7 +73,7 @@ interface PurposePanelActions {
 }
 
 /**
- * 用途水印的调节面板里的东西：顶上是名字和收起，下面是文字、颜色、角度、不透明度、密度，最底下是「恢复默认」和「移除」。
+ * 用途水印的调节面板里的东西：顶上是名字和收起，下面是文字、颜色、角度、不透明度、密度，最底下是「恢复默认」和「应用」开关。
  *
  * 和马克笔、画笔的面板一个样子、一个地方：手机上是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在图上，
  * 外面那一列（[PanelColumn]）由底栏摆；宽屏上占框列表的位置（见 [PurposePanel]）。原先它顶替整个底栏，样子也是另一套。
@@ -85,9 +92,8 @@ internal fun PurposePanelContent(
     imeVisible: Boolean = WindowInsets.isImeVisible,
 ) {
     val style = model.style
-    // 输入框自己持有正在编辑的文字：清空时 ViewModel 那边是 null（暂不加水印），
-    // 但框里该是空的，而不是跳回上一句。
-    var draft by remember { mutableStateOf(model.text.orEmpty()) }
+    // 输入框自己持有正在编辑的文字，不等 ViewModel 那边转一圈再回来
+    var draft by remember { mutableStateOf(model.text) }
     var focused by remember { mutableStateOf(false) }
     val focus = LocalFocusManager.current
 
@@ -158,11 +164,26 @@ internal fun PurposePanelContent(
             Text(stringResource(R.string.reset_defaults))
         }
         Spacer(Modifier.weight(1f))
-        // 移除只是这次不加：文字记着，再点开水印还是它（见 EditorViewModel.removePurposeWatermark）
-        TextButton(onClick = actions::onRemove) {
-            Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.remove))
+        // 关掉只是这次不加：文字记着，再打开还是它（见 EditorViewModel.setPurposeOn）
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .toggleable(value = model.on, role = Role.Switch, onValueChange = actions::onApply)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        ) {
+            Text(stringResource(R.string.apply), style = MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.width(12.dp))
+            Switch(
+                checked = model.on,
+                onCheckedChange = null,
+                thumbContent = if (model.on) {
+                    { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(SwitchDefaults.IconSize)) }
+                } else {
+                    null
+                },
+                // 同设置里的开关（SwitchRow）：默认的对勾在白色滑块上看不见
+                colors = SwitchDefaults.colors(checkedIconColor = MaterialTheme.colorScheme.primary),
+            )
         }
     }
 }

@@ -188,7 +188,7 @@ class EditorScreenLayoutTest {
 
     /**
      * 手机竖着拿，用途水印在「编辑」里，顶栏上没有它。点它和点了再点马克笔一样，胶囊长出它的面板盖在图上，
-     * 工具那一行不动；再点一下收起，这一组还展开着，图上的水印还在。
+     * 工具那一行不动；再点一下收起，这一组还展开着。打开面板不加水印，开了「应用」才加，收起后还在。
      */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the purpose watermark is under edit and grows its panel from the bar`() {
@@ -198,8 +198,11 @@ class EditorScreenLayoutTest {
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
         val tool = compose.onNodeWithText("水印").getUnclippedBoundsInRoot()
         compose.onNodeWithText("用途水印").assertIsDisplayed()
-        val remove = compose.onNodeWithText("移除").assertIsDisplayed().getUnclippedBoundsInRoot()
-        assertThat(remove.bottom).isAtMost(tool.top)
+        assertThat(vm.state.value.purposeText).isNull()
+        val apply = compose.onNodeWithText("应用").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(apply.bottom).isAtMost(tool.top)
+        compose.onNodeWithText("应用").performClick()
+        assertThat(vm.state.value.purposeText).isNotNull()
 
         compose.onNodeWithText("水印").performClick()
         frames(SETTLE_FRAMES)
@@ -501,6 +504,9 @@ class EditorScreenLayoutTest {
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
         compose.onNodeWithText("用途水印").assertIsDisplayed()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+        // 打开面板还没加上，按钮不说「已开启」
+        compose.onNodeWithContentDescription("用途水印").assertExists()
+        compose.onNodeWithText("应用").performClick()
 
         compose.runOnUiThread { vm.onStyleChipClick(vm.state.value.barLook.style) }
         frames(SETTLE_FRAMES)

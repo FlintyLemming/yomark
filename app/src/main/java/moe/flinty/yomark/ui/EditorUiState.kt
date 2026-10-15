@@ -79,8 +79,10 @@ data class EditorUiState(
     val colorPick: ColorTarget? = null,
     /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
     val unopenedDialogVisible: Boolean = false,
-    /** 用途水印文案（「仅供办理 XX 使用」）。安全功能，与付费去水印无关。 */
-    val purposeText: String? = null,
+    /** 用途水印面板里的文字（「仅供办理 XX 使用」）。打开面板只填上它，开关打开才画到图上（见 [purposeText]）。 */
+    val purposeDraft: String = "",
+    /** 用途水印面板上的「应用」开关。 */
+    val purposeOn: Boolean = false,
     /** 用途水印的外观。偏好项，活过每一次 EditorUiState 重建（换图不该把用户调好的样子丢掉）。 */
     val purposeStyle: PurposeWatermarkStyle = PurposeWatermarkStyle(),
     /** 用途水印调节面板开着：和样式的调节面板在同一个地方（手机上是底栏长出来的那一块），一次只开一个，图上实时预览。 */
@@ -111,6 +113,9 @@ data class EditorUiState(
      * 只是选中、什么也没改，画笔不动——取消选中后样式栏回到画笔。
      */
     val barLook: MaskLook get() = selectedItem?.look ?: brush
+
+    /** 图上（和导出时）的用途水印；null 是不加：开关关着，或者文字是空的。安全功能，与付费去水印无关。 */
+    val purposeText: String? get() = purposeDraft.takeIf { purposeOn && it.isNotBlank() }
 
     /**
      * 打码用的样子：识别出来直接打的码、AI 增强识别找到的、点一下打上的码都用它。

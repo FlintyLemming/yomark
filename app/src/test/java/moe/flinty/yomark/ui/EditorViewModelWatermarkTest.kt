@@ -187,25 +187,35 @@ class EditorViewModelWatermarkTest {
     // ---------- 用途水印 ----------
 
     @Test
-    fun `opening the panel turns the watermark on with a default text so the preview shows at once`() = runTest(dispatcher) {
+    fun `opening the panel fills in a default text but leaves the image alone until applied`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(whiteUri("open.png")); advanceUntilIdle()
         vm.showPurposeSheet()
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
-        assertThat(vm.state.value.purposeText).isNotEmpty()
+        assertThat(vm.state.value.purposeDraft).isNotEmpty()
+        assertThat(vm.state.value.purposeText).isNull()
+
+        vm.setPurposeOn(true)
+        assertThat(vm.state.value.purposeText).isEqualTo(vm.state.value.purposeDraft)
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()
+
+        vm.setPurposeOn(false)
+        assertThat(vm.state.value.purposeText).isNull()
+        assertThat(vm.state.value.purposeSheetVisible).isTrue()      // 关掉不收面板
     }
 
     @Test
     fun `clearing the text turns it off, and reopening brings back the last text`() = runTest(dispatcher) {
         val vm = vm()
         vm.showPurposeSheet()
+        vm.setPurposeOn(true)
         vm.setPurposeText("仅供办理签证使用")
+        assertThat(vm.state.value.purposeText).isEqualTo("仅供办理签证使用")
         vm.setPurposeText("")
         assertThat(vm.state.value.purposeText).isNull()
         assertThat(vm.state.value.purposeSheetVisible).isTrue()      // 打字途中清空不收面板
 
-        vm.removePurposeWatermark()
-        assertThat(vm.state.value.purposeSheetVisible).isFalse()
+        vm.dismissPurposeSheet()
         vm.showPurposeSheet()
         assertThat(vm.state.value.purposeText).isEqualTo("仅供办理签证使用")
     }
@@ -236,10 +246,11 @@ class EditorViewModelWatermarkTest {
 
         // 水印也是点一下开、再点一下收
         vm.togglePurposeSheet()
+        vm.setPurposeOn(true)
         vm.togglePurposeSheet()
         assertThat(vm.state.value.purposeSheetVisible).isFalse()
         assertThat(vm.state.value.stylePanelOpen).isFalse()
-        assertThat(vm.state.value.purposeText).isNotEmpty()      // 收起不是移除
+        assertThat(vm.state.value.purposeText).isNotEmpty()      // 收起不是关掉
     }
 
     /** 吸管给水印取色：取原图上那一处的颜色，打码的样子不动；取完吸管收起，面板还开着。 */
@@ -257,7 +268,7 @@ class EditorViewModelWatermarkTest {
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
     }
 
-    /** 等着取色时挑了色板上的颜色、收起了面板、移除了水印，吸管都跟着收起，下一下点图照常算数。 */
+    /** 等着取色时挑了色板上的颜色、收起了面板，吸管都跟着收起，下一下点图照常算数。 */
     @Test
     fun `the watermark eyedropper stops when the watermark moves on`() = runTest(dispatcher) {
         val vm = vm()
@@ -270,11 +281,6 @@ class EditorViewModelWatermarkTest {
         vm.startColorPick(ColorTarget.PURPOSE)
         vm.dismissPurposeSheet()
         assertThat(vm.state.value.colorPick).isNull()
-
-        vm.showPurposeSheet()
-        vm.startColorPick(ColorTarget.PURPOSE)
-        vm.removePurposeWatermark()
-        assertThat(vm.state.value.colorPick).isNull()
         assertThat(vm.state.value.purposeStyle.color).isEqualTo(PurposeWatermarkStyle.PALETTE[3])
     }
 
@@ -285,6 +291,7 @@ class EditorViewModelWatermarkTest {
         vm.onImageChosen(whiteUri("styled.png")); advanceUntilIdle()
         vm.showPurposeSheet()
         vm.setPurposeText("仅供办理签证使用")
+        vm.setPurposeOn(true)
         vm.setPurposeStyle(PurposeWatermarkStyle(color = PurposeWatermarkStyle.PALETTE[3], opacity = 0.6f))
         vm.onManualBox(Quad.fromRect(RectF(10f, 10f, 60f, 60f)))
         vm.requestExport(); advanceUntilIdle()

@@ -269,6 +269,7 @@ class PlayScreenshots {
         compose.runOnUiThread {
             vm.setPurposeText("仅供快递理赔使用")
             vm.showPurposeSheet()
+            vm.setPurposeOn(true)
             vm.dismissPurposeSheet()
         }
         advance(1_000)
