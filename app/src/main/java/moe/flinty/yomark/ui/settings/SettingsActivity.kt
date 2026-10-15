@@ -107,9 +107,6 @@ class SettingsPageActivity : YomarkActivity() {
             SettingsPage.BARCODE -> WithRecognitionConfig(store) { config, onChange ->
                 BarcodeSettingsScreen(config, onChange, onNavigateUp = ::finish)
             }
-            SettingsPage.CHAT -> WithRecognitionConfig(store) { config, onChange ->
-                ChatSettingsScreen(config, onChange, onNavigateUp = ::finish)
-            }
             SettingsPage.AI -> {
                 // 进页时问一次 AICore；只看不下，见 NanoStatus
                 val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
@@ -161,6 +158,9 @@ class SettingsPageActivity : YomarkActivity() {
                         onNavigateUp = ::finish,
                     )
                 }
+            }
+            SettingsPage.LABS -> WithRecognitionConfig(store) { config, onChange ->
+                LabsSettingsScreen(config, onChange, onNavigateUp = ::finish)
             }
             SettingsPage.DEVELOPER -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)

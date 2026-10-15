@@ -74,7 +74,7 @@ import moe.flinty.yomark.ui.theme.colorScheme
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、导出、外观。
+ * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、导出、外观、实验室。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
@@ -286,20 +286,29 @@ fun BarcodeSettingsScreen(
 }
 
 /**
- * 聊天记录：认出是聊天截图之后，头像、昵称、聊天标题怎么处理。三类共用一个处理方式：
- * 用户要遮的是「这段对话是谁和谁」，分开设没有意义。没有识别模式可选，说明写在页脚。
+ * 实验室：还不够稳、出厂关着的功能，一项一个开关，说明写在各自的页脚。
+ *
+ * 眼下只有聊天记录（2026-10-15 从一级页挪进来）：认出是聊天截图之后，遮住头像、昵称、聊天标题。
+ * 三类共用一个开关：用户要遮的是「这段对话是谁和谁」，分开设没有意义。开着就是打码。
  */
 @Composable
-fun ChatSettingsScreen(
+fun LabsSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsScaffold(title = stringResource(R.string.settings_chat), onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_labs), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader(stringResource(R.string.chat_when_found), first = true)
-            HandlingGroup(config.chatState) { onChange(config.copy(chatState = it)) }
+            PageTopSpacer()
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.settings_chat),
+                    icon = Icons.Outlined.Forum,
+                    checked = config.chatState != RuleState.OFF,
+                    onCheckedChange = { on -> onChange(config.copy(chatState = if (on) RuleState.MASKED else RuleState.OFF)) },
+                )
+            }
             FooterText(stringResource(R.string.chat_footer))
         }
     }

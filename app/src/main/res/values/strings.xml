@@ -188,6 +188,7 @@
     <string name="settings_edit">Editing</string>
     <string name="settings_export">Export</string>
     <string name="settings_appearance">Appearance</string>
+    <string name="settings_labs">Labs</string>
     <string name="settings_developer">Developer</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System default</string>
@@ -196,6 +197,7 @@
     <string name="restyle_all_on">Switching style changes all masks</string>
     <string name="restyle_all_off">Switching style changes the selected mask only</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
+    <string name="settings_labs_summary">Chat screenshots</string>
     <string name="settings_developer_summary">Debug info, debug log</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
@@ -265,7 +267,6 @@
     <string name="barcode_strict_summary">Only codes that decode, and similar codes right beside them</string>
     <string name="barcode_loose_summary">Also masks likely codes that don\'t decode; may be wrong</string>
     <string name="barcode_footer">QR codes and barcodes.</string>
-    <string name="chat_when_found">When a chat screenshot is found</string>
     <string name="chat_footer">Once a screenshot is recognized as a chat, covers every sender\'s avatar and display name, plus the chat title at the top (the other person\'s name or the group name). It goes by the layout, not by the app, so it works for WeChat, QQ, Telegram, WhatsApp, iMessage, LINE, Messenger, Discord and the like. Phone numbers, addresses and other details inside messages are still handled under Text.</string>
 
     <!-- settings: AI -->

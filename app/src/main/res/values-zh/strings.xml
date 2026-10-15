@@ -188,6 +188,7 @@
     <string name="settings_edit">编辑</string>
     <string name="settings_export">导出</string>
     <string name="settings_appearance">外观</string>
+    <string name="settings_labs">实验室</string>
     <string name="settings_developer">开发者</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_system">跟随系统</string>
@@ -196,6 +197,7 @@
     <string name="restyle_all_on">换样式时一起换</string>
     <string name="restyle_all_off">换样式时只换选中的</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
+    <string name="settings_labs_summary">聊天记录</string>
     <string name="settings_developer_summary">调试信息、调试记录</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
@@ -265,7 +267,6 @@
     <string name="barcode_strict_summary">只认能解码的条码，和紧挨着的同款码</string>
     <string name="barcode_loose_summary">解不出的疑似条码也打码，可能误遮</string>
     <string name="barcode_footer">包括二维码和条形码。</string>
-    <string name="chat_when_found">识别到聊天记录时</string>
     <string name="chat_footer">认出是聊天记录截图后，遮住每个发言者的头像和昵称，以及顶栏的聊天标题（对方名字或群名）。按版面认，不分是哪个应用：微信、QQ、Telegram、WhatsApp、iMessage、LINE、Messenger、Discord 等都适用。消息里的电话、地址等仍按「文字」里的各类处理。</string>
 
     <!-- settings: AI -->

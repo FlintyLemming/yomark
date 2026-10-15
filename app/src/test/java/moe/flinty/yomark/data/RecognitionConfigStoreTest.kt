@@ -34,7 +34,7 @@ class RecognitionConfigStoreTest {
             barcodeState = RuleState.OFF,
             face = FaceOption.ACCURATE,
             faceState = RuleState.OFF,
-            chatState = RuleState.OFF,
+            chatState = RuleState.MASKED,
             semantic = SemanticOption.OFF,
             maskUnanchoredNames = true,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
@@ -100,6 +100,16 @@ class RecognitionConfigStoreTest {
         assertThat(read.faceState).isEqualTo(RuleState.OFF)
         assertThat(read.chatState).isEqualTo(RuleState.OFF)
         assertThat(read.ruleOverrides).containsExactly("card", RuleState.OFF, "url", RuleState.MASKED)
+    }
+
+    /**
+     * 聊天记录 2026-10-15 起出厂关着、挪进实验室。setRecognitionConfig 每次整份写入，老安装的旧键里多半存着
+     * 当时出厂的打码，不是用户自己选的；换了键，升级后一律关着，要用再去实验室打开。
+     */
+    @Test fun `a chat state stored before it moved to labs is ignored`() = runTest {
+        val store = store()
+        store.writeLegacyChatStateForTest("MASKED")
+        assertThat(store.recognitionConfig.first().chatState).isEqualTo(RuleState.OFF)
     }
 
     // ---------- 设置页的「恢复默认设置」 ----------

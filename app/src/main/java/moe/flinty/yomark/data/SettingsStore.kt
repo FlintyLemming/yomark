@@ -329,6 +329,12 @@ class SettingsStore internal constructor(
         }
     }
 
+    /** 模拟升级前的老安装：聊天记录的处理方式存在换键前的旧键里。 */
+    @VisibleForTesting
+    internal suspend fun writeLegacyChatStateForTest(raw: String) {
+        store.edit { it[stringPreferencesKey("recognition_chat_state")] = raw }
+    }
+
     @VisibleForTesting
     internal suspend fun writeRawStyleForTest(raw: String) {
         store.edit { it[KEY_STYLE] = raw }
@@ -389,7 +395,8 @@ class SettingsStore internal constructor(
         val KEY_BARCODE_STATE = stringPreferencesKey("recognition_barcode_state")
         val KEY_FACE = stringPreferencesKey("recognition_face")
         val KEY_FACE_STATE = stringPreferencesKey("recognition_face_state")
-        val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state")
+        /** v2：出厂从打码改成关着（挪进实验室），换键的理由同 KEY_TEXT_ENGINE。 */
+        val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state_v2")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
