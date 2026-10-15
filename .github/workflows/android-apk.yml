@@ -1,6 +1,6 @@
 name: Android APK
 
-# 只在 Actions 页手动触发：打一份可直接安装的 debug APK。
+# 只在 Actions 页手动触发：打一份可直接安装的 release APK（R8 混淆裁剪，比 debug 包小得多）。
 # 发版：手动触发时填 release_tag，单元测试通过后发一个 GitHub Release，附上这次打出的 APK，标签由 Release 在当前提交上创建。
 # 说明取自 docs/release-notes/<标签>.md，没有这个文件就让 GitHub 自动生成。发完版顺带重新部署落地页（pages.yml）。
 on:
@@ -54,20 +54,27 @@ jobs:
           echo "$SIGNING_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/yomark-release.jks"
           echo "SIGNING_KEYSTORE_FILE=$RUNNER_TEMP/yomark-release.jks" >> "$GITHUB_ENV"
 
-      - name: Build debug APKs
-        run: ./gradlew --no-daemon :app:assembleDebug :app:assertDebugNoRuntimePermissions
+      - name: Build release APKs
+        run: ./gradlew --no-daemon :app:assembleRelease :app:assertReleaseNoRuntimePermissions
 
       # 真机装 arm64-v8a，模拟器装 x86_64。按 ABI 拆包是因为 ONNX Runtime 的 .so 每个 ABI 二三十 MB。
       - uses: actions/upload-artifact@v7
         with:
-          name: yomark-debug-arm64-v8a
-          path: app/build/outputs/apk/debug/app-arm64-v8a-debug.apk
+          name: yomark-release-arm64-v8a
+          path: app/build/outputs/apk/release/app-arm64-v8a-release.apk
           if-no-files-found: error
 
       - uses: actions/upload-artifact@v7
         with:
-          name: yomark-debug-x86_64
-          path: app/build/outputs/apk/debug/app-x86_64-debug.apk
+          name: yomark-release-x86_64
+          path: app/build/outputs/apk/release/app-x86_64-release.apk
+          if-no-files-found: error
+
+      # 用户报的崩溃堆栈是混淆过的，靠它还原
+      - uses: actions/upload-artifact@v7
+        with:
+          name: yomark-release-mapping
+          path: app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: error
 
       # 放在上传之后：测试挂了也先把 APK 交出去，失败照样把这次运行标红
@@ -95,7 +102,7 @@ jobs:
           fi
           mkdir dist
           for abi in arm64-v8a x86_64; do
-            cp "app/build/outputs/apk/debug/app-$abi-debug.apk" "dist/yomark-$TAG-$abi.apk"
+            cp "app/build/outputs/apk/release/app-$abi-release.apk" "dist/yomark-$TAG-$abi.apk"
           done
           notes="docs/release-notes/$TAG.md"
           if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi

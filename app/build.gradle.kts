@@ -98,7 +98,8 @@ android {
             if (fixedSigning != null) signingConfig = fixedSigning
         }
         release {
-            if (fixedSigning != null) signingConfig = fixedSigning
+            // 没有固定签名（本地、fork）就用 debug 签名，打出来的包能直接装；Play 那条流水线没 keystore 会先拦下
+            signingConfig = fixedSigning ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -135,6 +136,14 @@ android {
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64", "x86")
             isUniversalApk = false
+        }
+    }
+
+    // 直接装的 APK 把 .so 压缩存放：下载小一半多（ONNX Runtime 33 MB 压完 12 MB），代价是安装时解压到磁盘、多占一份空间。
+    // AAB 不压：Play 下发时本来就压缩传输，装到手机上不解压、直接映射，省空间。
+    packaging {
+        jniLibs {
+            useLegacyPackaging = gradle.startParameter.taskNames.none { it.contains("bundle", ignoreCase = true) }
         }
     }
 
