@@ -1,20 +1,21 @@
 package moe.flinty.yomark.store
 
+import android.content.ContentResolver
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
-import android.graphics.Color
+import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
+import android.os.CancellationSignal
 import android.os.Looper
-import android.view.View
-import android.view.WindowManager
+import android.util.Size
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.performScrollToKey
-import androidx.core.graphics.withTranslation
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
 import moe.flinty.yomark.core.geometry.Quad
@@ -50,9 +51,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
-import org.robolectric.shadows.ShadowDialog
+import org.robolectric.annotation.Implementation
+import org.robolectric.annotation.Implements
+import org.robolectric.shadows.ShadowContentResolver
 import java.io.File
-import kotlin.math.roundToInt
 
 /**
  * Google Play 商品详情的手机截图（docs/play/screenshots/）用的编辑器截图。不是测试，平时跳过；要重拍时：
@@ -99,6 +101,22 @@ class PlayScreenshots {
         override suspend fun recognize(image: SourceImage): List<TextLine> {
             gate.await()
             return delegate.recognize(image)
+        }
+    }
+
+    /**
+     * Robolectric 上 ImageDecoder 解不了图（Only supported on Android），胶片条的缩略图出不来。
+     * BatchThumbnails 先走系统缩略图，这里替它用 BitmapFactory 降采样解：样图都是 file:// 的。
+     */
+    @Implements(ContentResolver::class)
+    class ThumbnailContentResolver : ShadowContentResolver() {
+        @Implementation
+        fun loadThumbnail(uri: Uri, size: Size, signal: CancellationSignal?): Bitmap {
+            val path = uri.path!!
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            val sample = maxOf(1, minOf(bounds.outWidth / size.width, bounds.outHeight / size.height))
+            return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
         }
     }
 
@@ -174,48 +192,16 @@ class PlayScreenshots {
         File(outDir, "$name.png").outputStream().use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
-    /**
-     * captureToImage 在 Robolectric 上等不到重绘，直接把整个窗口画进一张位图。
-     *
-     * AlertDialog 是另一个窗口，activity 的 decorView 里没有它：照系统的样子先压一层暗幕，再把它画在正中。
-     * 它的大小照 ViewRootImpl 量 WRAP_CONTENT 窗口的办法重新量：先按 config_prefDialogWidth 试，
-     * 放不下才放宽到整屏；对话框主题的最小宽度由 DecorView 自己撑开。Robolectric 直接按整屏宽排，与真机不符。
-     */
+    /** captureToImage 在 Robolectric 上等不到重绘，直接把整个窗口画进一张位图。 */
     private fun render(): Bitmap {
         shadowOf(Looper.getMainLooper()).idle()
         val decor = compose.activity.window.decorView
         val bmp = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
-        compose.runOnUiThread {
-            val canvas = Canvas(bmp)
-            decor.draw(canvas)
-            ShadowDialog.getShownDialogs().filter { it.isShowing }.forEach { dialog ->
-                val window = dialog.window ?: return@forEach
-                val attrs = window.attributes
-                if (attrs.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND != 0) {
-                    canvas.drawColor(Color.argb((attrs.dimAmount * 255).roundToInt(), 0, 0, 0))
-                }
-                val view = window.decorView
-                measureLikeViewRoot(view, attrs, bmp.width, bmp.height)
-                view.layout(0, 0, view.measuredWidth, view.measuredHeight)
-                canvas.withTranslation((bmp.width - view.width) / 2f, (bmp.height - view.height) / 2f) { view.draw(this) }
-            }
-        }
+        compose.runOnUiThread { decor.draw(Canvas(bmp)) }
         return bmp
     }
 
-    private fun measureLikeViewRoot(view: View, attrs: WindowManager.LayoutParams, width: Int, height: Int) {
-        val heightSpec = View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.AT_MOST)
-        val res = context.resources
-        val prefId = res.getIdentifier("config_prefDialogWidth", "dimen", "android")
-        val base = if (prefId != 0) res.getDimensionPixelSize(prefId) else 0
-        if (attrs.width == WindowManager.LayoutParams.WRAP_CONTENT && base in 1 until width) {
-            view.measure(View.MeasureSpec.makeMeasureSpec(base, View.MeasureSpec.AT_MOST), heightSpec)
-            if (view.measuredWidthAndState and View.MEASURED_STATE_TOO_SMALL == 0) return
-        }
-        view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.AT_MOST), heightSpec)
-    }
-
-    /** 快递详情页识别完：有把握的打上码，拿不准的圈出来。 */
+    /** 快递详情页识别完：手机号、地址这些打上码，出厂关着的几类（快递单号、日期时间……）原样留着。 */
     @Test fun auto() {
         open(sample("/readme/order-page.png"))
         shoot("auto")
@@ -255,12 +241,12 @@ class PlayScreenshots {
         shoot("manual")
     }
 
-    /** 还有圈出没打码的就点导出：先列出来再问一次。 */
-    @Test fun reminder() {
+    /** 网址出厂不打码：点一下那行字，整行打上码。点的是 chat-page.png 里网盘链接那一行的正中，量自样图的像素。 */
+    @Test fun tap() {
         val vm = open(sample("/play/chat-page.png"))
-        compose.runOnUiThread { vm.requestExport() }
+        compose.runOnUiThread { vm.onTap(PointF(440f, 1238f)) }
         advance(1_000)
-        shoot("reminder")
+        shoot("tap")
     }
 
     /** 用途水印：整张图铺一行字。调节面板收起后拍。 */
@@ -277,6 +263,7 @@ class PlayScreenshots {
     }
 
     /** 从相册一次分享三张进来：底栏工具那一行上面是胶片条，停在第一张上。 */
+    @Config(shadows = [ThumbnailContentResolver::class])
     @Test fun batch() {
         open(
             sample("/play/chat-page.png"),
@@ -287,13 +274,13 @@ class PlayScreenshots {
     }
 
     /**
-     * 设置 › 文字：每一类一行，小字是它眼下怎么处理，点进去能改成打码、仅圈出或关闭。出厂配置，
-     * 列表滚到各类开头，默认打码的几类（人名、电话、地址……）和默认只圈出的几类（快递单号、日期时间、网址……）同在一屏。
+     * 设置 › 文字：每一类一行，小字是它眼下打码还是关闭，点进去能改。出厂配置，列表滚到「取件码」，
+     * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（快递单号、日期时间、网址……）同在一屏。
      */
     @Test fun rules() {
         show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenEngine = {}, onOpenRule = {}, onNavigateUp = {}) }
         compose.waitForIdle()
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("name")
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("pickup")
         compose.waitForIdle()
         shoot("rules")
     }

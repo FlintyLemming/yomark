@@ -3,7 +3,7 @@
      照 Play 的要求：底色不用白、黑、深灰（会和商店页面融在一起），用打码块的天蓝；要紧的东西放在中间，
      四边留出会被裁掉的余量；不重复画应用图标，也不写「免费」「最好」之类的字。
      右边的卡片是 README 头图里那张样图（order-page.html）的内容：一道光自上而下扫过，光走过的地方落了码，
-     与编辑器里识别完的样子一致——色块 #87CEEB，虚线框和类型标签 #FFB300，光是天蓝到淡紫。 -->
+     与编辑器里识别完的样子一致——色块 #87CEEB，默认关闭的日期、快递单号原样留着，光是天蓝到淡紫。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -14,7 +14,6 @@
     --text: #1f2329;
     --mute: #8a8f99;
     --sky: #87ceeb;
-    --amber: #ffb300;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 1024px; height: 500px; overflow: hidden; }
@@ -59,13 +58,6 @@
   .v.big { font-size: 24px; font-weight: 500; letter-spacing: 1px; }
 
   .mask { color: transparent; background: var(--sky); box-shadow: 0 0 0 3px var(--sky); }
-  .outline { position: relative; outline: 2px dashed var(--amber); outline-offset: 3px; }
-  .outline::before {
-    content: attr(data-label);
-    position: absolute; left: -5px; top: -21px;
-    padding: 1px 5px; background: var(--amber); color: #000;
-    font-size: 11px; font-weight: 500; line-height: 13px; letter-spacing: 0.5px; white-space: nowrap;
-  }
 
   /* 光正走到的那一块码：从半透明慢慢盖实，底下的字还看得见一点 */
   .mask.half { background: rgba(135, 206, 235, 0.55); box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.55); color: rgba(31, 35, 41, 0.35); }
@@ -97,9 +89,9 @@
   </div>
 
   <div class="card">
-    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="state"><b>待取件</b><span>09-29 12:30</span></div>
     <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span></div>
-    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v">773512046683217</span></div>
     <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
     <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span></div>
     <div class="row"><span class="k">联系邮箱</span><span class="v mask half">wangxm@example.com</span></div>
