@@ -1,12 +1,10 @@
 package moe.flinty.yomark.render
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
-import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import kotlin.math.max
@@ -26,11 +24,11 @@ import kotlin.math.roundToInt
  * 因为 RenderEffect 只能作用在硬件加速的 Canvas 上，而导出画在软件 Bitmap 上；
  * 分两条路径会让预览与导出的模糊强度不一致，破坏「所见即所得」。
  */
-class BlurRenderer : MaskRenderer {
+class BlurRenderer : PixelMaskRenderer {
 
     override val style = MaskStyle.BLUR
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun prepare(source: Bitmap, quad: Quad, options: MaskOptions): PreparedMask? {
         val bounds = quad.bounds()
         val src = Rect(
             bounds.left.toInt().coerceIn(0, source.width),
@@ -38,7 +36,7 @@ class BlurRenderer : MaskRenderer {
             bounds.right.roundToInt().coerceIn(0, source.width),
             bounds.bottom.roundToInt().coerceIn(0, source.height),
         )
-        if (src.width() < 2 || src.height() < 2) return
+        if (src.width() < 2 || src.height() < 2) return null
 
         // 原图口径下每次盒式模糊的半径；三次叠起来的等效高斯 σ 约等于它
         val radius = max(2f, quad.shortEdge() * options.blurRadiusRatio) * STRENGTH
@@ -66,11 +64,7 @@ class BlurRenderer : MaskRenderer {
             (src.left + sw * factor).toFloat(),
             (src.top + sh * factor).toFloat(),
         )
-        val save = canvas.save()
-        canvas.clipPath(quad.toPath())
-        canvas.drawBitmap(blurred, null, dst, SMOOTH)
-        canvas.restoreToCount(save)
-        blurred.recycle()
+        return ScaledPatch(blurred, dst, quad, SMOOTH)
     }
 
     private companion object {

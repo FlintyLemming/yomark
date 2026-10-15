@@ -63,6 +63,7 @@ import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.PurposeWatermarkDrawer
 import moe.flinty.yomark.render.MaskOrder
+import moe.flinty.yomark.render.PixelMaskRenderer
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.EditorUiState
 import kotlinx.coroutines.Dispatchers
@@ -170,6 +171,7 @@ fun ImageCanvas(
     }
     val scanPaints = remember { ScanPaints() }
     val maskComposite = remember(image) { MaskComposite() }
+    val preparedMasks = remember(image) { PreparedMasks() }
 
     // 选的是磨砂、动效又在走（识别中或收尾那一遍）时在后台准备。模糊图几十毫秒就好，先拿去盖住原图；
     // 光点要逐格算噪声，慢得多，好了再淡入。识别快到结果先到，也接着准备完，散开那一遍用得上。
@@ -435,7 +437,7 @@ fun ImageCanvas(
                 val toggle = if (toggles.active) toggles.frame(toggleClock) else null
                 drawScene(
                     canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite,
-                    toggle, togglePaints, animationMasks,
+                    toggle, togglePaints, animationMasks, preparedMasks,
                 )
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
@@ -633,6 +635,7 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
  * @param composite 静止时读像素的码压在别的码上，从这里取合成好的样子；跨帧复用才有缓存
  * @param toggle 点一下打码、取消打码的这一帧（见 MaskToggles）；只在 [time] 为 null 时画
  * @param animationMasks 动效里用的合成图（见 ComposedMasks），对不上眼下的码就不用
+ * @param prepared 不走合成图时，读像素的码各自算好的样子（见 PreparedMasks）；跨帧复用才省得了重算
  */
 internal fun drawScene(
     canvas: android.graphics.Canvas,
@@ -648,15 +651,17 @@ internal fun drawScene(
     toggle: ToggleFrame? = null,
     togglePaints: TogglePaints = TogglePaints(),
     animationMasks: ComposedMasks? = null,
+    prepared: PreparedMasks = PreparedMasks(),
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
+    prepared.retain(image, plan.items, toggle?.vanishing?.map { it.first }.orEmpty())
 
     // 识别出的在底下，用户加的后加的盖在先加的上面——与导出同一个顺序（见 MaskOrder）
     val sorted = MaskOrder.forDrawing(plan.items)
     val dp = density / scale
     if (time == null) {
         val composed = composite.of(image, sorted, registry)
-        val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
+        val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed, prepared) }
         if (toggle == null) {
             drawItems(sorted)
             return
@@ -672,7 +677,7 @@ internal fun drawScene(
         }
         toggle.vanishing.forEach { (item, progress) ->
             drawWiped(canvas, item, progress, laying = false, feather, togglePaints) {
-                drawItems(canvas, listOf(item), image, registry, null)
+                drawItems(canvas, listOf(item), image, registry, null, prepared)
             }
         }
         return
@@ -681,7 +686,7 @@ internal fun drawScene(
     // 动效里，读像素的码从后台合成好的那张上取。还没合成好的那几帧，识别出的码先不落：它们本来就是在磨砂、暗幕底下
     // 从无到有慢慢显出来的，晚到几帧看不出来；当场逐块现算的话，这几帧一帧要几十毫秒
     val ready = animationMasks?.takeIf { it.items == sorted }?.bitmap
-    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, ready) }
+    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, ready, prepared) }
     val (manual, detected) = sorted.partition { it.byUser }
     val drawDetected = { if (ready != null || detected.none { MaskOrder.readsPixels(it.look) }) drawItems(detected) }
 
@@ -728,7 +733,8 @@ internal fun drawScene(
 
 /**
  * 画 [items] 这几块码（已经按 MaskOrder 排好了），每块码按它自己的样式画。
- * 有 [composite]（见 MaskComposite）时，码所在的地方直接从合成好的图上取。
+ * 有 [composite]（见 MaskComposite）时，码所在的地方直接从合成好的图上取；
+ * 没有时读像素的码贴 [prepared] 里算好的样子，别的当场画。
  */
 private fun drawItems(
     canvas: android.graphics.Canvas,
@@ -736,6 +742,7 @@ private fun drawItems(
     image: SourceImage,
     registry: RendererRegistry,
     composite: android.graphics.Bitmap?,
+    prepared: PreparedMasks,
 ) {
     if (composite != null) {
         if (items.isNotEmpty()) {
@@ -748,10 +755,15 @@ private fun drawItems(
         }
     } else {
         items.forEach {
+            val renderer = registry[it.look.style]
+            if (renderer is PixelMaskRenderer) {
+                prepared.draw(canvas, image, it, renderer)
+                return@forEach
+            }
             // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
             // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
             val options = it.look.options.copy(renderScale = image.scale)
-            registry[it.look.style].render(canvas, image.bitmap, it.quad, options, it.ink)
+            renderer.render(canvas, image.bitmap, it.quad, options, it.ink)
         }
     }
 }
