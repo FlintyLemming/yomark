@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.canvas
 
+import android.graphics.Bitmap
 import android.graphics.BlendMode
 import android.graphics.Canvas
 import android.graphics.Color
@@ -19,16 +20,30 @@ internal sealed interface ScanLook {
     data object Sweep : ScanLook
 
     /**
-     * 磨砂（FrostEffect）。
+     * 磨砂（FrostEffect）。模糊图和光点都在后台准备，模糊图先好、光点晚得多。
      *
-     * @param layer 模糊图与光点。识别刚开始、还在后台准备的那几帧为 null，只压暗
+     * @param blurred 模糊过的图（FrostLayer.blur）。还没备好时为 null，图先用 [cover] 整块盖住：原图一帧都不露
+     * @param layer 光点与云。还没备好时为 null，只压暗
      * @param origin 结果到达时从哪里散开（图像坐标），即等待图标所在的位置；null 取图像中心
+     * @param cover 图的平均色（FrostLayer.averageColor），[blurred] 备好之前用
+     * @param blurAt [blurred] 在识别开始后多久备好（毫秒），识别开始时就有的是 0。晚到的从那一刻淡入（FrostEffect.arrival）
+     * @param layerAt [layer] 的，同上
      */
-    class Frost(val layer: FrostLayer?, val origin: PointF? = null) : ScanLook
+    class Frost(
+        val blurred: Bitmap?,
+        val layer: FrostLayer?,
+        val origin: PointF? = null,
+        val cover: Int = Color.TRANSPARENT,
+        val blurAt: Long = 0L,
+        val layerAt: Long = 0L,
+    ) : ScanLook
 }
 
 /** 磨砂的画笔、蒙版与临时对象，跨帧复用。 */
 internal class FrostPaints {
+    /** 模糊图备好之前盖在图上的平均色。 */
+    val cover = Paint()
+
     /** 模糊图拉伸回原尺寸，靠双线性插值抹匀。 */
     val blurred = Paint(Paint.FILTER_BITMAP_FLAG)
 
@@ -104,11 +119,11 @@ internal fun drawFrostScene(
     val farthest = FrostEffect.endRadius(origin.x, origin.y, width, height, 0f)
     when {
         // 识别中：整片磨砂，用不着离屏图层
-        radius == null -> drawFrost(canvas, width, height, dp, time, look.layer, paints, origin, holeRadius = -1f)
+        radius == null -> drawFrost(canvas, width, height, dp, time, look, paints, origin, holeRadius = -1f)
         // 散开中：磨砂画进只有图像大小的离屏图层，再在上面挖洞
         radius - edge < farthest -> {
             val layer = canvas.saveLayer(0f, 0f, width, height, null)
-            drawFrost(canvas, width, height, dp, time, look.layer, paints, origin, radius)
+            drawFrost(canvas, width, height, dp, time, look, paints, origin, radius)
             punchHole(canvas, origin, radius, edge, width, height, paints)
             canvas.restoreToCount(layer)
         }
@@ -138,7 +153,7 @@ internal fun drawLoader(canvas: Canvas, cx: Float, cy: Float, density: Float, ti
 }
 
 /**
- * 磨砂本身：模糊图、深蓝、云、光点。只盖图像范围。
+ * 磨砂本身：模糊图（没备好时是平均色）、深蓝、云、光点。只盖图像范围。
  *
  * @param holeRadius 散开时洞的半径，洞边那圈光点跟着它走；识别中为负
  */
@@ -148,29 +163,38 @@ private fun drawFrost(
     height: Float,
     dp: Float,
     time: ScanTime,
-    layer: FrostLayer?,
+    look: ScanLook.Frost,
     paints: FrostPaints,
     origin: PointF,
     holeRadius: Float,
 ) {
+    val bounds = paints.rect.apply { set(0f, 0f, width, height) }
+    // 模糊图一开场就整个盖上；还没备好就先拿平均色盖着，备好了在它上面淡入
+    val blurred = look.blurred
+    val blurIn = if (blurred == null) 0f else FrostEffect.arrival(time.sinceScan, look.blurAt)
+    if (blurIn < 1f) {
+        paints.cover.color = look.cover
+        canvas.drawRect(bounds, paints.cover)
+    }
+    if (blurred != null) {
+        paints.blurred.alpha = (blurIn * 255).roundToInt()
+        canvas.drawBitmap(blurred, null, bounds, paints.blurred)
+    }
     val strength = FrostEffect.strength(time.sinceScan, time.sinceResult)
     if (strength <= 0f) return
-    val bounds = paints.rect.apply { set(0f, 0f, width, height) }
-    if (layer != null) {
-        paints.blurred.alpha = (strength * 255).roundToInt()
-        canvas.drawBitmap(layer.blurred, null, bounds, paints.blurred)
-    }
     paints.dim.color = FrostEffect.DIM_COLOR
     paints.dim.alpha = (FrostEffect.DIM_ALPHA * strength * 255).roundToInt()
     canvas.drawRect(bounds, paints.dim)
-    if (layer == null) return
+    val layer = look.layer ?: return
+    val arrived = FrostEffect.arrival(time.sinceScan, look.layerAt)
+    if (arrived <= 0f) return
 
     val seconds = FrostEffect.timeSec(time.sinceScan)
     val clouds = layer.updateNoise(seconds)
-    paints.clouds.alpha = (FrostEffect.CLOUD_ALPHA * strength * 255).roundToInt()
+    paints.clouds.alpha = (FrostEffect.CLOUD_ALPHA * strength * arrived * 255).roundToInt()
     canvas.drawBitmap(clouds, null, bounds, paints.clouds)
     layer.drawSparkles(
-        canvas, seconds, FrostEffect.sparkleStrength(strength),
+        canvas, seconds, FrostEffect.sparkleStrength(strength) * arrived,
         diameter = FrostEffect.SPARKLE_DP * dp, paint = paints.sparkles,
         ringX = origin.x, ringY = origin.y, ringRadius = holeRadius, ringWidth = FrostEffect.RING_DP * dp,
     )

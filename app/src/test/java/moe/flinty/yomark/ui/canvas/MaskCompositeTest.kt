@@ -86,6 +86,32 @@ class MaskCompositeTest {
     }
 
     @Test
+    fun `while results land, blur masks wait for the composite made in the background`() {
+        val found = MaskItem(
+            "found", Quad.fromRect(RectF(30f, 90f, 170f, 110f)), SensitiveKind.PHONE, DetectorSource.RULE,
+            MaskLook(MaskStyle.BLUR, MaskOptions(blurRadiusRatio = MaskOptions.WEAKEST_BLUR_RATIO)),
+        )
+        val plan = MaskPlan(listOf(found))
+        val source = image()
+        // 落码那一遍的最后一帧：光和暗幕都已经走出图外，块已经盖实
+        val since = ScanEffect.settleMs(3_000L) - 1L
+        fun frame(masks: ComposedMasks?): Bitmap {
+            val out = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+            drawScene(
+                Canvas(out), source, plan, registry, 1f, 1f, ScanTime(3_000L + since, since), ScanPaints(),
+                animationMasks = masks,
+            )
+            return out
+        }
+        // 还没合成好：这一块先不落，底下的黑条还在
+        assertThat(frame(null).getPixel(100, 100)).isEqualTo(Color.BLACK)
+        val sorted = MaskOrder.forDrawing(plan.items)
+        val shown = frame(ComposedMasks(sorted, MaskComposite.compose(source, sorted, RendererRegistry.default())))
+        assertThat(shown.getPixel(100, 100)).isNotEqualTo(Color.BLACK)
+        assertThat(shown.getPixel(100, 100)).isEqualTo(exported(plan, source).getPixel(100, 100))
+    }
+
+    @Test
     fun `nothing is composited when no blur or mosaic lies over another mask`() {
         val composite = MaskComposite()
         val source = image()

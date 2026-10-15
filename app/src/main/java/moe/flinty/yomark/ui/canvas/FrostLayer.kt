@@ -11,8 +11,9 @@ import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 /**
- * 磨砂这一层里只跟图有关、不跟时间走的东西：模糊过的图、光点挑在哪些格子上、噪声网格多大。
- * 一张图在识别开始时准备一次（几毫秒，放在后台线程），之后每帧只算噪声网格和光点的闪烁。
+ * 磨砂这一层里只跟图有关、不跟时间走的东西：光点挑在哪些格子上、噪声网格多大。
+ * 一张图在识别开始时在后台线程准备一次，之后每帧只算噪声网格和光点的闪烁。
+ * 挑光点要逐格算噪声，比模糊图（[blur]）慢得多，所以两样分开准备：模糊图先好，先拿去盖住原图。
  *
  * 全部是图像坐标。尺寸按「整图适配时一 dp 合多少图像像素」（[pxPerDp]）折算：
  * 用户放大来看时，模糊和光点的疏密跟着图一起放大，就像是印在图上的一层。
@@ -21,8 +22,6 @@ internal class FrostLayer private constructor(
     val width: Int,
     val height: Int,
     val pxPerDp: Float,
-    /** 整张图模糊后缩小的样子；画的时候拉伸回原尺寸，双线性插值把它抹匀。 */
-    val blurred: Bitmap,
     /** 光点的位置，x、y 交错。 */
     private val sparkleXY: FloatArray,
     /** 每个光点三档闪烁的强度（见 FrostNoise.sparkleBands），三个一组。 */
@@ -149,6 +148,9 @@ internal class FrostLayer private constructor(
         /** 噪声网格每边最多这么多格。 */
         private const val MAX_GRID = 96
 
+        /** 取平均色的网格每边多少点。 */
+        private const val AVERAGE_GRID = 32
+
         /** 小图上的模糊做到这个 σ（小图像素），再大就继续缩小图，三遍半径 2 的盒式模糊正好约等于它。 */
         private const val SMALL_SIGMA = 2.45f
         private const val BOX_PASSES = 3
@@ -160,14 +162,12 @@ internal class FrostLayer private constructor(
         fun prepare(source: Bitmap, pxPerDp: Float): FrostLayer {
             val w = source.width
             val h = source.height
-            val blurred = blur(source, FrostEffect.BLUR_DP * pxPerDp)
             val (xy, bands) = pickSparkles(w, h, pxPerDp)
             val step = FrostEffect.NOISE_GRID_DP * pxPerDp
             return FrostLayer(
                 width = w,
                 height = h,
                 pxPerDp = pxPerDp,
-                blurred = blurred,
                 sparkleXY = xy,
                 sparkleBands = bands,
                 gridCols = ceil(w / step).toInt().coerceIn(2, MAX_GRID),
@@ -207,8 +207,8 @@ internal class FrostLayer private constructor(
         private fun jitter(seed: Float) = 0.15f + 0.7f * (seed - floor(seed))
 
         /**
-         * 重度模糊：先逐级对半缩小（每级都过滤，不会混叠），缩到模糊半径只剩两三个像素，
-         * 再在小图上做三遍盒式模糊（约等于高斯）。画的时候拉伸回原尺寸，双线性插值把它抹匀。
+         * 磨砂底下那张模糊的图。先逐级对半缩小（每级都过滤，不会混叠），缩到模糊半径只剩两三个像素，
+         * 再在小图上做三遍盒式模糊（约等于高斯）。返回的是缩小的图，画的时候拉伸回原尺寸，双线性插值把它抹匀。
          *
          * @param sigma 想要的高斯 σ（图像像素）
          */
@@ -243,6 +243,25 @@ internal class FrostLayer private constructor(
                 }
             }
             return Bitmap.createBitmap(pixels, tw, th, Bitmap.Config.ARGB_8888)
+        }
+
+        /**
+         * 图的平均色：模糊图还在后台准备的那几帧拿它整块盖住原图。按网格取一千来个点，主线程上当场算得完；
+         * 磨砂底下本来就糊得只剩大块的明暗，换成模糊图时不会一跳。
+         */
+        fun averageColor(source: Bitmap): Int {
+            val cols = minOf(source.width, AVERAGE_GRID)
+            val rows = minOf(source.height, AVERAGE_GRID)
+            var a = 0L; var r = 0L; var g = 0L; var b = 0L
+            for (row in 0 until rows) {
+                val y = ((row + 0.5f) * source.height / rows).toInt()
+                for (col in 0 until cols) {
+                    val p = source.getPixel(((col + 0.5f) * source.width / cols).toInt(), y)
+                    a += p ushr 24; r += (p shr 16) and 0xFF; g += (p shr 8) and 0xFF; b += p and 0xFF
+                }
+            }
+            val n = (cols * rows).toLong()
+            return Color.argb((a / n).toInt(), (r / n).toInt(), (g / n).toInt(), (b / n).toInt())
         }
 
         /** 一维盒式模糊，边缘取最近的像素。四个通道分开累加。 */

@@ -27,8 +27,17 @@ import kotlin.math.max
  */
 internal object FrostEffect {
 
-    /** 识别开始时磨砂淡入的时长：模糊、压暗、光点一起上来。 */
+    /**
+     * 识别开始时磨砂淡入的时长：压暗、云、光点一起上来。模糊不在其中：它一开场就整个盖上，
+     * 从清晰的原图慢慢糊过去的话，前几帧原图看得清清楚楚。
+     */
     const val FADE_IN_MS = 600L
+
+    /**
+     * 模糊图、光点在后台准备，备好得晚的（识别已经开始了才好）从备好那一刻起淡入的时长，不一下子冒出来。
+     * 模糊图备好之前，图先用它的平均色整块盖着（见 FrostLayer.averageColor）。
+     */
+    const val ARRIVAL_MS = 300L
 
     /** 等待图标入场的时长。 */
     const val LOADER_IN_MS = 420L
@@ -108,6 +117,13 @@ internal object FrostEffect {
 
     /** 光点跟着磨砂淡入，只是更早到满：原版的 smoothstep(0, 0.75, alpha)。 */
     fun sparkleStrength(strength: Float): Float = smooth(strength / 0.75f)
+
+    /**
+     * 在识别开始后 [atMs] 毫秒才备好的模糊图、光点，此刻淡入了多少（见 [ARRIVAL_MS]）。
+     * 识别开始时就已经备好的记 0，整个显出来。
+     */
+    fun arrival(sinceScanMs: Long, atMs: Long): Float =
+        if (atMs <= 0L) 1f else smooth((sinceScanMs - atMs).toFloat() / ARRIVAL_MS)
 
     /** 噪声与光点的时间（秒）。只跟识别开始以来的时间走，散开时洞外的光点接着闪、云接着飘。 */
     fun timeSec(sinceScanMs: Long): Float = (sinceScanMs.coerceAtLeast(0L) + TIME_SEED_MS) / 1000f
