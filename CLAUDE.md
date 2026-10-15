@@ -23,7 +23,7 @@
 改了代码，除了跑单元测试，还要在本机模拟器上装上跑一遍、截图看过再收尾。都在 worktree 里做。
 
 - **模拟器：每个窗口用自己的一台，不要共用。** 在 worktree 根目录跑 `$s = .\tools\emu\claim.ps1`，它会用 `-read-only` 起一台 `Pixel_10_Pro` 的独立实例（端口 5560–5574），等开机完成后返回 serial（如 `emulator-5560`）。shell 状态不保留，所以每次要用 serial 就再跑一遍 `claim.ps1`，同一个 worktree 拿回的总是同一台。之后**所有 adb 命令都带 `-s $s`**，别的窗口的实例别碰。
-  - 不要再手动 `Start-Process` 起 `Pixel_10_Pro`：只要有一台不带 `-read-only` 的实例在跑，它就锁住 AVD，所有窗口的 `claim.ps1` 都会失败（脚本会报出这个原因）。
+  - `Pixel_10_Pro` 被不带 `-read-only` 的实例（比如 Android Studio 开的那台）锁住时，`claim.ps1` 自动换用它的克隆 `Pixel_10_Pro_yomark`，照常领，不用去关别人的。自己别手动 `Start-Process` 起这两个 AVD。
   - `Galaxy_Z_Fold8` 可能正被别的窗口或 Android Studio 用着，别关它、别往上装。
   - 收尾时跑 `.\tools\emu\release.ps1` 关掉自己那台。忘了也没关系，下次有人领的时候会回收已经没有进程的锁，但还开着的实例会一直占内存。
   - 脚本要用 pwsh 7 跑（PowerShell 工具默认就是），Windows PowerShell 5.1 读中文会乱码。锁和启动日志在 `$env:TEMP\yomark-emu`。

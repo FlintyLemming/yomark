@@ -7,6 +7,7 @@
 冷启动（-no-snapshot）：从 default_boot 快照恢复的只读实例，写 /metadata（encryptionkey.img）会一直挂着，
 am instrument 之类碰到它的命令跟着卡死、杀不掉。冷启动多花一两分钟，没有这个问题；也不往共用的 AVD 存快照。
 同一个 worktree 重复调用会直接返回已领到的 serial，所以每次需要 serial 时再跑一遍即可。
+AVD 被 Android Studio 之类不带 -read-only 的实例锁着时，自动换用它的克隆 <AVD>_yomark（见 Get-Clone）。
 
 用法：
   $s = .\tools\emu\claim.ps1            # 默认 Pixel_10_Pro
@@ -23,13 +24,13 @@ $ErrorActionPreference = 'Stop'
 # 5554/5556 留给手动开的或不加 -port 起的模拟器
 $ports = 5560..5574 | Where-Object { $_ % 2 -eq 0 }
 
+$avdLocked = 'AVD 被不带 -read-only 的实例锁着'
+
 function Wait-Boot($serial, $proc, $log) {
     $deadline = (Get-Date).AddSeconds($BootTimeoutSec)
     while ((Get-Date) -lt $deadline) {
         if ($proc -and $proc.HasExited) {
-            if (Select-String -Quiet -Path $log -Pattern 'run all emulators with -read-only') {
-                throw "$Avd 已经有一个不带 -read-only 的实例在跑，它锁住了 AVD。要关掉那台（adb -s <serial> emu kill），以后统一用 claim.ps1 起"
-            }
+            if (Select-String -Quiet -Path $log -Pattern 'run all emulators with -read-only') { throw $avdLocked }
             throw "模拟器进程提前退出，日志在 $log"
         }
         $booted = & $adb -s $serial shell getprop sys.boot_completed 2>$null
@@ -37,6 +38,35 @@ function Wait-Boot($serial, $proc, $log) {
         Start-Sleep -Seconds 3
     }
     throw "$serial 在 $BootTimeoutSec 秒内没启动完"
+}
+
+# 只要有一个不带 -read-only 的实例在跑（Android Studio 开的就是），同一个 AVD 就起不了只读实例。
+# 这时换用一份克隆：只抄 config.ini，数据盘第一次冷启动时从系统镜像现做，不碰原 AVD。
+# 先在临时目录里建好再改名过去，两个窗口同时克隆也不会读到半份
+function Get-Clone($name) {
+    $root = if ($env:ANDROID_AVD_HOME) { $env:ANDROID_AVD_HOME } else { "$env:USERPROFILE\.android\avd" }
+    $clone = "${name}_yomark"
+    $ini = Join-Path $root "$clone.ini"
+    if (Test-Path $ini) { return $clone }
+
+    $srcIni = Get-Content (Join-Path $root "$name.ini")
+    $srcDir = ($srcIni | Where-Object { $_ -like 'path=*' }).Substring(5)
+    $avdDir = Join-Path $root "$clone.avd"
+    if (-not (Test-Path $avdDir)) {
+        $tmp = "$avdDir.tmp-$PID"
+        New-Item -ItemType Directory -Force $tmp | Out-Null
+        Get-Content (Join-Path $srcDir 'config.ini') | ForEach-Object {
+            if ($_ -like 'AvdId=*') { "AvdId=$clone" }
+            elseif ($_ -like 'avd.ini.displayname=*') { "$_ (yomark)" }
+            else { $_ }
+        } | Set-Content (Join-Path $tmp 'config.ini')
+        try { Move-Item $tmp $avdDir -ErrorAction Stop } catch { Remove-Item -Recurse -Force $tmp }
+    }
+    $tmpIni = "$ini.tmp-$PID"
+    @($srcIni | Where-Object { $_ -notlike 'path=*' -and $_ -notlike 'path.rel=*' }) +
+        "path=$avdDir" + "path.rel=avd\$clone.avd" | Set-Content $tmpIni
+    try { Move-Item $tmpIni $ini -ErrorAction Stop } catch { Remove-Item -Force $tmpIni }
+    return $clone
 }
 
 New-Item -ItemType Directory -Force $lockRoot | Out-Null
@@ -84,16 +114,30 @@ Get-ChildItem $logDir -File | Where-Object LastWriteTime -lt (Get-Date).AddDays(
     Remove-Item -Force -ErrorAction SilentlyContinue
 $log = Join-Path $logDir "$port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 
-Write-Host "启动 $Avd -> $serial（$owner）"
-$proc = Start-Process $emulator -PassThru `
-    -ArgumentList '-avd', $Avd, '-read-only', '-port', $port, '-no-boot-anim', '-no-snapshot' `
-    -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+function Start-Avd($name) {
+    $log = Join-Path $logDir "$port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
+    Set-Content (Join-Path $dir 'avd') $name
+    Write-Host "启动 $name -> $serial（$owner）"
+    $proc = Start-Process $emulator -PassThru `
+        -ArgumentList '-avd', $name, '-read-only', '-port', $port, '-no-boot-anim', '-no-snapshot' `
+        -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+    try {
+        Wait-Boot $serial $proc $log
+        return $true
+    } catch {
+        Stop-Emu $port
+        if ("$_" -eq $avdLocked) { return $false }
+        Remove-Item -Recurse -Force $dir
+        throw
+    }
+}
 
-try {
-    Wait-Boot $serial $proc $log
-} catch {
-    Stop-Emu $port
-    Remove-Item -Recurse -Force $dir
-    throw
+if (-not (Start-Avd $Avd)) {
+    $clone = Get-Clone $Avd
+    Write-Host "$Avd 被一个不带 -read-only 的实例锁着（多半是 Android Studio 开的），换用 $clone"
+    if (-not (Start-Avd $clone)) {
+        Remove-Item -Recurse -Force $dir
+        throw "$clone 也被一个不带 -read-only 的实例锁着，关掉那台（adb -s <serial> emu kill）再领"
+    }
 }
 Write-Output $serial
