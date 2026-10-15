@@ -451,6 +451,47 @@ class ChatLayoutTest {
         return ChatLayout.analyze(lines, px)
     }
 
+    /**
+     * 微信群里只有别人说话的一屏：输入栏空着（微信不写占位字），没有靠右的消息，昵称旁边不带时间。
+     * 剩下的是头像，和头像旁边顶对齐的一行小字昵称、下面一行大一号的消息。
+     * 同样的版面换成名字大、下面一行小（通讯录的签名、会话列表的预览）的，不算。
+     */
+    @Test fun `a WeChat group with only other people's messages is a chat`() {
+        val chat = wechatGroup(namesSmaller = true)
+        assertWithMessage("${chat.score} ${chat.reasons}").that(chat.isChat).isTrue()
+        assertThat(chat.names.map { it.text }).containsExactlyElementsIn(WECHAT_SENDERS)
+        assertThat(chat.avatars.count { it.centerX < 100f }).isEqualTo(WECHAT_SENDERS.size)
+        val list = wechatGroup(namesSmaller = false)
+        assertWithMessage("${list.score} ${list.reasons}").that(list.isChat).isFalse()
+        assertThat(list.reasons.none { it.startsWith("头像旁的昵称") }).isTrue()
+    }
+
+    private val WECHAT_SENDERS = listOf("程一舟", "方小禾", "方小禾", "程一舟", "方小禾", "孟华", "方小禾", "方小禾")
+
+    /** 浅色微信群聊（照一张真截图的版面缩到 540 宽）：八条消息，每条一个头像、一行昵称；中间一个居中的时间。 */
+    private fun wechatGroup(namesSmaller: Boolean): ChatFindings {
+        val px = canvas(540, 1170) { _, _ -> WECHAT_PAGE }
+        val lines = ArrayList<ChatLine>()
+        fun text(b: Box, s: String, color: Int) {
+            px.glyphs(b, color)
+            lines += ChatLine(b, s)
+        }
+        text(Box(150f, 108f, 390f, 132f), "周末爬山小分队(6)", INK)
+        val messages = listOf("我都忘了怎么认识的了", "这种还是算了", "补习班吧应该", "反正那时候觉得她很飒", "真假", "肯定的", "以前她跟个小黑皮一样", "我不知道哪里飒")
+        val (nameH, messageH) = if (namesSmaller) 16f to 24f else 24f to 16f
+        WECHAT_SENDERS.forEachIndexed { i, sender ->
+            val top = 200f + 96f * i + (if (i >= 6) 40f else 0f)
+            px.fill(Box(16f, top, 70f, top + 54f), AVATAR_COLORS[i % AVATAR_COLORS.size])
+            text(Box(88f, top + 5f, 88f + 14f * sender.length, top + 5f + nameH), sender, GRAY)
+            val m = messages[i]
+            px.fill(Box(85f, top + 28f, 120f + 20f * m.length, top + 38f + messageH), 0xFFFFFFFF.toInt())
+            text(Box(102f, top + 33f, 102f + 20f * m.length, top + 33f + messageH), m, INK)
+        }
+        text(Box(232f, 776f, 308f, 790f), "周二 20:00", GRAY)
+        px.fill(Box(65f, 1110f, 420f, 1150f), 0xFFFFFFFF.toInt())
+        return ChatLayout.analyze(lines, px)
+    }
+
     private fun zonesOf(lines: List<ChatLine>): Zones = Zones.of(lines, 540f, 1170f)
 
     private fun rgb(r: Int, g: Int, b: Int) = (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
@@ -500,4 +541,6 @@ class ChatLayoutTest {
     private val INCOMING = 0xFF2C3E50.toInt()
     private val OUTGOING = 0xFF7B5CD6.toInt()
     private val QUOTE = 0xFF8F72DA.toInt()
+    private val WECHAT_PAGE = 0xFFEDEDED.toInt()
+    private val INK = 0xFF1A1A1A.toInt()
 }
