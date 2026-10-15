@@ -160,6 +160,8 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
  * @param purpose 用途水印：设了水印时「编辑」里的水印着主题色，面板开着时从胶囊长出来
+ * @param pushCanvas 面板不盖在图上，画布让到面板上面为止（见 [PanelTop]）：写文本时字落在点的那一处，
+ *   面板盖着的话打的字看不见。用途水印铺满整张图，盖住一截照样看得见，不用让
  */
 @Composable
 fun EditorBottomBar(
@@ -176,6 +178,7 @@ fun EditorBottomBar(
     purposeActions: PurposePanelActions = object : PurposePanelActions {},
     /** 批量时的胶片条。单张时为 null。 */
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
+    pushCanvas: Boolean = false,
 ) {
     val wanted = (styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null
     val grow = animateFloatAsState(if (wanted) 1f else 0f, foldSpec(wanted), label = "stylePanel")
@@ -184,6 +187,8 @@ fun EditorBottomBar(
     // 收回去的半路上两样都已经关了，刚才开着的那一个还要接着画完
     val last = remember { LastPanel() }
     if (purpose.open) last.purpose = true else if (styleBar.panelOpen) last.purpose = false
+    // 收回去的半路上面板已经关了，画布还照刚才那样让，跟着胶囊的上沿一点点回来，不一下跳回去
+    if (wanted) last.push = pushCanvas
     val container = MaterialTheme.colorScheme.surfaceContainer
     val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = EDGE_ALPHA)
 
@@ -246,7 +251,9 @@ fun EditorBottomBar(
         val pill = part(BarPart.PILL)!!.measure(Constraints.fixed((pillRight - pillLeft).coerceAtLeast(0), height - pad - pillTop))
         val scrim = part(BarPart.SCRIM)?.measure(Constraints.fixed(width, height))
 
-        layout(width, height, mapOf(PanelTop to height - resting)) {
+        // 画布让到哪儿：平常只让工具那一行（和胶片条），面板往上长时盖在图上；要让开面板时跟着胶囊的上沿一点点让
+        val canvasEnd = if (last.push) min(pillTop, height - resting) else height - resting
+        layout(width, height, mapOf(PanelTop to canvasEnd)) {
             scrim?.place(0, 0)
             film?.place(FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
             pill.place(pillLeft, pillTop)
@@ -263,9 +270,10 @@ fun EditorBottomBar(
 
 private enum class BarPart { SCRIM, FILM, PILL, CONTENT, ROW }
 
-/** 胶囊上一次长出来的是不是用途水印的面板。只在组合时读写，不触发重组。 */
+/** 胶囊上一次长出来的是不是用途水印的面板、画布让没让开它。只在组合时写、量的时候读，不触发重组。 */
 private class LastPanel {
     var purpose = false
+    var push = false
 }
 
 /**

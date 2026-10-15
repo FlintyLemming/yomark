@@ -53,8 +53,11 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
@@ -402,41 +405,58 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
 /**
  * 文本写的字，一行。改一个字，图上跟着变（见 EditorViewModel.setText）。
  * 输入框自己持有正在编辑的字，不等 ViewModel 转一圈再回来；换了一块文本（[StyleBarModel.textKey]）就换成那一块的字，
- * 没在打字时（撤销了）也跟着图上的字走。要它拿焦点时（点了图上一处要写字、要改选中的文本）拿焦点、弹出输入法。
+ * 图上的字不是它刚发出去的那样（撤销了、重做了）也跟着图上的走，打着字也一样。
+ * 要它拿焦点时（点了图上一处要写字、要改选中的文本）拿焦点、弹出输入法：已经有焦点、输入法被收起了的，也再弹出来。
+ * 光标在最后：改字多半是接着打或者删掉重打，光标在最前面的话删除键删不到字。
+ * 面板顶上写着「文本」，这里不另起小标题，名字放在空着时的提示里，读屏也念得到。
  */
 @Composable
 private fun TextInput(model: StyleBarModel, actions: StyleBarActions, onFocus: (Boolean) -> Unit) {
-    var draft by remember(model.textKey) { mutableStateOf(model.text) }
-    var focused by remember { mutableStateOf(false) }
+    var draft by remember(model.textKey) { mutableStateOf(atEnd(model.text)) }
+    var sent by remember(model.textKey) { mutableStateOf(model.text) }
     val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
     val requester = remember { FocusRequester() }
-    LaunchedEffect(model.text, focused) { if (!focused) draft = model.text }
+    LaunchedEffect(model.text) {
+        if (model.text != sent) {
+            draft = atEnd(model.text)
+            sent = model.text
+        }
+    }
     LaunchedEffect(model.textFocus) {
         if (!model.textFocus) return@LaunchedEffect
         requester.requestFocus()
+        keyboard?.show()
         actions.onTextFocusTaken()
     }
-    PanelLabel(stringResource(R.string.text_content))
     OutlinedTextField(
         value = draft,
         onValueChange = {
-            draft = it
-            actions.onTextChange(it)
+            // 只写一行：粘贴进来的换行换成空格，和图上的一样。一个换一个，光标、正在拼的字都还在原处
+            val line = it.text.replace('\n', ' ')
+            draft = it.copy(text = line)
+            // 只挪了光标、选了字的，图上没变
+            if (line != sent) {
+                sent = line
+                actions.onTextChange(line)
+            }
         },
         singleLine = true,
+        placeholder = { Text(stringResource(R.string.text_content)) },
         // 和用途水印的输入框、「画法」那一排按钮一样是圆头的
         shape = CircleShape,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
         modifier = Modifier
+            .padding(top = 8.dp)
             .fillMaxWidth()
             .focusRequester(requester)
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocus(it.isFocused)
-            },
+            .onFocusChanged { onFocus(it.isFocused) },
     )
 }
+
+/** 光标落在最后的 [text]。 */
+private fun atEnd(text: String) = TextFieldValue(text, TextRange(text.length))
 
 /**
  * 马克笔、画笔下一笔怎么画：拉框，还是照着手指画（见 StrokeShape）。管的是下一笔，画好的不变。

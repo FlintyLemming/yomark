@@ -298,4 +298,13 @@ class SettingsStoreTest {
         store.writeRawThemeColorForTest("NOT_A_COLOR")
         assertThat(store.themeColor.first()).isEqualTo(ThemeColor.SYSTEM)
     }
+
+    /** 文本的颜色、字号、底色和别的样式一样记着，下次打开编辑器还是它。 */
+    @Test
+    fun `text options are remembered`() = runTest {
+        val store = store()
+        val tuned = MaskOptions(textColor = 0xFF1E88E5.toInt(), textSize = 0.09f, textBackground = true)
+        store.setMaskOptions(tuned)
+        assertThat(store.maskOptions.first()).isEqualTo(tuned)
+    }
 }

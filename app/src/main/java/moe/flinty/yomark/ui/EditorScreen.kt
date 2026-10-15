@@ -224,11 +224,16 @@ fun EditorScreen(
                 if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
             }
             // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
-            // 用途水印在「编辑」里，样式在它自己那一组
-            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible) {
-                if (!phone || toolGroup != null) return@LaunchedEffect
-                if (state.purposeSheetVisible) toolGroup = ToolGroup.EDIT
-                else if (state.stylePanelOpen) toolGroup = ToolGroup.of(state.barLook.style)
+            // 用途水印在「编辑」里，样式在它自己那一组。展开着另一组时也换过去：
+            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来
+            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
+                if (!phone) return@LaunchedEffect
+                val own = when {
+                    state.purposeSheetVisible -> ToolGroup.EDIT
+                    state.stylePanelOpen -> ToolGroup.of(state.barLook.style)
+                    else -> return@LaunchedEffect
+                }
+                if (toolGroup != own) toolGroup = own
             }
             // 吸管在等取色时，返回先收吸管；样式面板、用途水印面板开着时，返回先收面板，不直接退出编辑器。
             // 都不拦的时候不常驻 BackHandler（见 EditorActivity）
@@ -267,6 +272,7 @@ fun EditorScreen(
                             onCommitDrag = vm::commitDrag,
                             onDeleteSelected = vm::deleteSelected,
                             onEditSelected = vm::editSelectedText,
+                            plainSelection = panelUp && writingText(state),
                             scanStyle = scanStyle,
                             showOriginal = comparing,
                         )
@@ -316,6 +322,7 @@ fun EditorScreen(
                             purpose = purpose,
                             purposeActions = purposeActions,
                             filmstrip = filmstrip,
+                            pushCanvas = writingText(state),
                         )
                         else -> WideEditorPanel(
                             atSide = atSide,

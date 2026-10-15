@@ -92,4 +92,21 @@ class MaskOptionsTest {
         assertThat(c ushr 24).isEqualTo(128)
         assertThat(c and 0xFFFFFF).isEqualTo(0x345678)
     }
+
+    /** 文本：颜色不透明，字号收回范围内；只接文本那几项，恢复默认也只动它们。 */
+    @Test fun `text options are kept in range and stay their own`() {
+        val wild = MaskOptions(textColor = 0x401E88E5, textSize = 9f).normalized()
+        assertThat(wild.textColor).isEqualTo(0xFF1E88E5.toInt())
+        assertThat(wild.textSize).isEqualTo(MaskOptions.TEXT_SIZE_RANGE.endInclusive)
+        assertThat(MaskOptions(textSize = Float.NaN).normalized().textSize).isEqualTo(MaskOptions.DEFAULT_TEXT_SIZE)
+
+        val brush = MaskOptions(penColor = 0xFF000000.toInt())
+        val text = MaskOptions(textColor = 0xFF43A047.toInt(), textSize = 0.1f, textBackground = true, penColor = 0xFFFFFFFF.toInt())
+        val took = brush.withParamsOf(MaskStyle.TEXT, text)
+        assertThat(took.textColor).isEqualTo(0xFF43A047.toInt())
+        assertThat(took.textSize).isEqualTo(0.1f)
+        assertThat(took.textBackground).isTrue()
+        assertThat(took.penColor).isEqualTo(0xFF000000.toInt())
+        assertThat(took.resetFor(MaskStyle.TEXT)).isEqualTo(brush)
+    }
 }

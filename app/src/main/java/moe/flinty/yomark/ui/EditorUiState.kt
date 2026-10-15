@@ -44,9 +44,10 @@ sealed interface AiReview {
 
 /**
  * 拿着文本点了图上一处，字还没打（见 EditorViewModel.setText）：打下第一个字时，这块文本以 [center]（图像坐标）为中心落下，
- * id 是 [id]。[look] 是它的样子，null 用画笔：改字时把字删光了，那一块先拿掉、留下它原来的位置和样子，接着打还在原处。
+ * id 是 [id]。[look] 是它的样子，null 用画笔：改字时把字删光了，那一块先拿掉、留下它原来的位置、样子和它在 plan 里的第几个
+ * （[index]，-1 是排到最后），接着打还在原处、还在原来那一层。
  */
-data class TextPlacement(val id: String, val center: PointF, val look: MaskLook? = null)
+data class TextPlacement(val id: String, val center: PointF, val look: MaskLook? = null, val index: Int = -1)
 
 data class EditorUiState(
     val image: SourceImage? = null,

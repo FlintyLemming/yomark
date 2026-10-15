@@ -94,6 +94,8 @@ import moe.flinty.yomark.R
  * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一行多远还算点中它（图像像素）
  * @param onInk 手画完一笔：手指走过的点，图像坐标
  * @param onEditSelected 选中的是文本时，框上方多一个「编辑」：改它写的字
+ * @param plainSelection 选中框只描一圈线，不画手柄、不浮工具条：手机上写文本时面板开着，点画布只是收起面板，
+ *   手柄和工具条点不到，倒把缩小了的图上正在打的字盖住了
  */
 @Composable
 fun ImageCanvas(
@@ -109,6 +111,7 @@ fun ImageCanvas(
     showOriginal: Boolean = false,
     onInk: (List<PointF>) -> Unit = {},
     onEditSelected: () -> Unit = {},
+    plainSelection: Boolean = false,
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
@@ -270,9 +273,13 @@ fun ImageCanvas(
                         var grabOffset = PointF(0f, 0f)
                         var grabbingBody = false
                         if (selected != null) {
-                            val hitSize = HANDLE_HIT_DP * density.density / viewport.scale
+                            val inside = selected.quad.contains(downImage)
+                            // 文本的框常常比四个角的命中区还小，整块都落在命中区里：框里面只认画出来的那颗手柄，
+                            // 别处算按住框体——点一下改字，拖是挪。框外面照旧放宽
+                            val hitSize = (if (inside && selected.look.style == MaskStyle.TEXT) HANDLE_DP / 1.5f else HANDLE_HIT_DP) *
+                                density.density / viewport.scale
                             grabbedHandle = SelectionHandles.hitHandle(selected.quad, downImage, hitSize)
-                            grabbingBody = grabbedHandle == null && selected.quad.contains(downImage)
+                            grabbingBody = grabbedHandle == null && inside
                             // 按下的地方离角有多远：拖起来角跟着手指平移，不会一动就跳到手指底下
                             grabbedHandle?.let {
                                 val corner = SelectionHandles.cornerPoint(selected.quad, it)
@@ -433,7 +440,7 @@ fun ImageCanvas(
                 }
                 val dp = density.density / viewport.scale
                 state.selectedManualId?.let { id ->
-                    state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp) }
+                    state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp, handles = !plainSelection) }
                 }
                 draftQuad?.let { drawDraft(canvas, it, selectionColors, dp) }
                 state.textPlacement?.let { drawCaret(canvas, it, state.brush, image, selectionColors, dp) }
@@ -457,7 +464,7 @@ fun ImageCanvas(
         // 淡出的那一下框已经没了，按钮照着它最后的样子留着，不在半路上少一个
         if (selectedItem != null) lastSelectedQuad.text = selectedItem.look.style == MaskStyle.TEXT
         AnimatedVisibility(
-            visible = selectedQuad != null && !editingSelection && !drafting && !showOriginal,
+            visible = selectedQuad != null && !editingSelection && !drafting && !showOriginal && !plainSelection,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.matchParentSize(),
@@ -591,11 +598,12 @@ private fun linePaint(colors: SelectionColors, dp: Float) = Paint(Paint.ANTI_ALI
     strokeWidth = SELECTION_LINE_DP * dp
 }
 
-/** 选中框：主题色实线，四角是可以拖的手柄。 */
-private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
+/** 选中框：主题色实线，四角是可以拖的手柄（[handles] 为 false 时只描线）。 */
+private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float, handles: Boolean = true) {
     val path = quad.toPath()
     canvas.drawPath(path, haloPaint(colors, dp))
     canvas.drawPath(path, linePaint(colors, dp))
+    if (!handles) return
     // 手柄：主题色圆点套一圈浅色，再带一点投影——Material 滑块上那个拖动点的样子
     val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
@@ -753,7 +761,9 @@ internal fun drawScene(
 
 /**
  * 画 [items] 这几块码（已经按 MaskOrder 排好了）。有 [composite]（动效里的合成图，见 ComposedMasks）时，
- * 码所在的地方直接从合成好的图上取；没有时一块块地画（见 [drawItem]）。
+ * 盖住整块的码（打码的几种）所在的地方直接从合成好的图上取；马克笔、画笔、文本只占框里的一部分，
+ * 整框贴过来的话框里没画到的地方是没压暗、没磨砂的原图，照它自己的样子画（见 [drawItem]）。
+ * 按先后一段段地来：连着的几块打码一次贴，中间夹着的标记照画，后面的打码照样盖在它上面。没有合成图时一块块地画。
  */
 private fun drawItems(
     canvas: android.graphics.Canvas,
@@ -768,13 +778,24 @@ private fun drawItems(
         items.forEach { drawItem(canvas, it, image, registry, prepared, alone) }
         return
     }
-    if (items.isEmpty()) return
-    val area = android.graphics.Path()
-    items.forEach { area.op(it.quad.toPath(), android.graphics.Path.Op.UNION) }
-    val save = canvas.save()
-    canvas.clipPath(area)
-    canvas.drawBitmap(composite, 0f, 0f, null)
-    canvas.restoreToCount(save)
+    var run: android.graphics.Path? = null
+    fun paste() {
+        val area = run ?: return
+        run = null
+        val save = canvas.save()
+        canvas.clipPath(area)
+        canvas.drawBitmap(composite, 0f, 0f, null)
+        canvas.restoreToCount(save)
+    }
+    items.forEach { item ->
+        if (item.look.style.redacts) {
+            (run ?: android.graphics.Path().also { run = it }).op(item.quad.toPath(), android.graphics.Path.Op.UNION)
+        } else {
+            paste()
+            drawItem(canvas, item, image, registry, prepared, alone)
+        }
+    }
+    paste()
 }
 
 /**

@@ -54,11 +54,16 @@
             </intent-filter>
         </activity>
 
-        <!-- 编辑器：首页选图后进来，或作为分享目标 -->
+        <!--
+          编辑器：首页选图后进来，或作为分享目标。
+          输入法弹起来时界面自己让（imePadding，见 EditorScreen），系统别再把整个窗口往上推：
+          文本的面板一长出来就要输入框拿焦点，那一下输入框还在低处，被推上去的窗口之后不会落回来。
+        -->
         <activity
             android:name=".ui.EditorActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden"
+            android:windowSoftInputMode="adjustResize"
             android:parentActivityName=".ui.home.HomeActivity">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
