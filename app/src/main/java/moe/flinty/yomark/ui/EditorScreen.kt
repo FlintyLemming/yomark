@@ -296,7 +296,8 @@ fun EditorScreen(
                         }
                     } else null
                     val purpose = PurposePanelModel(
-                        text = state.purposeText,
+                        text = state.purposeDraft,
+                        on = state.purposeOn,
                         style = state.purposeStyle,
                         open = state.purposeSheetVisible,
                         picking = state.colorPick == ColorTarget.PURPOSE,
@@ -428,7 +429,7 @@ private class ViewModelPurposeActions(private val vm: EditorViewModel) : Purpose
     override fun onTextChange(text: String) = vm.setPurposeText(text)
     override fun onStyleChange(style: PurposeWatermarkStyle) = vm.setPurposeStyle(style)
     override fun onReset() = vm.resetPurposeStyle()
-    override fun onRemove() = vm.removePurposeWatermark()
+    override fun onApply(on: Boolean) = vm.setPurposeOn(on)
     override fun onCollapse() = vm.dismissPurposeSheet()
     override fun onPickColor(pick: Boolean) = if (pick) vm.startColorPick(ColorTarget.PURPOSE) else vm.cancelColorPick()
 }

@@ -1031,8 +1031,7 @@ class EditorViewModel(
     // ---------- 用途水印 ----------
 
     /**
-     * 打开调节面板即打开水印：还没设文案时先填上默认措辞，画布上马上就能看到效果，
-     * 用户改中间那几个字即可。不想要就点面板上的「移除」。
+     * 打开调节面板，水印不跟着加上：文字框是空的就先填上上次的文字或默认措辞，加不加由面板上的「应用」开关定。
      * 它和样式的调节面板是同一块地方（手机上都是底栏的胶囊长出来的），一次只开一个：样式面板开着就换成它。
      */
     fun showPurposeSheet() {
@@ -1042,7 +1041,7 @@ class EditorViewModel(
             purposeSheetVisible = true,
             stylePanelOpen = false,
             colorPick = null,
-            purposeText = s.purposeText ?: lastPurposeText ?: defaultPurposeText,
+            purposeDraft = s.purposeDraft.ifBlank { lastPurposeText ?: defaultPurposeText },
         )
     }
 
@@ -1054,16 +1053,15 @@ class EditorViewModel(
     /** 收起面板，水印保持现状。 */
     fun dismissPurposeSheet() { _state.value = _state.value.copy(purposeSheetVisible = false, colorPick = null) }
 
-    /** 边打字边生效。清空就等于暂时不加，面板不收，接着打字又回来。 */
-    fun setPurposeText(text: String?) {
-        val t = text?.takeIf { it.isNotBlank() }
-        if (t != null) lastPurposeText = t
-        _state.value = _state.value.copy(purposeText = t)
+    /** 开关开着时边打字边生效。清空就等于暂时不加，接着打字又回来。 */
+    fun setPurposeText(text: String) {
+        if (text.isNotBlank()) lastPurposeText = text
+        _state.value = _state.value.copy(purposeDraft = text)
     }
 
-    /** 移除水印并收起面板。文案记在内存里，这次会话里再打开面板还是它。 */
-    fun removePurposeWatermark() {
-        _state.value = _state.value.copy(purposeText = null, purposeSheetVisible = false, colorPick = null)
+    /** 面板上的「应用」开关：加上或去掉图上的水印，面板不收，文字留着。 */
+    fun setPurposeOn(on: Boolean) {
+        _state.value = _state.value.copy(purposeOn = on)
     }
 
     /**

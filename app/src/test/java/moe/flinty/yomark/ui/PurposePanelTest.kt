@@ -15,6 +15,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -66,14 +68,14 @@ class PurposePanelTest {
         val texts = mutableListOf<String>()
         val styles = mutableListOf<PurposeWatermarkStyle>()
         var resets = 0
-        var removes = 0
+        val applies = mutableListOf<Boolean>()
         var collapsed = 0
         val picks = mutableListOf<Boolean>()
         override fun onToggle() { toggles++ }
         override fun onTextChange(text: String) { texts += text }
         override fun onStyleChange(style: PurposeWatermarkStyle) { styles += style }
         override fun onReset() { resets++ }
-        override fun onRemove() { removes++ }
+        override fun onApply(on: Boolean) { applies += on }
         override fun onCollapse() { collapsed++ }
         override fun onPickColor(pick: Boolean) { picks += pick }
     }
@@ -117,12 +119,12 @@ class PurposePanelTest {
         val tool = compose.onNodeWithText("水印").getUnclippedBoundsInRoot()
         model = opened
         val title = compose.onNodeWithText("用途水印").assertIsDisplayed().getUnclippedBoundsInRoot()
-        val remove = compose.onNodeWithText("移除").assertIsDisplayed().getUnclippedBoundsInRoot()
+        val apply = compose.onNodeWithText("应用").assertIsDisplayed().getUnclippedBoundsInRoot()
         // 选中的水印撑宽了（见 EditorToolbarTest），这一行上下没挪
         val picked = compose.onNodeWithText("水印").getUnclippedBoundsInRoot()
         assertThat(picked.top to picked.bottom).isEqualTo(tool.top to tool.bottom)
         assertThat(title.bottom).isLessThan(tool.top)
-        assertThat(remove.bottom).isAtMost(tool.top)
+        assertThat(apply.bottom).isAtMost(tool.top)
         field.assert(hasText("仅供办理签证使用"))
         listOf("文字", "颜色").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         listOf("角度", "不透明度", "密度").forEach { compose.onNodeWithContentDescription(it).assertIsDisplayed() }
@@ -153,13 +155,13 @@ class PurposePanelTest {
         assertThat(actions.texts).containsExactly("仅供入职使用")
     }
 
-    /** 清空时 ViewModel 那边是「暂时不加」（null）：框里还是空的，不跳回上一句。 */
+    /** 清空了框里就是空的，不跳回上一句。 */
     @Test fun clearingTheTextLeavesTheFieldEmpty() {
         val actions = Recorder()
         var model by mutableStateOf(opened)
         compose.setContent { MaterialTheme { Surface { PhoneBar(model, actions) } } }
         field.performTextClearance()
-        model = model.copy(text = null)
+        model = model.copy(text = "")
         assertThat(actions.texts).containsExactly("")
         field.assert(!hasText("仅供办理签证使用"))
     }
@@ -232,20 +234,29 @@ class PurposePanelTest {
         assertThat(actions.collapsed).isEqualTo(0)
     }
 
-    // ---------- 恢复默认、移除 ----------
+    // ---------- 恢复默认、应用 ----------
 
     @Test fun resetIsOnlyOfferedOnceSomethingWasChanged() {
         show(opened)
         compose.onNodeWithText("恢复默认").assertIsNotEnabled()
     }
 
-    @Test fun resetAndRemoveReport() {
+    @Test fun resetReports() {
         val actions = Recorder()
         show(opened.copy(style = PurposeWatermarkStyle(angle = 0f)), actions)
         compose.onNodeWithText("恢复默认").assertIsEnabled().performClick()
-        compose.onNodeWithText("移除").performClick()
         assertThat(actions.resets).isEqualTo(1)
-        assertThat(actions.removes).isEqualTo(1)
+    }
+
+    /** 「应用」是开关，点一下翻过来：关着点是加上，开着点是去掉。 */
+    @Test fun theApplySwitchFlips() {
+        val actions = Recorder()
+        var model by mutableStateOf(opened)
+        compose.setContent { MaterialTheme { Surface { PhoneBar(model, actions) } } }
+        compose.onNodeWithText("应用").assertIsOff().performClick()
+        model = model.copy(on = true)
+        compose.onNodeWithText("应用").assertIsOn().performClick()
+        assertThat(actions.applies).containsExactly(true, false).inOrder()
     }
 
     // ---------- 手机上和样式面板同一块地方 ----------
@@ -287,7 +298,7 @@ class PurposePanelTest {
         val actions = Recorder()
         var model by mutableStateOf(opened)
         compose.setContent { MaterialTheme { Surface { PurposePanel(model, actions) } } }
-        listOf("用途水印", "文字", "颜色", "恢复默认", "移除").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        listOf("用途水印", "文字", "颜色", "恢复默认", "应用").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         model = model.copy(picking = true)
         compose.onNodeWithContentDescription("从图上取色").performClick()
