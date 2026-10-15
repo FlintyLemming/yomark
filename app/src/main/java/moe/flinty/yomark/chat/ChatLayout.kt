@@ -73,8 +73,8 @@ object ChatLayout {
 
         val split = Titles.split(lines, w)
         val tight = split.map { TextInk.tighten(it, pixels) }
-        val onHeader = { b: Box -> TextInk.onPageColor(b, pixels) }
-        val zones = Zones.of(tight, w, h, onHeader)
+        val onPage = { b: Box -> TextInk.onPageColor(b, pixels) }
+        val zones = Zones.of(tight, w, h, onPage)
         val grid = Grid.of(pixels)
         val avatars = Avatars.find(grid, zones)
         val (score, reasons) = score(zones, avatars)
@@ -85,7 +85,7 @@ object ChatLayout {
         val cut = split.indices.mapNotNull { i ->
             Avatars.cutOff(split[i], avatars.body, w)?.let { if (it === split[i]) tight[i] else TextInk.tighten(it, pixels) }
         }
-        val names = Names.find(Zones.of(cut, w, h, onHeader), avatars.body) { TextInk.chroma(it, pixels) }
+        val names = Names.find(Zones.of(cut, w, h, onPage), avatars.body) { TextInk.chroma(it, pixels) }
         return ChatFindings(
             isChat = true,
             score = score,
@@ -137,7 +137,7 @@ object ChatLayout {
 }
 
 /**
- * 一页的几个区：状态栏、顶栏、正文、底栏。只按 OCR 行的位置分，不看像素。
+ * 一页的几个区：状态栏、顶栏、正文、底栏。按 OCR 行的位置分；像素只经 onPage 问一句字底下是不是页面的底色。
  */
 internal class Zones private constructor(
     val w: Float,
@@ -150,6 +150,7 @@ internal class Zones private constructor(
     val header: List<ChatLine>,
     val body: List<ChatLine>,
     val bottom: List<ChatLine>,
+    private val onPage: (Box) -> Boolean,
 ) {
     fun isCentered(l: ChatLine) = abs(l.box.centerX - w / 2f) < 0.06f * w && l.box.width < 0.7f * w
 
@@ -172,9 +173,12 @@ internal class Zones private constructor(
         return col.size
     }
 
-    /** 贴着右边的一个时间：会话列表每一行右上角的「10:24」「昨天」。聊天页上没有这种。 */
+    /**
+     * 贴着右边的一个时间：会话列表每一行右上角的「10:24」「昨天」，直接写在页面底色上。
+     * 聊天页上贴着右边的时间在气泡里：Telegram、WhatsApp 自己发的消息，气泡右下角的「15:56 ✓✓」，短消息和时间读成一行「嗯 15:56」。
+     */
     fun isRightEdgeTime(l: ChatLine) =
-        l.box.right > 0.9f * w && l.box.width < 0.25f * w && ChatLayout.TIME.containsMatchIn(l.text) && l.text.length <= 12
+        l.box.right > 0.9f * w && l.box.width < 0.25f * w && ChatLayout.TIME.containsMatchIn(l.text) && l.text.length <= 12 && onPage(l.box)
 
     companion object {
         /** 状态栏下沿：手机状态栏大约是屏宽的 8%–11%。 */
@@ -184,11 +188,14 @@ internal class Zones private constructor(
         /** 底栏：输入栏、导航栏大约屏宽的 15%。 */
         const val BOTTOM = 0.17f
 
-        /** @param onHeader 这个框是不是直接写在顶栏的底色上（不是印在头像上的字），见 [Titles.pick]。 */
-        fun of(lines: List<ChatLine>, w: Float, h: Float, onHeader: (Box) -> Boolean = { true }): Zones {
+        /**
+         * @param onPage 这个框是不是直接写在页面的底色上：不是印在头像上的字（见 [Titles.pick]），
+         * 不是气泡里的字（见 [isRightEdgeTime]）。
+         */
+        fun of(lines: List<ChatLine>, w: Float, h: Float, onPage: (Box) -> Boolean = { true }): Zones {
             val status = STATUS * w
             val visible = lines.filter { it.text.isNotBlank() && it.box.centerY > status }
-            val title = Titles.pick(visible, w, onHeader)
+            val title = Titles.pick(visible, w, onPage)
             val headerBottom = Titles.headerBottom(title, visible, w)
             val bottomTop = h - BOTTOM * w
             return Zones(
@@ -200,6 +207,7 @@ internal class Zones private constructor(
                 header = visible.filter { it.box.centerY <= headerBottom },
                 body = visible.filter { it.box.centerY > headerBottom && it.box.centerY < bottomTop },
                 bottom = visible.filter { it.box.centerY >= bottomTop },
+                onPage = onPage,
             )
         }
 

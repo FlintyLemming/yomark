@@ -380,6 +380,52 @@ class ChatLayoutTest {
         assertThat(Names.find(zonesOf(indented), emptyList()).map { it.text }).containsExactly("程一舟")
     }
 
+    /**
+     * Telegram 自己发的消息没有头像，气泡贴到屏宽 97%，时间在气泡右下角：短消息和时间读成一行「嗯 15:56」，
+     * 长消息的时间单占一行。贴着右边、又短、带时间，同会话列表每行右上角的时间，可它在气泡里，不算会话列表。
+     * 同样的字直接写在页面底色上的照旧扣分。
+     */
+    @Test fun `times inside outgoing Telegram bubbles are not a chat list's time column`() {
+        val chat = telegramGroup(outgoingBubbles = true)
+        assertWithMessage("${chat.score} ${chat.reasons}").that(chat.isChat).isTrue()
+        assertWithMessage("${chat.reasons}").that(chat.reasons.none { it.startsWith("行尾一列时间") }).isTrue()
+        val bare = telegramGroup(outgoingBubbles = false)
+        assertWithMessage("${bare.reasons}").that(bare.reasons.any { it.startsWith("行尾一列时间") }).isTrue()
+    }
+
+    /** 深色 Telegram 群聊（照一张真截图的版面缩到 540 宽）：别人的消息四组，头像在每组旁边；自己的四条，三条的时间贴着右边。 */
+    private fun telegramGroup(outgoingBubbles: Boolean): ChatFindings {
+        val px = canvas(540, 1170) { _, _ -> DARK }
+        val lines = ArrayList<ChatLine>()
+        fun text(b: Box, s: String, color: Int = WHITE) {
+            px.glyphs(b, color)
+            lines += ChatLine(b, s)
+        }
+        text(Box(170f, 90f, 290f, 110f), "周末羽毛球群")
+        text(Box(170f, 118f, 290f, 134f), "三三 正在输入…", BLUE)
+        fun incoming(top: Float, name: String, message: String, avatar: Int) {
+            px.fill(Box(70f, top, 400f, top + 70f), INCOMING)
+            px.disc(Box(8f, top + 14f, 64f, top + 70f), avatar)
+            text(Box(94f, top + 8f, 94f + 14f * name.length, top + 24f), name, PINK)
+            text(Box(94f, top + 32f, 94f + 16f * message.length, top + 52f), message)
+        }
+        fun outgoing(bubble: Box, vararg texts: Pair<Box, String>) {
+            if (outgoingBubbles) px.fill(bubble, OUTGOING)
+            texts.forEach { (b, s) -> text(b, s) }
+        }
+        incoming(250f, "Maple", "这个会让我以为是自带的", AVATAR_COLORS[0])
+        outgoing(Box(405f, 340f, 526f, 374f), Box(421f, 348f, 516f, 366f) to "嗯 15:56")
+        incoming(400f, "Akarin", "我还是执着于扁平一点", AVATAR_COLORS[1])
+        outgoing(Box(390f, 490f, 526f, 524f), Box(400f, 498f, 516f, 516f) to "不带 15:57")
+        outgoing(Box(215f, 532f, 526f, 566f), Box(230f, 540f, 516f, 558f) to "框架能实现但不是自带的 15:57")
+        incoming(590f, "Maple", "看着挺基础的 15:57", AVATAR_COLORS[0])
+        outgoing(Box(215f, 680f, 526f, 740f), Box(232f, 690f, 413f, 710f) to "平板模式是扁平的", Box(470f, 718f, 516f, 730f) to "15:57")
+        incoming(760f, "Akarin", "能不展开就不用 15:57", AVATAR_COLORS[1])
+        px.fill(Box(10f, 1100f, 460f, 1150f), INCOMING)
+        text(Box(80f, 1115f, 170f, 1135f), "输入消息", GRAY)
+        return ChatLayout.analyze(lines, px)
+    }
+
     private fun zonesOf(lines: List<ChatLine>): Zones = Zones.of(lines, 540f, 1170f)
 
     private fun rgb(r: Int, g: Int, b: Int) = (0xFF shl 24) or (r.coerceIn(0, 255) shl 16) or (g.coerceIn(0, 255) shl 8) or b.coerceIn(0, 255)
@@ -409,6 +455,16 @@ class ChatLayoutTest {
         for (y in b.top.toInt() + 2 until b.bottom.toInt() - 2 step 2) for (x in b.left.toInt() + 2 until b.right.toInt() - 2) argb[y * width + x] = color
     }
 
+    /**
+     * 稀疏一点的字：框里隔几个像素一竖，框边上留着底色。[strokes] 的横条把收紧以后的框边占满了，
+     * 框边上最常见的颜色成了字的颜色，看不出字底下是什么。
+     */
+    private fun Pixels.glyphs(b: Box, color: Int) {
+        for (y in b.top.toInt() + 2 until b.bottom.toInt() - 2) for (x in b.left.toInt() + 2 until b.right.toInt() - 2) {
+            if ((x - b.left.toInt()) % 6 < 2) argb[y * width + x] = color
+        }
+    }
+
     private val AVATAR_COLORS = listOf(0xFFE5533D, 0xFF3D7BE5, 0xFF8E44AD, 0xFFF0A030).map { it.toInt() }
     private val DARK = 0xFF1E2A36.toInt()
     private val PINK = 0xFFE87A9A.toInt()
@@ -416,4 +472,6 @@ class ChatLayoutTest {
     private val PURPLE = 0xFFA77BE0.toInt()
     private val WHITE = 0xFFF0F0F0.toInt()
     private val GRAY = 0xFF8E8E93.toInt()
+    private val INCOMING = 0xFF2C3E50.toInt()
+    private val OUTGOING = 0xFF7B5CD6.toInt()
 }
