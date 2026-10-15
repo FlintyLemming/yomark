@@ -24,7 +24,6 @@
   const chip = demo.querySelector('[data-chip]');
   const replay = demo.querySelector('[data-replay]');
   const maskedCount = demo.querySelector('[data-count="masked"]');
-  const outlinedCount = demo.querySelector('[data-count="outlined"]');
   const marks = Array.from(demo.querySelectorAll('.m'));
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -50,9 +49,7 @@
   }
 
   function updateCounts() {
-    const masked = marks.filter((m) => m.dataset.state === 'masked').length;
-    maskedCount.textContent = masked;
-    outlinedCount.textContent = marks.length - masked;
+    maskedCount.textContent = marks.filter((m) => m.dataset.state === 'masked').length;
   }
 
   function setPhase(next) {
@@ -116,7 +113,7 @@
         finish();
         return;
       }
-      setMark(m, m.dataset.state === 'masked' ? 'outlined' : 'masked');
+      setMark(m, m.dataset.state === 'masked' ? 'off' : 'masked');
       updateCounts();
     });
   }

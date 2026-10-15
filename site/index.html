@@ -40,7 +40,7 @@
     <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V4"/><path d="M7.5 8.5 12 4l4.5 4.5"/><path d="M5 13.5V17a3 3 0 0 0 3 3h8a3 3 0 0 0 3-3v-3.5"/></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 9V6.5A2.5 2.5 0 0 1 6.5 4H9M15 4h2.5A2.5 2.5 0 0 1 20 6.5V9M20 15v2.5a2.5 2.5 0 0 1-2.5 2.5H15M9 20H6.5A2.5 2.5 0 0 1 4 17.5V15"/><path d="M12 9v6M9 12h6"/></symbol>
     <symbol id="i-stack" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></symbol>
-    <symbol id="i-remind" viewBox="0 0 24 24"><path d="M5 5h14a1.5 1.5 0 0 1 1.5 1.5v9A1.5 1.5 0 0 1 19 17h-9l-4 3.2V17H5a1.5 1.5 0 0 1-1.5-1.5v-9A1.5 1.5 0 0 1 5 5z"/><path d="M12 8.5v3.5M12 14.5v.01"/></symbol>
+    <symbol id="i-handoff" viewBox="0 0 24 24"><rect x="3.5" y="4.5" width="10" height="15" rx="2.5"/><path d="M9.5 12h11"/><path d="M17 8.5 20.5 12 17 15.5"/></symbol>
     <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M10.5 3.5c.5 3.8 2.2 5.5 6 6-3.8.5-5.5 2.2-6 6-.5-3.8-2.2-5.5-6-6 3.8-.5 5.5-2.2 6-6z"/><path d="M18 14.5c.25 1.7 1 2.45 2.5 2.7-1.5.25-2.25 1-2.5 2.7-.25-1.7-1-2.45-2.5-2.7 1.5-.25 2.25-1 2.5-2.7z"/></symbol>
     <symbol id="i-type" viewBox="0 0 24 24"><path d="M5.5 7.5v-2h13v2"/><path d="M12 5.5v13"/><path d="M9.5 18.5h5"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.5a8.5 8.5 0 1 0 0 17c1.1 0 1.7-.8 1.7-1.6 0-.5-.2-.9-.5-1.2-.3-.3-.5-.7-.5-1.2 0-.9.7-1.6 1.6-1.6h1.8a4.4 4.4 0 0 0 4.4-4.4C20.5 6.7 16.7 3.5 12 3.5z"/><circle cx="7.7" cy="11.2" r="1.1"/><circle cx="10.4" cy="7.6" r="1.1"/><circle cx="15" cy="7.9" r="1.1"/></symbol>
@@ -100,7 +100,7 @@
           <p class="meta"><span data-release></span>Android 10 及以上 · 开源免费</p>
         </div>
 
-        <!-- 首屏演示：照编辑器里的样子，先扫一遍光，再把码落下来。点标记在打码和圈出之间切换。
+        <!-- 首屏演示：照编辑器里的样子，先扫一遍光，再把码落下来。点一下打码或取消；日期、单号这几类默认关闭，识别后不打码。
              没有 JS 时停在识别后的样子。 -->
         <figure class="demo" data-demo>
           <div class="demo-stage">
@@ -110,18 +110,18 @@
               <div class="shot-bar" aria-hidden="true"><span class="back"></span>包裹详情</div>
               <div class="shot-body">
                 <div class="o-card">
-                  <div class="o-state"><b>待取件</b><button class="m" type="button" data-kind="日期时间" data-state="outlined">09-29 12:30</button></div>
+                  <div class="o-state"><b>待取件</b><button class="m" type="button" data-kind="日期时间" data-state="off">09-29 12:30</button></div>
                   <div class="o-code"><span class="k">取件码</span><button class="m m-big" type="button" data-kind="取件码" data-state="masked">3-2-1234</button><span class="o-btn" aria-hidden="true">复制</span></div>
                 </div>
                 <div class="o-card">
-                  <div class="o-row"><span class="k">顺达快递</span><button class="m" type="button" data-kind="快递单号" data-state="outlined">773512046683217</button><span class="o-btn" aria-hidden="true">复制</span></div>
+                  <div class="o-row"><span class="k">顺达快递</span><button class="m" type="button" data-kind="快递单号" data-state="off">773512046683217</button><span class="o-btn" aria-hidden="true">复制</span></div>
                   <div class="o-row"><span class="k">送至</span><button class="m" type="button" data-kind="地址" data-state="masked">长江路88号阳光新村5幢302室</button></div>
                   <div class="o-row"><span class="k">收件人</span><button class="m" type="button" data-kind="人名" data-state="masked">王小明</button><button class="m" type="button" data-kind="电话" data-state="masked">86-139****5678</button><span class="o-tag">号码保护中</span></div>
                 </div>
                 <div class="o-card">
                   <div class="o-shop">青柠生活旗舰店</div>
                   <div class="o-item"><span class="thumb" aria-hidden="true"></span><span class="o-name">挂耳咖啡 · 中度烘焙<small>20 袋装 ×1</small></span><span class="o-price">¥59.9</span></div>
-                  <div class="o-row"><span class="k">订单编号</span><button class="m" type="button" data-kind="长数字串" data-state="outlined">2026092912304518839201746355</button></div>
+                  <div class="o-row"><span class="k">订单编号</span><button class="m" type="button" data-kind="长数字串" data-state="off">2026092912304518839201746355</button></div>
                   <div class="o-row"><span class="k">联系邮箱</span><button class="m" type="button" data-kind="邮箱" data-state="masked">wangxm@example.com</button></div>
                 </div>
               </div>
@@ -131,11 +131,10 @@
           </div>
           <figcaption class="demo-foot">
             <span class="legend"><i class="sw sw-mask" aria-hidden="true"></i><b data-count="masked">5</b> 处已打码</span>
-            <span class="legend"><i class="sw sw-outline" aria-hidden="true"></i><b data-count="outlined">3</b> 处等你确认</span>
             <button class="replay" type="button" data-replay hidden>
               <svg class="i" aria-hidden="true"><use href="#i-replay"/></svg>重新识别
             </button>
-            <span class="demo-hint">点一下标记，在打码和圈出之间切换。</span>
+            <span class="demo-hint">点一下字，打码或取消。</span>
           </figcaption>
         </figure>
       </div>
@@ -156,12 +155,12 @@
           <li class="step">
             <div class="step-top"><span class="step-n">02</span><svg class="i" aria-hidden="true"><use href="#i-scan"/></svg></div>
             <h3>看一眼</h3>
-            <p>一两秒就识别完。<span class="key key-mask">天蓝色块</span>是已经打码的，<span class="key key-outline">琥珀色虚线框</span>是拿不准、等你确认的，点一下就能切换。漏掉的地方，用一根手指拖出一个框补上。</p>
+            <p>一两秒就识别完，认出来的盖上<span class="key key-mask">天蓝色块</span>。点一下码就取消，点一下没打码的字就打上。漏掉的地方，用一根手指拖出一个框补上。</p>
           </li>
           <li class="step">
             <div class="step-top"><span class="step-n">03</span><svg class="i" aria-hidden="true"><use href="#i-export"/></svg></div>
             <h3>导出</h3>
-            <p>按原图分辨率重新绘制，EXIF 一律不保留。还有圈出但没打码的内容，导出前会先提醒你。</p>
+            <p>按原图分辨率重新绘制，EXIF 一律不保留。</p>
           </li>
         </ol>
       </div>
@@ -176,24 +175,24 @@
         </header>
         <div class="scope">
           <div class="scope-card">
-            <h3><span class="sw sw-mask" aria-hidden="true"></span>默认直接打码</h3>
+            <h3><span class="sw sw-mask" aria-hidden="true"></span>默认打码</h3>
             <ul class="chips chips-mask">
               <li>电话</li><li>邮箱</li><li>人名</li><li>地址</li><li>取件码</li>
               <li>银行卡号</li><li>IBAN</li><li>护照号</li><li>社保号</li>
               <li>密钥（API key）</li><li>MAC 地址</li>
               <li>人脸</li><li>能解码的二维码、条形码</li>
             </ul>
+            <p class="scope-note">条码识别设为「宽松」时，解不出的疑似条码也打码。</p>
           </div>
           <div class="scope-card">
-            <h3><span class="sw sw-outline" aria-hidden="true"></span>默认只圈出，等你确认</h3>
-            <ul class="chips chips-outline">
+            <h3><span class="sw sw-off" aria-hidden="true"></span>默认关闭</h3>
+            <ul class="chips chips-off">
               <li>快递单号</li><li>订单号、交易号等长数字串</li><li>日期时间</li>
-              <li>网址</li><li>IP 地址</li><li>无法解码的疑似条码</li>
+              <li>网址</li><li>IP 地址</li>
             </ul>
-            <p class="scope-note">疑似条码只在条码识别设为「宽松」时圈出。</p>
           </div>
         </div>
-        <p class="sec-note">每一类都可以在设置里改成「打码」「仅圈出」或「关闭」：文字按类型逐条设，人脸和条码各一项。</p>
+        <p class="sec-note">每一类都可以在设置里设为「打码」或「关闭」：文字按类型逐条设，人脸和条码各一项。</p>
       </div>
     </section>
 
@@ -306,9 +305,9 @@
             <p>在相册里一次分享多张图，逐张处理后一起导出。</p>
           </li>
           <li class="feature">
-            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-remind"/></svg></span>
-            <h3>导出前提醒</h3>
-            <p>还有圈出但没打码的内容，导出前先列出来，让你再确认一次。不需要的话可以在设置里关掉。</p>
+            <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-handoff"/></svg></span>
+            <h3>替别的应用选图</h3>
+            <p>别的应用要图时选「有码」，打完码点「完成」，图直接交回给它，不存进相册。</p>
           </li>
           <li class="feature feature-wm">
             <svg class="wm-bg" aria-hidden="true">
@@ -327,7 +326,7 @@
           <li class="feature">
             <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-sparkle"/></svg></span>
             <h3>AI 增强识别</h3>
-            <p>在支持 AICore 的机型上，让本机的 Gemini Nano 把整页文字再读一遍。新发现的内容只圈出，不会自动打码。</p>
+            <p>在支持 AICore 的机型上，让本机的 Gemini Nano 把整页文字再读一遍，新找到的直接打码。</p>
           </li>
           <li class="feature">
             <span class="f-icon"><svg class="i" aria-hidden="true"><use href="#i-palette"/></svg></span>
