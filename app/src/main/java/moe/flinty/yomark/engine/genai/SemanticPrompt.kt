@@ -101,8 +101,11 @@ object SemanticPrompt {
     /**
      * 这几类的提示词（不含页上的文字）。用 Google 给 Nano 的写法：## 分段，说明、反例、格式、例子各一段。
      * 一类都不问时为空串，调用方不该再发请求。
+     *
+     * [masked]：页上的文字里，规则认出的号码已经换成了〔电话〕这样的占位符（见 [mask]），提示词多一句说明。
+     * 换掉的不用它再报，但还是线索：〔电话〕前面常是人名。
      */
-    fun instructions(kinds: Set<SensitiveKind>): String {
+    fun instructions(kinds: Set<SensitiveKind>, masked: Boolean = false): String {
         val asked = CATEGORIES.filter { it.kind in kinds }
         if (asked.isEmpty()) return ""
         val labels = asked.distinctBy { it.kind }.associate { it.kind to it.label }
@@ -111,6 +114,7 @@ object SemanticPrompt {
         val notPrivate = NOT_PRIVATE.filter { (_, kind) -> kind == null || kind !in kinds }.joinToString("、") { it.first }
         return buildString {
             append("你在帮用户给手机截图打码。截图里识别出的文字一行一条，每行以「行号: 」开头。找出能指向具体某个人的隐私信息。\n")
+            if (masked) append("文字里的〔电话〕〔证件号〕这类标记是已经打过码的号码，不用再报，但可以当线索（比如〔电话〕前面常是人名）。\n")
             append("## 类型\n")
             asked.forEach { append(it.label).append('：').append(it.hint).append('\n') }
             append("## 不算隐私\n").append(notPrivate).append("。\n")
@@ -128,9 +132,15 @@ object SemanticPrompt {
      * 连同提示词本身和回答，在 nano-v2 那一档约 4000 token 的上限以内。
      *
      * @param texts null 表示这一行不送（置信度太低、没有文字内容）。
+     * @param masked 见 [instructions]。
      */
-    fun chunks(texts: List<String?>, kinds: Set<SensitiveKind> = KINDS, budget: Int = CHUNK_CHARS): List<Chunk> {
-        val instructions = instructions(kinds)
+    fun chunks(
+        texts: List<String?>,
+        kinds: Set<SensitiveKind> = KINDS,
+        budget: Int = CHUNK_CHARS,
+        masked: Boolean = false,
+    ): List<Chunk> {
+        val instructions = instructions(kinds, masked)
         if (instructions.isEmpty()) return emptyList()
         val out = ArrayList<Chunk>()
         var body = StringBuilder()
@@ -154,6 +164,7 @@ object SemanticPrompt {
     /**
      * 回答里的每一条落到页上：[texts] 是整页的行（送没送的都算），原文在哪几行出现，哪几处就都是；聊天标题只算第一处，
      * 群名、对方名字在顶栏，消息里同样的字（「妈妈」）不是它。
+     * 哪一行里都没有的，再在相邻两行拼起来的文字里找（[acrossLines]）：OCR 把一个地址拆成了两行。
      * 只认 [kinds] 里的类型；行号写了也不看（见上面为什么）。
      *
      * [vetoed] 管用户关掉的类型：模型把关掉的那一类报成别的类型（关了电话，它把手机号报成证件号），这一条不认。
@@ -175,12 +186,60 @@ object SemanticPrompt {
             val quote = m.groupValues[2].trim().trim(*QUOTES).trim()
             if (quote.codePointCount(0, quote.length) < 2 || quote.length > MAX_SPAN) return@flatMap emptySequence()
             if (!plausible(kind, quote) || vetoed(kind, quote)) return@flatMap emptySequence()
-            val found = texts.asSequence().withIndex().flatMap { (i, text) ->
+            val found = texts.withIndex().flatMap { (i, text) ->
                 locateAll(text, quote).filterNot { inSignature(text, it) }.map { Finding(i, it, kind) }
             }
-            if (kind == SensitiveKind.CHAT_TITLE) found.take(1) else found
+            when {
+                found.isEmpty() -> acrossLines(texts, quote, kind).asSequence()
+                kind == SensitiveKind.CHAT_TITLE -> found.asSequence().take(1)
+                else -> found.asSequence()
+            }
         }.toList().let(::collapse)
     }
+
+    /**
+     * 跨在相邻两行上的原文：上一行的末尾接下一行的开头。拆成两段，各落在自己那一行上，空格不算进去。
+     * 证件上的住址、聊天气泡里换了行的地址，OCR 都读成两行，模型复述的却是一整段。
+     */
+    private fun acrossLines(texts: List<String>, quote: String, kind: SensitiveKind): List<Finding> =
+        (0 until texts.size - 1).flatMap { i ->
+            val head = texts[i]
+            val tail = texts[i + 1]
+            locateAll(head + tail, quote).filter { it.first < head.length && it.last >= head.length }.flatMap { r ->
+                listOfNotNull(
+                    head.trimmedRange(r.first..head.lastIndex)?.let { Finding(i, it, kind) },
+                    tail.trimmedRange(0..r.last - head.length)?.let { Finding(i + 1, it, kind) },
+                )
+            }
+        }
+
+    private fun String.trimmedRange(range: IntRange): IntRange? {
+        var first = range.first
+        var last = range.last
+        while (first <= last && this[first].isWhitespace()) first++
+        while (last >= first && this[last].isWhitespace()) last--
+        return if (first <= last) first..last else null
+    }
+
+    /**
+     * 发出去之前，把 [find] 认出的几段换成「〔类型〕」（[placeholder]）：规则已经打上码的号码不必离开手机，
+     * 留个占位符模型照样知道那里有个电话。重叠的几段只换先开始、更长的那一段。
+     *
+     * @param texts null 的行原样留着（不送的行）
+     * @param find 一行里要换掉的几段和它们的类型
+     */
+    fun mask(texts: List<String?>, find: (String) -> List<Pair<IntRange, SensitiveKind>>): List<String?> = texts.map { text ->
+        if (text == null) return@map null
+        val spans = find(text).filter { !it.first.isEmpty() && it.first.last < text.length }
+            .sortedWith(compareBy<Pair<IntRange, SensitiveKind>> { it.first.first }.thenByDescending { it.first.last })
+        val kept = ArrayList<Pair<IntRange, SensitiveKind>>()
+        spans.forEach { s -> if (kept.none { it.first.last >= s.first.first }) kept += s }
+        kept.asReversed().fold(text) { acc, (range, kind) -> acc.replaceRange(range, placeholder(kind)) }
+    }
+
+    /** 「〔电话〕」：提示词里这一类的名字，没有的（提示词里不问的类型）写「号码」。 */
+    fun placeholder(kind: SensitiveKind): String =
+        "〔" + (CATEGORIES.firstOrNull { it.kind == kind }?.label ?: "号码") + "〕"
 
     /**
      * 同一处报成了几类时只留一类：聊天里的名字算昵称、标题，其余照提示词里的顺序。

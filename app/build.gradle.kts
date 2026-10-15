@@ -35,6 +35,8 @@ abstract class AssertPermissionsTask : DefaultTask() {
          * \u5141\u8bb8\u540d\u5355\u53ea\u80fd\u88c5\u300c\u4e0d\u6388\u4e88\u4efb\u4f55\u6570\u636e\u8bbf\u95ee\u80fd\u529b\u300d\u7684\u6761\u76ee\uff0c\u9010\u6761\u5199\u6b7b\uff0c\u4e0d\u5141\u8bb8\u524d\u7f00\u5339\u914d\u3002
          * \u65b0\u51fa\u73b0\u7684\u4efb\u4f55\u6743\u9650\u90fd\u5e94\u8be5\u8ba9\u6784\u5efa\u5931\u8d25\uff0c\u7531\u4eba\u5224\u65ad\u540e\u518d\u51b3\u5b9a\u8981\u4e0d\u8981\u52a0\u8fdb\u6765\u3002
          *
+         * - android.permission.INTERNET\uff1a\u5b9e\u9a8c\u5ba4\u91cc\u7684\u5916\u90e8\u6a21\u578b\u8981\u8054\u7f51\uff082026-10-15 \u53bb\u6389\u4e86\u300c\u4e0d\u8054\u7f51\u300d\u8fd9\u6761\u8981\u6c42\uff09\u3002
+         *   \u666e\u901a\u6743\u9650\uff0c\u5b89\u88c5\u65f6\u6388\u4e88\u3001\u4e0d\u5f39\u6388\u6743\u6846\uff0c\u4e0d\u89e6\u53ca\u4efb\u4f55\u7528\u6237\u6570\u636e\u3002
          * - com.android.vending.BILLING\uff1aPlay Billing \u5408\u5e76\u8fdb\u6765\uff0c\u4e0d\u53ef\u89c4\u907f\u3002
          * - com.google.android.apps.aicore.service.BIND_SERVICE\uff1aML Kit GenAI\uff08Gemini Nano\uff09\u5408\u5e76\u8fdb\u6765\u3002
          *   \u53ea\u7528\u4e8e\u7ed1\u5b9a\u7cfb\u7edf\u7684 AICore \u670d\u52a1\u3001\u7531\u5b83\u5728\u672c\u673a\u8dd1\u6a21\u578b\uff1b
@@ -46,6 +48,7 @@ abstract class AssertPermissionsTask : DefaultTask() {
          *   \u4e14\u56e0\u4e3a\u662f signature \u7ea7\uff0c\u5176\u4ed6\u5e94\u7528\u6839\u672c\u62ff\u4e0d\u5230\u3002
          */
         val ALLOWED = setOf(
+            "android.permission.INTERNET",
             "com.android.vending.BILLING",
             "com.google.android.apps.aicore.service.BIND_SERVICE",
             "moe.flinty.yomark.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",

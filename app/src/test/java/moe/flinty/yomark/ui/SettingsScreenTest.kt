@@ -26,6 +26,8 @@ import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.BuildConfig
+import moe.flinty.yomark.engine.genai.ExternalModelException
+import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.rules.RuleCatalog
@@ -36,6 +38,7 @@ import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
 import moe.flinty.yomark.ui.settings.EditSettingsScreen
+import moe.flinty.yomark.ui.settings.ExternalField
 import moe.flinty.yomark.ui.settings.ExportSettingsScreen
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.LabsSettingsScreen
@@ -145,11 +148,11 @@ class SettingsScreenTest {
             .inOrder()
     }
 
-    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它。 */
+    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它（和外部模型）。 */
     @Test fun chatScreenshotsLiveInLabs() {
         val opened = mutableListOf<SettingsPage>()
         home(onOpen = { opened += it })
-        compose.onNodeWithText("聊天记录").assertIsDisplayed()
+        compose.onNodeWithText("聊天记录、外部模型").assertIsDisplayed()
         compose.onNodeWithText("实验室").performClick()
         assertThat(opened).containsExactly(SettingsPage.LABS)
     }
@@ -412,6 +415,71 @@ class SettingsScreenTest {
     @Test fun theUnanchoredNamesSwitchIsDisabledWhileNamesAreOff() {
         rulePage("name", RecognitionConfig().withRule("name", RuleState.OFF, RuleCatalog.factoryState("name")))
         compose.onNodeWithTag("unanchored-names").assertIsNotEnabled()
+    }
+
+    // ---------- 外部模型（实验室） ----------
+
+    private val filled = ExternalModelSettings(enabled = true, baseUrl = "https://api.example.com/v1", apiKey = "sk-secret", model = "glm")
+
+    /** 出厂关着，开关在实验室里。 */
+    @Test fun theExternalModelIsOffInLabsAndCanBeTurnedOn() {
+        var on: Boolean? = null
+        show {
+            LabsSettingsScreen(RecognitionConfig(), onChange = {}, onNavigateUp = {}, externalModel = false, onExternalModelChange = { on = it })
+        }
+        compose.onNodeWithTag("labs-external-model").assertIsOff().performClick()
+        assertThat(on).isTrue()
+    }
+
+    /** 实验室里没打开，AI 页上就没有这一组。 */
+    @Test fun theAiPageHasNoExternalGroupUntilLabsTurnsItOn() {
+        ai(nano = null)
+        compose.onNodeWithText("外部模型").assertDoesNotExist()
+    }
+
+    /** 填了什么一看就知道，key 只说填没填；没填完不能测。 */
+    @Test fun theExternalGroupSaysWhatIsFilledInWithoutShowingTheKey() {
+        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(model = "")) }
+        compose.onNodeWithText("外部模型").assertIsDisplayed()
+        compose.onNodeWithText("https://api.example.com/v1").assertIsDisplayed()
+        compose.onNodeWithText("已填写").assertIsDisplayed()
+        compose.onNodeWithText("sk-secret", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("未填写").assertIsDisplayed()
+        compose.onNodeWithTag("external-test").assertIsNotEnabled()
+    }
+
+    /**
+     * 弹框保存时只换掉这一项，别的几项用存着的那份。
+     * 弹框本身不在这里点开：Robolectric 下弹框里的输入框会一直重新排版、耗尽内存，弹框在模拟器上验。
+     */
+    @Test fun savingAFieldReplacesOnlyThatField() {
+        assertThat(ExternalField.MODEL.of(filled)).isEqualTo("glm")
+        assertThat(ExternalField.URL.set(filled, "https://other.example.com/v1"))
+            .isEqualTo(filled.copy(baseUrl = "https://other.example.com/v1"))
+        assertThat(ExternalField.KEY.set(ExternalModelSettings(), "sk-2")).isEqualTo(ExternalModelSettings(apiKey = "sk-2"))
+    }
+
+    @Test fun anHttpAddressIsTurnedDownBeforeTesting() {
+        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(baseUrl = "http://192.168.1.2/v1")) }
+        compose.onNodeWithText("接口地址要以 https:// 开头").assertIsDisplayed()
+        compose.onNodeWithTag("external-test").assertIsNotEnabled()
+    }
+
+    @Test fun testingTheConnectionSaysHowLongItTook() {
+        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = { 1400L }) }
+        compose.onNodeWithTag("external-test").performClick()
+        compose.onNodeWithText("可用 · 1.4 秒").assertIsDisplayed()
+    }
+
+    /** 401、404 带着接口自己说的那句：一看就知道是 key 还是地址填错了。 */
+    @Test fun aFailedTestSaysWhy() {
+        show {
+            AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = {
+                throw ExternalModelException(ExternalModelException.Reason.HTTP, 401, "Invalid API key")
+            })
+        }
+        compose.onNodeWithTag("external-test").performClick()
+        compose.onNodeWithText("失败：HTTP 401 · Invalid API key").assertIsDisplayed()
     }
 
     // ---------- AI ----------
