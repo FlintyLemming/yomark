@@ -565,7 +565,9 @@ class EditorViewModel(
         // 调试信息开着时记下这一次：记录器挂在协程上下文里，识别的各环节自己往里记（见 engine/Traced.kt）
         val trace = if (debugTrace.value) traceLog.start("识别") else null
         trace?.add(inputSection(image, ranWith))
-        val outcome = runCatching { withContext(trace ?: EmptyCoroutineContext) { ranOn.analyze(image) } }
+        // 识别器自己会切到后台，可文字出来之后的聊天截图、合并等都接着跑在调用方的线程上——留在主线程上，
+        // 结果出来之前画布要卡一下。整个放到后台（与导出同一个调度器）
+        val outcome = runCatching { withContext(ioDispatcher + (trace ?: EmptyCoroutineContext)) { ranOn.analyze(image) } }
         trace?.run {
             add(resultSection(outcome))
             finish()
@@ -650,7 +652,8 @@ class EditorViewModel(
         trace: TraceRecorder?,
     ) {
         aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
-            if (!ranOn.refineReady()) return@launch
+            // 头一回探测要建 Nano 的客户端、连 AICore，放在主线程上画布会卡住，正赶上开始落码
+            if (!withContext(ioDispatcher) { ranOn.refineReady() }) return@launch
             val current = _state.value
             if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
             if (current.aiReview != AiReview.Hidden) return@launch

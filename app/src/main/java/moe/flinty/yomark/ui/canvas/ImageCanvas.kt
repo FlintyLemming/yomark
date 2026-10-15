@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.canvas
 
+import android.graphics.Bitmap
 import android.graphics.BlendMode
 import android.graphics.Color as AndroidColor
 import android.graphics.ComposeShader
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -64,6 +66,7 @@ import moe.flinty.yomark.render.MaskOrder
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.EditorUiState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlin.math.hypot
 import kotlin.math.min
@@ -109,48 +112,95 @@ fun ImageCanvas(
     // 识别中的扫光 / 磨砂，与结果上屏的落码 / 散开（见 ScanEffect、FrostEffect）。时间轴只在绘制里读，
     // 走起来只触发重绘、不触发重组；识别中和收尾那一遍之外它是 null，一帧都不占。
     val scanning = state.analyzing
-    val currentStyle by rememberUpdatedState(scanStyle)
     var scanTime by remember(image) { mutableStateOf<ScanTime?>(null) }
-    // 收尾那一遍按结果到达那一刻的样式与位置走，中途不变
-    var settling by remember(image) { mutableStateOf(ScanStyle.SWEEP) }
+    // 收尾那一遍按结果到达那一刻的样式走，中途不变。在重组里定，结果到达的那一帧就已经是它：
+    // 留到协程里定的话，那一帧画在协程改它之前，还是上一次的样式，磨砂会换成扫光闪一下
+    val settling = remember(image, scanning) { scanStyle }
     var revealOrigin by remember(image) { mutableStateOf<PointF?>(null) }
-    LaunchedEffect(image, scanning) {
-        if (scanning) {
+
+    // 磨砂要用的模糊图与光点（见 ScanLook.Frost），各自在识别开始后多久备好；识别开始时就有的记 0，每遍收尾后清回 0
+    var frostBlur by remember(image) { mutableStateOf<Bitmap?>(null) }
+    var frostLayer by remember(image) { mutableStateOf<FrostLayer?>(null) }
+    var frostBlurAt by remember(image) { mutableLongStateOf(0L) }
+    var frostLayerAt by remember(image) { mutableLongStateOf(0L) }
+    val frostCover = remember(image) { lazy { FrostLayer.averageColor(image.bitmap) } }
+
+    // 一遍动效从头到尾都在这一个协程里逐帧走：识别中，结果到了接着收尾，走完停下等下一遍。结果到没到在每一帧里看，
+    // 发现到了的那一帧就已经在收尾。按识别状态重启协程的话，要等新协程跑起来才接得上，中间那一两帧画面不动，出结果前顿一下
+    val scanningNow by rememberUpdatedState(scanning)
+    val settlingNow by rememberUpdatedState(settling)
+    LaunchedEffect(image) {
+        while (true) {
+            snapshotFlow { scanningNow }.first { it }
             val start = withFrameMillis { it }
-            while (true) withFrameMillis { scanTime = ScanTime(it - start, null) }
-        } else {
-            // 没扫过就没有收尾这一遍：从重建里恢复的 plan 直接显示，不再演一遍
-            val scanned = scanTime ?: return@LaunchedEffect
-            settling = currentStyle
-            // 磨砂从等待图标所在的位置散开，即画布中心；换算成图像坐标，用户此后拖动画面，洞也跟着图走
-            revealOrigin = viewport.screenToImage(PointF(viewSize.first / 2f, viewSize.second / 2f))
-            val settle = when (settling) {
-                ScanStyle.SWEEP -> ScanEffect.settleMs(scanned.sinceScan)
-                ScanStyle.FROST -> FrostEffect.SETTLE_MS
-            }
-            val resultAt = withFrameMillis { it }
-            while (true) {
-                val since = withFrameMillis { it - resultAt }
-                if (since >= settle) break
-                scanTime = ScanTime(scanned.sinceScan + since, since)
-            }
-            scanTime = null
+            var last = start                // 识别中的最后一帧
+            var resultAt = -1L              // 收尾从哪一帧数起；还在识别时为 -1
+            var settle = 0L
+            do {
+                val going = withFrameMillis { frame ->
+                    when {
+                        resultAt < 0 && scanningNow -> {
+                            last = frame
+                            scanTime = ScanTime(frame - start, null)
+                            true
+                        }
+                        // 收尾到一半又开始识别（换了方案）：这一遍作罢，从头再来
+                        scanningNow -> false
+                        else -> {
+                            if (resultAt < 0) {
+                                // 结果在识别中的最后一帧之后到的，从那一帧接着数
+                                resultAt = last
+                                settle = when (settlingNow) {
+                                    ScanStyle.SWEEP -> ScanEffect.settleMs(last - start)
+                                    ScanStyle.FROST -> FrostEffect.SETTLE_MS
+                                }
+                                // 磨砂从等待图标所在的位置散开，即画布中心；换算成图像坐标，用户此后拖动画面，洞也跟着图走
+                                revealOrigin = viewport.screenToImage(PointF(viewSize.first / 2f, viewSize.second / 2f))
+                            }
+                            val since = frame - resultAt
+                            scanTime = if (since < settle) ScanTime(frame - start, since) else null
+                            since < settle
+                        }
+                    }
+                }
+            } while (going)
+            frostBlurAt = 0L
+            frostLayerAt = 0L
         }
     }
     val scanPaints = remember { ScanPaints() }
     val maskComposite = remember(image) { MaskComposite() }
 
-    // 磨砂要用的模糊图与光点：选的是磨砂、动效又在走（识别中或收尾那一遍）时在后台准备一次（几毫秒）。
-    // 准备好之前的那几帧只压暗，淡入刚开始，看不出差别。识别快到结果先到，也接着准备完，散开那一遍用得上。
+    // 选的是磨砂、动效又在走（识别中或收尾那一遍）时在后台准备。模糊图几十毫秒就好，先拿去盖住原图；
+    // 光点要逐格算噪声，慢得多，好了再淡入。识别快到结果先到，也接着准备完，散开那一遍用得上。
     // 「动效在走」用 derivedStateOf 读：时间轴每帧都在变，直接读会每帧重组一次。
-    var frostLayer by remember(image) { mutableStateOf<FrostLayer?>(null) }
     val animating by remember(image) { derivedStateOf { scanTime != null } }
     val wantsFrost = (scanning || animating) && (if (scanning) scanStyle else settling) == ScanStyle.FROST
-    LaunchedEffect(image, wantsFrost, viewSize) {
-        val (w, h) = viewSize
-        if (!wantsFrost || frostLayer != null || w <= 0 || h <= 0) return@LaunchedEffect
-        val fit = Viewport.fit(image.width, image.height, w, h)
-        frostLayer = withContext(Dispatchers.Default) { FrostLayer.prepare(image.bitmap, density.density / fit.scale) }
+    LaunchedEffect(image, wantsFrost) {
+        if (!wantsFrost || frostLayer != null) return@LaunchedEffect
+        // 按头一回量到的画布折算：之后底栏、输入法把画布挤高挤矮，差的那点 dp 看不出来，不为它把算到一半的扔掉重来
+        val (w, h) = snapshotFlow { viewSize }.first { (w, h) -> w > 0 && h > 0 }
+        val pxPerDp = density.density / Viewport.fit(image.width, image.height, w, h).scale
+        if (frostBlur == null) {
+            val blurred = withContext(Dispatchers.Default) { FrostLayer.blur(image.bitmap, FrostEffect.BLUR_DP * pxPerDp) }
+            frostBlurAt = scanTime?.sinceScan ?: 0L
+            frostBlur = blurred
+        }
+        val layer = withContext(Dispatchers.Default) { FrostLayer.prepare(image.bitmap, pxPerDp) }
+        frostLayerAt = scanTime?.sinceScan ?: 0L
+        frostLayer = layer
+    }
+    // 动效每帧都要画码，模糊、马赛克逐块现算太慢：动效在走时有读像素的码，就在后台把码合成一张（见 ComposedMasks）。
+    // 渲染器里有跨调用复用的画笔，后台另用一套，不和界面上正在画的抢
+    var animationMasks by remember(image) { mutableStateOf<ComposedMasks?>(null) }
+    val sortedItems = remember(state.plan.items) { MaskOrder.forDrawing(state.plan.items) }
+    LaunchedEffect(image, sortedItems, scanning || animating) {
+        if (!(scanning || animating) || sortedItems.none { MaskOrder.readsPixels(it.look) }) {
+            animationMasks = null
+            return@LaunchedEffect
+        }
+        val bitmap = withContext(Dispatchers.Default) { MaskComposite.compose(image, sortedItems, RendererRegistry.default()) }
+        animationMasks = ComposedMasks(sortedItems, bitmap)
     }
     val purposeWatermark = remember { PurposeWatermarkDrawer() }
 
@@ -376,12 +426,16 @@ fun ImageCanvas(
                 val time = if (scanning) scanTime?.takeIf { it.sinceResult == null } ?: ScanTime.START else scanTime
                 val look = when (if (scanning) scanStyle else settling) {
                     ScanStyle.SWEEP -> ScanLook.Sweep
-                    ScanStyle.FROST -> ScanLook.Frost(frostLayer, revealOrigin)
+                    ScanStyle.FROST -> ScanLook.Frost(
+                        frostBlur, frostLayer, revealOrigin,
+                        cover = if (frostBlur == null) frostCover.value else 0,
+                        blurAt = frostBlurAt, layerAt = frostLayerAt,
+                    )
                 }
                 val toggle = if (toggles.active) toggles.frame(toggleClock) else null
                 drawScene(
                     canvas, image, state.plan, registry, viewport.scale, density.density, time, scanPaints, look, maskComposite,
-                    toggle, togglePaints,
+                    toggle, togglePaints, animationMasks,
                 )
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
@@ -576,8 +630,9 @@ private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: Selec
  *
  * @param time 动效时间轴上的这一帧（见 ScanEffect、FrostEffect）；null 表示静止，照常画全部遮罩
  * @param look 按哪种样式画这一帧
- * @param composite 读像素的码压在别的码上时，从这里取合成好的样子；跨帧复用才有缓存
+ * @param composite 静止时读像素的码压在别的码上，从这里取合成好的样子；跨帧复用才有缓存
  * @param toggle 点一下打码、取消打码的这一帧（见 MaskToggles）；只在 [time] 为 null 时画
+ * @param animationMasks 动效里用的合成图（见 ComposedMasks），对不上眼下的码就不用
  */
 internal fun drawScene(
     canvas: android.graphics.Canvas,
@@ -592,15 +647,16 @@ internal fun drawScene(
     composite: MaskComposite = MaskComposite(),
     toggle: ToggleFrame? = null,
     togglePaints: TogglePaints = TogglePaints(),
+    animationMasks: ComposedMasks? = null,
 ) {
     canvas.drawBitmap(image.bitmap, 0f, 0f, null)
 
     // 识别出的在底下，用户加的后加的盖在先加的上面——与导出同一个顺序（见 MaskOrder）
     val sorted = MaskOrder.forDrawing(plan.items)
-    val composed = composite.of(image, sorted, registry)
-    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
     val dp = density / scale
     if (time == null) {
+        val composed = composite.of(image, sorted, registry)
+        val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, composed) }
         if (toggle == null) {
             drawItems(sorted)
             return
@@ -622,11 +678,17 @@ internal fun drawScene(
         return
     }
 
+    // 动效里，读像素的码从后台合成好的那张上取。还没合成好的那几帧，识别出的码先不落：它们本来就是在磨砂、暗幕底下
+    // 从无到有慢慢显出来的，晚到几帧看不出来；当场逐块现算的话，这几帧一帧要几十毫秒
+    val ready = animationMasks?.takeIf { it.items == sorted }?.bitmap
+    val drawItems = { items: List<MaskItem> -> drawItems(canvas, items, image, registry, ready) }
+    val (manual, detected) = sorted.partition { it.byUser }
+    val drawDetected = { if (ready != null || detected.none { MaskOrder.readsPixels(it.look) }) drawItems(detected) }
+
     if (look is ScanLook.Frost) {
-        val (manual, detected) = sorted.partition { it.byUser }
         drawFrostScene(
             canvas, image.width.toFloat(), image.height.toFloat(), dp, time, look, paints.frost,
-            drawDetected = { drawItems(detected) },
+            drawDetected = drawDetected,
             drawManual = { drawItems(manual) },
         )
         return
@@ -636,7 +698,6 @@ internal fun drawScene(
     val trail = ScanEffect.TRAIL_DP * dp
     val lead = ScanEffect.LEAD_DP * dp
     val light = LightSpec(image.width, height, trail, lead, ScanEffect.HUE_SPAN_DP * dp, ScanEffect.drift(time.sinceScan))
-    val (manual, detected) = sorted.partition { it.byUser }
     val feather = ScanEffect.FEATHER_DP * dp
     // 结果到达后，循环光先提速走完手头这一趟，落码那一遍紧接着从顶上开始
     val front = ScanEffect.revealMs(time.sinceScan, time.sinceResult)?.let { ScanEffect.revealFront(it, height, lead, trail, feather) }
@@ -648,7 +709,7 @@ internal fun drawScene(
     // 落码中，它们画进一个离屏图层，只留光已经走过的那部分。
     if (front != null) {
         val layer = canvas.saveLayer(null, null)
-        drawItems(detected)
+        drawDetected()
         keepRevealed(canvas, front, feather, image.width.toFloat(), height, paints)
         canvas.restoreToCount(layer)
         drawLight(canvas, light, front, strength = 1f, paints)

@@ -51,6 +51,16 @@ class FrostEffectTest {
     }
 
     @Test
+    fun `what was ready when recognition started shows at once, what comes later fades in from then`() {
+        assertThat(FrostEffect.arrival(0L, 0L)).isEqualTo(1f)
+        assertThat(FrostEffect.arrival(5_000L, 0L)).isEqualTo(1f)
+        val at = 900L
+        assertThat(FrostEffect.arrival(at, at)).isEqualTo(0f)
+        assertThat(FrostEffect.arrival(at + FrostEffect.ARRIVAL_MS / 2, at)).isWithin(1e-6f).of(0.5f)
+        assertThat(FrostEffect.arrival(at + FrostEffect.ARRIVAL_MS, at)).isEqualTo(1f)
+    }
+
+    @Test
     fun `sparkles reach full strength before the frost does`() {
         assertThat(FrostEffect.sparkleStrength(0f)).isEqualTo(0f)
         assertThat(FrostEffect.sparkleStrength(0.5f)).isGreaterThan(0.5f)
