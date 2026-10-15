@@ -254,6 +254,25 @@ class RedactionEngineTest {
         assertThat(e.refine(emptyList(), covered)!!.map { it.id }).containsExactly("new")
     }
 
+    /** 同一处报成了两类（人名、昵称）：叠两个码的话点一下拿不掉，像是没点上。 */
+    @Test
+    fun `refine does not stack two of its own boxes on the same spot, whatever their kinds`() = runTest {
+        val wide = Candidate("at-name", Quad.fromRect(RectF(0f, 0f, 14f, 10f)), SensitiveKind.CHAT_NAME, DetectorSource.LLM, 0.5f)
+        val slow = FakeClassifier("nano", available = true, out = listOf(at("name", 2f), wide, at("other", 50f)))
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(slow))
+        assertThat(e.refine(emptyList(), emptyList())!!.map { it.id }).containsExactly("at-name", "other")
+    }
+
+    /** 点掉的是误报：模型在同一处再报不要；点掉的那两个字不能把模型报的整段（比它大得多的框）也带走。 */
+    @Test
+    fun `a dismissed spot keeps out the same finding but not a bigger one around it`() = runTest {
+        val whole = Candidate("whole", Quad.fromRect(RectF(100f, 0f, 200f, 10f)), SensitiveKind.POSTAL_ADDRESS, DetectorSource.LLM, 0.5f)
+        val slow = FakeClassifier("nano", available = true, out = listOf(at("again", 0f), whole))
+        val e = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(slow))
+        val dismissed = listOf(at("was", 0f).quad, Quad.fromRect(RectF(100f, 0f, 110f, 10f)))
+        assertThat(e.refine(emptyList(), emptyList(), dismissed)!!.map { it.id }).containsExactly("whole")
+    }
+
     @Test
     fun `refine that ran and found nothing is an empty list, not a failure`() = runTest {
         val quiet = FakeClassifier("nano", available = true, out = emptyList())

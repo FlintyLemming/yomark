@@ -345,6 +345,21 @@ class EditorViewModelAnalysisTest {
         assertThat(vm.state.value.aiReviewsFinished).isEqualTo(2)
     }
 
+    /** 点掉的多半是误报：AI 不该在同一处再打回来。 */
+    @Test
+    fun `the model does not bring back a mask the user tapped away`() = runTest(dispatcher) {
+        val same = Candidate("llm", Quad.fromRect(RectF(10f, 10f, 60f, 30f)), SensitiveKind.PERSON_NAME, DetectorSource.LLM, 0.5f)
+        val vm = vmWithNano(Nano(out = listOf(same)))
+        vm.onImageChosen(sampleUri("nano-dismissed.jpg")); advanceUntilIdle()
+
+        vm.onTap(PointF(30f, 20f))                                      // 点掉规则打上的那块
+        assertThat(vm.state.value.plan.items).isEmpty()
+        vm.runAiReview(); advanceUntilIdle()
+
+        assertThat(vm.state.value.plan.items).isEmpty()
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 0))
+    }
+
     @Test
     fun `the model does not stack a box on a manual box`() = runTest(dispatcher) {
         val vm = vmWithNano(Nano())

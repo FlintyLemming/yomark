@@ -1,0 +1,9997 @@
+[
+ {
+  "name": "zgroup-wechat-family",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "09:47"
+   },
+   {
+    "role": "status",
+    "text": "5G 76%"
+   },
+   {
+    "role": "title",
+    "text": "< 相亲相爱一家人(18)"
+   },
+   {
+    "role": "time",
+    "text": "昨天 21:08"
+   },
+   {
+    "role": "name",
+    "text": "大姑"
+   },
+   {
+    "role": "bubble-in",
+    "text": "明天中午在王记烧烤聚餐，给奶奶过八十大寿"
+   },
+   {
+    "role": "name",
+    "text": "大姑"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[位置] 王记烧烤(长江路店) 玄武区长江路188号"
+   },
+   {
+    "role": "name",
+    "text": "二舅"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@大姑 收到，我带两瓶茅台过去"
+   },
+   {
+    "role": "name",
+    "text": "表妹琳琳"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我明天加班去不了 让晓雯替我给奶奶带个蛋糕"
+   },
+   {
+    "role": "system",
+    "text": "“阿杰” 拍了拍 “二舅”"
+   },
+   {
+    "role": "time",
+    "text": "今天 08:15"
+   },
+   {
+    "role": "name",
+    "text": "老妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "转发：这几种食物千万不能一起吃！看完赶紧告诉家人"
+   },
+   {
+    "role": "secondary",
+    "text": "健康生活小常识"
+   },
+   {
+    "role": "name",
+    "text": "老爸"
+   },
+   {
+    "role": "bubble-in",
+    "text": "奶奶的快递到楼下驿站了，取件码 6-3-2087，谁顺路去拿一下"
+   },
+   {
+    "role": "bubble-out",
+    "text": "我下班去拿"
+   },
+   {
+    "role": "name",
+    "text": "老妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "顺便把奶奶的新地址发一下，以后东西都寄这里"
+   },
+   {
+    "role": "name",
+    "text": "老爸"
+   },
+   {
+    "role": "bubble-in",
+    "text": "江宁区翠屏山庄12栋2单元601 王秀兰 139 1572 6804"
+   },
+   {
+    "role": "name",
+    "text": "大姑"
+   },
+   {
+    "role": "bubble-in",
+    "text": "那小区我知道，挨着苏果超市，买菜方便"
+   },
+   {
+    "role": "quote",
+    "text": "老爸：江宁区翠屏山庄12栋2单元601 王秀兰…"
+   },
+   {
+    "role": "name",
+    "text": "表妹琳琳"
+   },
+   {
+    "role": "bubble-in",
+    "text": "蛋糕订的好利来，下午三点送到"
+   },
+   {
+    "role": "system",
+    "text": "“二舅”撤回了一条消息"
+   },
+   {
+    "role": "name",
+    "text": "二舅"
+   },
+   {
+    "role": "bubble-in",
+    "text": "发错群了 不 好意思"
+   },
+   {
+    "role": "name",
+    "text": "平安是福"
+   },
+   {
+    "role": "bubble-in",
+    "text": "12\""
+   },
+   {
+    "role": "name",
+    "text": "老妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@阿杰 周六你开车接奶奶，小区门口要登记，我把苏A·7K29Q报给物业了"
+   },
+   {
+    "role": "name",
+    "text": "阿杰"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的 我十点到楼下"
+   },
+   {
+    "role": "bubble-out",
+    "text": "奶奶最近天天听刀郎的歌哈哈"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "相亲相爱一家人"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "大姑"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "大姑"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "大姑"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "大姑"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "二舅"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "二舅"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "二舅"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "二舅"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "表妹琳琳"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "表妹琳琳"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "晓雯"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "阿杰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "阿杰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "阿杰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老妈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老妈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老妈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老爸"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老爸"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老爸"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "6-3-2087"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "翠屏山庄12栋2单元601"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "翠屏山庄12栋2单元601"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王秀兰"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王秀兰"
+   },
+   {
+    "kind": "PHONE",
+    "text": "139 1572 6804"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "平安是福"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "苏A·7K29Q"
+   }
+  ],
+  "avoid": [
+   "王记烧烤",
+   "茅台",
+   "苏果超市",
+   "好利来",
+   "刀郎",
+   "健康生活小常识",
+   "按住 说话"
+  ],
+  "neutral": [
+   "玄武区长江路188号",
+   "长江路店",
+   "江宁区",
+   "八十大寿",
+   "奶奶",
+   "昨天 21:08",
+   "今天 08:15",
+   "12\""
+  ]
+ },
+ {
+  "name": "zgroup-wechat-owners",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "19:26"
+   },
+   {
+    "role": "status",
+    "text": "5G 54%"
+   },
+   {
+    "role": "title",
+    "text": "< 锦绣华庭三期业主群(486)"
+   },
+   {
+    "role": "time",
+    "text": "18:02"
+   },
+   {
+    "role": "name",
+    "text": "物业客服-小陈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@所有人 今晚22:00至次日6:00 7栋、8栋停水检修，请提前储水"
+   },
+   {
+    "role": "name",
+    "text": "7-1-1502 张姐"
+   },
+   {
+    "role": "bubble-in",
+    "text": "又停水？上周不是刚修过吗"
+   },
+   {
+    "role": "name",
+    "text": "8-2-901 Kevin"
+   },
+   {
+    "role": "bubble-in",
+    "text": "谁家的车堵在地库B区出口了 浙A·D82761 白色特斯拉 赶紧挪一下"
+   },
+   {
+    "role": "name",
+    "text": "物业客服-小陈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "已联系车主，马上挪车"
+   },
+   {
+    "role": "system",
+    "text": "“物业客服-小陈”邀请“12-3-702 刘阿姨”加入了群聊"
+   },
+   {
+    "role": "time",
+    "text": "18:47"
+   },
+   {
+    "role": "name",
+    "text": "12-3-702 刘阿姨"
+   },
+   {
+    "role": "bubble-in",
+    "text": "大家好，我家刚搬来，请问快递柜在哪呀"
+   },
+   {
+    "role": "name",
+    "text": "5-1-302 胖虎妈妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@12-3-702 刘阿姨 南门有丰巢柜，菜鸟驿站在3号楼底商"
+   },
+   {
+    "role": "name",
+    "text": "5-1-302 胖虎妈妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "谁晚点路过驿站帮我拿下快递 取件码 12-4-3071 放我家门口就行 谢谢"
+   },
+   {
+    "role": "bubble-out",
+    "text": "我10栋2单元1101的，楼上1201每天半夜拖椅子，能不能注意点"
+   },
+   {
+    "role": "name",
+    "text": "10-2-1201 老王"
+   },
+   {
+    "role": "bubble-in",
+    "text": "不是我家啊，我家这周都在三亚"
+   },
+   {
+    "role": "name",
+    "text": "5-1-302 胖虎妈妈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "转：南门新开的张亮麻辣烫周五开业，前50名送饮料"
+   },
+   {
+    "role": "name",
+    "text": "8-2-901 Kevin"
+   },
+   {
+    "role": "bubble-in",
+    "text": "拼团买大米的私我 五常稻花香 18657120943"
+   },
+   {
+    "role": "system",
+    "text": "“8-2-901 Kevin”撤回了一条消息"
+   },
+   {
+    "role": "name",
+    "text": "物业客服-小陈"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@8-2-901 Kevin 群内禁止发广告，再发移出群聊"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "锦绣华庭三期业主群"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小陈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小陈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小陈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小陈"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "7-1-1502"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "张姐"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "8-2-901"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "8-2-901"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "8-2-901"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "8-2-901"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Kevin"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Kevin"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Kevin"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Kevin"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "浙A·D82761"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "12-3-702"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "12-3-702"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "12-3-702"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "刘阿姨"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "刘阿姨"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "刘阿姨"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "5-1-302"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "5-1-302"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "5-1-302"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "胖虎妈妈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "胖虎妈妈"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "胖虎妈妈"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "12-4-3071"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "10栋2单元1101"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "10-2-1201"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老王"
+   },
+   {
+    "kind": "PHONE",
+    "text": "18657120943"
+   }
+  ],
+  "avoid": [
+   "所有人",
+   "特斯拉",
+   "丰巢",
+   "菜鸟驿站",
+   "张亮麻辣烫",
+   "五常稻花香",
+   "三亚"
+  ],
+  "neutral": [
+   "楼上1201",
+   "7栋、8栋",
+   "3号楼底商",
+   "地库B区",
+   "物业客服",
+   "18:02",
+   "18:47",
+   "22:00"
+  ]
+ },
+ {
+  "name": "zgroup-wechat-work",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "16:05"
+   },
+   {
+    "role": "status",
+    "text": "4G 32%"
+   },
+   {
+    "role": "title",
+    "text": "< Q4华东大区冲刺群(37)"
+   },
+   {
+    "role": "time",
+    "text": "周一 09:30"
+   },
+   {
+    "role": "system",
+    "text": "“周海峰”修改群名为“Q4华东大区冲刺群”"
+   },
+   {
+    "role": "name",
+    "text": "周海峰"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@所有人 本周五前每人报一下签约进度，没报的周会点名"
+   },
+   {
+    "role": "name",
+    "text": "Amy 孙悦"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@周海峰 收到。苏州那边钱总已经口头同意，合同下周一签"
+   },
+   {
+    "role": "name",
+    "text": "Amy 孙悦"
+   },
+   {
+    "role": "bubble-in",
+    "text": "苏州恒远精密-报价单V3.pdf"
+   },
+   {
+    "role": "secondary",
+    "text": "1.2M"
+   },
+   {
+    "role": "name",
+    "text": "老蒋"
+   },
+   {
+    "role": "bubble-in",
+    "text": "宁波的刘建国经理换号了，新号 135 8741 0926，大家更新一下"
+   },
+   {
+    "role": "time",
+    "text": "周一 10:12"
+   },
+   {
+    "role": "bubble-out",
+    "text": "下周三去杭州拜访阿里的客户，酒店订哪家"
+   },
+   {
+    "role": "name",
+    "text": "周海峰"
+   },
+   {
+    "role": "bubble-in",
+    "text": "订公司协议的全季，杭州西湖文化广场店"
+   },
+   {
+    "role": "name",
+    "text": "行政-陶陶"
+   },
+   {
+    "role": "bubble-in",
+    "text": "差旅统一报我这边，身份证号私聊发我，别发群里！"
+   },
+   {
+    "role": "name",
+    "text": "小马哥"
+   },
+   {
+    "role": "bubble-in",
+    "text": "320106199208154417 马骁"
+   },
+   {
+    "role": "name",
+    "text": "行政-陶陶"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@小马哥 都说了私聊，快撤回"
+   },
+   {
+    "role": "quote",
+    "text": "小马哥：320106199208154417 马骁"
+   },
+   {
+    "role": "time",
+    "text": "周一 11:40"
+   },
+   {
+    "role": "name",
+    "text": "Amy 孙悦"
+   },
+   {
+    "role": "bubble-in",
+    "text": "周海峰和钱伟的聊天记录"
+   },
+   {
+    "role": "secondary",
+    "text": "周海峰: 价格还能再谈吗"
+   },
+   {
+    "role": "secondary",
+    "text": "钱伟: 最低八五折，不含运费"
+   },
+   {
+    "role": "secondary",
+    "text": "聊天记录"
+   },
+   {
+    "role": "name",
+    "text": "老蒋"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@Amy 孙悦 八五折可以接，晚上一起吃饭 海底捞还是外婆家"
+   },
+   {
+    "role": "bubble-out",
+    "text": "海底捞吧，我请"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "Q4华东大区冲刺群"
+   },
+   {
+    "kind": "CHAT_TITLE",
+    "text": "Q4华东大区冲刺群"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周海峰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Amy 孙悦"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Amy 孙悦"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Amy 孙悦"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Amy 孙悦"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "钱总"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老蒋"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老蒋"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘建国"
+   },
+   {
+    "kind": "PHONE",
+    "text": "135 8741 0926"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陶陶"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陶陶"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小马哥"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小马哥"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小马哥"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "320106199208154417"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "320106199208154417"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "马骁"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "马骁"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "钱伟"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "钱伟"
+   }
+  ],
+  "avoid": [
+   "所有人",
+   "阿里",
+   "全季",
+   "海底捞",
+   "外婆家",
+   "身份证号"
+  ],
+  "neutral": [
+   "苏州恒远精密-报价单V3.pdf",
+   "杭州西湖文化广场店",
+   "宁波",
+   "苏州",
+   "八五折",
+   "行政",
+   "周一 09:30",
+   "1.2M"
+  ]
+ },
+ {
+  "name": "zgroup-qq-class",
+  "app": "QQ",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "22:41"
+   },
+   {
+    "role": "status",
+    "text": "5G 63%"
+   },
+   {
+    "role": "title",
+    "text": "< 计科2201班(52)"
+   },
+   {
+    "role": "time",
+    "text": "21:15"
+   },
+   {
+    "role": "name",
+    "text": "群主 班长-李浩然"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@全体成员 明天上午体测，8:00东区体育馆集合，带好学生证"
+   },
+   {
+    "role": "name",
+    "text": "LV7 赵一鸣"
+   },
+   {
+    "role": "bubble-in",
+    "text": "体测签到要报学号吗"
+   },
+   {
+    "role": "name",
+    "text": "群主 班长-李浩然"
+   },
+   {
+    "role": "quote",
+    "text": "赵一鸣：体测签到要报学号吗"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@赵一鸣 要，你学号 2022110437，上次报错害我被导员说"
+   },
+   {
+    "role": "name",
+    "text": "管理员 学委-周晴"
+   },
+   {
+    "role": "bubble-in",
+    "text": "计科2201体测分组名单.xlsx"
+   },
+   {
+    "role": "secondary",
+    "text": "36.5KB"
+   },
+   {
+    "role": "system",
+    "text": "周晴邀请陈思远加入了本群"
+   },
+   {
+    "role": "name",
+    "text": "LV1 陈思远"
+   },
+   {
+    "role": "bubble-in",
+    "text": "大家好，我是转专业过来的陈思远，宿舍在梅园6舍412，以后多指教"
+   },
+   {
+    "role": "time",
+    "text": "21:48"
+   },
+   {
+    "role": "bubble-out",
+    "text": "欢迎欢迎 我就在你隔壁415"
+   },
+   {
+    "role": "name",
+    "text": "LV9 王梓涵"
+   },
+   {
+    "role": "bubble-in",
+    "text": "有人帮我带个饭吗 北门那家李先生牛肉面"
+   },
+   {
+    "role": "name",
+    "text": "LV7 赵一鸣"
+   },
+   {
+    "role": "quote",
+    "text": "王梓涵：有人帮我带个饭吗 北门那家李先生牛肉面"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我刚好在北门 给你送楼下？你是竹园3舍吧"
+   },
+   {
+    "role": "name",
+    "text": "LV9 王梓涵"
+   },
+   {
+    "role": "bubble-in",
+    "text": "对 3舍208 到了打我电话 17751203386"
+   },
+   {
+    "role": "system",
+    "text": "王梓涵戳了戳赵一鸣"
+   },
+   {
+    "role": "name",
+    "text": "群主 班长-李浩然"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@王梓涵 @赵一鸣 群里别刷屏，私聊去"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "计科2201班"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "李浩然"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "李浩然"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "李浩然"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "赵一鸣"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "2022110437"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周晴"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周晴"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈思远"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈思远"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈思远"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "梅园6舍412"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "王梓涵"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "王梓涵"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "王梓涵"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "王梓涵"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "王梓涵"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "竹园3舍"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "3舍208"
+   },
+   {
+    "kind": "PHONE",
+    "text": "17751203386"
+   }
+  ],
+  "avoid": [
+   "全体成员",
+   "东区体育馆",
+   "李先生牛肉面",
+   "群主",
+   "管理员",
+   "学生证"
+  ],
+  "neutral": [
+   "415",
+   "计科2201体测分组名单.xlsx",
+   "北门",
+   "班长",
+   "学委",
+   "LV7",
+   "21:15",
+   "36.5KB"
+  ]
+ },
+ {
+  "name": "zgroup-qq-fans",
+  "app": "QQ",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "13:20"
+   },
+   {
+    "role": "status",
+    "text": "91%"
+   },
+   {
+    "role": "title",
+    "text": "< 杰迷互助小分队(1856)"
+   },
+   {
+    "role": "time",
+    "text": "12:03"
+   },
+   {
+    "role": "name",
+    "text": "管理员 小鱼干"
+   },
+   {
+    "role": "bubble-in",
+    "text": "周杰伦嘉年华杭州站11月8号开票，大麦猫眼同步，别信黄牛"
+   },
+   {
+    "role": "name",
+    "text": "LV15 奶茶不加糖"
+   },
+   {
+    "role": "bubble-in",
+    "text": "有没有一起拼车去奥体的，我从滨江出发"
+   },
+   {
+    "role": "name",
+    "text": "LV4 晴天"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我我我！加我QQ 2764019385"
+   },
+   {
+    "role": "name",
+    "text": "LV15 奶茶不加糖"
+   },
+   {
+    "role": "quote",
+    "text": "晴天：我我我！加我QQ 2764019385"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@晴天 已加，白色比亚迪 浙A·5M3P8，当天下午4点宝龙城北门接你"
+   },
+   {
+    "role": "time",
+    "text": "12:31"
+   },
+   {
+    "role": "name",
+    "text": "管理员 小鱼干"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[转发] 周边团购：吧唧+手幅 68元/套，收货信息按格式接龙"
+   },
+   {
+    "role": "name",
+    "text": "LV4 晴天"
+   },
+   {
+    "role": "bubble-in",
+    "text": "3. 林雨桐 西湖区古荡新村东区9幢3单元502 158 6712 0459"
+   },
+   {
+    "role": "bubble-out",
+    "text": "4. 我先占个位 地址晚点私发管理员"
+   },
+   {
+    "role": "system",
+    "text": "小鱼干撤回了奶茶不加糖的一条消息"
+   },
+   {
+    "role": "name",
+    "text": "LV22 七里香的秋"
+   },
+   {
+    "role": "bubble-in",
+    "text": "求一张内场票 原价收 有的打我电话 13916728850"
+   },
+   {
+    "role": "name",
+    "text": "管理员 小鱼干"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@七里香的秋 群里禁止收票出票，再发踢了"
+   },
+   {
+    "role": "name",
+    "text": "LV4 晴天"
+   },
+   {
+    "role": "bubble-in",
+    "text": "今晚去星聚会K歌有人吗 必点《稻香》《夜曲》"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "杰迷互助小分队"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小鱼干"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小鱼干"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小鱼干"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "小鱼干"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "奶茶不加糖"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "奶茶不加糖"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "奶茶不加糖"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "晴天"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "晴天"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "晴天"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "晴天"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "晴天"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "2764019385"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "2764019385"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "浙A·5M3P8"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林雨桐"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "古荡新村东区9幢3单元502"
+   },
+   {
+    "kind": "PHONE",
+    "text": "158 6712 0459"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "七里香的秋"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "七里香的秋"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13916728850"
+   }
+  ],
+  "avoid": [
+   "周杰伦",
+   "大麦",
+   "猫眼",
+   "比亚迪",
+   "宝龙城",
+   "星聚会",
+   "《稻香》",
+   "奥体"
+  ],
+  "neutral": [
+   "西湖区",
+   "滨江",
+   "68元/套",
+   "杭州",
+   "11月8号",
+   "12:03",
+   "管理员"
+  ]
+ },
+ {
+  "name": "zgroup-dingtalk-dev",
+  "app": "钉钉",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "10:18"
+   },
+   {
+    "role": "status",
+    "text": "5G 81%"
+   },
+   {
+    "role": "title",
+    "text": "< 移动端研发群(64)"
+   },
+   {
+    "role": "label",
+    "text": "内部群"
+   },
+   {
+    "role": "time",
+    "text": "09:02"
+   },
+   {
+    "role": "name",
+    "text": "宋佳琪"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@黄磊 线上包崩溃率又涨了，Crash集中在支付模块，麻烦看下"
+   },
+   {
+    "role": "secondary",
+    "text": "2人未读"
+   },
+   {
+    "role": "name",
+    "text": "黄磊"
+   },
+   {
+    "role": "bubble-in",
+    "text": "收到，给我个测试账号"
+   },
+   {
+    "role": "name",
+    "text": "宋佳琪"
+   },
+   {
+    "role": "bubble-in",
+    "text": "账号 qa_android07 密码 Yk#2026test"
+   },
+   {
+    "role": "secondary",
+    "text": "已读"
+   },
+   {
+    "role": "name",
+    "text": "黄磊"
+   },
+   {
+    "role": "bubble-in",
+    "text": "登录要短信验证码，发你手机上了"
+   },
+   {
+    "role": "name",
+    "text": "宋佳琪"
+   },
+   {
+    "role": "bubble-in",
+    "text": "482915，5分钟有效"
+   },
+   {
+    "role": "system",
+    "text": "宋佳琪 邀请 外包-付晓东 加入了群聊"
+   },
+   {
+    "role": "time",
+    "text": "09:40"
+   },
+   {
+    "role": "name",
+    "text": "外包-付晓东"
+   },
+   {
+    "role": "bubble-in",
+    "text": "大家好，我是负责iOS的付晓东，工号 WB20261088"
+   },
+   {
+    "role": "bubble-out",
+    "text": "欢迎，测试服 10.24.18.106，VPN账号找IT的老刘开"
+   },
+   {
+    "role": "name",
+    "text": "黄磊"
+   },
+   {
+    "role": "label",
+    "text": "DING"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@宋佳琪 已修复，下午发灰度，帮忙回归一下"
+   },
+   {
+    "role": "secondary",
+    "text": "全部已读"
+   },
+   {
+    "role": "name",
+    "text": "刘婷"
+   },
+   {
+    "role": "label",
+    "text": "部门助理"
+   },
+   {
+    "role": "bubble-in",
+    "text": "午餐统计：老乡鸡 / 和府捞面 二选一，接龙"
+   },
+   {
+    "role": "name",
+    "text": "外包-付晓东"
+   },
+   {
+    "role": "bubble-in",
+    "text": "和府捞面 +1，送B座7楼前台"
+   },
+   {
+    "role": "input",
+    "text": "发消息"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "移动端研发群"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "宋佳琪"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "宋佳琪"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "宋佳琪"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "宋佳琪"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "宋佳琪"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "黄磊"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "黄磊"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "黄磊"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "黄磊"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "Yk#2026test"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "482915"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "付晓东"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "付晓东"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "付晓东"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "付晓东"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "WB20261088"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "10.24.18.106"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "老刘"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "刘婷"
+   }
+  ],
+  "avoid": [
+   "老乡鸡",
+   "和府捞面",
+   "内部群",
+   "DING",
+   "未读",
+   "支付模块",
+   "Crash"
+  ],
+  "neutral": [
+   "qa_android07",
+   "B座7楼前台",
+   "外包",
+   "部门助理",
+   "全部已读",
+   "09:02",
+   "5分钟"
+  ]
+ },
+ {
+  "name": "zgroup-feishu-design",
+  "app": "飞书",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "15:47"
+   },
+   {
+    "role": "status",
+    "text": "5G 72%"
+   },
+   {
+    "role": "title",
+    "text": "< 品牌设计组(12)"
+   },
+   {
+    "role": "label",
+    "text": "外部"
+   },
+   {
+    "role": "time",
+    "text": "今天 14:02"
+   },
+   {
+    "role": "name",
+    "text": "林梓萱 14:02"
+   },
+   {
+    "role": "bubble-in",
+    "text": "新版 KV 已上传，大家看下"
+   },
+   {
+    "role": "link",
+    "text": "https://k3r8vx.feishu.cn/docx/Qm7TdXa2Lp9rWbYcZ1eN4hGsKfe"
+   },
+   {
+    "role": "primary",
+    "text": "品牌KV提案 v4"
+   },
+   {
+    "role": "name",
+    "text": "Oscar 何 14:10"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@林梓萱 主视觉的字体是思源黑体吗？商用要确认授权"
+   },
+   {
+    "role": "name",
+    "text": "林梓萱 14:11"
+   },
+   {
+    "role": "quote",
+    "text": "回复 Oscar 何：主视觉的字体是思源黑体吗？商用要…"
+   },
+   {
+    "role": "bubble-in",
+    "text": "是的，可免费商用。模特还约上次那位叶蓁蓁，她经纪人电话 186 2190 7735"
+   },
+   {
+    "role": "secondary",
+    "text": "3 条回复"
+   },
+   {
+    "role": "system",
+    "text": "周雯 将群名称修改为“品牌设计组”"
+   },
+   {
+    "role": "time",
+    "text": "今天 15:20"
+   },
+   {
+    "role": "name",
+    "text": "周雯 15:20"
+   },
+   {
+    "role": "bubble-in",
+    "text": "样品直接寄我家吧，公司周末没人收：徐汇区漕溪北路595弄7号1802 周雯收"
+   },
+   {
+    "role": "name",
+    "text": "Oscar 何 15:22"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，我约顺丰上门，单号一会儿发"
+   },
+   {
+    "role": "name",
+    "text": "Oscar 何 15:31"
+   },
+   {
+    "role": "bubble-in",
+    "text": "SF1427836590214 明天上午到"
+   },
+   {
+    "role": "bubble-out",
+    "text": "@周雯 到了记得拍个开箱，Nike 那边要看"
+   },
+   {
+    "role": "input",
+    "text": "发送给 品牌设计组"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "品牌设计组"
+   },
+   {
+    "kind": "CHAT_TITLE",
+    "text": "品牌设计组"
+   },
+   {
+    "kind": "CHAT_TITLE",
+    "text": "品牌设计组"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "林梓萱"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "林梓萱"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "林梓萱"
+   },
+   {
+    "kind": "URL",
+    "text": "https://k3r8vx.feishu.cn/docx/Qm7TdXa2Lp9rWbYcZ1eN4hGsKfe"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Oscar 何"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Oscar 何"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Oscar 何"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Oscar 何"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "叶蓁蓁"
+   },
+   {
+    "kind": "PHONE",
+    "text": "186 2190 7735"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周雯"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周雯"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "周雯"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周雯"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "漕溪北路595弄7号1802"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "SF1427836590214"
+   }
+  ],
+  "avoid": [
+   "思源黑体",
+   "顺丰",
+   "Nike",
+   "外部",
+   "3 条回复",
+   "主视觉"
+  ],
+  "neutral": [
+   "徐汇区",
+   "品牌KV提案 v4",
+   "今天 14:02",
+   "今天 15:20",
+   "明天上午"
+  ]
+ },
+ {
+  "name": "zgroup-wecom-stores",
+  "app": "企业微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "08:56"
+   },
+   {
+    "role": "status",
+    "text": "5G 44%"
+   },
+   {
+    "role": "title",
+    "text": "一 城西片区店长群(28)"
+   },
+   {
+    "role": "time",
+    "text": "08:31"
+   },
+   {
+    "role": "name",
+    "text": "邓伟"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@所有人 今天文三路店盘点，其他门店9点前把昨日损耗报上来"
+   },
+   {
+    "role": "secondary",
+    "text": "12人未读"
+   },
+   {
+    "role": "name",
+    "text": "沈丽娟"
+   },
+   {
+    "role": "bubble-in",
+    "text": "古墩路店：损耗236元，主要是草莓和蓝莓"
+   },
+   {
+    "role": "name",
+    "text": "陈浩 @微信"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我是配送司机，今天换车了，车牌皖P·8E631，到店前打电话"
+   },
+   {
+    "role": "name",
+    "text": "邓伟"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@陈浩 古墩路店收货找沈丽娟，电话 189 6823 1047"
+   },
+   {
+    "role": "system",
+    "text": "你邀请吴佳加入了群聊"
+   },
+   {
+    "role": "time",
+    "text": "09:12"
+   },
+   {
+    "role": "name",
+    "text": "吴佳"
+   },
+   {
+    "role": "bubble-in",
+    "text": "各位店长好，我是蒋村店新来的店长吴佳，以后多关照"
+   },
+   {
+    "role": "bubble-out",
+    "text": "欢迎！正好有个顾客投诉，说昨天买的车厘子坏了，要上门退"
+   },
+   {
+    "role": "bubble-out",
+    "text": "顾客周女士 15067213398，住蒋村花园如意苑14幢1单元302"
+   },
+   {
+    "role": "name",
+    "text": "吴佳"
+   },
+   {
+    "role": "bubble-in",
+    "text": "这个小区在我们店配送范围，我下午安排人去"
+   },
+   {
+    "role": "quote",
+    "text": "李响：顾客周女士 15067213398，住…"
+   },
+   {
+    "role": "name",
+    "text": "沈丽娟"
+   },
+   {
+    "role": "bubble-in",
+    "text": "盒马的车厘子比我们便宜十块，顾客老拿来比"
+   },
+   {
+    "role": "secondary",
+    "text": "已读"
+   },
+   {
+    "role": "input",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "城西片区店长群"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "邓伟"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "邓伟"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "沈丽娟"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "沈丽娟"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "沈丽娟"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈浩"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈浩"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "皖P·8E631"
+   },
+   {
+    "kind": "PHONE",
+    "text": "189 6823 1047"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "吴佳"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "吴佳"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "吴佳"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "吴佳"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周女士"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周女士"
+   },
+   {
+    "kind": "PHONE",
+    "text": "15067213398"
+   },
+   {
+    "kind": "PHONE",
+    "text": "15067213398"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "蒋村花园如意苑14幢1单元302"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "李响"
+   }
+  ],
+  "avoid": [
+   "所有人",
+   "草莓",
+   "盒马",
+   "车厘子",
+   "未读"
+  ],
+  "neutral": [
+   "文三路店",
+   "古墩路店",
+   "蒋村店",
+   "236元",
+   "@微信",
+   "08:31",
+   "十块",
+   "已读"
+  ]
+ },
+ {
+  "name": "zgroup-wechat-redpacket",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "21:37"
+   },
+   {
+    "role": "status",
+    "text": "5G 68%"
+   },
+   {
+    "role": "title",
+    "text": "< 周三羽毛球AA群(9)"
+   },
+   {
+    "role": "time",
+    "text": "20:05"
+   },
+   {
+    "role": "name",
+    "text": "方小禾"
+   },
+   {
+    "role": "bubble-in",
+    "text": "今晚场地+球一共540，9个人每人60，转我就行"
+   },
+   {
+    "role": "bubble-out",
+    "text": "¥60.00"
+   },
+   {
+    "role": "secondary",
+    "text": "转账给方小禾"
+   },
+   {
+    "role": "name",
+    "text": "老K"
+   },
+   {
+    "role": "bubble-in",
+    "text": "今晚输球 请大家喝水"
+   },
+   {
+    "role": "secondary",
+    "text": "微信红包"
+   },
+   {
+    "role": "system",
+    "text": "你领取了老K的红包"
+   },
+   {
+    "role": "system",
+    "text": "陈默领取了老K的红包"
+   },
+   {
+    "role": "system",
+    "text": "“老K” 拍了拍 “陈默” 的头"
+   },
+   {
+    "role": "name",
+    "text": "陈默"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@方小禾 下周还订光合羽毛球馆吧，我开车顺路接Lily和阿哲"
+   },
+   {
+    "role": "name",
+    "text": "阿哲"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好嘞 我在天通苑北二区5号楼楼下等你，电话 13520874196"
+   },
+   {
+    "role": "system",
+    "text": "“阿哲”撤回了一条消息"
+   },
+   {
+    "role": "name",
+    "text": "方小禾"
+   },
+   {
+    "role": "bubble-in",
+    "text": "¥60.00"
+   },
+   {
+    "role": "secondary",
+    "text": "已收款"
+   },
+   {
+    "role": "name",
+    "text": "老K"
+   },
+   {
+    "role": "bubble-in",
+    "text": "李宁雷霆80限时直降，比尤尼克斯同级便宜一半"
+   },
+   {
+    "role": "name",
+    "text": "老K"
+   },
+   {
+    "role": "bubble-in",
+    "text": "要拼单的@我，收货地址填我家，到了群里叫人来拿"
+   },
+   {
+    "role": "bubble-out",
+    "text": "@老K 我要一支，晚上去你那拿"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "周三羽毛球AA群"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "方小禾"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "方小禾"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "方小禾"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "方小禾"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "老K"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈默"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈默"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈默"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Lily"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "阿哲"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "阿哲"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "阿哲"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "天通苑北二区5号楼"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13520874196"
+   }
+  ],
+  "avoid": [
+   "光合羽毛球馆",
+   "李宁",
+   "雷霆80",
+   "尤尼克斯",
+   "微信红包",
+   "已收款"
+  ],
+  "neutral": [
+   "¥60.00",
+   "540",
+   "20:05",
+   "今晚输球 请大家喝水",
+   "每人60"
+  ]
+ },
+ {
+  "name": "zprivate-wechat-friend",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "14:32"
+   },
+   {
+    "role": "status",
+    "text": "5G 87%"
+   },
+   {
+    "role": "title",
+    "text": "< 林晓雯"
+   },
+   {
+    "role": "button",
+    "text": "···"
+   },
+   {
+    "role": "time",
+    "text": "昨天 21:08"
+   },
+   {
+    "role": "bubble-in",
+    "text": "周六去不去国贸那家新开的王记烧烤"
+   },
+   {
+    "role": "bubble-out",
+    "text": "去啊 几点"
+   },
+   {
+    "role": "bubble-in",
+    "text": "六点吧，我先过去排号"
+   },
+   {
+    "role": "bubble-out",
+    "text": "行，我把周航也叫上"
+   },
+   {
+    "role": "time",
+    "text": "13:55"
+   },
+   {
+    "role": "bubble-in",
+    "text": "对了你帮我代收的那个快递到了吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "到了，放我家门口了，你下班直接来拿"
+   },
+   {
+    "role": "bubble-in",
+    "text": "你家地址再发我一下，我导航过去"
+   },
+   {
+    "role": "bubble-out",
+    "text": "滨江区江南大道588号恒鑫花园7幢2单元1503"
+   },
+   {
+    "role": "bubble-out",
+    "text": "到楼下打我电话 13857246019，门禁坏了"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好嘞"
+   },
+   {
+    "role": "bubble-in",
+    "text": "还有个事，我妹晓楠下周来杭州面试，能在你那借住两晚吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "可以啊，让她直接加我微信 chen_yu_0612"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[链接] 周杰伦嘉年华世界巡回演唱会 杭州站 抢票攻略"
+   },
+   {
+    "role": "bubble-in",
+    "text": "要不要一起抢"
+   },
+   {
+    "role": "bubble-out",
+    "text": "必须的，抢到了我请你吃张亮麻辣烫"
+   },
+   {
+    "role": "time",
+    "text": "14:30"
+   },
+   {
+    "role": "bubble-in",
+    "text": "¥286.00 已收款"
+   },
+   {
+    "role": "bubble-in",
+    "text": "烧烤AA的钱 收一下"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   },
+   {
+    "role": "button",
+    "text": "+"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "林晓雯"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周航"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "江南大道588号恒鑫花园7幢2单元1503"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13857246019"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "晓楠"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "chen_yu_0612"
+   }
+  ],
+  "avoid": [
+   "国贸",
+   "王记烧烤",
+   "周杰伦",
+   "张亮麻辣烫",
+   "按住 说话",
+   "抢票攻略"
+  ],
+  "neutral": [
+   "滨江区",
+   "杭州",
+   "¥286.00",
+   "昨天 21:08"
+  ]
+ },
+ {
+  "name": "zprivate-wechat-mom",
+  "app": "微信",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "08:17"
+   },
+   {
+    "role": "status",
+    "text": "4G 52%"
+   },
+   {
+    "role": "title",
+    "text": "< 妈妈"
+   },
+   {
+    "role": "button",
+    "text": "···"
+   },
+   {
+    "role": "time",
+    "text": "上午 7:42"
+   },
+   {
+    "role": "bubble-in",
+    "text": "儿子，帮我在12306上买张后天回老家的票"
+   },
+   {
+    "role": "bubble-in",
+    "text": "身份证号我发你：330102196804153029"
+   },
+   {
+    "role": "bubble-out",
+    "text": "好，手机号还填你那个吗"
+   },
+   {
+    "role": "bubble-in",
+    "text": "填你爸的吧 139 5712 6684 我的老收不到短信"
+   },
+   {
+    "role": "bubble-out",
+    "text": "买好了 G7512 二等座 07车12F"
+   },
+   {
+    "role": "bubble-in",
+    "text": "12306发了个验证码 836204 要告诉你吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "不用了妈，这种验证码谁问都别给"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的好的"
+   },
+   {
+    "role": "time",
+    "text": "上午 8:03"
+   },
+   {
+    "role": "bubble-in",
+    "text": "你王阿姨家闺女国庆结婚，礼金我先从你那张卡里转了"
+   },
+   {
+    "role": "bubble-in",
+    "text": "建行那张 6217 0012 3456 7890 123"
+   },
+   {
+    "role": "bubble-out",
+    "text": "行，转了多少"
+   },
+   {
+    "role": "bubble-in",
+    "text": "1000，你张叔叔说现在都随这个数"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[语音] 12\""
+   },
+   {
+    "role": "bubble-in",
+    "text": "回来带两盒稻香村的月饼，你外婆爱吃"
+   },
+   {
+    "role": "bubble-in",
+    "text": "要是来不及就直接寄外婆家：绍兴市越城区府山街道仓桥直街41号"
+   },
+   {
+    "role": "bubble-out",
+    "text": "收到"
+   },
+   {
+    "role": "input",
+    "text": "按住 说话"
+   },
+   {
+    "role": "button",
+    "text": "+"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "妈妈"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "330102196804153029"
+   },
+   {
+    "kind": "PHONE",
+    "text": "139 5712 6684"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "836204"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王阿姨"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6217 0012 3456 7890 123"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "张叔叔"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "府山街道仓桥直街41号"
+   }
+  ],
+  "avoid": [
+   "12306",
+   "稻香村",
+   "二等座",
+   "建行",
+   "按住 说话"
+  ],
+  "neutral": [
+   "绍兴市越城区",
+   "G7512",
+   "07车12F",
+   "1000",
+   "上午 7:42",
+   "上午 8:03"
+  ]
+ },
+ {
+  "name": "zprivate-qq-friend",
+  "app": "QQ",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "22:47"
+   },
+   {
+    "role": "status",
+    "text": "5G 64%"
+   },
+   {
+    "role": "title",
+    "text": "< 周子杰"
+   },
+   {
+    "role": "subtitle",
+    "text": "手机在线 - 5G"
+   },
+   {
+    "role": "time",
+    "text": "22:31"
+   },
+   {
+    "role": "bubble-in",
+    "text": "兄弟今晚开黑吗，王者荣耀五排缺一个"
+   },
+   {
+    "role": "bubble-out",
+    "text": "来，拉我"
+   },
+   {
+    "role": "bubble-in",
+    "text": "你小号是多少来着"
+   },
+   {
+    "role": "bubble-out",
+    "text": "2874519630 安卓QQ区"
+   },
+   {
+    "role": "bubble-in",
+    "text": "加了，我表弟也来，他QQ 1056327894 你同意一下"
+   },
+   {
+    "role": "bubble-out",
+    "text": "好。上次说的那个原神号你还要不要"
+   },
+   {
+    "role": "bubble-in",
+    "text": "要，账号密码发我"
+   },
+   {
+    "role": "bubble-out",
+    "text": "账号 xiaoyu_play@163.com"
+   },
+   {
+    "role": "bubble-out",
+    "text": "密码 Yy@20010923tt"
+   },
+   {
+    "role": "bubble-out",
+    "text": "绑的手机是我的 186****2207，改绑完跟我说"
+   },
+   {
+    "role": "bubble-in",
+    "text": "收到，钱明天微信转你"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[图片]"
+   },
+   {
+    "role": "bubble-in",
+    "text": "你看这个皮肤，李白的凤求凰，帅不帅"
+   },
+   {
+    "role": "bubble-out",
+    "text": "可以可以"
+   },
+   {
+    "role": "time",
+    "text": "22:46"
+   },
+   {
+    "role": "bubble-in",
+    "text": "对了我搬家了，以后快递寄 龙华区民治街道 锦绣江南四期 B座1708"
+   },
+   {
+    "role": "bubble-out",
+    "text": "OK"
+   },
+   {
+    "role": "input",
+    "text": "发消息"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "周子杰"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "2874519630"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "1056327894"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "xiaoyu_play@163.com"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "Yy@20010923tt"
+   },
+   {
+    "kind": "PHONE",
+    "text": "186****2207"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "锦绣江南四期 B座1708"
+   }
+  ],
+  "avoid": [
+   "王者荣耀",
+   "原神",
+   "李白",
+   "凤求凰",
+   "手机在线",
+   "安卓QQ区"
+  ],
+  "neutral": [
+   "龙华区民治街道",
+   "22:31",
+   "22:46"
+  ]
+ },
+ {
+  "name": "zprivate-xianyu-trade",
+  "app": "闲鱼",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "16:05"
+   },
+   {
+    "role": "status",
+    "text": "4G 73%"
+   },
+   {
+    "role": "title",
+    "text": "< 柠檬不酸了"
+   },
+   {
+    "role": "subtitle",
+    "text": "最近在线 · 上海"
+   },
+   {
+    "role": "primary",
+    "text": "索尼 WH-1000XM5 头戴式降噪耳机 99新"
+   },
+   {
+    "role": "value",
+    "text": "¥1580"
+   },
+   {
+    "role": "button",
+    "text": "立即购买"
+   },
+   {
+    "role": "time",
+    "text": "昨天 15:12"
+   },
+   {
+    "role": "bubble-out",
+    "text": "你好，耳机还在吗"
+   },
+   {
+    "role": "bubble-in",
+    "text": "在的，箱说全，发票也在"
+   },
+   {
+    "role": "bubble-out",
+    "text": "1450包邮可以吗"
+   },
+   {
+    "role": "bubble-in",
+    "text": "最低1500，顺丰到付或者同城自提都行"
+   },
+   {
+    "role": "bubble-out",
+    "text": "同城的话我过去拿吧，你在哪"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我住田林新苑12号楼，可以在门口保安亭交易"
+   },
+   {
+    "role": "bubble-out",
+    "text": "有点远，那还是寄吧"
+   },
+   {
+    "role": "system",
+    "text": "你已付款，等待卖家发货"
+   },
+   {
+    "role": "bubble-out",
+    "text": "收货人 赵文博 15921834476 上海市浦东新区张杨路1288弄4号601室"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，明天上午顺丰发出"
+   },
+   {
+    "role": "time",
+    "text": "今天 09:41"
+   },
+   {
+    "role": "bubble-in",
+    "text": "已发货，单号 SF1438275590126"
+   },
+   {
+    "role": "bubble-in",
+    "text": "收到记得确认收货，有问题随时找我"
+   },
+   {
+    "role": "bubble-out",
+    "text": "好的谢谢"
+   },
+   {
+    "role": "system",
+    "text": "卖家已发货"
+   },
+   {
+    "role": "input",
+    "text": "想跟TA说点什么..."
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "柠檬不酸了"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "田林新苑12号楼"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "赵文博"
+   },
+   {
+    "kind": "PHONE",
+    "text": "15921834476"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "张杨路1288弄4号601室"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "SF1438275590126"
+   }
+  ],
+  "avoid": [
+   "索尼 WH-1000XM5",
+   "立即购买",
+   "顺丰",
+   "保安亭",
+   "¥1580"
+  ],
+  "neutral": [
+   "上海",
+   "上海市浦东新区",
+   "1500",
+   "1450包邮",
+   "昨天 15:12"
+  ]
+ },
+ {
+  "name": "zprivate-taobao-cs",
+  "app": "淘宝",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "20:19"
+   },
+   {
+    "role": "status",
+    "text": "5G 91%"
+   },
+   {
+    "role": "title",
+    "text": "< 李宁官方旗舰店"
+   },
+   {
+    "role": "subtitle",
+    "text": "客服 阿瑶 为您服务"
+   },
+   {
+    "role": "primary",
+    "text": "李宁 赤兔7 PRO 男款跑步鞋 竞速训练"
+   },
+   {
+    "role": "secondary",
+    "text": "订单号：4012736658192034417"
+   },
+   {
+    "role": "value",
+    "text": "实付 ¥469.00"
+   },
+   {
+    "role": "button",
+    "text": "查看订单"
+   },
+   {
+    "role": "time",
+    "text": "20:02"
+   },
+   {
+    "role": "bubble-out",
+    "text": "你好，我想改一下收货地址，还没发货吧"
+   },
+   {
+    "role": "bubble-in",
+    "text": "亲亲，还未发货哦，请提供新的收 货信息～"
+   },
+   {
+    "role": "bubble-out",
+    "text": "收货人：何嘉怡"
+   },
+   {
+    "role": "bubble-out",
+    "text": "手机号码：17706813925"
+   },
+   {
+    "role": "bubble-out",
+    "text": "所在地区：广东省深圳市南山区粤海街道"
+   },
+   {
+    "role": "bubble-out",
+    "text": "详细地址：后海大道2378号蔚蓝海岸三期9栋18B"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的亲，已为您修改为：何嘉怡，177****3925，请亲核对哦"
+   },
+   {
+    "role": "bubble-out",
+    "text": "对的。另外要开发票，抬头写公司：深圳市云栖科技有限公司"
+   },
+   {
+    "role": "bubble-out",
+    "text": "电子发票发到 hejiayi_work@qq.com"
+   },
+   {
+    "role": "bubble-in",
+    "text": "收到亲～电子发票会在确认收货后发送至您的邮箱"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[表情]"
+   },
+   {
+    "role": "bubble-in",
+    "text": "亲亲还有其他问题吗？赤兔7 PRO 现在第二件半价哦"
+   },
+   {
+    "role": "button",
+    "text": "物流查询"
+   },
+   {
+    "role": "button",
+    "text": "退换货"
+   },
+   {
+    "role": "button",
+    "text": "常见问题"
+   },
+   {
+    "role": "input",
+    "text": "请输入消息"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "何嘉怡"
+   },
+   {
+    "kind": "PHONE",
+    "text": "17706813925"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "后海大道2378号蔚蓝海岸三期9栋18B"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "何嘉怡"
+   },
+   {
+    "kind": "PHONE",
+    "text": "177****3925"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "hejiayi_work@qq.com"
+   }
+  ],
+  "avoid": [
+   "李宁官方旗舰店",
+   "赤兔7 PRO",
+   "查看订单",
+   "物流查询",
+   "实付 ¥469.00",
+   "第二件半价"
+  ],
+  "neutral": [
+   "4012736658192034417",
+   "广东省深圳市南山区粤海街道",
+   "深圳市云栖科技有限公司",
+   "阿瑶"
+  ]
+ },
+ {
+  "name": "zprivate-meituan-rider",
+  "app": "美团外卖",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "12:08"
+   },
+   {
+    "role": "status",
+    "text": "5G 45%"
+   },
+   {
+    "role": "title",
+    "text": "< 骑手 刘师傅"
+   },
+   {
+    "role": "subtitle",
+    "text": "美团专送 · 预计12:20送达"
+   },
+   {
+    "role": "primary",
+    "text": "张亮麻辣烫（望京SOHO店）"
+   },
+   {
+    "role": "secondary",
+    "text": "订单尾号 #27 · 共2件"
+   },
+   {
+    "role": "button",
+    "text": "拨打电话"
+   },
+   {
+    "role": "system",
+    "text": "骑手已取餐，正在为您配送"
+   },
+   {
+    "role": "time",
+    "text": "11:58"
+   },
+   {
+    "role": "bubble-in",
+    "text": "您好，我已经取餐了，大概十分钟到"
+   },
+   {
+    "role": "bubble-out",
+    "text": "好的，送到小区东门就行"
+   },
+   {
+    "role": "bubble-in",
+    "text": "地址写的是望京花园西区5号楼3单元702对吧"
+   },
+   {
+    "role": "bubble-out",
+    "text": "对，但保安不让外卖进，你放东门的外卖柜"
+   },
+   {
+    "role": "bubble-in",
+    "text": "外卖柜要码，放好了发您"
+   },
+   {
+    "role": "bubble-in",
+    "text": "放好了，柜子取餐码 5-0318"
+   },
+   {
+    "role": "bubble-out",
+    "text": "收到"
+   },
+   {
+    "role": "bubble-out",
+    "text": "要是柜子满了打我电话 15010726638"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的。单子上写的孙女士，是您本人吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "是我室友点的，她叫孙佳琪，我帮她拿"
+   },
+   {
+    "role": "bubble-in",
+    "text": "明白，祝您用餐愉快，麻烦给个五星好评"
+   },
+   {
+    "role": "system",
+    "text": "骑手已送达，订单已完成"
+   },
+   {
+    "role": "input",
+    "text": "请输入消息"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "刘师傅"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "望京花园西区5号楼3单元702"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "5-0318"
+   },
+   {
+    "kind": "PHONE",
+    "text": "15010726638"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙女士"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙佳琪"
+   }
+  ],
+  "avoid": [
+   "张亮麻辣烫",
+   "望京SOHO店",
+   "美团专送",
+   "拨打电话",
+   "五星好评",
+   "外卖柜"
+  ],
+  "neutral": [
+   "订单尾号 #27",
+   "预计12:20送达",
+   "东门",
+   "11:58"
+  ]
+ },
+ {
+  "name": "zprivate-didi-driver",
+  "app": "滴滴出行",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "07:46"
+   },
+   {
+    "role": "status",
+    "text": "5G 78%"
+   },
+   {
+    "role": "title",
+    "text": "< 王师傅"
+   },
+   {
+    "role": "subtitle",
+    "text": "浙A·7K3M9 · 白色 比亚迪 秦PLUS"
+   },
+   {
+    "role": "secondary",
+    "text": "订 单进行中"
+   },
+   {
+    "role": "time",
+    "text": "07:38"
+   },
+   {
+    "role": "system",
+    "text": "司机已接单，预计3分钟到达上车点"
+   },
+   {
+    "role": "bubble-in",
+    "text": "您好，我到上车点了，在西溪银泰城北门"
+   },
+   {
+    "role": "bubble-out",
+    "text": "师傅我还在小区里，您直接开进来吧"
+   },
+   {
+    "role": "bubble-out",
+    "text": "文二西路西溪诚园9幢楼下，门口能停"
+   },
+   {
+    "role": "bubble-in",
+    "text": "小区进不去，要登记"
+   },
+   {
+    "role": "bubble-out",
+    "text": "您跟门卫说接9幢1单元的林先生就行"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，车牌您核对下 浙A7K3M9 白色秦"
+   },
+   {
+    "role": "bubble-out",
+    "text": "看到了"
+   },
+   {
+    "role": "system",
+    "text": "司机已到达上车点"
+   },
+   {
+    "role": "bubble-in",
+    "text": "麻烦报一下手机尾号"
+   },
+   {
+    "role": "bubble-out",
+    "text": "6620"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，目的地萧山国际机场T4航站楼对吧"
+   },
+   {
+    "role": "bubble-out",
+    "text": "对，麻烦开快点，赶9:05的航班"
+   },
+   {
+    "role": "time",
+    "text": "07:51"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[位置] 西溪诚园东门"
+   },
+   {
+    "role": "button",
+    "text": "常用语"
+   },
+   {
+    "role": "input",
+    "text": "输入消息"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   },
+   {
+    "role": "button",
+    "text": "一键报警"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "王师傅"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "浙A·7K3M9"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "文二西路西溪诚园9幢"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "9幢1单元"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林先生"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "浙A7K3M9"
+   }
+  ],
+  "avoid": [
+   "西溪银泰城北门",
+   "萧山国际机场T4航站楼",
+   "比亚迪 秦PLUS",
+   "一键报警",
+   "常用语"
+  ],
+  "neutral": [
+   "6620",
+   "西溪诚园东门",
+   "9:05",
+   "07:38"
+  ]
+ },
+ {
+  "name": "zprivate-xhs-dm",
+  "app": "小红书",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "21:13"
+   },
+   {
+    "role": "status",
+    "text": "WiFi 33%"
+   },
+   {
+    "role": "title",
+    "text": "< 是栗子呀"
+   },
+   {
+    "role": "button",
+    "text": "···"
+   },
+   {
+    "role": "time",
+    "text": "10月12日 19:40"
+   },
+   {
+    "role": "quote",
+    "text": "分享笔记｜大理洱海边的宝藏民宿 人均200住海景房"
+   },
+   {
+    "role": "bubble-in",
+    "text": "姐妹你这篇民宿在哪订的呀"
+   },
+   {
+    "role": "bubble-out",
+    "text": "直接找老板娘订的，不走平台便宜好多"
+   },
+   {
+    "role": "bubble-out",
+    "text": "她微信 erhai_xiaozhu88，就说是我推荐的"
+   },
+   {
+    "role": "bubble-in",
+    "text": "谢谢！老板娘怎么称呼"
+   },
+   {
+    "role": "bubble-out",
+    "text": "叫她段姐就行，白族人特别热情"
+   },
+   {
+    "role": "time",
+    "text": "21:05"
+   },
+   {
+    "role": "bubble-in",
+    "text": "对了你笔记里@的那个穿搭博主是你朋友吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "@奶油芝士cc 是我大学室友，小红书号 476203158"
+   },
+   {
+    "role": "bubble-in",
+    "text": "关注了！她是不是也去了刘亦菲同款的那家咖啡馆"
+   },
+   {
+    "role": "bubble-out",
+    "text": "对，就在喜洲古镇里面"
+   },
+   {
+    "role": "bubble-in",
+    "text": "我下个月去大理，到时候能约你吃饭吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "可以呀，我就在大理古城，加我微信吧 momo_dl_1107"
+   },
+   {
+    "role": "bubble-in",
+    "text": "已申请～备注写的小红书 是栗子呀"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[表情]"
+   },
+   {
+    "role": "input",
+    "text": "说点什么..."
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "是栗子呀"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "erhai_xiaozhu88"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "段姐"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "奶油芝士cc"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "476203158"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "momo_dl_1107"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "是栗子呀"
+   }
+  ],
+  "avoid": [
+   "刘亦菲",
+   "喜洲古镇",
+   "大理洱海",
+   "白族",
+   "宝藏民宿"
+  ],
+  "neutral": [
+   "大理古城",
+   "人均200",
+   "大学室友",
+   "10月12日 19:40"
+  ]
+ },
+ {
+  "name": "zprivate-boss-recruiter",
+  "app": "BOSS直聘",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "11:26"
+   },
+   {
+    "role": "status",
+    "text": "5G 69%"
+   },
+   {
+    "role": "title",
+    "text": "< 陈婧"
+   },
+   {
+    "role": "subtitle",
+    "text": "星澜科技 · 招聘经理"
+   },
+   {
+    "role": "primary",
+    "text": "高级Android开发工程师"
+   },
+   {
+    "role": "value",
+    "text": "25-40K·15薪"
+   },
+   {
+    "role": "secondary",
+    "text": "北京·海淀区 | 3-5年 | 本科"
+   },
+   {
+    "role": "button",
+    "text": "换电话"
+   },
+   {
+    "role": "button",
+    "text": "换微信"
+   },
+   {
+    "role": "button",
+    "text": "发简历"
+   },
+   {
+    "role": "button",
+    "text": "不感兴趣"
+   },
+   {
+    "role": "time",
+    "text": "昨天 18:22"
+   },
+   {
+    "role": "bubble-in",
+    "text": "你好，看了你的经历很匹配，方便发一份简历吗？"
+   },
+   {
+    "role": "bubble-out",
+    "text": "您好，简历已发送，请查收"
+   },
+   {
+    "role": "system",
+    "text": "附件简历：吴昊然_Android_5年.pdf"
+   },
+   {
+    "role": "time",
+    "text": "今天 10:05"
+   },
+   {
+    "role": "bubble-in",
+    "text": "简历收到了，想约你本周四下午两点线上一面，可以吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "可以的"
+   },
+   {
+    "role": "bubble-in",
+    "text": "麻烦留个邮箱，我把会议邀请发你"
+   },
+   {
+    "role": "bubble-out",
+    "text": "wuhaoran.dev@gmail.com"
+   },
+   {
+    "role": "system",
+    "text": "双方已交换电话：136 9125 7740"
+   },
+   {
+    "role": "system",
+    "text": "双方已交换微信：whr_android_0731"
+   },
+   {
+    "role": "bubble-in",
+    "text": "简历上没写年龄，方便说一下吗"
+   },
+   {
+    "role": "bubble-out",
+    "text": "1995年7月31号生的"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的。背调需要，终面前要提供身份证号和上家公司工号"
+   },
+   {
+    "role": "bubble-out",
+    "text": "现在就要吗？"
+   },
+   {
+    "role": "bubble-in",
+    "text": "不急。你目前是在美团吧？"
+   },
+   {
+    "role": "bubble-out",
+    "text": "对，美团到店事业群，工号 MT2019083721"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，面试官是我们技术总监周振宇，人很nice"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[面试邀请] 10月17日 14:00 腾讯会议 862 471 395"
+   },
+   {
+    "role": "button",
+    "text": "接受"
+   },
+   {
+    "role": "button",
+    "text": "拒绝"
+   },
+   {
+    "role": "input",
+    "text": "新信息"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "陈婧"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "吴昊然"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "wuhaoran.dev@gmail.com"
+   },
+   {
+    "kind": "PHONE",
+    "text": "136 9125 7740"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "whr_android_0731"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "1995年7月31号"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "MT2019083721"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周振宇"
+   }
+  ],
+  "avoid": [
+   "高级Android开发工程师",
+   "25-40K·15薪",
+   "发简历",
+   "腾讯会议",
+   "不感兴趣",
+   "招聘经理"
+  ],
+  "neutral": [
+   "星澜科技",
+   "美团到店事业群",
+   "美团",
+   "北京·海淀区",
+   "862 471 395",
+   "10月17日 14:00"
+  ]
+ },
+ {
+  "name": "zsms-thread-list",
+  "app": "信息",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "09:41"
+   },
+   {
+    "role": "status",
+    "text": "5G 76%"
+   },
+   {
+    "role": "button",
+    "text": "编辑"
+   },
+   {
+    "role": "title",
+    "text": "信息"
+   },
+   {
+    "role": "input",
+    "text": "搜索联系人和信息"
+   },
+   {
+    "role": "name",
+    "text": "妈妈"
+   },
+   {
+    "role": "time",
+    "text": "09:12"
+   },
+   {
+    "role": "secondary",
+    "text": "到家了没？晚上降温，记得把阳台衣服收了"
+   },
+   {
+    "role": "name",
+    "text": "周雅婷"
+   },
+   {
+    "role": "time",
+    "text": "08:47"
+   },
+   {
+    "role": "secondary",
+    "text": "我在翠苑三区12幢2单元门口了，你下来吧"
+   },
+   {
+    "role": "name",
+    "text": "+86 186 0215 7743"
+   },
+   {
+    "role": "time",
+    "text": "昨天"
+   },
+   {
+    "role": "secondary",
+    "text": "王哥，明早八点半公司楼下见，我开沪AD72915那辆白色的"
+   },
+   {
+    "role": "name",
+    "text": "顺丰速运"
+   },
+   {
+    "role": "time",
+    "text": "昨天"
+   },
+   {
+    "role": "secondary",
+    "text": "【顺丰速运】您的快件SF1428830917265由快递员陈师傅（13917284056）派送中，请保持电话畅通"
+   },
+   {
+    "role": "name",
+    "text": "老陈"
+   },
+   {
+    "role": "time",
+    "text": "星期一"
+   },
+   {
+    "role": "secondary",
+    "text": "周六钓鱼叫上小林，他上次说想去淀山湖"
+   },
+   {
+    "role": "name",
+    "text": "招商银行"
+   },
+   {
+    "role": "time",
+    "text": "星期一"
+   },
+   {
+    "role": "secondary",
+    "text": "【招商银行】您账户1987于10月12日消费人民币58.00元，余额4,215.36元"
+   },
+   {
+    "role": "name",
+    "text": "京东"
+   },
+   {
+    "role": "time",
+    "text": "10/11"
+   },
+   {
+    "role": "secondary",
+    "text": "【京东】您购买的李宁运动鞋已出库，预计明天送达"
+   },
+   {
+    "role": "name",
+    "text": "10086"
+   },
+   {
+    "role": "time",
+    "text": "10/10"
+   },
+   {
+    "role": "secondary",
+    "text": "【中国移动】尊敬的客户，您本月通用流量已使用80%"
+   },
+   {
+    "role": "name",
+    "text": "林晓雯"
+   },
+   {
+    "role": "time",
+    "text": "10/09"
+   },
+   {
+    "role": "secondary",
+    "text": "[图片]"
+   },
+   {
+    "role": "button",
+    "text": "开始聊天"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "周雅婷"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "翠苑三区12幢2单元"
+   },
+   {
+    "kind": "PHONE",
+    "text": "+86 186 0215 7743"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王哥"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "沪AD72915"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "SF1428830917265"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈师傅"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13917284056"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "老陈"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "小林"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林晓雯"
+   }
+  ],
+  "avoid": [
+   "顺丰速运",
+   "招商银行",
+   "李宁运动鞋",
+   "淀山湖",
+   "中国移动",
+   "开始聊天"
+  ],
+  "neutral": [
+   "妈妈",
+   "账户1987",
+   "58.00元",
+   "余额4,215.36元",
+   "八点半",
+   "公司楼下"
+  ]
+ },
+ {
+  "name": "zsms-cmb-otp",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "14:32"
+   },
+   {
+    "role": "status",
+    "text": "5G 87%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "95555"
+   },
+   {
+    "role": "subtitle",
+    "text": "招商银行"
+   },
+   {
+    "role": "time",
+    "text": "10月13日 20:05"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【招商银行】您的验证码是482913，您正在进行一网通支付绑卡操作，请勿向任何人提供。"
+   },
+   {
+    "role": "time",
+    "text": "10月14日 11:26"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【招商银行】验证码：730561。您尾号6688的信用卡正在为“滴滴出行”快捷支付59.80元，非本人操作请致电95555。"
+   },
+   {
+    "role": "time",
+    "text": "10月14日 19:00"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【招商银行】张志远先生，您尾号6688信用卡10月账单¥3,284.50，到期还款日11月02日，可登录掌上生活还款。"
+   },
+   {
+    "role": "time",
+    "text": "今天 14:30"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【招商银行】您正在登录招商银行App，动态码 915204，10分钟内有效。工作人员不会向您索取，切勿泄露。"
+   },
+   {
+    "role": "button",
+    "text": "复制验证码 915204"
+   },
+   {
+    "role": "secondary",
+    "text": "此信息由招商银行官方号码发送"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "API_KEY",
+    "text": "482913"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "730561"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "张志远"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "915204"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "915204"
+   }
+  ],
+  "avoid": [
+   "招商银行",
+   "95555",
+   "滴滴出行",
+   "一网通支付",
+   "掌上生活",
+   "复制验证码",
+   "10分钟内有效"
+  ],
+  "neutral": [
+   "尾号6688",
+   "59.80元",
+   "¥3,284.50",
+   "11月02日",
+   "10月13日 20:05"
+  ]
+ },
+ {
+  "name": "zsms-pickup-codes",
+  "app": "信息",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "18:06"
+   },
+   {
+    "role": "status",
+    "text": "4G 41%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "快递"
+   },
+   {
+    "role": "subtitle",
+    "text": "3 条待取件"
+   },
+   {
+    "role": "name",
+    "text": "菜鸟驿站"
+   },
+   {
+    "role": "time",
+    "text": "17:52"
+   },
+   {
+    "role": "secondary",
+    "text": "【菜鸟驿站】您的中通包裹已到科技园东门菜鸟驿站，请凭8-5-2001于21:00前取件，询13651873320"
+   },
+   {
+    "role": "label",
+    "text": "取件码"
+   },
+   {
+    "role": "value",
+    "text": "8-5-2001"
+   },
+   {
+    "role": "button",
+    "text": "复制取件码"
+   },
+   {
+    "role": "name",
+    "text": "丰巢"
+   },
+   {
+    "role": "time",
+    "text": "15:20"
+   },
+   {
+    "role": "secondary",
+    "text": "【丰巢】您的顺丰快递SF1398025517740已存入幸福里小区7号楼丰巢柜，凭取件码36920471取件，超时将收取保管费。"
+   },
+   {
+    "role": "name",
+    "text": "兔喜生活"
+   },
+   {
+    "role": "time",
+    "text": "11:03"
+   },
+   {
+    "role": "secondary",
+    "text": "【兔喜生活】您的韵达快递已到幸福里小区南门兔喜快递超市，货架号B3，取件码B3-1107，营业至22:00。"
+   },
+   {
+    "role": "name",
+    "text": "菜鸟驿站"
+   },
+   {
+    "role": "time",
+    "text": "昨天 19:40"
+   },
+   {
+    "role": "secondary",
+    "text": "【菜鸟驿站】王丽娟您好，您的京东包裹JDVA28816037452已到站，请凭3-2-1234到科技园东门菜鸟驿站领取。"
+   },
+   {
+    "role": "secondary",
+    "text": "已取件"
+   },
+   {
+    "role": "button",
+    "text": "全部标为已取"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PICKUP_CODE",
+    "text": "8-5-2001"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13651873320"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "8-5-2001"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "SF1398025517740"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "幸福里小区7号楼"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "36920471"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "B3-1107"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王丽娟"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "JDVA28816037452"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "3-2-1234"
+   }
+  ],
+  "avoid": [
+   "菜鸟驿站",
+   "丰巢",
+   "兔喜生活",
+   "中通",
+   "韵达快递",
+   "京东",
+   "复制取件码",
+   "全部标为已取"
+  ],
+  "neutral": [
+   "货架号B3",
+   "幸福里小区南门兔喜快递超市",
+   "21:00前",
+   "营业至22:00"
+  ]
+ },
+ {
+  "name": "zsms-12306-ticket",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "07:58"
+   },
+   {
+    "role": "status",
+    "text": "5G 92%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "12306"
+   },
+   {
+    "role": "subtitle",
+    "text": "铁路 客服"
+   },
+   {
+    "role": "time",
+    "text": "10月10日 22:14"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【铁路客服】订单EA39271846,刘思远您已购10月16日G7316次4车12F号上海虹桥08:35开，检票口B12，请携带购票时使用的有效身份证件。"
+   },
+   {
+    "role": "time",
+    "text": "10月10日 22:15"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【铁路客服】订单EA39271846,陈思琪您已购10月16日G7316次4车12D号上海虹桥08:35开，检票口B12。"
+   },
+   {
+    "role": "time",
+    "text": "10月11日 08:02"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【铁路客服】您的12306账号正在新设备登录，验证码386015，如非本人操作请及时修改密码。"
+   },
+   {
+    "role": "time",
+    "text": "10月12日 13:47"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【铁路客服】订单EB51830297,张秀兰10月20日D3125次退票成功，退票费6.00元，应退票款158.50元，将于7-15个工作日退回原支付账户。"
+   },
+   {
+    "role": "time",
+    "text": "今天 07:30"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【铁路客服】温馨提示：G7316次列车今日08:35由上海虹桥开出，乘车人刘思远（证件尾号0516），请预留充足时间进站。"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘思远"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈思琪"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "386015"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "张秀兰"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘思远"
+   }
+  ],
+  "avoid": [
+   "12306",
+   "上海虹桥",
+   "铁路客服",
+   "检票口B12",
+   "修改密码"
+  ],
+  "neutral": [
+   "EA39271846",
+   "G7316次",
+   "4车12F号",
+   "4车12D号",
+   "EB51830297",
+   "D3125次",
+   "证件尾号0516",
+   "158.50元"
+  ]
+ },
+ {
+  "name": "zsms-icbc-transactions",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "21:17"
+   },
+   {
+    "role": "status",
+    "text": "5G 63%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "95588"
+   },
+   {
+    "role": "subtitle",
+    "text": "中国工商 银行"
+   },
+   {
+    "role": "time",
+    "text": "10月12日 12:03"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【工商银行】您尾号3307卡10月12日12:03快捷支付(财付通-美团)支出42.80元，余额8,316.27元。"
+   },
+   {
+    "role": "time",
+    "text": "10月13日 09:41"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【工商银行】您尾号3307卡10月13日09:41收入(他行汇入)5,000.00元，余额13,316.27元，对方户名：何建平，对方账号尾号8842。"
+   },
+   {
+    "role": "time",
+    "text": "10月14日 18:22"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【工商银行】您尾号3307卡10月14日18:22网上银行转出3,200.00元，余额10,116.27元，收款人：宋佳怡，收款账号6222 0216 0402 7718 455。"
+   },
+   {
+    "role": "time",
+    "text": "10月15日 08:00"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【工商银行】您尾号3307卡10月15日08:00代发工资收入18,600.00元，余额28,716.27元，摘要：上海鼎恒信息技术有限公司。"
+   },
+   {
+    "role": "time",
+    "text": "今天 21:15"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【工商银行】尊敬的周文涛客户，您的信用卡6222 **** **** 5120本期账单2,486.00元，最后还款日10月25日。回复HK可快速还款。"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "何建平"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "宋佳怡"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6222 0216 0402 7718 455"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周文涛"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6222 **** **** 5120"
+   }
+  ],
+  "avoid": [
+   "工商银行",
+   "95588",
+   "财付通",
+   "美团",
+   "网上银行",
+   "回复HK"
+  ],
+  "neutral": [
+   "尾号3307",
+   "对方账号尾号8842",
+   "上海鼎恒信息技术有限公司",
+   "42.80元",
+   "18,600.00元",
+   "余额28,716.27元"
+  ]
+ },
+ {
+  "name": "zsms-courier-thread",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "10:24"
+   },
+   {
+    "role": "status",
+    "text": "5G 58%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "177 2309 4651"
+   },
+   {
+    "role": "subtitle",
+    "text": "江苏 南京 移动"
+   },
+   {
+    "role": "button",
+    "text": "添加联系人"
+   },
+   {
+    "role": "time",
+    "text": "今天 09:58"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【中通快递】您好，我是派送员郑海波，电话17723094651，您的快件78329160554281今天上午送达，家里没人可以放门口吗？"
+   },
+   {
+    "role": "bubble-out",
+    "text": "放门口吧，鼓楼区汉中门大街星河苑5栋1单元1802"
+   },
+   {
+    "role": "time",
+    "text": "10:15"
+   },
+   {
+    "role": "bubble-in",
+    "text": "好的，放您家门口鞋柜上面了，给您拍了照"
+   },
+   {
+    "role": "bubble-in",
+    "text": "[彩信] 图片"
+   },
+   {
+    "role": "bubble-out",
+    "text": "收到，谢谢郑师傅"
+   },
+   {
+    "role": "time",
+    "text": "10:21"
+   },
+   {
+    "role": "bubble-in",
+    "text": "不客气。隔壁1801李阿姨的件我先放物业了，麻烦跟她说一声"
+   },
+   {
+    "role": "bubble-out",
+    "text": "好的没问题"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PHONE",
+    "text": "177 2309 4651"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "郑海波"
+   },
+   {
+    "kind": "PHONE",
+    "text": "17723094651"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "78329160554281"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "汉中门大街星河苑5栋1单元1802"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "郑师傅"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "1801"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "李阿姨"
+   }
+  ],
+  "avoid": [
+   "中通快递",
+   "添加联系人",
+   "物业",
+   "鞋柜",
+   "彩信"
+  ],
+  "neutral": [
+   "江苏 南京 移动",
+   "鼓楼区",
+   "今天上午",
+   "隔壁"
+  ]
+ },
+ {
+  "name": "zsms-hospital-booking",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "16:45"
+   },
+   {
+    "role": "status",
+    "text": "5G 71%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "106905710120"
+   },
+   {
+    "role": "time",
+    "text": "10月13日 19:02"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【浙大一院】预约成功：患者孙梦洁，就诊卡号0012847365，10月17日上午消化内科吴国强主任医师，序号12，请于09:10前到庆春院区门诊2号楼3楼签到。"
+   },
+   {
+    "role": "time",
+    "text": "10月13日 19:03"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【浙大一院】温馨提示：孙梦洁您好，就诊当日请空腹，携带身份证330106199203154528或医保卡，如需取消请提前一天操作。"
+   },
+   {
+    "role": "time",
+    "text": "今天 16:40"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【浙大一院】您的检验报告已出，查询码PX7731，点击 https://rpt.zy91.cn/r?k=8fT2qLm9Wz 查看，链接24小时内有效。"
+   },
+   {
+    "role": "time",
+    "text": "今天 16:42"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【浙大一院】陪诊登记成功：陪诊人孙建业（父亲），联系电话139 5718 2246，已关联患者档案号ZY20231458。"
+   },
+   {
+    "role": "time",
+    "text": "今天 16:44"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【浙大一院】温馨提示：院区停车位紧张，建议乘坐地铁1号线至城站站出行。"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙梦洁"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "0012847365"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙梦洁"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "330106199203154528"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "PX7731"
+   },
+   {
+    "kind": "URL",
+    "text": "https://rpt.zy91.cn/r?k=8fT2qLm9Wz"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙建业"
+   },
+   {
+    "kind": "PHONE",
+    "text": "139 5718 2246"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "ZY20231458"
+   }
+  ],
+  "avoid": [
+   "浙大一院",
+   "消化内科",
+   "庆春院区",
+   "医保卡",
+   "门诊2号楼",
+   "地铁1号线"
+  ],
+  "neutral": [
+   "吴国强",
+   "10月17日上午",
+   "序号12",
+   "106905710120",
+   "父亲",
+   "09:10前"
+  ]
+ },
+ {
+  "name": "zsms-12123-violation",
+  "app": "信息",
+  "lang": "zh",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "12:08"
+   },
+   {
+    "role": "status",
+    "text": "4G 55%"
+   },
+   {
+    "role": "link",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "12123"
+   },
+   {
+    "role": "label",
+    "text": "官方号码 · 已验证"
+   },
+   {
+    "role": "time",
+    "text": "10月09日 15:31"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【交管12123】您的小型汽车苏E·5R82M于2026年10月06日08:17在苏州工业园区星湖街与苏州大道东交叉口，实施机动车违反禁止标线指示的违法行为，罚款100元，记3分。"
+   },
+   {
+    "role": "time",
+    "text": "10月12日 10:05"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【交管12123】杨振华，您名下苏E·5R82M的违法记录已处理完毕，驾驶证档案编号320500839921累积记分已更新。"
+   },
+   {
+    "role": "time",
+    "text": "今天 12:01"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【交管12123】您名下小型汽车苏EF07163（车辆识别代号LSVAU2180N2184276）检验有效期至2026年11月30日，请及时申请检验。"
+   },
+   {
+    "role": "time",
+    "text": "今天 12:06"
+   },
+   {
+    "role": "bubble-in",
+    "text": "【交管12123】您正在解除机动车绑定，验证码：507329，5分钟内有效，请勿泄露给他人。"
+   },
+   {
+    "role": "input",
+    "text": "短信"
+   },
+   {
+    "role": "button",
+    "text": "发送"
+   }
+  ],
+  "find": [
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "苏E·5R82M"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "杨振华"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "苏E·5R82M"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "320500839921"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "苏EF07163"
+   },
+   {
+    "kind": "VIN",
+    "text": "LSVAU2180N2184276"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "507329"
+   }
+  ],
+  "avoid": [
+   "交管12123",
+   "小型汽车",
+   "苏州大道东",
+   "禁止标线",
+   "官方号码"
+  ],
+  "neutral": [
+   "2026年10月06日08:17",
+   "罚款100元",
+   "记3分",
+   "星湖街",
+   "苏州工业园区",
+   "2026年11月30日"
+  ]
+ },
+ {
+  "name": "zsms-lockscreen-stack",
+  "app": "锁屏",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "中国移动 5G"
+   },
+   {
+    "role": "status",
+    "text": "86%"
+   },
+   {
+    "role": "time",
+    "text": "22:47"
+   },
+   {
+    "role": "label",
+    "text": "10月15日 星期四"
+   },
+   {
+    "role": "name",
+    "text": "微信"
+   },
+   {
+    "role": "time",
+    "text": "现在"
+   },
+   {
+    "role": "title",
+    "text": "相亲相爱一家人(8)"
+   },
+   {
+    "role": "secondary",
+    "text": "二姑：明天中午都来外婆家吃饭，莲花新村14幢301，别迟到"
+   },
+   {
+    "role": "name",
+    "text": "微信"
+   },
+   {
+    "role": "time",
+    "text": "2分钟前"
+   },
+   {
+    "role": "title",
+    "text": "许嘉禾"
+   },
+   {
+    "role": "secondary",
+    "text": "[2条] 我把Wi-Fi密码改了，新的是 xjh@2026home"
+   },
+   {
+    "role": "name",
+    "text": "淘宝"
+   },
+   {
+    "role": "time",
+    "text": "5分钟前"
+   },
+   {
+    "role": "title",
+    "text": "双11预售开启"
+   },
+   {
+    "role": "secondary",
+    "text": "李宁运动鞋限时直降200元，周杰伦同款潮T抢先加购>>"
+   },
+   {
+    "role": "name",
+    "text": "微信"
+   },
+   {
+    "role": "time",
+    "text": "12分钟前"
+   },
+   {
+    "role": "title",
+    "text": "项目组-华东区(23)"
+   },
+   {
+    "role": "secondary",
+    "text": "邵静：@陈子航 明早9点的会改到307会议室，记得带合同"
+   },
+   {
+    "role": "name",
+    "text": "支付宝"
+   },
+   {
+    "role": "time",
+    "text": "20分钟前"
+   },
+   {
+    "role": "title",
+    "text": "转账到账"
+   },
+   {
+    "role": "secondary",
+    "text": "曹文静 向你转账520.00元，已存入余额"
+   },
+   {
+    "role": "name",
+    "text": "美团外卖"
+   },
+   {
+    "role": "time",
+    "text": "35分钟前"
+   },
+   {
+    "role": "secondary",
+    "text": "您的张亮麻辣烫订单已送达，骑手王师傅祝您用餐愉快"
+   },
+   {
+    "role": "name",
+    "text": "信息"
+   },
+   {
+    "role": "time",
+    "text": "1小时前"
+   },
+   {
+    "role": "title",
+    "text": "1069 0089 5533"
+   },
+   {
+    "role": "secondary",
+    "text": "【丰巢】您的快递已存入丰巢柜，取件码 74183025，请及时领取"
+   },
+   {
+    "role": "button",
+    "text": "通知管理"
+   },
+   {
+    "role": "button",
+    "text": "全部清除"
+   },
+   {
+    "role": "secondary",
+    "text": "上滑解锁"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "相亲相爱一家人"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "莲花新村14幢301"
+   },
+   {
+    "kind": "CHAT_TITLE",
+    "text": "许嘉禾"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "xjh@2026home"
+   },
+   {
+    "kind": "CHAT_TITLE",
+    "text": "项目组-华东区"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "邵静"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "陈子航"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "曹文静"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王师傅"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "74183025"
+   }
+  ],
+  "avoid": [
+   "李宁运动鞋",
+   "周杰伦",
+   "张亮麻辣烫",
+   "淘宝",
+   "美团外卖",
+   "丰巢",
+   "上滑解锁",
+   "双11预售开启"
+  ],
+  "neutral": [
+   "二姑",
+   "520.00元",
+   "307会议室",
+   "外婆家",
+   "1069 0089 5533",
+   "明早9点"
+  ]
+ },
+ {
+  "name": "zshop-taobao-order-detail",
+  "app": "淘宝",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "09:41"
+   },
+   {
+    "role": "status",
+    "text": "5G 76%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "订单详情"
+   },
+   {
+    "role": "button",
+    "text": "···"
+   },
+   {
+    "role": "primary",
+    "text": "卖家已发货"
+   },
+   {
+    "role": "secondary",
+    "text": "还剩9天23小时自动确认收货"
+   },
+   {
+    "role": "secondary",
+    "text": "【杭州市】快件已到达 杭州转运中心，正发往下一站"
+   },
+   {
+    "role": "time",
+    "text": "2026-10-14 22:17"
+   },
+   {
+    "role": "name",
+    "text": "陈思远 186****2731"
+   },
+   {
+    "role": "secondary",
+    "text": "浙江省 杭州市 西湖区 文新街道 嘉绿苑东区 12幢2单元501室"
+   },
+   {
+    "role": "label",
+    "text": "优衣库官方旗舰店 >"
+   },
+   {
+    "role": "primary",
+    "text": "男装 摇粒绒拉链茄克 长袖外套 460318"
+   },
+   {
+    "role": "secondary",
+    "text": "09 黑色；175/100A/L"
+   },
+   {
+    "role": "value",
+    "text": "¥199.00"
+   },
+   {
+    "role": "secondary",
+    "text": "x1"
+   },
+   {
+    "role": "button",
+    "text": "申请售后"
+   },
+   {
+    "role": "button",
+    "text": "加入购物车"
+   },
+   {
+    "role": "label",
+    "text": "退货宝"
+   },
+   {
+    "role": "secondary",
+    "text": "退货可享 上门取件 免费"
+   },
+   {
+    "role": "label",
+    "text": "实付款"
+   },
+   {
+    "role": "value",
+    "text": "¥189.00"
+   },
+   {
+    "role": "label",
+    "text": "订单编号"
+   },
+   {
+    "role": "value",
+    "text": "4128837620915563892"
+   },
+   {
+    "role": "button",
+    "text": "复制"
+   },
+   {
+    "role": "label",
+    "text": "支付宝交易号"
+   },
+   {
+    "role": "value",
+    "text": "2026101322001437201408156731"
+   },
+   {
+    "role": "label",
+    "text": "创建时间"
+   },
+   {
+    "role": "value",
+    "text": "2026-10-13 20:05:41"
+   },
+   {
+    "role": "label",
+    "text": "买家留言"
+   },
+   {
+    "role": "value",
+    "text": "白天家里没人，到了交给物业的李姐代收，谢谢"
+   },
+   {
+    "role": "title",
+    "text": "你可能还喜欢"
+   },
+   {
+    "role": "primary",
+    "text": "李宁运动鞋 男款 超轻21 跑步鞋"
+   },
+   {
+    "role": "value",
+    "text": "¥329"
+   },
+   {
+    "role": "primary",
+    "text": "王小卤虎皮凤爪 香辣味 200g"
+   },
+   {
+    "role": "value",
+    "text": "¥29.9"
+   },
+   {
+    "role": "button",
+    "text": "延长收货"
+   },
+   {
+    "role": "button",
+    "text": "查看物流"
+   },
+   {
+    "role": "button",
+    "text": "确认收货"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈思远"
+   },
+   {
+    "kind": "PHONE",
+    "text": "186****2731"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "嘉绿苑东区 12幢2单元501室"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "李姐"
+   }
+  ],
+  "avoid": [
+   "优衣库官方旗舰店",
+   "李宁运动鞋",
+   "王小卤虎皮凤爪",
+   "杭州转运中心",
+   "退货宝",
+   "申请售后"
+  ],
+  "neutral": [
+   "4128837620915563892",
+   "2026101322001437201408156731",
+   "浙江省 杭州市 西湖区 文新街道",
+   "¥189.00",
+   "2026-10-13 20:05:41",
+   "2026-10-14 22:17",
+   "物业"
+  ]
+ },
+ {
+  "name": "zshop-jd-logistics-tracking",
+  "app": "京东",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "12:31"
+   },
+   {
+    "role": "status",
+    "text": "5G 54%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "物流详情"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "secondary",
+    "text": "京东快递"
+   },
+   {
+    "role": "label",
+    "text": "运单号"
+   },
+   {
+    "role": "value",
+    "text": "JDVA28471630592"
+   },
+   {
+    "role": "button",
+    "text": "复制"
+   },
+   {
+    "role": "primary",
+    "text": "已签收"
+   },
+   {
+    "role": "secondary",
+    "text": "签收时间 10-15 12:26"
+   },
+   {
+    "role": "secondary",
+    "text": "Apple AirPods Pro 2 配MagSafe充电盒 (USB-C)"
+   },
+   {
+    "role": "secondary",
+    "text": "共1件商品"
+   },
+   {
+    "role": "name",
+    "text": "配送员 刘师傅"
+   },
+   {
+    "role": "secondary",
+    "text": "服务 5.0分 · 本月送达 2311 单"
+   },
+   {
+    "role": "button",
+    "text": "打电话"
+   },
+   {
+    "role": "button",
+    "text": "评价配送员"
+   },
+   {
+    "role": "label",
+    "text": "收货地址"
+   },
+   {
+    "role": "secondary",
+    "text": "北京朝阳区酒仙桥街道 驼房营路 万象新天二区 6号楼3单元1102"
+   },
+   {
+    "role": "time",
+    "text": "10-15 12:26"
+   },
+   {
+    "role": "secondary",
+    "text": "您的快件已签收，签收人：孙佳怡。感谢您使用京东物流，期待再次为您服务"
+   },
+   {
+    "role": "time",
+    "text": "10-15 08:42"
+   },
+   {
+    "role": "secondary",
+    "text": "您的快件正在派送中，配送员：刘建军，电话：13822150637，京东已开启号码保护，请放心接听"
+   },
+   {
+    "role": "time",
+    "text": "10-15 06:31"
+   },
+   {
+    "role": "secondary",
+    "text": "您的快件已到达【北京朝阳酒仙桥营业部】"
+   },
+   {
+    "role": "time",
+    "text": "10-14 23:10"
+   },
+   {
+    "role": "secondary",
+    "text": "您的快件已由【北京马驹桥分拣中心】发出"
+   },
+   {
+    "role": "time",
+    "text": "10-14 15:47"
+   },
+   {
+    "role": "secondary",
+    "text": "您的快件已由【京东物流·廊坊亚一】揽收"
+   },
+   {
+    "role": "time",
+    "text": "10-14 15:20"
+   },
+   {
+    "role": "secondary",
+    "text": "商家正在通知快递公司揽件"
+   },
+   {
+    "role": "secondary",
+    "text": "订单号 302871459916"
+   },
+   {
+    "role": "button",
+    "text": "联系客服"
+   },
+   {
+    "role": "button",
+    "text": "查看订单"
+   }
+  ],
+  "find": [
+   {
+    "kind": "TRACKING_NO",
+    "text": "JDVA28471630592"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘师傅"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "万象新天二区 6号楼3单元1102"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙佳怡"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘建军"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13822150637"
+   }
+  ],
+  "avoid": [
+   "北京朝阳酒仙桥营业部",
+   "北京马驹桥分拣中心",
+   "京东物流·廊坊亚一",
+   "Apple AirPods Pro 2",
+   "京东快递",
+   "评价配送员"
+  ],
+  "neutral": [
+   "北京朝阳区酒仙桥街道 驼房营路",
+   "302871459916",
+   "10-15 12:26",
+   "签收时间",
+   "10-15 08:42"
+  ]
+ },
+ {
+  "name": "zshop-sf-waybill-detail",
+  "app": "顺丰速运",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "11:20"
+   },
+   {
+    "role": "status",
+    "text": "4G 63%"
+   },
+   {
+    "role": "button",
+    "text": "一"
+   },
+   {
+    "role": "title",
+    "text": "运单详情"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "value",
+    "text": "SF1428830917625"
+   },
+   {
+    "role": "button",
+    "text": "复制"
+   },
+   {
+    "role": "primary",
+    "text": "运输中"
+   },
+   {
+    "role": "secondary",
+    "text": "预计明天 12:00 前送达"
+   },
+   {
+    "role": "label",
+    "text": "寄"
+   },
+   {
+    "role": "name",
+    "text": "张*伟 138****5678"
+   },
+   {
+    "role": "secondary",
+    "text": "广东省深圳市南山区"
+   },
+   {
+    "role": "label",
+    "text": "收"
+   },
+   {
+    "role": "name",
+    "text": "何*婷 159****0384"
+   },
+   {
+    "role": "secondary",
+    "text": "上海市浦东新区张江镇 祖冲之路 汤臣豪园三期 15号楼702室"
+   },
+   {
+    "role": "label",
+    "text": "托寄物"
+   },
+   {
+    "role": "value",
+    "text": "衣物"
+   },
+   {
+    "role": "label",
+    "text": "产品类型"
+   },
+   {
+    "role": "value",
+    "text": "顺丰标快"
+   },
+   {
+    "role": "label",
+    "text": "付款方式"
+   },
+   {
+    "role": "value",
+    "text": "寄付现结"
+   },
+   {
+    "role": "label",
+    "text": "计费重量"
+   },
+   {
+    "role": "value",
+    "text": "1.0kg"
+   },
+   {
+    "role": "label",
+    "text": "运费"
+   },
+   {
+    "role": "value",
+    "text": "¥23.00"
+   },
+   {
+    "role": "label",
+    "text": "寄件备注"
+   },
+   {
+    "role": "value",
+    "text": "生日礼物，到了让婷婷本人签收，别放丰巢"
+   },
+   {
+    "role": "time",
+    "text": "10-15 09:47"
+   },
+   {
+    "role": "secondary",
+    "text": "快件到达【上海浦东张江集散中心】"
+   },
+   {
+    "role": "time",
+    "text": "10-15 03:12"
+   },
+   {
+    "role": "secondary",
+    "text": "快件在【深圳华南陆运枢纽】完成分拣，准备发往【上海浦东张江集散中心】"
+   },
+   {
+    "role": "time",
+    "text": "10-14 19:35"
+   },
+   {
+    "role": "secondary",
+    "text": "顺丰速运 已收取快件，收派员：黄小龙，电话：13510948826"
+   },
+   {
+    "role": "button",
+    "text": "催派送"
+   },
+   {
+    "role": "button",
+    "text": "修改地址"
+   },
+   {
+    "role": "button",
+    "text": "我要投诉"
+   }
+  ],
+  "find": [
+   {
+    "kind": "TRACKING_NO",
+    "text": "SF1428830917625"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "张*伟"
+   },
+   {
+    "kind": "PHONE",
+    "text": "138****5678"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "何*婷"
+   },
+   {
+    "kind": "PHONE",
+    "text": "159****0384"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "汤臣豪园三期 15号楼702室"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "婷婷"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "黄小龙"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13510948826"
+   }
+  ],
+  "avoid": [
+   "顺丰标快",
+   "上海浦东张江集散中心",
+   "深圳华南陆运枢纽",
+   "顺丰速运",
+   "丰巢",
+   "修改地址",
+   "寄付现结"
+  ],
+  "neutral": [
+   "广东省深圳市南山区",
+   "上海市浦东新区张江镇",
+   "祖冲之路",
+   "¥23.00",
+   "1.0kg",
+   "10-14 19:35",
+   "衣物"
+  ]
+ },
+ {
+  "name": "zshop-pdd-pickup-order",
+  "app": "拼多多",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "18:55"
+   },
+   {
+    "role": "status",
+    "text": "5G 41%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "订单详情"
+   },
+   {
+    "role": "button",
+    "text": "客服"
+   },
+   {
+    "role": "primary",
+    "text": "待取件"
+   },
+   {
+    "role": "secondary",
+    "text": "包裹已到达自提点，请在10月18日前取件"
+   },
+   {
+    "role": "label",
+    "text": "取件码"
+   },
+   {
+    "role": "value",
+    "text": "6-3-2208"
+   },
+   {
+    "role": "button",
+    "text": "出示取件码"
+   },
+   {
+    "role": "label",
+    "text": "自提点"
+   },
+   {
+    "role": "primary",
+    "text": "兔喜生活·多多驿站（富力桃园店）"
+   },
+   {
+    "role": "secondary",
+    "text": "朝阳区富力桃园C区底商12号 08:30-21:30"
+   },
+   {
+    "role": "button",
+    "text": "导航"
+   },
+   {
+    "role": "button",
+    "text": "联系驿站"
+   },
+   {
+    "role": "name",
+    "text": "吴海峰 177****6620"
+   },
+   {
+    "role": "secondary",
+    "text": "北京市朝阳区 富力桃园A区 8号楼2单元603"
+   },
+   {
+    "role": "secondary",
+    "text": "已授权 妈妈 139****1176 代取包裹"
+   },
+   {
+    "role": "label",
+    "text": "三只松鼠旗舰店 >"
+   },
+   {
+    "role": "primary",
+    "text": "【百亿补贴】三只松鼠 每日坚果750g/30袋 混合果仁零食"
+   },
+   {
+    "role": "secondary",
+    "text": "已拼1.2万件 · 极速退款"
+   },
+   {
+    "role": "value",
+    "text": "¥59.9"
+   },
+   {
+    "role": "secondary",
+    "text": "×1"
+   },
+   {
+    "role": "label",
+    "text": "商品总价"
+   },
+   {
+    "role": "value",
+    "text": "¥69.90"
+   },
+   {
+    "role": "label",
+    "text": "店铺优惠"
+   },
+   {
+    "role": "value",
+    "text": "-¥10.00"
+   },
+   {
+    "role": "label",
+    "text": "实付"
+   },
+   {
+    "role": "value",
+    "text": "¥59.90"
+   },
+   {
+    "role": "label",
+    "text": "物流公司"
+   },
+   {
+    "role": "value",
+    "text": "中通快递"
+   },
+   {
+    "role": "label",
+    "text": "快递单号"
+   },
+   {
+    "role": "value",
+    "text": "78294103652817"
+   },
+   {
+    "role": "label",
+    "text": "订单编号"
+   },
+   {
+    "role": "value",
+    "text": "261013-583720194628351"
+   },
+   {
+    "role": "label",
+    "text": "下单时间"
+   },
+   {
+    "role": "value",
+    "text": "2026-10-13 21:44:09"
+   },
+   {
+    "role": "title",
+    "text": "多多买菜 · 猜你喜欢"
+   },
+   {
+    "role": "primary",
+    "text": "李子柒 柳州螺蛳粉 335g×3袋"
+   },
+   {
+    "role": "value",
+    "text": "¥39.9"
+   },
+   {
+    "role": "button",
+    "text": "联系商家"
+   },
+   {
+    "role": "button",
+    "text": "确认收货"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PICKUP_CODE",
+    "text": "6-3-2208"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "吴海峰"
+   },
+   {
+    "kind": "PHONE",
+    "text": "177****6620"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "富力桃园A区 8号楼2单元603"
+   },
+   {
+    "kind": "PHONE",
+    "text": "139****1176"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "78294103652817"
+   }
+  ],
+  "avoid": [
+   "兔喜生活·多多驿站",
+   "三只松鼠",
+   "中通快递",
+   "李子柒",
+   "百亿补贴",
+   "出示取件码"
+  ],
+  "neutral": [
+   "富力桃园C区底商12号",
+   "261013-583720194628351",
+   "北京市朝阳区",
+   "妈妈",
+   "¥59.90",
+   "2026-10-13 21:44:09",
+   "10月18日"
+  ]
+ },
+ {
+  "name": "zshop-meituan-waimai-order",
+  "app": "美团",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "12:03"
+   },
+   {
+    "role": "status",
+    "text": "5G 92%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "订单详情"
+   },
+   {
+    "role": "button",
+    "text": "联系客服"
+   },
+   {
+    "role": "primary",
+    "text": "骑手正在送餐"
+   },
+   {
+    "role": "secondary",
+    "text": "预计 12:15 送达"
+   },
+   {
+    "role": "name",
+    "text": "骑手 赵伟强"
+   },
+   {
+    "role": "secondary",
+    "text": "美团专送 · 准时率 99%"
+   },
+   {
+    "role": "button",
+    "text": "打电话"
+   },
+   {
+    "role": "button",
+    "text": "发消息"
+   },
+   {
+    "role": "secondary",
+    "text": "号码保护中，骑手看到的是隐私号"
+   },
+   {
+    "role": "label",
+    "text": "张亮麻辣烫（望京SOHO店） >"
+   },
+   {
+    "role": "primary",
+    "text": "自选麻辣烫 微辣 加麻酱"
+   },
+   {
+    "role": "value",
+    "text": "¥32.80"
+   },
+   {
+    "role": "primary",
+    "text": "冰峰橙味汽水 330ml"
+   },
+   {
+    "role": "value",
+    "text": "¥5.00"
+   },
+   {
+    "role": "label",
+    "text": "打包费"
+   },
+   {
+    "role": "value",
+    "text": "¥2.00"
+   },
+   {
+    "role": "label",
+    "text": "配送费"
+   },
+   {
+    "role": "value",
+    "text": "¥0.00"
+   },
+   {
+    "role": "label",
+    "text": "满减优惠"
+   },
+   {
+    "role": "value",
+    "text": "-¥8.00"
+   },
+   {
+    "role": "label",
+    "text": "实付"
+   },
+   {
+    "role": "value",
+    "text": "¥31.80"
+   },
+   {
+    "role": "title",
+    "text": "配送信息"
+   },
+   {
+    "role": "label",
+    "text": "期望时间"
+   },
+   {
+    "role": "value",
+    "text": "尽快送达"
+   },
+   {
+    "role": "label",
+    "text": "配送地址"
+   },
+   {
+    "role": "value",
+    "text": "北京朝阳区望京街道 金隅丽港城 5号楼2单元1803"
+   },
+   {
+    "role": "value",
+    "text": "林(先生) 152****9043"
+   },
+   {
+    "role": "label",
+    "text": "配送服务"
+   },
+   {
+    "role": "value",
+    "text": "美团专送"
+   },
+   {
+    "role": "title",
+    "text": "订单信息"
+   },
+   {
+    "role": "label",
+    "text": "订单号码"
+   },
+   {
+    "role": "value",
+    "text": "6017 2893 4451 0726 5"
+   },
+   {
+    "role": "label",
+    "text": "下单时间"
+   },
+   {
+    "role": "value",
+    "text": "2026-10-15 11:41"
+   },
+   {
+    "role": "label",
+    "text": "餐具数量"
+   },
+   {
+    "role": "value",
+    "text": "1份"
+   },
+   {
+    "role": "label",
+    "text": "备注"
+   },
+   {
+    "role": "value",
+    "text": "到了打电话，交给门卫说是18楼林子轩的就行，麻酱多给点"
+   },
+   {
+    "role": "button",
+    "text": "再来一单"
+   },
+   {
+    "role": "button",
+    "text": "申请售后"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "赵伟强"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "金隅丽港城 5号楼2单元1803"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林(先生)"
+   },
+   {
+    "kind": "PHONE",
+    "text": "152****9043"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林子轩"
+   }
+  ],
+  "avoid": [
+   "张亮麻辣烫",
+   "望京SOHO店",
+   "美团专送",
+   "冰峰橙味汽水",
+   "再来一单",
+   "号码保护中"
+  ],
+  "neutral": [
+   "北京朝阳区望京街道",
+   "6017 2893 4451 0726 5",
+   "18楼",
+   "¥31.80",
+   "2026-10-15 11:41",
+   "门卫"
+  ]
+ },
+ {
+  "name": "zshop-didi-trip-receipt",
+  "app": "滴滴出行",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "23:47"
+   },
+   {
+    "role": "status",
+    "text": "4G 38%"
+   },
+   {
+    "role": "button",
+    "text": "×"
+   },
+   {
+    "role": "title",
+    "text": "行程详情"
+   },
+   {
+    "role": "primary",
+    "text": "行程已结束"
+   },
+   {
+    "role": "value",
+    "text": "58.60元"
+   },
+   {
+    "role": "link",
+    "text": "费用明细 >"
+   },
+   {
+    "role": "name",
+    "text": "王师傅"
+   },
+   {
+    "role": "value",
+    "text": "京N·6M27H"
+   },
+   {
+    "role": "secondary",
+    "text": "白色 · 比亚迪秦PLUS"
+   },
+   {
+    "role": "secondary",
+    "text": "4.9分 · 已服务 3127 单"
+   },
+   {
+    "role": "button",
+    "text": "联系司机"
+   },
+   {
+    "role": "time",
+    "text": "10月15日 23:08"
+   },
+   {
+    "role": "secondary",
+    "text": "三里屯太古里南区-北门"
+   },
+   {
+    "role": "time",
+    "text": "10月15日 23:41"
+   },
+   {
+    "role": "secondary",
+    "text": "家 · 天地家园 9号楼东门"
+   },
+   {
+    "role": "secondary",
+    "text": "朝阳区 · 双桥东路"
+   },
+   {
+    "role": "secondary",
+    "text": "快车 · 18.3公里 · 33分钟"
+   },
+   {
+    "role": "label",
+    "text": "起步价"
+   },
+   {
+    "role": "value",
+    "text": "13.00元"
+   },
+   {
+    "role": "label",
+    "text": "里程费（18.3公里）"
+   },
+   {
+    "role": "value",
+    "text": "36.60元"
+   },
+   {
+    "role": "label",
+    "text": "时长费（33分钟）"
+   },
+   {
+    "role": "value",
+    "text": "9.00元"
+   },
+   {
+    "role": "label",
+    "text": "远途费"
+   },
+   {
+    "role": "value",
+    "text": "3.20元"
+   },
+   {
+    "role": "label",
+    "text": "优惠券抵扣"
+   },
+   {
+    "role": "value",
+    "text": "-3.20元"
+   },
+   {
+    "role": "label",
+    "text": "实付"
+   },
+   {
+    "role": "value",
+    "text": "58.60元"
+   },
+   {
+    "role": "label",
+    "text": "支付方式"
+   },
+   {
+    "role": "value",
+    "text": "微信支付"
+   },
+   {
+    "role": "label",
+    "text": "乘车人"
+   },
+   {
+    "role": "value",
+    "text": "本人（尾号8817）"
+   },
+   {
+    "role": "secondary",
+    "text": "行程已自动分享给紧急联系人 周雨桐"
+   },
+   {
+    "role": "label",
+    "text": "订单编号"
+   },
+   {
+    "role": "value",
+    "text": "TA8173920516824096"
+   },
+   {
+    "role": "button",
+    "text": "开发票"
+   },
+   {
+    "role": "button",
+    "text": "评价司机"
+   },
+   {
+    "role": "button",
+    "text": "投诉/求助"
+   },
+   {
+    "role": "secondary",
+    "text": "滴滴快车 · 安全出行"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "王师傅"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "京N·6M27H"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "天地家园 9号楼东门"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周雨桐"
+   }
+  ],
+  "avoid": [
+   "比亚迪秦PLUS",
+   "三里屯太古里南区-北门",
+   "滴滴快车",
+   "微信支付",
+   "评价司机",
+   "紧急联系人"
+  ],
+  "neutral": [
+   "尾号8817",
+   "TA8173920516824096",
+   "朝阳区 · 双桥东路",
+   "58.60元",
+   "10月15日 23:08",
+   "10月15日 23:41",
+   "18.3公里"
+  ]
+ },
+ {
+  "name": "zshop-12306-ticket-order",
+  "app": "铁路12306",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "07:15"
+   },
+   {
+    "role": "status",
+    "text": "5G 99%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "订单详情"
+   },
+   {
+    "role": "primary",
+    "text": "已支付"
+   },
+   {
+    "role": "secondary",
+    "text": "订单号：E928301746"
+   },
+   {
+    "role": "time",
+    "text": "2026-10-18 周日"
+   },
+   {
+    "role": "primary",
+    "text": "北京南"
+   },
+   {
+    "role": "primary",
+    "text": "G117"
+   },
+   {
+    "role": "primary",
+    "text": "上海虹桥"
+   },
+   {
+    "role": "time",
+    "text": "07:55"
+   },
+   {
+    "role": "secondary",
+    "text": "4小时38分"
+   },
+   {
+    "role": "time",
+    "text": "12:33"
+   },
+   {
+    "role": "link",
+    "text": "经停信息"
+   },
+   {
+    "role": "title",
+    "text": "乘车人"
+   },
+   {
+    "role": "name",
+    "text": "李文博 成人票"
+   },
+   {
+    "role": "secondary",
+    "text": "中国居民身份证 1101**********3518"
+   },
+   {
+    "role": "secondary",
+    "text": "05车 08A号 二等座"
+   },
+   {
+    "role": "value",
+    "text": "¥553.0"
+   },
+   {
+    "role": "name",
+    "text": "陈晓萌 学生票"
+   },
+   {
+    "role": "secondary",
+    "text": "中国居民身份证 3205**********2046"
+   },
+   {
+    "role": "secondary",
+    "text": "05车 08B号 二等座"
+   },
+   {
+    "role": "value",
+    "text": "¥331.8"
+   },
+   {
+    "role": "name",
+    "text": "李一诺 儿童票"
+   },
+   {
+    "role": "secondary",
+    "text": "中国居民身份证 1101**********0029"
+   },
+   {
+    "role": "secondary",
+    "text": "05车 08C号 二等座"
+   },
+   {
+    "role": "value",
+    "text": "¥276.5"
+   },
+   {
+    "role": "label",
+    "text": "检票口：9B"
+   },
+   {
+    "role": "label",
+    "text": "联系手机"
+   },
+   {
+    "role": "value",
+    "text": "135****2864"
+   },
+   {
+    "role": "secondary",
+    "text": "温馨提示：请携带购票时所使用的有效身份证件原件，提前到达车站，留足安检候车时间"
+   },
+   {
+    "role": "button",
+    "text": "改签"
+   },
+   {
+    "role": "button",
+    "text": "退票"
+   },
+   {
+    "role": "button",
+    "text": "变更到站"
+   },
+   {
+    "role": "button",
+    "text": "订餐服务"
+   },
+   {
+    "role": "button",
+    "text": "购买返程"
+   },
+   {
+    "role": "secondary",
+    "text": "铁路畅行 积分 +553"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "李文博"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "1101**********3518"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈晓萌"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "3205**********2046"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "李一诺"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "1101**********0029"
+   },
+   {
+    "kind": "PHONE",
+    "text": "135****2864"
+   }
+  ],
+  "avoid": [
+   "北京南",
+   "上海虹桥",
+   "G117",
+   "铁路畅行",
+   "二等座",
+   "改签",
+   "中国居民身份证"
+  ],
+  "neutral": [
+   "E928301746",
+   "2026-10-18 周日",
+   "05车 08A号",
+   "05车 08B号",
+   "05车 08C号",
+   "¥553.0",
+   "检票口：9B",
+   "成人票"
+  ]
+ },
+ {
+  "name": "zshop-ctrip-hotel-order",
+  "app": "携程旅行",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "20:31"
+   },
+   {
+    "role": "status",
+    "text": "5G 70%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "订单详情"
+   },
+   {
+    "role": "button",
+    "text": "客服"
+   },
+   {
+    "role": "primary",
+    "text": "预订成功"
+   },
+   {
+    "role": "secondary",
+    "text": "酒店已确认，入住当天请出示有效证件办理入住"
+   },
+   {
+    "role": "primary",
+    "text": "亚朵酒店（杭州西湖湖滨银泰in77店）"
+   },
+   {
+    "role": "secondary",
+    "text": "上城区东坡路68号"
+   },
+   {
+    "role": "button",
+    "text": "地图"
+   },
+   {
+    "role": "button",
+    "text": "致电酒店"
+   },
+   {
+    "role": "time",
+    "text": "10月24日 周六"
+   },
+   {
+    "role": "time",
+    "text": "10月26日 周一"
+   },
+   {
+    "role": "secondary",
+    "text": "共2晚"
+   },
+   {
+    "role": "primary",
+    "text": "高级大床房 · 1间"
+   },
+   {
+    "role": "secondary",
+    "text": "含双早 · 不可取消 · 免费WiFi"
+   },
+   {
+    "role": "label",
+    "text": "入住人"
+   },
+   {
+    "role": "value",
+    "text": "杨帆，许嘉宁"
+   },
+   {
+    "role": "label",
+    "text": "联系手机"
+   },
+   {
+    "role": "value",
+    "text": "+86 182 1037 5594"
+   },
+   {
+    "role": "label",
+    "text": "联系邮箱"
+   },
+   {
+    "role": "value",
+    "text": "jianing.xu@foxmail.com"
+   },
+   {
+    "role": "label",
+    "text": "预计到店"
+   },
+   {
+    "role": "value",
+    "text": "18:00前"
+   },
+   {
+    "role": "label",
+    "text": "特殊要求"
+   },
+   {
+    "role": "value",
+    "text": "高楼层无烟房；帮忙在房间放个蛋糕，卡片写“小许生日快乐”，费用到店付"
+   },
+   {
+    "role": "label",
+    "text": "在线付款"
+   },
+   {
+    "role": "value",
+    "text": "¥1,276"
+   },
+   {
+    "role": "label",
+    "text": "订单号"
+   },
+   {
+    "role": "value",
+    "text": "1128749302615"
+   },
+   {
+    "role": "secondary",
+    "text": "钻石贵宾 · 延迟退房至14:00"
+   },
+   {
+    "role": "secondary",
+    "text": "携程积分 +64"
+   },
+   {
+    "role": "title",
+    "text": "周边美食"
+   },
+   {
+    "role": "primary",
+    "text": "外婆家（湖滨店）"
+   },
+   {
+    "role": "secondary",
+    "text": "4.6分 · ¥72/人"
+   },
+   {
+    "role": "primary",
+    "text": "楼外楼（孤山路店）"
+   },
+   {
+    "role": "secondary",
+    "text": "4.5分 · 西湖醋鱼"
+   },
+   {
+    "role": "button",
+    "text": "修改订单"
+   },
+   {
+    "role": "button",
+    "text": "再次预订"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "杨帆"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "许嘉宁"
+   },
+   {
+    "kind": "PHONE",
+    "text": "+86 182 1037 5594"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "jianing.xu@foxmail.com"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "小许"
+   }
+  ],
+  "avoid": [
+   "亚朵酒店",
+   "东坡路68号",
+   "外婆家",
+   "楼外楼",
+   "西湖醋鱼",
+   "高级大床房",
+   "钻石贵宾"
+  ],
+  "neutral": [
+   "1128749302615",
+   "¥1,276",
+   "10月24日 周六",
+   "10月26日 周一",
+   "18:00前",
+   "上城区",
+   "生日快乐"
+  ]
+ },
+ {
+  "name": "zshop-dianping-shop-reviews",
+  "app": "大众点评",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "13:26"
+   },
+   {
+    "role": "status",
+    "text": "5G 81%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "王记烧烤（朝阳大悦城店）"
+   },
+   {
+    "role": "button",
+    "text": "收藏"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "value",
+    "text": "4.7分"
+   },
+   {
+    "role": "secondary",
+    "text": "口味4.8 环境4.5 服务4.6"
+   },
+   {
+    "role": "secondary",
+    "text": "¥89/人 · 烧烤 · 青年路"
+   },
+   {
+    "role": "secondary",
+    "text": "营业中 11:00-02:00"
+   },
+   {
+    "role": "secondary",
+    "text": "朝阳北路101号朝阳大悦城6层"
+   },
+   {
+    "role": "button",
+    "text": "导航"
+   },
+   {
+    "role": "button",
+    "text": "电话"
+   },
+   {
+    "role": "secondary",
+    "text": "必吃榜 2026 · 朝阳区烧烤热门榜第3名"
+   },
+   {
+    "role": "label",
+    "text": "推荐菜"
+   },
+   {
+    "role": "secondary",
+    "text": "羊肉串 · 烤腰子 · 王记秘制鸡翅 · 烤馒头片"
+   },
+   {
+    "role": "label",
+    "text": "团购"
+   },
+   {
+    "role": "primary",
+    "text": "双人套餐 ¥168 门市价¥236"
+   },
+   {
+    "role": "button",
+    "text": "抢购"
+   },
+   {
+    "role": "label",
+    "text": "网友评价 (3271)"
+   },
+   {
+    "role": "secondary",
+    "text": "好评 2865 · 有图 1204 · 差评 47"
+   },
+   {
+    "role": "name",
+    "text": "吃货小胖丁"
+   },
+   {
+    "role": "secondary",
+    "text": "Lv6 · 10-12"
+   },
+   {
+    "role": "secondary",
+    "text": "★★★★★ 人均¥95"
+   },
+   {
+    "role": "primary",
+    "text": "周末跟同事来的，装修有点像周杰伦MV里那种老北京胡同风。羊肉串是真的香，比簋街胡大排队短多了。服务员小刘很热情，主动帮换烤盘。"
+   },
+   {
+    "role": "secondary",
+    "text": "赞 128  回应 16"
+   },
+   {
+    "role": "name",
+    "text": "匿名用户"
+   },
+   {
+    "role": "secondary",
+    "text": "Lv4 · 10-09"
+   },
+   {
+    "role": "secondary",
+    "text": "★★★★ 人均¥82"
+   },
+   {
+    "role": "primary",
+    "text": "味道中规中矩，烤馒头片好评。从大悦城李宁店那个门进来坐扶梯最近，别走地库。"
+   },
+   {
+    "role": "secondary",
+    "text": "商家回复：感谢支持，欢迎下次再来～"
+   },
+   {
+    "role": "title",
+    "text": "附近同类商家"
+   },
+   {
+    "role": "primary",
+    "text": "海底捞火锅（朝阳大悦城店）"
+   },
+   {
+    "role": "secondary",
+    "text": "4.6分 · ¥128/人"
+   },
+   {
+    "role": "button",
+    "text": "写评价"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_NAME",
+    "text": "吃货小胖丁"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "小刘"
+   }
+  ],
+  "avoid": [
+   "王记烧烤",
+   "朝阳大悦城",
+   "周杰伦",
+   "胡大",
+   "李宁店",
+   "海底捞火锅",
+   "王记秘制鸡翅",
+   "匿名用户"
+  ],
+  "neutral": [
+   "¥89/人",
+   "10-12",
+   "朝阳北路101号",
+   "同事",
+   "簋街"
+  ]
+ },
+ {
+  "name": "zdocs-id-card-front",
+  "app": "相册",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "10:07"
+   },
+   {
+    "role": "status",
+    "text": "5G 76%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "3月12日"
+   },
+   {
+    "role": "subtitle",
+    "text": "上午10:05 · 相机"
+   },
+   {
+    "role": "value",
+    "text": "姓名 陈思远"
+   },
+   {
+    "role": "value",
+    "text": "性别 男  民族 汉"
+   },
+   {
+    "role": "value",
+    "text": "出生 1993 年 7 月 21 日"
+   },
+   {
+    "role": "value",
+    "text": "住址 浙江省杭州市西湖区古荡湾"
+   },
+   {
+    "role": "value",
+    "text": "新村12幢3单元402室"
+   },
+   {
+    "role": "value",
+    "text": "公民身份号码 330106199307214515"
+   },
+   {
+    "role": "secondary",
+    "text": "点按文字可复制"
+   },
+   {
+    "role": "button",
+    "text": "复制全部"
+   },
+   {
+    "role": "button",
+    "text": "翻译"
+   },
+   {
+    "role": "secondary",
+    "text": "IMG_20260312_100512.jpg"
+   },
+   {
+    "role": "secondary",
+    "text": "4032×3024  3.21MB"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "button",
+    "text": "编辑"
+   },
+   {
+    "role": "button",
+    "text": "收藏"
+   },
+   {
+    "role": "button",
+    "text": "删除"
+   },
+   {
+    "role": "button",
+    "text": "更多"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "陈思远"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "1993 年 7 月 21 日"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "浙江省杭州市西湖区古荡湾"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "新村12幢3单元402室"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "330106199307214515"
+   }
+  ],
+  "avoid": [
+   "复制全部",
+   "翻译",
+   "IMG_20260312_100512.jpg",
+   "4032×3024  3.21MB",
+   "分享",
+   "删除"
+  ],
+  "neutral": [
+   "男",
+   "汉",
+   "3月12日",
+   "上午10:05",
+   "姓名",
+   "住址",
+   "公民身份号码",
+   "出生"
+  ]
+ },
+ {
+  "name": "zdocs-driver-license-12123",
+  "app": "交管12123",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "08:15"
+   },
+   {
+    "role": "status",
+    "text": "4G 52%"
+   },
+   {
+    "role": "button",
+    "text": "一"
+   },
+   {
+    "role": "title",
+    "text": "电子驾驶证"
+   },
+   {
+    "role": "button",
+    "text": "使用说明"
+   },
+   {
+    "role": "primary",
+    "text": "中华人民共和国机动车驾驶证"
+   },
+   {
+    "role": "label",
+    "text": "证号"
+   },
+   {
+    "role": "value",
+    "text": "310115198811023628"
+   },
+   {
+    "role": "label",
+    "text": "姓名"
+   },
+   {
+    "role": "value",
+    "text": "刘佳怡"
+   },
+   {
+    "role": "value",
+    "text": "性别 女   国籍 中国"
+   },
+   {
+    "role": "label",
+    "text": "住址"
+   },
+   {
+    "role": "value",
+    "text": "上海市浦东新区张杨路1288弄"
+   },
+   {
+    "role": "value",
+    "text": "15号1102室"
+   },
+   {
+    "role": "value",
+    "text": "出生日期 1988-11-02"
+   },
+   {
+    "role": "value",
+    "text": "初次领证日期 2010-07-19"
+   },
+   {
+    "role": "value",
+    "text": "准驾车型 C1"
+   },
+   {
+    "role": "value",
+    "text": "有效期限 2026-07-19 至 长期"
+   },
+   {
+    "role": "value",
+    "text": "档案编号 310012458392"
+   },
+   {
+    "role": "value",
+    "text": "累积记分 0分    状态 正常"
+   },
+   {
+    "role": "secondary",
+    "text": "发证机关 上海市公安局交通警察总队"
+   },
+   {
+    "role": "secondary",
+    "text": "二维码有效期 58秒"
+   },
+   {
+    "role": "button",
+    "text": "刷新"
+   },
+   {
+    "role": "secondary",
+    "text": "本电子驾驶证与纸质驾驶证具有同等效力"
+   },
+   {
+    "role": "button",
+    "text": "保存到相册"
+   },
+   {
+    "role": "button",
+    "text": "出示驾驶证"
+   }
+  ],
+  "find": [
+   {
+    "kind": "ID_NUMBER",
+    "text": "310115198811023628"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "刘佳怡"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "上海市浦东新区张杨路1288弄"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "15号1102室"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "1988-11-02"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "310012458392"
+   }
+  ],
+  "avoid": [
+   "中华人民共和国机动车驾驶证",
+   "C1",
+   "上海市公安局交通警察总队",
+   "刷新",
+   "保存到相册",
+   "出示驾驶证"
+  ],
+  "neutral": [
+   "2010-07-19",
+   "2026-07-19 至 长期",
+   "0分",
+   "正常",
+   "女",
+   "中国",
+   "58秒"
+  ]
+ },
+ {
+  "name": "zdocs-vehicle-license-insurance",
+  "app": "车险投保",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "16:48"
+   },
+   {
+    "role": "status",
+    "text": "5G 63%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "确认车辆信息"
+   },
+   {
+    "role": "secondary",
+    "text": "已识别行驶证，请核对以下信息"
+   },
+   {
+    "role": "label",
+    "text": "号牌号码"
+   },
+   {
+    "role": "value",
+    "text": "苏A·8Q2M7"
+   },
+   {
+    "role": "label",
+    "text": "车辆类型"
+   },
+   {
+    "role": "value",
+    "text": "小型轿车"
+   },
+   {
+    "role": "label",
+    "text": "所有人"
+   },
+   {
+    "role": "value",
+    "text": "黄志强"
+   },
+   {
+    "role": "label",
+    "text": "住址"
+   },
+   {
+    "role": "value",
+    "text": "南京市鼓楼区清江花苑9栋205室"
+   },
+   {
+    "role": "label",
+    "text": "使用性质"
+   },
+   {
+    "role": "value",
+    "text": "非营运"
+   },
+   {
+    "role": "label",
+    "text": "品牌型号"
+   },
+   {
+    "role": "value",
+    "text": "大众汽车牌SVW7148BRD"
+   },
+   {
+    "role": "label",
+    "text": "车辆识别代 号"
+   },
+   {
+    "role": "value",
+    "text": "LSVAU2180N2184735"
+   },
+   {
+    "role": "label",
+    "text": "发动机号码"
+   },
+   {
+    "role": "value",
+    "text": "DKX274519"
+   },
+   {
+    "role": "label",
+    "text": "注册日期"
+   },
+   {
+    "role": "value",
+    "text": "2022-04-18"
+   },
+   {
+    "role": "label",
+    "text": "发证日期"
+   },
+   {
+    "role": "value",
+    "text": "2022-04-18"
+   },
+   {
+    "role": "link",
+    "text": "信息有误？重新拍摄"
+   },
+   {
+    "role": "label",
+    "text": "车主手机号"
+   },
+   {
+    "role": "value",
+    "text": "139 1584 2706"
+   },
+   {
+    "role": "secondary",
+    "text": "被保险人与车主一致"
+   },
+   {
+    "role": "secondary",
+    "text": "续保客户享专属折扣，最高立减300元"
+   },
+   {
+    "role": "button",
+    "text": "下一步，获取报价"
+   },
+   {
+    "role": "secondary",
+    "text": "本服务由中国太平洋财产保险股份有限公司提供"
+   }
+  ],
+  "find": [
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "苏A·8Q2M7"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "黄志强"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "南京市鼓楼区清江花苑9栋205室"
+   },
+   {
+    "kind": "VIN",
+    "text": "LSVAU2180N2184735"
+   },
+   {
+    "kind": "VIN",
+    "text": "DKX274519"
+   },
+   {
+    "kind": "PHONE",
+    "text": "139 1584 2706"
+   }
+  ],
+  "avoid": [
+   "小型轿车",
+   "大众汽车牌SVW7148BRD",
+   "非营运",
+   "重新拍摄",
+   "下一步，获取报价",
+   "中国太平洋财产保险股份有限公司",
+   "最高立减300元"
+  ],
+  "neutral": [
+   "2022-04-18",
+   "注册日期",
+   "发证日期",
+   "所有人"
+  ]
+ },
+ {
+  "name": "zdocs-bank-transfer-receipt",
+  "app": "招商银行",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "13:22"
+   },
+   {
+    "role": "status",
+    "text": "5G 41%"
+   },
+   {
+    "role": "title",
+    "text": "转账结果"
+   },
+   {
+    "role": "button",
+    "text": "完成"
+   },
+   {
+    "role": "primary",
+    "text": "转账成功"
+   },
+   {
+    "role": "value",
+    "text": "¥5,800.00"
+   },
+   {
+    "role": "secondary",
+    "text": "预计2小时内到账，以收款行入账时间为准"
+   },
+   {
+    "role": "label",
+    "text": "收款人"
+   },
+   {
+    "role": "value",
+    "text": "周雨桐"
+   },
+   {
+    "role": "label",
+    "text": "收款账号"
+   },
+   {
+    "role": "value",
+    "text": "6217 0012 4608 3391 275"
+   },
+   {
+    "role": "label",
+    "text": "收款银行"
+   },
+   {
+    "role": "value",
+    "text": "中国建设银行北京望京支行"
+   },
+   {
+    "role": "label",
+    "text": "付款账户"
+   },
+   {
+    "role": "value",
+    "text": "招商银行一卡通(8826)"
+   },
+   {
+    "role": "label",
+    "text": "转账附言"
+   },
+   {
+    "role": "value",
+    "text": "10月房租 王浩代付"
+   },
+   {
+    "role": "label",
+    "text": "手续费"
+   },
+   {
+    "role": "value",
+    "text": "0.00"
+   },
+   {
+    "role": "label",
+    "text": "交易时间"
+   },
+   {
+    "role": "value",
+    "text": "2026-10-15 13:22:08"
+   },
+   {
+    "role": "label",
+    "text": "交易流水号"
+   },
+   {
+    "role": "value",
+    "text": "M20261015132208437726"
+   },
+   {
+    "role": "secondary",
+    "text": "已短信通知收款人 158****3326"
+   },
+   {
+    "role": "secondary",
+    "text": "已将周雨桐添加为常用收款人"
+   },
+   {
+    "role": "button",
+    "text": "查看电子回单"
+   },
+   {
+    "role": "button",
+    "text": "再转一笔"
+   },
+   {
+    "role": "link",
+    "text": "分享给收款人"
+   },
+   {
+    "role": "secondary",
+    "text": "转账到账提醒 免费开通 >"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "周雨桐"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6217 0012 4608 3391 275"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王浩"
+   },
+   {
+    "kind": "PHONE",
+    "text": "158****3326"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "周雨桐"
+   }
+  ],
+  "avoid": [
+   "转账成功",
+   "中国建设银行",
+   "招商银行一卡通",
+   "查看电子回单",
+   "再转一笔",
+   "分享给收款人"
+  ],
+  "neutral": [
+   "¥5,800.00",
+   "(8826)",
+   "望京支行",
+   "M20261015132208437726",
+   "2026-10-15 13:22:08",
+   "10月房租",
+   "0.00"
+  ]
+ },
+ {
+  "name": "zdocs-alipay-transfer-bill",
+  "app": "支付宝",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "21:06"
+   },
+   {
+    "role": "status",
+    "text": "Wi-Fi 33%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "账单详情"
+   },
+   {
+    "role": "primary",
+    "text": "林静怡"
+   },
+   {
+    "role": "value",
+    "text": "-200.00"
+   },
+   {
+    "role": "secondary",
+    "text": "交易成功"
+   },
+   {
+    "role": "label",
+    "text": "付款方式"
+   },
+   {
+    "role": "value",
+    "text": "余额宝"
+   },
+   {
+    "role": "label",
+    "text": "转账备注"
+   },
+   {
+    "role": "value",
+    "text": "海底捞聚餐AA 帮小敏也付了"
+   },
+   {
+    "role": "label",
+    "text": "对方账户"
+   },
+   {
+    "role": "value",
+    "text": "林静怡 lin***@qq.com"
+   },
+   {
+    "role": "label",
+    "text": "创建时间"
+   },
+   {
+    "role": "value",
+    "text": "2026-10-14 20:47:31"
+   },
+   {
+    "role": "label",
+    "text": "订单号"
+   },
+   {
+    "role": "value",
+    "text": "20261014200040011100830071234567"
+   },
+   {
+    "role": "label",
+    "text": "账单分类"
+   },
+   {
+    "role": "value",
+    "text": "转账红包"
+   },
+   {
+    "role": "button",
+    "text": "修改"
+   },
+   {
+    "role": "label",
+    "text": "标签和备注"
+   },
+   {
+    "role": "button",
+    "text": "添加"
+   },
+   {
+    "role": "label",
+    "text": "计入收支"
+   },
+   {
+    "role": "button",
+    "text": "对此订单有疑问"
+   },
+   {
+    "role": "button",
+    "text": "查看往来转账"
+   },
+   {
+    "role": "button",
+    "text": "再转一笔"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "林静怡"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "小敏"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "林静怡"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "lin***@qq.com"
+   }
+  ],
+  "avoid": [
+   "余额宝",
+   "海底捞",
+   "交易成功",
+   "转账红包",
+   "对此订单有疑问",
+   "查看往来转账"
+  ],
+  "neutral": [
+   "-200.00",
+   "2026-10-14 20:47:31",
+   "20261014200040011100830071234567",
+   "聚餐AA"
+  ]
+ },
+ {
+  "name": "zdocs-social-security-card",
+  "app": "掌上12333",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "11:30"
+   },
+   {
+    "role": "status",
+    "text": "5G 88%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "电子社保卡"
+   },
+   {
+    "role": "button",
+    "text": "···"
+   },
+   {
+    "role": "primary",
+    "text": "中华人民共和国社会保障卡"
+   },
+   {
+    "role": "value",
+    "text": "姓名 赵明轩"
+   },
+   {
+    "role": "value",
+    "text": "社会保障号码 4401**********283X"
+   },
+   {
+    "role": "value",
+    "text": "社保卡号 G13285604"
+   },
+   {
+    "role": "value",
+    "text": "发卡地 广州市"
+   },
+   {
+    "role": "secondary",
+    "text": "签发日期 2021年06月"
+   },
+   {
+    "role": "button",
+    "text": "亮码就医"
+   },
+   {
+    "role": "button",
+    "text": "扫一扫"
+   },
+   {
+    "role": "title",
+    "text": "医保账户"
+   },
+   {
+    "role": "label",
+    "text": "个人账户余额"
+   },
+   {
+    "role": "value",
+    "text": "¥1,286.40"
+   },
+   {
+    "role": "label",
+    "text": "金融账户"
+   },
+   {
+    "role": "value",
+    "text": "中国工商银行 6212 **** **** 3907"
+   },
+   {
+    "role": "title",
+    "text": "家庭共济"
+   },
+   {
+    "role": "secondary",
+    "text": "已绑定 赵子涵（子女），可共用本人医保个人账户"
+   },
+   {
+    "role": "title",
+    "text": "最近使用"
+   },
+   {
+    "role": "primary",
+    "text": "中山大学附属第三医院"
+   },
+   {
+    "role": "secondary",
+    "text": "门诊缴费 统筹支付 ¥142.00"
+   },
+   {
+    "role": "time",
+    "text": "09-28 10:16"
+   },
+   {
+    "role": "primary",
+    "text": "大参林药店(天河北店)"
+   },
+   {
+    "role": "secondary",
+    "text": "个人账户支付 ¥58.30"
+   },
+   {
+    "role": "time",
+    "text": "09-21 19:42"
+   },
+   {
+    "role": "button",
+    "text": "参保证明"
+   },
+   {
+    "role": "button",
+    "text": "异地备案"
+   },
+   {
+    "role": "button",
+    "text": "缴费记录"
+   },
+   {
+    "role": "button",
+    "text": "待遇查询"
+   },
+   {
+    "role": "button",
+    "text": "首页"
+   },
+   {
+    "role": "button",
+    "text": "我的"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "赵明轩"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "4401**********283X"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "G13285604"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6212 **** **** 3907"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "赵子涵"
+   }
+  ],
+  "avoid": [
+   "中华人民共和国社会保障卡",
+   "中山大学附属第三医院",
+   "大参林药店(天河北店)",
+   "亮码就医",
+   "参保证明",
+   "中国工商银行"
+  ],
+  "neutral": [
+   "广州市",
+   "2021年06月",
+   "¥1,286.40",
+   "¥142.00",
+   "¥58.30",
+   "09-28 10:16",
+   "09-21 19:42",
+   "子女"
+  ]
+ },
+ {
+  "name": "zdocs-health-checkup-report",
+  "app": "WPS Office",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "22:14"
+   },
+   {
+    "role": "status",
+    "text": "Wi-Fi 71%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "体检报告_吴晓雯.pdf"
+   },
+   {
+    "role": "secondary",
+    "text": "1/24"
+   },
+   {
+    "role": "primary",
+    "text": "美年大健康"
+   },
+   {
+    "role": "title",
+    "text": "健康体检报告"
+   },
+   {
+    "role": "value",
+    "text": "姓名：吴晓雯"
+   },
+   {
+    "role": "value",
+    "text": "性别：女    年龄：34岁"
+   },
+   {
+    "role": "value",
+    "text": "出生日期：1992年05月14日"
+   },
+   {
+    "role": "value",
+    "text": "身份证号：420102199205143425"
+   },
+   {
+    "role": "value",
+    "text": "体检编号：2610080572"
+   },
+   {
+    "role": "value",
+    "text": "体检日期：2026-10-08"
+   },
+   {
+    "role": "value",
+    "text": "单位：杭州云帆网络科技有限公司"
+   },
+   {
+    "role": "value",
+    "text": "联系电话：186 5712 0934"
+   },
+   {
+    "role": "value",
+    "text": "体检套餐：女性尊享套餐A"
+   },
+   {
+    "role": "title",
+    "text": "总检结论"
+   },
+   {
+    "role": "primary",
+    "text": "1. 甲状腺右叶结节（TI-RADS 3类），建议3-6个月复查"
+   },
+   {
+    "role": "primary",
+    "text": "2. 总胆固醇偏高，建议低脂饮食，适量运动"
+   },
+   {
+    "role": "primary",
+    "text": "3. 幽门螺杆菌C13呼气试验阳性，建议消化科就诊"
+   },
+   {
+    "role": "secondary",
+    "text": "主检医师：沈立平    审核医师：何静"
+   },
+   {
+    "role": "secondary",
+    "text": "美年大健康杭州西溪分院"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "button",
+    "text": "打印"
+   },
+   {
+    "role": "button",
+    "text": "用其他应用打开"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "吴晓雯"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "吴晓雯"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "1992年05月14日"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "420102199205143425"
+   },
+   {
+    "kind": "PHONE",
+    "text": "186 5712 0934"
+   }
+  ],
+  "avoid": [
+   "美年大健康",
+   "健康体检报告",
+   "女性尊享套餐A",
+   "TI-RADS 3类",
+   "美年大健康杭州西溪分院",
+   "用其他应用打开"
+  ],
+  "neutral": [
+   "女",
+   "34岁",
+   "2026-10-08",
+   "2610080572",
+   "杭州云帆网络科技有限公司",
+   "甲状腺右叶结节",
+   "幽门螺杆菌C13呼气试验阳性",
+   "沈立平",
+   "何静",
+   "1/24"
+  ]
+ },
+ {
+  "name": "zdocs-resume-preview",
+  "app": "BOSS直聘",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "19:03"
+   },
+   {
+    "role": "status",
+    "text": "5G 58%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "简历预览"
+   },
+   {
+    "role": "button",
+    "text": "导出PDF"
+   },
+   {
+    "role": "primary",
+    "text": "孙浩然"
+   },
+   {
+    "role": "secondary",
+    "text": "男 | 28岁 | 本科 | 6年工作经验"
+   },
+   {
+    "role": "value",
+    "text": "出生日期：1998年2月17日"
+   },
+   {
+    "role": "value",
+    "text": "手机：177 0216 8843"
+   },
+   {
+    "role": "value",
+    "text": "邮箱：haoran.sun98@outlook.com"
+   },
+   {
+    "role": "value",
+    "text": "现居：上海市闵行区七宝镇万科城市花园12号楼"
+   },
+   {
+    "role": "value",
+    "text": "求职意向：高级Java开发工程师 | 上海 | 25-35K"
+   },
+   {
+    "role": "title",
+    "text": "教育经历"
+   },
+   {
+    "role": "primary",
+    "text": "同济大学  计算机科学与技术  本科"
+   },
+   {
+    "role": "secondary",
+    "text": "2016.09 - 2020.06"
+   },
+   {
+    "role": "title",
+    "text": "工作经历"
+   },
+   {
+    "role": "primary",
+    "text": "上海寻梦信息技术有限公司  服务端开发工程师"
+   },
+   {
+    "role": "secondary",
+    "text": "2022.07 - 至今"
+   },
+   {
+    "role": "primary",
+    "text": "负责交易链路订单服务，峰值QPS 12万，主导Redis集群迁移"
+   },
+   {
+    "role": "primary",
+    "text": "上海携程商务有限公司  Java开发工程师"
+   },
+   {
+    "role": "secondary",
+    "text": "2020.07 - 2022.06"
+   },
+   {
+    "role": "title",
+    "text": "个人主页"
+   },
+   {
+    "role": "link",
+    "text": "github.com/haoransun-dev"
+   },
+   {
+    "role": "title",
+    "text": "证书"
+   },
+   {
+    "role": "secondary",
+    "text": "CET-6  软件设计师（中级）"
+   },
+   {
+    "role": "title",
+    "text": "自我评价"
+   },
+   {
+    "role": "primary",
+    "text": "热爱开源，业余参与 Spring Boot 中文文档翻译"
+   },
+   {
+    "role": "secondary",
+    "text": "推荐人：前主管 钱志伟 138 1652 9047"
+   },
+   {
+    "role": "button",
+    "text": "编辑简历"
+   },
+   {
+    "role": "button",
+    "text": "投递简历"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "孙浩然"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "1998年2月17日"
+   },
+   {
+    "kind": "PHONE",
+    "text": "177 0216 8843"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "haoran.sun98@outlook.com"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "上海市闵行区七宝镇万科城市花园12号楼"
+   },
+   {
+    "kind": "URL",
+    "text": "github.com/haoransun-dev"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "钱志伟"
+   },
+   {
+    "kind": "PHONE",
+    "text": "138 1652 9047"
+   }
+  ],
+  "avoid": [
+   "高级Java开发工程师",
+   "Redis",
+   "Spring Boot",
+   "CET-6",
+   "软件设计师（中级）",
+   "导出PDF",
+   "计算机科学与技术"
+  ],
+  "neutral": [
+   "同济大学",
+   "上海寻梦信息技术有限公司",
+   "上海携程商务有限公司",
+   "28岁",
+   "男",
+   "2016.09 - 2020.06",
+   "25-35K",
+   "前主管"
+  ]
+ },
+ {
+  "name": "zdocs-rental-contract-scan",
+  "app": "扫描全能王",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "15:40"
+   },
+   {
+    "role": "status",
+    "text": "5G 90%"
+   },
+   {
+    "role": "button",
+    "text": "<"
+   },
+   {
+    "role": "title",
+    "text": "房屋租赁合同(2)"
+   },
+   {
+    "role": "button",
+    "text": "导出"
+   },
+   {
+    "role": "primary",
+    "text": "房屋租赁合同"
+   },
+   {
+    "role": "value",
+    "text": "出租方（甲方）：郑国栋"
+   },
+   {
+    "role": "value",
+    "text": "身份证号：510104197608152719"
+   },
+   {
+    "role": "value",
+    "text": "联系电话：13308216675"
+   },
+   {
+    "role": "value",
+    "text": "承租方（乙方）：许 晴"
+   },
+   {
+    "role": "value",
+    "text": "身份证号：51130219970923472X"
+   },
+   {
+    "role": "value",
+    "text": "联系电话：152 8104 3369"
+   },
+   {
+    "role": "primary",
+    "text": "根据《中华人民共和国民法典》及有关规定，甲乙双方在平等、"
+   },
+   {
+    "role": "primary",
+    "text": "自愿、协商一致的基础上，就房屋租赁事宜达成如下协议："
+   },
+   {
+    "role": "primary",
+    "text": "第一条 甲方将位于成都市武侯区桐梓林北路18号"
+   },
+   {
+    "role": "primary",
+    "text": "蓝色加勒比小区5栋2单元1203室的房屋出租给乙方使用，"
+   },
+   {
+    "role": "primary",
+    "text": "建筑面积约89平方米，用途为居住。"
+   },
+   {
+    "role": "primary",
+    "text": "第二条 租期自2026年11月1日起至2027年10月31日止。"
+   },
+   {
+    "role": "primary",
+    "text": "第三条 月租金人民币叁仟贰佰元整（¥3,200），押一付三，"
+   },
+   {
+    "role": "primary",
+    "text": "乙方应于每期租金到期前5日转入甲方指定账户："
+   },
+   {
+    "role": "value",
+    "text": "开户行：中国农业银行成都桐梓林支行"
+   },
+   {
+    "role": "value",
+    "text": "户名：郑国栋"
+   },
+   {
+    "role": "value",
+    "text": "账号：6228 4801 2873 4419 076"
+   },
+   {
+    "role": "primary",
+    "text": "第四条 乙方之兄许明远可随同居住，其他人员入住须经甲方同意。"
+   },
+   {
+    "role": "secondary",
+    "text": "第 1 页 / 共 6 页"
+   },
+   {
+    "role": "button",
+    "text": "签名"
+   },
+   {
+    "role": "button",
+    "text": "OCR识别"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "郑国栋"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "510104197608152719"
+   },
+   {
+    "kind": "PHONE",
+    "text": "13308216675"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "许 晴"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "51130219970923472X"
+   },
+   {
+    "kind": "PHONE",
+    "text": "152 8104 3369"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "成都市武侯区桐梓林北路18号"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "蓝色加勒比小区5栋2单元1203室"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "郑国栋"
+   },
+   {
+    "kind": "PAYMENT_CARD",
+    "text": "6228 4801 2873 4419 076"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "许明远"
+   }
+  ],
+  "avoid": [
+   "中华人民共和国民法典",
+   "中国农业银行",
+   "房屋租赁合同",
+   "OCR识别",
+   "签名",
+   "押一付三"
+  ],
+  "neutral": [
+   "89平方米",
+   "2026年11月1日",
+   "2027年10月31日",
+   "¥3,200",
+   "叁仟贰佰元整",
+   "成都桐梓林支行",
+   "甲方",
+   "乙方"
+  ]
+ },
+ {
+  "name": "mixed-android-wifi-details",
+  "app": "Android 设置 · WLAN",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "14:32"
+   },
+   {
+    "role": "status",
+    "text": "5G 87%"
+   },
+   {
+    "role": "title",
+    "text": "< 网络详情"
+   },
+   {
+    "role": "title",
+    "text": "Xiaomi_7A2C_5G"
+   },
+   {
+    "role": "secondary",
+    "text": "已连接"
+   },
+   {
+    "role": "button",
+    "text": "分享"
+   },
+   {
+    "role": "button",
+    "text": "删除网络"
+   },
+   {
+    "role": "label",
+    "text": "信号强度"
+   },
+   {
+    "role": "value",
+    "text": "极好"
+   },
+   {
+    "role": "label",
+    "text": "频率"
+   },
+   {
+    "role": "value",
+    "text": "5 GHz"
+   },
+   {
+    "role": "label",
+    "text": "安全性"
+   },
+   {
+    "role": "value",
+    "text": "WPA2/WPA3-Personal"
+   },
+   {
+    "role": "label",
+    "text": "密码"
+   },
+   {
+    "role": "value",
+    "text": "Qiaoqiao#2468"
+   },
+   {
+    "role": "label",
+    "text": "隐私"
+   },
+   {
+    "role": "value",
+    "text": "使用随机 MAC"
+   },
+   {
+    "role": "label",
+    "text": "设备 MAC 地址"
+   },
+   {
+    "role": "value",
+    "text": "6a:3f:91:c2:e7:05"
+   },
+   {
+    "role": "label",
+    "text": "IP 地址"
+   },
+   {
+    "role": "value",
+    "text": "192.168.31.124"
+   },
+   {
+    "role": "label",
+    "text": "网关"
+   },
+   {
+    "role": "value",
+    "text": "192.168.31.1"
+   },
+   {
+    "role": "label",
+    "text": "子网掩码"
+   },
+   {
+    "role": "value",
+    "text": "255.255.255.0"
+   },
+   {
+    "role": "label",
+    "text": "DNS"
+   },
+   {
+    "role": "value",
+    "text": "223.5.5.5"
+   },
+   {
+    "role": "label",
+    "text": "IPv6 地址"
+   },
+   {
+    "role": "value",
+    "text": "240e:3b7:2410:8c51:1d4e:9a2f:6b07:3c11"
+   },
+   {
+    "role": "label",
+    "text": "链接速度"
+   },
+   {
+    "role": "value",
+    "text": "1201 Mbps"
+   },
+   {
+    "role": "label",
+    "text": "按流量计费"
+   },
+   {
+    "role": "value",
+    "text": "自动检测"
+   },
+   {
+    "role": "button",
+    "text": "高级"
+   }
+  ],
+  "find": [
+   {
+    "kind": "API_KEY",
+    "text": "Qiaoqiao#2468"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "6a:3f:91:c2:e7:05"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.124"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "240e:3b7:2410:8c51:1d4e:9a2f:6b07:3c11"
+   }
+  ],
+  "avoid": [
+   "WPA2/WPA3-Personal",
+   "255.255.255.0",
+   "223.5.5.5",
+   "1201 Mbps",
+   "删除网络",
+   "使用随机 MAC",
+   "5 GHz"
+  ],
+  "neutral": [
+   "Xiaomi_7A2C_5G",
+   "192.168.31.1",
+   "自动检测"
+  ]
+ },
+ {
+  "name": "mixed-router-admin-devices",
+  "app": "小米路由器后台（手机浏览器）",
+  "lang": "zh",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "21:08"
+   },
+   {
+    "role": "status",
+    "text": "WiFi 64%"
+   },
+   {
+    "role": "title",
+    "text": "192.168.31.1/cgi-bin/luci/;stok=4e9a07c2d1b85f36/web/home"
+   },
+   {
+    "role": "title",
+    "text": "小米路由器 AX3000T"
+   },
+   {
+    "role": "link",
+    "text": "路由状态"
+   },
+   {
+    "role": "link",
+    "text": "终端设备"
+   },
+   {
+    "role": "link",
+    "text": "常用设置"
+   },
+   {
+    "role": "label",
+    "text": "外网 IP"
+   },
+   {
+    "role": "value",
+    "text": "115.204.87.33"
+   },
+   {
+    "role": "label",
+    "text": "在线 设备 (7)"
+   },
+   {
+    "role": "primary",
+    "text": "Kevin's iPhone"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.105  MAC A4:83:E7:1B:5C:92"
+   },
+   {
+    "role": "secondary",
+    "text": "↓ 2.1MB/s  ↑ 86KB/s  在线 3小时12分"
+   },
+   {
+    "role": "button",
+    "text": "限速  拉黑"
+   },
+   {
+    "role": "primary",
+    "text": "张敏的MacBook-Air"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.118  MAC 3C:22:FB:90:4D:6E"
+   },
+   {
+    "role": "secondary",
+    "text": "↓ 0  ↑ 0  在线 26分钟"
+   },
+   {
+    "role": "primary",
+    "text": "王浩的 Redmi K70"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.122  MAC 5E:0B:77:A1:C3:48"
+   },
+   {
+    "role": "primary",
+    "text": "客厅-小米电视"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.140  MAC 64:9E:31:08:2A:FD"
+   },
+   {
+    "role": "primary",
+    "text": "DESKTOP-L7Q2K9M"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.151  MAC 00:E0:4C:68:12:B7"
+   },
+   {
+    "role": "primary",
+    "text": "米家智能摄像机 云台版2K"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.163  MAC 78:8C:B5:3D:E0:19"
+   },
+   {
+    "role": "primary",
+    "text": "李阿姨的手机"
+   },
+   {
+    "role": "secondary",
+    "text": "IP 192.168.31.177  MAC D2:6B:1E:44:9F:30"
+   },
+   {
+    "role": "label",
+    "text": "黑名单 (1)"
+   },
+   {
+    "role": "primary",
+    "text": "未知设备"
+   },
+   {
+    "role": "secondary",
+    "text": "MAC 9A:51:0F:C4:7E:22"
+   },
+   {
+    "role": "button",
+    "text": "移出黑名单"
+   },
+   {
+    "role": "secondary",
+    "text": "系统版本 1.0.68 | MAC地址 C8:BF:4C:5A:21:F0"
+   },
+   {
+    "role": "secondary",
+    "text": "© 2026 小米 版权所有"
+   }
+  ],
+  "find": [
+   {
+    "kind": "IP_ADDR",
+    "text": "115.204.87.33"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Kevin"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.105"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "A4:83:E7:1B:5C:92"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "张敏"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.118"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "3C:22:FB:90:4D:6E"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "王浩"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.122"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "5E:0B:77:A1:C3:48"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.140"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "64:9E:31:08:2A:FD"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.151"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "00:E0:4C:68:12:B7"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.163"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "78:8C:B5:3D:E0:19"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "李阿姨"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "192.168.31.177"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "D2:6B:1E:44:9F:30"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "9A:51:0F:C4:7E:22"
+   },
+   {
+    "kind": "MAC_ADDR",
+    "text": "C8:BF:4C:5A:21:F0"
+   }
+  ],
+  "avoid": [
+   "小米路由器 AX3000T",
+   "Redmi K70",
+   "米家智能摄像机 云台版2K",
+   "客厅-小米电视",
+   "MacBook-Air",
+   "移出黑名单",
+   "限速  拉黑"
+  ],
+  "neutral": [
+   "stok=4e9a07c2d1b85f36",
+   "DESKTOP-L7Q2K9M",
+   "1.0.68",
+   "iPhone"
+  ]
+ },
+ {
+  "name": "mixed-github-pat",
+  "app": "GitHub（Chrome 移动版）",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "09:41"
+   },
+   {
+    "role": "status",
+    "text": "LTE 72%"
+   },
+   {
+    "role": "title",
+    "text": "github.com/settings/tokens"
+   },
+   {
+    "role": "title",
+    "text": "Personal access tokens (classic)"
+   },
+   {
+    "role": "button",
+    "text": "Generate new token"
+   },
+   {
+    "role": "secondary",
+    "text": "Tokens you have generated that can be used to access the GitHub API."
+   },
+   {
+    "role": "primary",
+    "text": "homelab-backup — repo, workflow"
+   },
+   {
+    "role": "secondary",
+    "text": "Expires on Sat, Jan 16 2027."
+   },
+   {
+    "role": "system",
+    "text": "Make sure to copy your personal access token now. You won't be able to see it again!"
+   },
+   {
+    "role": "value",
+    "text": "ghp_7Rk2mQx9VbL4tN0sYp8WcH3eJdZ6uF1aGo5i"
+   },
+   {
+    "role": "button",
+    "text": "Copy"
+   },
+   {
+    "role": "button",
+    "text": "Delete"
+   },
+   {
+    "role": "primary",
+    "text": "nas-sync for Mei's NAS — repo"
+   },
+   {
+    "role": "secondary",
+    "text": "Last used within the last week"
+   },
+   {
+    "role": "secondary",
+    "text": "Expires on Mon, Nov 9 2026."
+   },
+   {
+    "role": "button",
+    "text": "Delete"
+   },
+   {
+    "role": "primary",
+    "text": "renovate-bot — repo, read:packages"
+   },
+   {
+    "role": "secondary",
+    "text": "Never used"
+   },
+   {
+    "role": "secondary",
+    "text": "This token has no expiration date."
+   },
+   {
+    "role": "button",
+    "text": "Delete"
+   },
+   {
+    "role": "secondary",
+    "text": "Signed in as chenyu-dev"
+   },
+   {
+    "role": "link",
+    "text": "Fine-grained tokens"
+   },
+   {
+    "role": "link",
+    "text": "Tokens (classic)"
+   },
+   {
+    "role": "secondary",
+    "text": "© 2026 GitHub, Inc."
+   }
+  ],
+  "find": [
+   {
+    "kind": "API_KEY",
+    "text": "ghp_7Rk2mQx9VbL4tN0sYp8WcH3eJdZ6uF1aGo5i"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Mei"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "chenyu-dev"
+   }
+  ],
+  "avoid": [
+   "Generate new token",
+   "GitHub API",
+   "Fine-grained tokens",
+   "github.com/settings/tokens",
+   "renovate-bot",
+   "Personal access tokens (classic)"
+  ],
+  "neutral": [
+   "homelab-backup",
+   "nas-sync",
+   "Jan 16 2027",
+   "Nov 9 2026",
+   "GitHub, Inc."
+  ]
+ },
+ {
+  "name": "mixed-termux-env",
+  "app": "Termux",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "23:17"
+   },
+   {
+    "role": "status",
+    "text": "Wi-Fi 41%"
+   },
+   {
+    "role": "title",
+    "text": "Termux"
+   },
+   {
+    "role": "primary",
+    "text": "~/projects/shopbot $ cat .env"
+   },
+   {
+    "role": "primary",
+    "text": "NODE_ENV=production"
+   },
+   {
+    "role": "primary",
+    "text": "PORT=8080"
+   },
+   {
+    "role": "primary",
+    "text": "DATABASE_URL=postgres://shopbot:Xk92!vLp@db.internal:5432/shopbot"
+   },
+   {
+    "role": "primary",
+    "text": "DB_PASSWORD=Xk92!vLp"
+   },
+   {
+    "role": "primary",
+    "text": "REDIS_HOST=10.0.3.17"
+   },
+   {
+    "role": "primary",
+    "text": "OPENAI_API_KEY=sk-proj-4fT9xQ2mLr8VbN6cZs1JhW0eYk3P"
+   },
+   {
+    "role": "primary",
+    "text": "STRIPE_SECRET_KEY=sk_live_51NcR8sKq2Wm7YtXb9Lz0Pd4F"
+   },
+   {
+    "role": "primary",
+    "text": "STRIPE_PUBLISHABLE_KEY=pk_live_51NcR8sKq2Wm7YtA3hD6"
+   },
+   {
+    "role": "primary",
+    "text": "SMTP_HOST=smtp.mailgun.org"
+   },
+   {
+    "role": "primary",
+    "text": "SMTP_USER=ops@lumenshop.io"
+   },
+   {
+    "role": "primary",
+    "text": "SMTP_PASS=hunter2-Q7w"
+   },
+   {
+    "role": "primary",
+    "text": "ADMIN_EMAIL=dana.whitfield@gmail.com"
+   },
+   {
+    "role": "primary",
+    "text": "SENTRY_DSN=https://3f8a1c2e9b7d4e6f@o4505.ingest.sentry.io/4507"
+   },
+   {
+    "role": "primary",
+    "text": "~/projects/shopbot $ ssh deploy@203.0.113.42"
+   },
+   {
+    "role": "primary",
+    "text": "deploy@203.0.113.42's password:"
+   },
+   {
+    "role": "primary",
+    "text": "Welcome to Ubuntu 24.04.1 LTS (GNU/Linux 6.8.0-45-generic x86_64)"
+   },
+   {
+    "role": "primary",
+    "text": "Last login: Tue Oct 13 22:51:06 2026 from 116.233.19.88"
+   },
+   {
+    "role": "primary",
+    "text": "deploy@shop-prod-1:~$"
+   },
+   {
+    "role": "button",
+    "text": "ESC  /  -  HOME  ↑  END  PGUP"
+   },
+   {
+    "role": "button",
+    "text": "⇥  CTRL  ALT  ←  ↓  →  PGDN"
+   }
+  ],
+  "find": [
+   {
+    "kind": "API_KEY",
+    "text": "Xk92!vLp"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "Xk92!vLp"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "10.0.3.17"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "sk-proj-4fT9xQ2mLr8VbN6cZs1JhW0eYk3P"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "sk_live_51NcR8sKq2Wm7YtXb9Lz0Pd4F"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "ops@lumenshop.io"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "hunter2-Q7w"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "dana.whitfield@gmail.com"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "3f8a1c2e9b7d4e6f"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "203.0.113.42"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "203.0.113.42"
+   },
+   {
+    "kind": "IP_ADDR",
+    "text": "116.233.19.88"
+   }
+  ],
+  "avoid": [
+   "NODE_ENV=production",
+   "PORT=8080",
+   "smtp.mailgun.org",
+   "Ubuntu 24.04.1 LTS",
+   "Termux",
+   "CTRL",
+   "cat .env"
+  ],
+  "neutral": [
+   "pk_live_51NcR8sKq2Wm7YtA3hD6",
+   "db.internal",
+   "shop-prod-1",
+   "Tue Oct 13 22:51:06 2026",
+   "o4505.ingest.sentry.io",
+   "shopbot"
+  ]
+ },
+ {
+  "name": "mixed-whatsapp-book-club",
+  "app": "WhatsApp",
+  "lang": "en",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "18:05"
+   },
+   {
+    "role": "status",
+    "text": "5G 63%"
+   },
+   {
+    "role": "title",
+    "text": "< Maple St Book Club"
+   },
+   {
+    "role": "subtitle",
+    "text": "Priya Raman, Marcus, Grace Liu, You"
+   },
+   {
+    "role": "system",
+    "text": "Today"
+   },
+   {
+    "role": "system",
+    "text": "Marcus added Danny Okafor"
+   },
+   {
+    "role": "name",
+    "text": "Priya Raman"
+   },
+   {
+    "role": "bubble-in",
+    "text": "Welcome Danny!!"
+   },
+   {
+    "role": "bubble-in",
+    "text": "Next meeting is at my place, 2217 Larkin St Apt 4B. Saturday 7pm"
+   },
+   {
+    "role": "time",
+    "text": "5:41 PM"
+   },
+   {
+    "role": "name",
+    "text": "Marcus"
+   },
+   {
+    "role": "bubble-in",
+    "text": "@Priya Raman can I bring my neighbour Hannah? She just finished Tomorrow, and Tomorrow, and Tomorrow"
+   },
+   {
+    "role": "time",
+    "text": "5:44 PM"
+   },
+   {
+    "role": "name",
+    "text": "Priya Raman"
+   },
+   {
+    "role": "quote",
+    "text": "Marcus"
+   },
+   {
+    "role": "quote",
+    "text": "can I bring my neighbour Hannah?"
+   },
+   {
+    "role": "bubble-in",
+    "text": "Of course! Buzzer's broken so call me at 415-830-2291 when you're outside"
+   },
+   {
+    "role": "time",
+    "text": "5:45 PM"
+   },
+   {
+    "role": "name",
+    "text": "Grace Liu"
+   },
+   {
+    "role": "bubble-in",
+    "text": "I'll grab Danny from Civic Center BART on the way, he doesn't know the area yet"
+   },
+   {
+    "role": "time",
+    "text": "5:47 PM"
+   },
+   {
+    "role": "bubble-out",
+    "text": "I'll bring wine + the Trader Joe's cheese plate"
+   },
+   {
+    "role": "time",
+    "text": "5:49 PM"
+   },
+   {
+    "role": "name",
+    "text": "Danny Okafor"
+   },
+   {
+    "role": "bubble-in",
+    "text": "Thanks everyone! I'm at 88 Hoff St #3 if that's easier, Grace"
+   },
+   {
+    "role": "time",
+    "text": "5:52 PM"
+   },
+   {
+    "role": "name",
+    "text": "Grace Liu"
+   },
+   {
+    "role": "bubble-in",
+    "text": "Perfect, 6:40 outside yours. Snacks were $36, Venmo @grace-liu-88 $12 each pls"
+   },
+   {
+    "role": "time",
+    "text": "5:53 PM"
+   },
+   {
+    "role": "input",
+    "text": "Message"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "Maple St Book Club"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Priya Raman"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Marcus"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Grace Liu"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Marcus"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Danny Okafor"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Priya Raman"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Danny"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "2217 Larkin St Apt 4B"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Marcus"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Priya Raman"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Hannah"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Priya Raman"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Marcus"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Hannah"
+   },
+   {
+    "kind": "PHONE",
+    "text": "415-830-2291"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Grace Liu"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Danny"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Danny Okafor"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "88 Hoff St #3"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Grace"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Grace Liu"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "grace-liu-88"
+   }
+  ],
+  "avoid": [
+   "Tomorrow, and Tomorrow, and Tomorrow",
+   "Civic Center BART",
+   "Trader Joe's",
+   "Message",
+   "Today"
+  ],
+  "neutral": [
+   "Saturday 7pm",
+   "$36",
+   "$12",
+   "6:40",
+   "You"
+  ]
+ },
+ {
+  "name": "mixed-telegram-2fa-forward",
+  "app": "Telegram",
+  "lang": "en",
+  "chat": true,
+  "rows": [
+   {
+    "role": "status",
+    "text": "08:12"
+   },
+   {
+    "role": "status",
+    "text": "4G 55%"
+   },
+   {
+    "role": "title",
+    "text": "< Ethan Brooks"
+   },
+   {
+    "role": "subtitle",
+    "text": "last seen recently"
+   },
+   {
+    "role": "system",
+    "text": "October 14"
+   },
+   {
+    "role": "bubble-in",
+    "text": "hey can you set up mom's new TV? Netflix wants her Google login"
+   },
+   {
+    "role": "time",
+    "text": "21:03"
+   },
+   {
+    "role": "bubble-out",
+    "text": "which email is it under"
+   },
+   {
+    "role": "time",
+    "text": "21:04"
+   },
+   {
+    "role": "bubble-in",
+    "text": "olivia.brooks62@gmail.com"
+   },
+   {
+    "role": "time",
+    "text": "21:04"
+   },
+   {
+    "role": "system",
+    "text": "Forwarded from Olivia Brooks"
+   },
+   {
+    "role": "bubble-in",
+    "text": "G-482916 is your Google verification code. Don't share it with anyone."
+   },
+   {
+    "role": "time",
+    "text": "21:06"
+   },
+   {
+    "role": "bubble-out",
+    "text": "ok but please stop forwarding codes around lol"
+   },
+   {
+    "role": "time",
+    "text": "21:06"
+   },
+   {
+    "role": "bubble-in",
+    "text": "she also said the password is Brooks#1962 if it asks"
+   },
+   {
+    "role": "time",
+    "text": "21:07"
+   },
+   {
+    "role": "bubble-out",
+    "text": "ok I'll swing by Saturday. still 14 Cedar Ln, gate code 4471?"
+   },
+   {
+    "role": "time",
+    "text": "21:08"
+   },
+   {
+    "role": "bubble-in",
+    "text": "yep. and Dr. Patel's office moved her appointment to Thursday 10am"
+   },
+   {
+    "role": "bubble-in",
+    "text": "she wants you to drive her, you know she hates Lyft"
+   },
+   {
+    "role": "time",
+    "text": "21:09"
+   },
+   {
+    "role": "input",
+    "text": "Message"
+   }
+  ],
+  "find": [
+   {
+    "kind": "CHAT_TITLE",
+    "text": "Ethan Brooks"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "olivia.brooks62@gmail.com"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Olivia Brooks"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "482916"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "Brooks#1962"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "14 Cedar Ln"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "4471"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Dr. Patel"
+   }
+  ],
+  "avoid": [
+   "Netflix",
+   "Google verification code",
+   "Lyft",
+   "last seen recently",
+   "Forwarded from",
+   "Message"
+  ],
+  "neutral": [
+   "October 14",
+   "Saturday",
+   "Thursday 10am",
+   "mom's"
+  ]
+ },
+ {
+  "name": "mixed-sms-otp-inbox",
+  "app": "Google Messages",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "12:47"
+   },
+   {
+    "role": "status",
+    "text": "5G 91%"
+   },
+   {
+    "role": "title",
+    "text": "Messages"
+   },
+   {
+    "role": "input",
+    "text": "Search conversations"
+   },
+   {
+    "role": "name",
+    "text": "Chase"
+   },
+   {
+    "role": "secondary",
+    "text": "Chase: Your one-time code is 739204. We'll never call or text you for it."
+   },
+   {
+    "role": "time",
+    "text": "12:41 PM"
+   },
+   {
+    "role": "name",
+    "text": "Amazon"
+   },
+   {
+    "role": "secondary",
+    "text": "Your package with Kindle Paperwhite arrives today. Share delivery PIN 6618 with the driver."
+   },
+   {
+    "role": "time",
+    "text": "11:02 AM"
+   },
+   {
+    "role": "name",
+    "text": "Jess Moreno"
+   },
+   {
+    "role": "secondary",
+    "text": "can u grab my parcel from the UPS Access Point on Divisadero? it's under Jessica Moreno, code 2Z4V9"
+   },
+   {
+    "role": "time",
+    "text": "10:15 AM"
+   },
+   {
+    "role": "name",
+    "text": "+1 (628) 555-0143"
+   },
+   {
+    "role": "secondary",
+    "text": "Hi this is Rob from Bay Plumbing, I'll be at 1450 Fulton St around 3. Text back if the side gate is locked"
+   },
+   {
+    "role": "time",
+    "text": "9:30 AM"
+   },
+   {
+    "role": "name",
+    "text": "USPS"
+   },
+   {
+    "role": "secondary",
+    "text": "USPS: Your item 9400 1118 9922 3851 6403 77 was delivered in/at mailbox at 9:12 am."
+   },
+   {
+    "role": "time",
+    "text": "Yesterday"
+   },
+   {
+    "role": "name",
+    "text": "Dad"
+   },
+   {
+    "role": "secondary",
+    "text": "Landed! Uber driver is Ahmed, silver Camry plate 8KTP219, see you in 40"
+   },
+   {
+    "role": "time",
+    "text": "Yesterday"
+   },
+   {
+    "role": "name",
+    "text": "62893"
+   },
+   {
+    "role": "secondary",
+    "text": "Your Verizon verification code: 481 077. Valid for 10 min."
+   },
+   {
+    "role": "time",
+    "text": "Mon"
+   },
+   {
+    "role": "button",
+    "text": "Start chat"
+   }
+  ],
+  "find": [
+   {
+    "kind": "API_KEY",
+    "text": "739204"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "6618"
+   },
+   {
+    "kind": "CHAT_NAME",
+    "text": "Jess Moreno"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Jessica Moreno"
+   },
+   {
+    "kind": "PICKUP_CODE",
+    "text": "2Z4V9"
+   },
+   {
+    "kind": "PHONE",
+    "text": "+1 (628) 555-0143"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Rob"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "1450 Fulton St"
+   },
+   {
+    "kind": "TRACKING_NO",
+    "text": "9400 1118 9922 3851 6403 77"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Ahmed"
+   },
+   {
+    "kind": "LICENSE_PLATE",
+    "text": "8KTP219"
+   },
+   {
+    "kind": "API_KEY",
+    "text": "481 077"
+   }
+  ],
+  "avoid": [
+   "Chase",
+   "Kindle Paperwhite",
+   "UPS Access Point",
+   "Bay Plumbing",
+   "USPS",
+   "Verizon",
+   "Start chat"
+  ],
+  "neutral": [
+   "Dad",
+   "62893",
+   "silver Camry",
+   "Divisadero",
+   "9:12 am"
+  ]
+ },
+ {
+  "name": "mixed-benefits-enrollment",
+  "app": "HR benefits portal",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "10:26"
+   },
+   {
+    "role": "status",
+    "text": "LTE 48%"
+   },
+   {
+    "role": "title",
+    "text": "< Review & Submit"
+   },
+   {
+    "role": "subtitle",
+    "text": "Northwind Logistics · 2027 Open Enrollment · Step 4 of 4"
+   },
+   {
+    "role": "label",
+    "text": "EMPLOYEE"
+   },
+   {
+    "role": "label",
+    "text": "Full legal name"
+   },
+   {
+    "role": "value",
+    "text": "Marisol T. Vega"
+   },
+   {
+    "role": "label",
+    "text": "Employee ID"
+   },
+   {
+    "role": "value",
+    "text": "E-204417"
+   },
+   {
+    "role": "label",
+    "text": "Social Security Number"
+   },
+   {
+    "role": "value",
+    "text": "512-68-4097"
+   },
+   {
+    "role": "label",
+    "text": "Date of birth"
+   },
+   {
+    "role": "value",
+    "text": "04/22/1988"
+   },
+   {
+    "role": "label",
+    "text": "Home address"
+   },
+   {
+    "role": "value",
+    "text": "3318 N Whipple St, Apt 2"
+   },
+   {
+    "role": "value",
+    "text": "Chicago, IL 60618"
+   },
+   {
+    "role": "label",
+    "text": "Mobile phone"
+   },
+   {
+    "role": "value",
+    "text": "(773) 555-0186"
+   },
+   {
+    "role": "label",
+    "text": "Personal email"
+   },
+   {
+    "role": "value",
+    "text": "mvega.home@gmail.com"
+   },
+   {
+    "role": "label",
+    "text": "DEPENDENTS (2)"
+   },
+   {
+    "role": "primary",
+    "text": "Rafael Vega · Spouse"
+   },
+   {
+    "role": "secondary",
+    "text": "DOB 11/03/1986 · SSN ***-**-7731"
+   },
+   {
+    "role": "primary",
+    "text": "Lucia Vega · Child"
+   },
+   {
+    "role": "secondary",
+    "text": "DOB 06/14/2019 · SSN ***-**-2058"
+   },
+   {
+    "role": "label",
+    "text": "ELECTIONS"
+   },
+   {
+    "role": "primary",
+    "text": "Medical: Blue Cross PPO 500"
+   },
+   {
+    "role": "secondary",
+    "text": "Employee + Family · $412.60 per paycheck"
+   },
+   {
+    "role": "primary",
+    "text": "Dental: Delta Dental Basic"
+   },
+   {
+    "role": "secondary",
+    "text": "Employee + Family · $38.15 per paycheck"
+   },
+   {
+    "role": "primary",
+    "text": "HSA: $150.00 per paycheck"
+   },
+   {
+    "role": "label",
+    "text": "Life insurance beneficiary"
+   },
+   {
+    "role": "value",
+    "text": "Rafael Vega (Spouse) 100%"
+   },
+   {
+    "role": "secondary",
+    "text": "Note to HR: my sister Ana Ruiz is the emergency contact, 312-555-0172"
+   },
+   {
+    "role": "secondary",
+    "text": "I certify that the information above is true and complete."
+   },
+   {
+    "role": "button",
+    "text": "Submit elections"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "Marisol T. Vega"
+   },
+   {
+    "kind": "ID_NUMBER",
+    "text": "E-204417"
+   },
+   {
+    "kind": "SSN",
+    "text": "512-68-4097"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "04/22/1988"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "3318 N Whipple St, Apt 2"
+   },
+   {
+    "kind": "PHONE",
+    "text": "(773) 555-0186"
+   },
+   {
+    "kind": "EMAIL",
+    "text": "mvega.home@gmail.com"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Rafael Vega"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "11/03/1986"
+   },
+   {
+    "kind": "SSN",
+    "text": "***-**-7731"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Lucia Vega"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "06/14/2019"
+   },
+   {
+    "kind": "SSN",
+    "text": "***-**-2058"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Rafael Vega"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Ana Ruiz"
+   },
+   {
+    "kind": "PHONE",
+    "text": "312-555-0172"
+   }
+  ],
+  "avoid": [
+   "Blue Cross PPO 500",
+   "Delta Dental Basic",
+   "Submit elections",
+   "Open Enrollment",
+   "Social Security Number",
+   "Employee + Family"
+  ],
+  "neutral": [
+   "Northwind Logistics",
+   "Chicago, IL 60618",
+   "$412.60",
+   "$38.15",
+   "Spouse",
+   "Step 4 of 4"
+  ]
+ },
+ {
+  "name": "mixed-sepa-transfer",
+  "app": "Banking app",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "16:20"
+   },
+   {
+    "role": "status",
+    "text": "4G 78%"
+   },
+   {
+    "role": "title",
+    "text": "< Review transfer"
+   },
+   {
+    "role": "label",
+    "text": "From"
+   },
+   {
+    "role": "value",
+    "text": "Jonas Weber"
+   },
+   {
+    "role": "secondary",
+    "text": "Main account · DE21 1001 1001 2623 8456 77"
+   },
+   {
+    "role": "secondary",
+    "text": "Available balance €3,482.15"
+   },
+   {
+    "role": "label",
+    "text": "To"
+   },
+   {
+    "role": "value",
+    "text": "Sophie Laurent"
+   },
+   {
+    "role": "label",
+    "text": "IBAN"
+   },
+   {
+    "role": "value",
+    "text": "FR76 3000 6000 0112 3456 7890 189"
+   },
+   {
+    "role": "label",
+    "text": "BIC"
+   },
+   {
+    "role": "value",
+    "text": "AGRIFRPPXXX"
+   },
+   {
+    "role": "label",
+    "text": "Bank"
+   },
+   {
+    "role": "value",
+    "text": "Crédit Agricole"
+   },
+   {
+    "role": "system",
+    "text": "Name check: matches the account holder"
+   },
+   {
+    "role": "label",
+    "text": "Amount"
+   },
+   {
+    "role": "value",
+    "text": "€850.00"
+   },
+   {
+    "role": "label",
+    "text": "Reference"
+   },
+   {
+    "role": "value",
+    "text": "Loyer novembre – 27 rue des Martyrs, apt 3B"
+   },
+   {
+    "role": "label",
+    "text": "Execution date"
+   },
+   {
+    "role": "value",
+    "text": "Today, 15 Oct 2026"
+   },
+   {
+    "role": "label",
+    "text": "Fee"
+   },
+   {
+    "role": "value",
+    "text": "Free (SEPA Instant)"
+   },
+   {
+    "role": "secondary",
+    "text": "Save Sophie Laurent as a payee"
+   },
+   {
+    "role": "button",
+    "text": "Confirm and send"
+   },
+   {
+    "role": "secondary",
+    "text": "You'll confirm with your PIN or Face ID next."
+   }
+  ],
+  "find": [
+   {
+    "kind": "PERSON_NAME",
+    "text": "Jonas Weber"
+   },
+   {
+    "kind": "IBAN",
+    "text": "DE21 1001 1001 2623 8456 77"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Sophie Laurent"
+   },
+   {
+    "kind": "IBAN",
+    "text": "FR76 3000 6000 0112 3456 7890 189"
+   },
+   {
+    "kind": "POSTAL_ADDRESS",
+    "text": "27 rue des Martyrs, apt 3B"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "Sophie Laurent"
+   }
+  ],
+  "avoid": [
+   "Crédit Agricole",
+   "Free (SEPA Instant)",
+   "Confirm and send",
+   "Face ID",
+   "Review transfer",
+   "Name check"
+  ],
+  "neutral": [
+   "AGRIFRPPXXX",
+   "€850.00",
+   "€3,482.15",
+   "15 Oct 2026",
+   "Loyer novembre",
+   "Main account"
+  ]
+ },
+ {
+  "name": "mixed-passport-scan",
+  "app": "Document scanner",
+  "lang": "en",
+  "chat": false,
+  "rows": [
+   {
+    "role": "status",
+    "text": "11:58"
+   },
+   {
+    "role": "status",
+    "text": "5G 66%"
+   },
+   {
+    "role": "title",
+    "text": "< Scan 2026-09-03 10.15"
+   },
+   {
+    "role": "secondary",
+    "text": "Page 1 of 2"
+   },
+   {
+    "role": "primary",
+    "text": "PASSPORT  PASSEPORT  PASAPORTE"
+   },
+   {
+    "role": "secondary",
+    "text": "UNITED STATES OF AMERICA"
+   },
+   {
+    "role": "label",
+    "text": "Type / Type / Tipo  Code / Code / Código  Passport No. / No. du Passeport / No. de Pasaporte"
+   },
+   {
+    "role": "value",
+    "text": "P  USA  583174290"
+   },
+   {
+    "role": "label",
+    "text": "Surname / Nom / Apellidos"
+   },
+   {
+    "role": "value",
+    "text": "HARTLEY"
+   },
+   {
+    "role": "label",
+    "text": "Given Names / Prénoms / Nombres"
+   },
+   {
+    "role": "value",
+    "text": "CLAIRE ELIZABETH"
+   },
+   {
+    "role": "label",
+    "text": "Nationality / Nationalité / Nacionalidad"
+   },
+   {
+    "role": "value",
+    "text": "UNITED STATES OF AMERICA"
+   },
+   {
+    "role": "label",
+    "text": "Date of birth / Date de naissance / Fecha de nacimiento"
+   },
+   {
+    "role": "value",
+    "text": "14 MAR 1991"
+   },
+   {
+    "role": "label",
+    "text": "Place of birth / Lieu de naissance / Lugar de nacimiento"
+   },
+   {
+    "role": "value",
+    "text": "OREGON, U.S.A."
+   },
+   {
+    "role": "label",
+    "text": "Sex / Sexe / Sexo"
+   },
+   {
+    "role": "value",
+    "text": "F"
+   },
+   {
+    "role": "label",
+    "text": "Date of issue / Date de délivrance / Fecha de expedición"
+   },
+   {
+    "role": "value",
+    "text": "02 JUN 2022"
+   },
+   {
+    "role": "label",
+    "text": "Date of expiration / Date d'expiration / Fecha de caducidad"
+   },
+   {
+    "role": "value",
+    "text": "01 JUN 2032"
+   },
+   {
+    "role": "label",
+    "text": "Authority / Autorité / Autoridad"
+   },
+   {
+    "role": "value",
+    "text": "United States Department of State"
+   },
+   {
+    "role": "label",
+    "text": "Endorsements / Mentions Spéciales / Anotaciones"
+   },
+   {
+    "role": "value",
+    "text": "SEE PAGE 27"
+   },
+   {
+    "role": "value",
+    "text": "P<USAHARTLEY<<CLAIRE<ELIZABETH<<<<<<<<<<<<<<"
+   },
+   {
+    "role": "value",
+    "text": "5831742905USA9103144F3206010<<<<<<<<<<<<<<04"
+   },
+   {
+    "role": "button",
+    "text": "Edit   Crop   Share   Delete"
+   }
+  ],
+  "find": [
+   {
+    "kind": "PASSPORT",
+    "text": "583174290"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "HARTLEY"
+   },
+   {
+    "kind": "PERSON_NAME",
+    "text": "CLAIRE ELIZABETH"
+   },
+   {
+    "kind": "BIRTH_DATE",
+    "text": "14 MAR 1991"
+   },
+   {
+    "kind": "PASSPORT",
+    "text": "P<USAHARTLEY<<CLAIRE<ELIZABETH<<<<<<<<<<<<<<"
+   },
+   {
+    "kind": "PASSPORT",
+    "text": "5831742905USA9103144F3206010<<<<<<<<<<<<<<04"
+   }
+  ],
+  "avoid": [
+   "UNITED STATES OF AMERICA",
+   "United States Department of State",
+   "PASSPORT",
+   "Surname / Nom / Apellidos",
+   "SEE PAGE 27",
+   "Share"
+  ],
+  "neutral": [
+   "OREGON, U.S.A.",
+   "02 JUN 2022",
+   "01 JUN 2032",
+   "Scan 2026-09-03 10.15",
+   "Page 1 of 2"
+  ]
+ }
+]
