@@ -6,7 +6,6 @@ import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
-import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import kotlin.math.ceil
@@ -21,7 +20,7 @@ import kotlin.math.roundToInt
  * 拖动选框也不会让颗粒跟着变。块边长下限 12px（原图口径）：块太小的马赛克是可以被去码工具还原的。
  * 框小到连一个块都放不下时降级为实色块——不画一个假的马赛克糊弄用户。
  */
-class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : MaskRenderer {
+class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : PixelMaskRenderer {
 
     override val style = MaskStyle.PIXELATE
 
@@ -43,12 +42,13 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
     fun willFallBack(quad: Quad, imageShortEdge: Float, divisor: Int, renderScale: Float = 1f): Boolean =
         blockSizeFor(imageShortEdge, divisor, renderScale) >= quad.shortEdge()
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun prepare(source: Bitmap, quad: Quad, options: MaskOptions): PreparedMask? {
         val imageShortEdge = min(source.width, source.height).toFloat()
         val block = blockSizeFor(imageShortEdge, options.pixelBlockDivisor, options.renderScale)
         if (block >= quad.shortEdge()) {
-            fallback.render(canvas, source, quad, options)
-            return
+            return object : PreparedMask {
+                override fun draw(canvas: Canvas) = fallback.render(canvas, source, quad, options)
+            }
         }
 
         val bounds = quad.bounds()
@@ -58,10 +58,10 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
             bounds.right.roundToInt().coerceIn(0, source.width),
             bounds.bottom.roundToInt().coerceIn(0, source.height),
         )
-        if (src.width() <= 0 || src.height() <= 0) return
+        if (src.width() <= 0 || src.height() <= 0) return null
 
         // 块数向上取整，画回去的每块都正好 block 见方：取整不往回拉伸，框大小不同颗粒也一样粗。
-        // 多出来的一截落在框外，由下面的 clipPath 裁掉。
+        // 多出来的一截落在框外，贴的时候裁掉（见 ScaledPatch）。
         val smallW = max(1, ceil(src.width() / block).toInt())
         val smallH = max(1, ceil(src.height() / block).toInt())
         val cropW = min(source.width - src.left, (smallW * block).roundToInt()).coerceAtLeast(1)
@@ -70,18 +70,13 @@ class PixelateRenderer(private val fallback: MaskRenderer = SolidRenderer()) : M
         // 缩小时用双线性（取块内平均色），放大时用最近邻（保持硬边）
         val cropped = Bitmap.createBitmap(source, src.left, src.top, cropW, cropH)
         val small = Bitmap.createScaledBitmap(cropped, smallW, smallH, true)
+        // 裁的是整张不可变的图时 createBitmap 原样交回 source，那一张不能回收
+        if (cropped !== small && cropped !== source) cropped.recycle()
         val dst = RectF(
             src.left.toFloat(), src.top.toFloat(),
             src.left + smallW * block, src.top + smallH * block,
         )
-
-        val save = canvas.save()
-        canvas.clipPath(quad.toPath())
-        canvas.drawBitmap(small, null, dst, NEAREST)
-        canvas.restoreToCount(save)
-
-        if (small !== cropped) small.recycle()
-        cropped.recycle()
+        return ScaledPatch(small, dst, quad, NEAREST)
     }
 
     companion object {

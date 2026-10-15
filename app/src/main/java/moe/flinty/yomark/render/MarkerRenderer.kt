@@ -57,8 +57,10 @@ class MarkerRenderer : MaskRenderer {
         return path
     }
 
-    private companion object {
-        const val SEGMENTS = 6
+    companion object {
+        private const val SEGMENTS = 6
+
+        /** 边往框内外抖多少：框短边的这么多。 */
         const val JITTER_RATIO = 0.03f
     }
 }
