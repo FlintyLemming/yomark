@@ -79,8 +79,8 @@ import moe.flinty.yomark.R
  * 画布：图像 + 遮罩 + 叠层 + 手势。
  *
  * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
- * 手势分工：一指画框、两指缩放平移、双击切换适配/放大、点手动框进选中态（框上方浮出「删除」）、
- * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。
+ * 手势分工：一指画框、两指缩放平移、点手动框进选中态（框上方浮出「删除」）、
+ * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。缩放只用两指，没有双击放大（2026-10-15 去掉）。
  * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
@@ -237,11 +237,6 @@ fun ImageCanvas(
     var editingSelection by remember(image) { mutableStateOf(false) }
     // 草稿框每一帧都在变；工具条只关心「是不是正在画」，不跟着每帧重组
     val drafting by remember { derivedStateOf { draftQuad != null || inkTick > 0 } }
-    // 双击自己数时间戳，不叠第二层 detectTapGestures：
-    // 两层 pointerInput 里第二层根本收不到本层已在处理的手势（实机验证过），
-    // 而把单击延后 300ms 去等第二击又会让「点遮罩」明显发滞。
-    var lastTapAt by remember { mutableLongStateOf(0L) }
-    var lastTapAtScreen by remember { mutableStateOf(PointF(0f, 0f)) }
 
     // 选中框、草稿框与手柄用主题色，与应用其余部分一致
     val colorScheme = MaterialTheme.colorScheme
@@ -284,7 +279,6 @@ fun ImageCanvas(
                         var last = down.position
                         var pointerCount = 1
                         var mode = Mode.UNDECIDED
-                        val downTime = System.currentTimeMillis()
 
                         while (true) {
                             val event = awaitPointerEvent(PointerEventPass.Main)
@@ -363,7 +357,6 @@ fun ImageCanvas(
                         // 整段拖动只压一个快照。没真拖起来的话 ViewModel 那边什么也没记，这一下什么都不做
                         if (grabbedHandle != null || grabbingBody) onCommitDrag()
 
-                        val duration = System.currentTimeMillis() - downTime
                         when {
                             mode == Mode.DRAG && grabbedHandle == null && !grabbingBody -> {
                                 val q = draftQuad
@@ -376,26 +369,11 @@ fun ImageCanvas(
                                 // 和框一样，太短的一笔是手抖
                                 if (ink != null && Ink.length(ink) >= minInImage) onInk(ink.toList())
                             }
-                            // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了
+                            // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了。
+                            // 按得久的一下也是点击（Android 上没有长按动作的控件都这样）
                             mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null && editable -> {
                                 val p = viewport.screenToImage(PointF(last.x, last.y))
-                                val now = System.currentTimeMillis()
-                                // 按得久的一下也是点击（Android 上没有长按动作的控件都这样），只是不拿来凑双击
-                                val quick = duration < LONG_PRESS_MS
-                                val isSecond = quick && now - lastTapAt <= DOUBLE_TAP_MS &&
-                                    hypot(last.x - lastTapAtScreen.x, last.y - lastTapAtScreen.y) <= touchSlopPx * 2f
-                                if (isSecond) {
-                                    // 第二击只做缩放，不再切换遮罩状态——第一击已经切过一次了
-                                    viewport = viewport.doubleTapTarget(
-                                        PointF(last.x, last.y),
-                                        image.width, image.height, viewSize.first, viewSize.second,
-                                    )
-                                    lastTapAt = 0L
-                                } else {
-                                    onTap(p, GestureRules.LINE_REACH_DP * density.density / viewport.scale)
-                                    lastTapAt = if (quick) now else 0L
-                                    lastTapAtScreen = PointF(last.x, last.y)
-                                }
+                                onTap(p, GestureRules.LINE_REACH_DP * density.density / viewport.scale)
                             }
                         }
                     }
@@ -543,8 +521,6 @@ private fun drawInkDraft(
 }
 
 private enum class Mode { UNDECIDED, DRAG, NAVIGATE }
-private const val LONG_PRESS_MS = 450L
-private const val DOUBLE_TAP_MS = 300L
 
 /** 手柄直径（dp），含外面那一圈。画的时候按缩放反算到图像坐标，视觉大小恒定。 */
 private const val HANDLE_DP = 16f

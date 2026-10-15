@@ -86,13 +86,4 @@ class ViewportTest {
         assertThat(panned.offsetX).isAtMost(0f)
         assertThat(panned.offsetX).isAtLeast(-500f)
     }
-
-    @Test
-    fun `doubleTapTarget toggles between fit and twice fit`() {
-        val fit = Viewport.fit(1000, 1000, 500, 500)
-        val zoomed = fit.doubleTapTarget(PointF(250f, 250f), 1000, 1000, 500, 500)
-        assertThat(zoomed.scale).isWithin(1e-3f).of(fit.scale * Viewport.DOUBLE_TAP_FACTOR)
-        val back = zoomed.doubleTapTarget(PointF(250f, 250f), 1000, 1000, 500, 500)
-        assertThat(back.scale).isWithin(1e-3f).of(fit.scale)
-    }
 }
