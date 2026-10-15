@@ -28,7 +28,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 缩放、平移、点选时，没压着别的码的模糊、马赛克贴留着的那张，不再逐块重算；贴出来和逐块现算、和导出一模一样。
+ * 缩放、平移、点选时，模糊、马赛克贴留着的那张，不再逐块重算；拖框时只重算变了的那块和读到它的。
+ * 贴出来和导出一模一样，压在别的码上的也一样。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 模式下 getPixel 恒为 0，断言会假通过
@@ -102,7 +103,6 @@ class PreparedMasksTest {
     fun `masks drawn from the cache match the export pixel for pixel`() {
         val prepared = PreparedMasks()
         val expected = exported(plan)
-        assertThat(MaskComposite().of(image, MaskOrder.forDrawing(plan.items), registry)).isNull()
         assertThat(differing(preview(plan, prepared), expected)).isEqualTo(0)
         // 第二遍全从留着的那几张上贴
         assertThat(differing(preview(plan, prepared, scale = 2f), expected)).isEqualTo(0)
@@ -135,6 +135,49 @@ class PreparedMasksTest {
         preview(plan, prepared)
         // c 拿掉时扔了，再回来重算一次
         assertThat(blur.prepared).isEqualTo(3)
+    }
+
+    // 压在 a、b 上的模糊框：读的是 a、b 画上去之后的样子
+    private val over = item("over", RectF(100f, 60f, 200f, 140f), MaskStyle.BLUR)
+    private val solid = item("solid", RectF(150f, 180f, 260f, 240f), MaskStyle.SOLID)
+
+    @Test
+    fun `a box dragged over other masks recomputes only itself and matches the export`() {
+        val prepared = PreparedMasks()
+        val start = MaskPlan(listOf(a, b, c, over))
+        assertThat(differing(preview(start, prepared), exported(start))).isEqualTo(0)
+        assertThat(blur.prepared).isEqualTo(3)
+        assertThat(mosaic.prepared).isEqualTo(1)
+        listOf(RectF(110f, 70f, 210f, 150f), RectF(120f, 150f, 220f, 230f), RectF(130f, 230f, 230f, 290f)).forEachIndexed { i, to ->
+            val moved = MaskPlan(listOf(a, b, c, over.copy(quad = Quad.fromRect(to))))
+            assertThat(differing(preview(moved, prepared), exported(moved))).isEqualTo(0)
+            assertThat(blur.prepared).isEqualTo(4 + i)
+            assertThat(mosaic.prepared).isEqualTo(1)
+        }
+    }
+
+    @Test
+    fun `masks that read over a dragged box are recomputed with it`() {
+        val prepared = PreparedMasks()
+        // 色块在 c 底下：拖色块，c 读到的跟着变
+        val plan = MaskPlan(listOf(solid, a, b, c))
+        preview(plan, prepared)
+        assertThat(blur.prepared).isEqualTo(2)
+        val moved = MaskPlan(listOf(solid.copy(quad = Quad.fromRect(RectF(100f, 190f, 210f, 250f))), a, b, c))
+        assertThat(differing(preview(moved, prepared), exported(moved))).isEqualTo(0)
+        assertThat(blur.prepared).isEqualTo(3)
+        assertThat(mosaic.prepared).isEqualTo(1)
+    }
+
+    @Test
+    fun `the first still frame after the reveal uses what the background composed`() {
+        val prepared = PreparedMasks()
+        val plan = MaskPlan(listOf(solid, a, b, c, over))
+        val sorted = MaskOrder.forDrawing(plan.items)
+        prepared.adopt(image, ComposedMasks.compose(image, sorted, RendererRegistry.default()))
+        assertThat(differing(preview(plan, prepared), exported(plan))).isEqualTo(0)
+        assertThat(blur.prepared).isEqualTo(0)
+        assertThat(mosaic.prepared).isEqualTo(0)
     }
 
     @Test

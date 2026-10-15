@@ -106,17 +106,42 @@ class MaskCompositeTest {
         // 还没合成好：这一块先不落，底下的黑条还在
         assertThat(frame(null).getPixel(100, 100)).isEqualTo(Color.BLACK)
         val sorted = MaskOrder.forDrawing(plan.items)
-        val shown = frame(ComposedMasks(sorted, MaskComposite.compose(source, sorted, RendererRegistry.default())))
+        val shown = frame(ComposedMasks.compose(source, sorted, RendererRegistry.default()))
         assertThat(shown.getPixel(100, 100)).isNotEqualTo(Color.BLACK)
         assertThat(shown.getPixel(100, 100)).isEqualTo(exported(plan, source).getPixel(100, 100))
     }
 
+    private fun differing(a: Bitmap, b: Bitmap, top: Int = 0): Int {
+        var n = 0
+        for (x in 0 until a.width) for (y in top until a.height) if (a.getPixel(x, y) != b.getPixel(x, y)) n++
+        return n
+    }
+
     @Test
-    fun `nothing is composited when no blur or mosaic lies over another mask`() {
-        val composite = MaskComposite()
-        val source = image()
-        // 色块在模糊上面：模糊读的是原图，照常一块块地画
-        assertThat(composite.of(source, listOf(blur, bar), registry)).isNull()
-        assertThat(composite.of(source, listOf(bar, blur), registry)).isNotNull()
+    fun `stacked masks of every kind match the export pixel for pixel`() {
+        val plan = MaskPlan(listOf(
+            bar,
+            manual("mosaic", RectF(60f, 60f, 150f, 130f), MaskLook(MaskStyle.PIXELATE)),
+            manual("marker", RectF(10f, 120f, 120f, 190f), MaskLook(MaskStyle.MARKER)),
+            blur,
+            manual("pen", RectF(100f, 10f, 190f, 80f), MaskLook(MaskStyle.PEN)),
+            manual("top", RectF(90f, 85f, 195f, 150f), MaskLook(MaskStyle.BLUR)),
+        ))
+        assertThat(differing(preview(plan), exported(plan))).isEqualTo(0)
+    }
+
+    @Test
+    fun `a blur reads a marker whose wobbly edge pokes past its box`() {
+        // 马克笔的框底边在 120，边抖出去近 3 像素；模糊的框从 122 起，框与框不挨着，读的那几行里已经有马克笔
+        val marker = manual("marker", RectF(20f, 20f, 180f, 120f), MaskLook(MaskStyle.MARKER))
+        val below = manual(
+            "below", RectF(20f, 122f, 180f, 180f),
+            MaskLook(MaskStyle.BLUR, MaskOptions(blurRadiusRatio = MaskOptions.WEAKEST_BLUR_RATIO)),
+        )
+        val plan = MaskPlan(listOf(marker, below))
+        val expected = exported(plan)
+        // 真读到了：马克笔够不着的那几行里，照原图糊出来的也不一样
+        assertThat(differing(exported(MaskPlan(listOf(below))), expected, top = 126)).isGreaterThan(0)
+        assertThat(differing(preview(plan), expected)).isEqualTo(0)
     }
 }
