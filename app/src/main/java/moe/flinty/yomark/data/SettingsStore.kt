@@ -64,7 +64,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡，马克笔、画笔的画法与粗细。
+     * 画笔里各样式的参数：色块颜色与近似色、马赛克粗细、模糊强度、马克笔颜色与浓淡，马克笔、画笔的画法与粗细，文本的颜色、字号与底色。
      * 与 lastStyle 一样是编辑器里记住的偏好，不是设置页上的项，「恢复默认设置」不动它。
      *
      * 读回来一律 normalized()：手改过的或以后改了范围的旧值收回范围内，色块不会变成半透明的，
@@ -86,6 +86,9 @@ class SettingsStore internal constructor(
             penColor = prefs[KEY_PEN_COLOR] ?: fallback.penColor,
             penShape = prefs[KEY_PEN_SHAPE].toShape(fallback.penShape),
             penWidth = prefs[KEY_PEN_WIDTH] ?: fallback.penWidth,
+            textColor = prefs[KEY_TEXT_COLOR] ?: fallback.textColor,
+            textSize = prefs[KEY_TEXT_SIZE] ?: fallback.textSize,
+            textBackground = prefs[KEY_TEXT_BACKGROUND] ?: fallback.textBackground,
         ).normalized()
     }
 
@@ -102,6 +105,9 @@ class SettingsStore internal constructor(
             it[KEY_PEN_COLOR] = o.penColor
             it[KEY_PEN_SHAPE] = o.penShape.name
             it[KEY_PEN_WIDTH] = o.penWidth
+            it[KEY_TEXT_COLOR] = o.textColor
+            it[KEY_TEXT_SIZE] = o.textSize
+            it[KEY_TEXT_BACKGROUND] = o.textBackground
         }
     }
 
@@ -402,6 +408,9 @@ class SettingsStore internal constructor(
         val KEY_PEN_COLOR = intPreferencesKey("mask_pen_color")
         val KEY_PEN_SHAPE = stringPreferencesKey("mask_pen_shape")
         val KEY_PEN_WIDTH = floatPreferencesKey("mask_pen_width")
+        val KEY_TEXT_COLOR = intPreferencesKey("mask_text_color")
+        val KEY_TEXT_SIZE = floatPreferencesKey("mask_text_size")
+        val KEY_TEXT_BACKGROUND = booleanPreferencesKey("mask_text_background")
         val KEY_ONBOARDING = booleanPreferencesKey("onboarding_seen")
         val KEY_PURPOSE_COLOR = intPreferencesKey("purpose_watermark_color")
         val KEY_PURPOSE_ANGLE = floatPreferencesKey("purpose_watermark_angle")

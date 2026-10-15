@@ -18,10 +18,11 @@ import moe.flinty.yomark.core.model.MaskStyle
  * @param quad   与 canvas 同一坐标系下的目标区域。
  * @param ink    手画的一笔（见 MaskItem.ink），[quad] 是它的外接框。只有马克笔、画笔照着它画；
  *               打码的几种不看它，盖住整个外接框。
+ * @param text   文本写的字（见 MaskItem.text），[quad] 正好包住它。只有文本看它。
  */
 interface MaskRenderer {
     val style: MaskStyle
-    fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath? = null)
+    fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath? = null, text: String? = null)
 }
 
 /**
@@ -34,7 +35,7 @@ interface PixelMaskRenderer : MaskRenderer {
     /** 按 [source] 上 [quad] 这一块算好要贴的样子。null：这一块什么也不画（框出了图、小得放不下）。 */
     fun prepare(source: Bitmap, quad: Quad, options: MaskOptions): PreparedMask?
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?, text: String?) {
         val prepared = prepare(source, quad, options) ?: return
         prepared.draw(canvas)
         prepared.release()

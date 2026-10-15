@@ -16,7 +16,7 @@ class PenRenderer : MaskRenderer {
 
     override val style = MaskStyle.PEN
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?, text: String?) {
         val half = InkStroke.halfWidth(style, options, source)
         val paint = InkStroke.paint(options.penColor, half)
         if (ink != null) {

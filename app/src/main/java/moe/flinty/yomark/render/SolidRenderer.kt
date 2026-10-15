@@ -19,7 +19,7 @@ class SolidRenderer : MaskRenderer {
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.style = Paint.Style.FILL }
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?, text: String?) {
         paint.color = colorFor(source, quad, options)
         paint.alpha = 255                      // 不透明是安全属性，不接受 options 覆盖
         canvas.drawPath(quad.toPath(), paint)

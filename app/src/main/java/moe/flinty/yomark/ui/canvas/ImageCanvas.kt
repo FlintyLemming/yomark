@@ -17,6 +17,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -60,12 +62,15 @@ import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
+import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.PurposeWatermarkDrawer
 import moe.flinty.yomark.render.MaskOrder
 import moe.flinty.yomark.render.PixelMaskRenderer
 import moe.flinty.yomark.render.RendererRegistry
+import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.EditorUiState
+import moe.flinty.yomark.ui.TextPlacement
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -82,11 +87,13 @@ import moe.flinty.yomark.R
  * 手势分工：一指画框、两指缩放平移、点手动框进选中态（框上方浮出「删除」）、
  * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。缩放只用两指，没有双击放大（2026-10-15 去掉）。
  * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
+ * 拿着文本点图上一处是在那儿写字（见 EditorViewModel.onTap）：字还没打时那儿立着一道光标。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
  * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一行多远还算点中它（图像像素）
  * @param onInk 手画完一笔：手指走过的点，图像坐标
+ * @param onEditSelected 选中的是文本时，框上方多一个「编辑」：改它写的字
  */
 @Composable
 fun ImageCanvas(
@@ -101,6 +108,7 @@ fun ImageCanvas(
     scanStyle: ScanStyle = ScanStyle.SWEEP,
     showOriginal: Boolean = false,
     onInk: (List<PointF>) -> Unit = {},
+    onEditSelected: () -> Unit = {},
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
@@ -428,6 +436,7 @@ fun ImageCanvas(
                     state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp) }
                 }
                 draftQuad?.let { drawDraft(canvas, it, selectionColors, dp) }
+                state.textPlacement?.let { drawCaret(canvas, it, state.brush, image, selectionColors, dp) }
                 // 手画的这一笔照画好之后的样子画：用的是同一个渲染器
                 if (inkTick > 0) draftInk.points?.let { drawInkDraft(canvas, it, state.brush, image, registry) }
 
@@ -441,9 +450,12 @@ fun ImageCanvas(
         }
 
         // 选中框上方的「删除」。淡出的那一下（删掉了、开始拖了）框可能已经不在 plan 里，按它最后的位置摆
-        val selectedQuad = state.selectedManualId?.let { state.plan.find(it) }?.quad
+        val selectedItem = state.selectedManualId?.let { state.plan.find(it) }
+        val selectedQuad = selectedItem?.quad
         val lastSelectedQuad = remember { QuadHolder() }
         if (selectedQuad != null) lastSelectedQuad.quad = selectedQuad
+        // 淡出的那一下框已经没了，按钮照着它最后的样子留着，不在半路上少一个
+        if (selectedItem != null) lastSelectedQuad.text = selectedItem.look.style == MaskStyle.TEXT
         AnimatedVisibility(
             visible = selectedQuad != null && !editingSelection && !drafting && !showOriginal,
             enter = fadeIn(),
@@ -454,6 +466,7 @@ fun ImageCanvas(
                 quad = selectedQuad ?: lastSelectedQuad.quad,
                 viewport = { viewport },
                 onDelete = onDeleteSelected,
+                onEdit = if (lastSelectedQuad.text) onEditSelected else null,
             )
         }
     }
@@ -462,19 +475,29 @@ fun ImageCanvas(
 /**
  * 选中手动框时浮在框上方的工具条。与应用里其余的按钮一样是 Material 组件——主题色、字体、
  * 按下时的水波纹都一致，不在画布上自己画。只有「删除」一个操作：移动、调大小直接在框上拖。
+ * 选中的是文本时前面多一个「编辑」（[onEdit]）：改它写的字。
  *
  * 这一层铺满画布，但只有工具条本身接触摸；别处的手势照常落到底下的画布上。
  */
 @Composable
-private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: () -> Unit) {
+private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: () -> Unit, onEdit: (() -> Unit)? = null) {
     Layout(
         content = {
             // 与 Material 的菜单、文字选择工具条同一种容器：surfaceContainer 底色加一层浅投影
             Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainer, shadowElevation = 3.dp) {
-                TextButton(onClick = onDelete) {
-                    Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.delete))
+                Row {
+                    if (onEdit != null) {
+                        TextButton(onClick = onEdit) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.edit_text))
+                        }
+                    }
+                    TextButton(onClick = onDelete) {
+                        Icon(Icons.Filled.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.delete))
+                    }
                 }
             }
         },
@@ -491,8 +514,11 @@ private fun SelectionToolbar(quad: Quad?, viewport: () -> Viewport, onDelete: ()
     }
 }
 
-/** 记住最后一个选中框的位置，供工具条淡出时用。普通字段，改它不触发重组。 */
-private class QuadHolder { var quad: Quad? = null }
+/** 记住最后一个选中框的位置、是不是文本，供工具条淡出时用。普通字段，改它不触发重组。 */
+private class QuadHolder {
+    var quad: Quad? = null
+    var text = false
+}
 
 /** 正在手画的一笔。普通字段，改它不触发重组（重画靠 ImageCanvas 的 inkTick）。 */
 private class InkDraft { var points: ArrayList<PointF>? = null }
@@ -585,6 +611,28 @@ private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: S
         canvas.drawCircle(p.x, p.y, HANDLE_DP / 2f * dp, ring)
         canvas.drawCircle(p.x, p.y, (HANDLE_DP / 2f - HANDLE_RING_DP) * dp, dot)
     }
+}
+
+/**
+ * 要写字的那一处还没有字：立一道光标，和输入框里的光标一个意思。主题色、垫一道浅色的边，和选中框一样哪里都看得见；
+ * 一行字多高它就多高，摆在第一个字将来落下的地方（见 TextStamp.boxAt）。
+ */
+private fun drawCaret(
+    canvas: android.graphics.Canvas,
+    at: TextPlacement,
+    brush: MaskLook,
+    image: SourceImage,
+    colors: SelectionColors,
+    dp: Float,
+) {
+    val look = at.look ?: brush
+    val size = look.options.textSize * min(image.width, image.height)
+    val box = TextStamp.boxAt("", size, at.center, image.width, image.height).bounds()
+    val x = box.centerX()
+    val inset = size * TextStamp.PAD_Y
+    val round = { p: Paint -> p.apply { strokeCap = Paint.Cap.ROUND } }
+    canvas.drawLine(x, box.top + inset, x, box.bottom - inset, round(haloPaint(colors, dp)))
+    canvas.drawLine(x, box.top + inset, x, box.bottom - inset, round(linePaint(colors, dp)))
 }
 
 /** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
@@ -749,7 +797,7 @@ private fun drawItem(
     // 预览画在分析图上；渲染器里的绝对像素常数是原图口径，按 image.scale 折算，
     // 否则大图上预览会比导出更糊（见 MaskOptions.renderScale）。
     val options = item.look.options.copy(renderScale = image.scale)
-    renderer.render(canvas, image.bitmap, item.quad, options, item.ink)
+    renderer.render(canvas, image.bitmap, item.quad, options, item.ink, item.text)
 }
 
 /** 扫描动效的画笔，跨帧复用。 */

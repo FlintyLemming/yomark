@@ -267,7 +267,7 @@ class EditorToolbarTest {
 
     private val backButton get() = compose.onNodeWithContentDescription("返回")
 
-    /** 编辑：马克笔、画笔（两种样式，和打码的一样点了换）、水印（点开用途水印）。 */
+    /** 编辑：马克笔、画笔、文本（三种样式，和打码的一样点了换）、水印（点开用途水印）。 */
     @Test fun editHoldsTheMarkerThePenAndTheWatermark() {
         val actions = Recorder()
         show(actions = actions)
@@ -276,7 +276,8 @@ class EditorToolbarTest {
         compose.onNodeWithText("表情").assertDoesNotExist()      // 去掉了
         compose.onNodeWithText("马克笔").assertIsNotSelected().performClick()
         compose.onNodeWithText("画笔").assertIsEnabled().assertIsNotSelected().performClick()
-        assertThat(actions.clicked).containsExactly(MaskStyle.MARKER, MaskStyle.PEN).inOrder()
+        compose.onNodeWithText("文本").assertIsEnabled().assertIsNotSelected().performClick()
+        assertThat(actions.clicked).containsExactly(MaskStyle.MARKER, MaskStyle.PEN, MaskStyle.TEXT).inOrder()
         compose.onNodeWithText("水印").performClick()
         assertThat(purposeClicks).isEqualTo(1)
     }

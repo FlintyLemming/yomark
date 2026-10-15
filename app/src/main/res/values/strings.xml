@@ -107,6 +107,7 @@
     <string name="style_blur">Blur</string>
     <string name="style_marker">Marker</string>
     <string name="style_pen">Pen</string>
+    <string name="style_text">Text</string>
     <string name="collapse_style_panel">Collapse style panel</string>
     <string name="color">Color</string>
     <string name="grain">Grain</string>
@@ -116,6 +117,10 @@
     <string name="stroke_shape_box">Box</string>
     <string name="stroke_shape_freehand">Freehand</string>
     <string name="stroke_width">Thickness</string>
+    <string name="text_content">Text</string>
+    <string name="text_size">Size</string>
+    <string name="text_background">Background</string>
+    <string name="edit_text">Edit</string>
     <string name="near_color">Nearby color</string>
     <string name="custom_color">Custom color</string>
     <string name="eyedropper">Pick from image</string>

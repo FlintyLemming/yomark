@@ -246,10 +246,10 @@ fun EditorScreen(
             CanvasAndPanel(
                 panelAtSide = atSide,
                 // 用途水印面板开着时输入法弹起来，整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
-                // （手机上面板盖在图上，打字时它只留文字那一格，见 PurposePanelContent）
+                // （手机上面板盖在图上，打字时它只留文字那一格，见 PurposePanelContent）。写文本也一样
                 modifier = Modifier
                     .weight(1f)
-                    .then(if (state.purposeSheetVisible) Modifier.imePadding() else Modifier),
+                    .then(if (state.purposeSheetVisible || writingText(state)) Modifier.imePadding() else Modifier),
                 canvas = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         // 批量里切图的那一下，画布上先垫着这一张的缩略图，载入完换成原图
@@ -266,6 +266,7 @@ fun EditorScreen(
                             onResize = vm::previewSelectedQuad,
                             onCommitDrag = vm::commitDrag,
                             onDeleteSelected = vm::deleteSelected,
+                            onEditSelected = vm::editSelectedText,
                             scanStyle = scanStyle,
                             showOriginal = comparing,
                         )
@@ -415,13 +416,20 @@ private fun styleBarModel(state: EditorUiState): StyleBarModel {
     val nearColors = remember(state.image, state.plan, selected?.candidateId, wantNear) {
         if (wantNear) nearColorsOf(state.image, state.plan, selected) else emptyList()
     }
+    val text = state.selectedText
     return StyleBarModel(
         look = look,
         panelOpen = state.stylePanelOpen,
         colorPick = state.colorPick,
         nearColors = nearColors,
+        text = text?.text.orEmpty(),
+        textKey = text?.candidateId ?: state.textPlacement?.id,
+        textFocus = state.textFocus,
     )
 }
+
+/** 文本的面板开着：输入框在上面，输入法可能弹着。 */
+private fun writingText(state: EditorUiState) = state.stylePanelOpen && state.barLook.style == MaskStyle.TEXT
 
 /** 用途水印面板的动作都交给 ViewModel。 */
 private class ViewModelPurposeActions(private val vm: EditorViewModel) : PurposePanelActions {
@@ -443,6 +451,8 @@ private class ViewModelStyleActions(private val vm: EditorViewModel) : StyleBarA
     override fun onCollapse() = vm.dismissStylePanel()
     override fun onPickColor(target: ColorTarget?) =
         if (target == null) vm.cancelColorPick() else vm.startColorPick(target)
+    override fun onTextChange(text: String) = vm.setText(text)
+    override fun onTextFocusTaken() = vm.textFocusTaken()
 }
 
 /**

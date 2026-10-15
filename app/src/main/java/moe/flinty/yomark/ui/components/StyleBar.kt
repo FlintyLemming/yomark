@@ -5,20 +5,28 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BlurOn
+import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -26,9 +34,17 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -36,7 +52,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogWindowProvider
@@ -50,6 +68,7 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.render.NearColor
+import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.ColorTarget
 import kotlin.math.roundToInt
 import androidx.annotation.StringRes
@@ -66,6 +85,12 @@ data class StyleBarModel(
     val colorPick: ColorTarget? = null,
     /** 这张图上取到的近似色，最多三种：面板上「近似色」那一颗、开着近似色时色块的小样子都画它们（见 [nearColorsOf]）。 */
     val nearColors: List<Int> = emptyList(),
+    /** 文本面板输入框里的字：选中的文本写的字，还没写的是空的。 */
+    val text: String = "",
+    /** 输入框写的是哪一块文本（选中的，或还没落下的那一处）：换了一块，输入框换成那一块的字。 */
+    val textKey: String? = null,
+    /** 输入框该拿焦点、弹出输入法了（见 EditorUiState.textFocus）。 */
+    val textFocus: Boolean = false,
 )
 
 /** 样式栏上的动作。都有空实现，测试只接自己关心的。 */
@@ -80,6 +105,12 @@ interface StyleBarActions {
 
     /** 开吸管（[target] 非 null）或收起吸管（null）。 */
     fun onPickColor(target: ColorTarget?) {}
+
+    /** 文本面板的输入框改了。 */
+    fun onTextChange(text: String) {}
+
+    /** 输入框照 [StyleBarModel.textFocus] 拿到了焦点。 */
+    fun onTextFocusTaken() {}
 }
 
 // ---------- 小样子 ----------
@@ -125,6 +156,17 @@ internal fun StyleGlyph(
                 .size(width = 20.dp * scale, height = 14.dp * scale)
                 .border(2.dp * scale, Color(options.penColor), RoundedCornerShape(2.dp * scale)),
         )
+        // 文本：一个 T，是文本的颜色；垫着底色时是那个颜色的一块底，上面的 T 和图上的字一样取黑或白
+        MaskStyle.TEXT -> if (options.textBackground) Box(
+            Modifier
+                .size(width = 22.dp * scale, height = 16.dp * scale)
+                .background(Color(options.textColor), RoundedCornerShape(4.dp * scale)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(14.dp * scale), tint = Color(TextStamp.onColor(options.textColor)))
+        } else {
+            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.textColor))
+        }
     }
 }
 
@@ -179,15 +221,25 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
  * 外面那一列（[PanelColumn]）由底栏摆，用途水印的面板也在那一列里，换着开时面板一点点变高变矮。
  * 样式和参数管的是下一笔；选中了手动框时那个框照样当场跟着变。
  * 吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
+ *
+ * @param compactWhileTyping 文本打字时（输入框有焦点、输入法弹着）只留输入框那一格，收起输入法再摊开，和用途水印一样：
+ *   面板盖在图上，输入法又占掉下半截，整个摊开的话看不到字落在图上是什么样
+ * @param imeVisible 输入法弹着。测试里没有输入法，由测试给
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun StylePanelContent(model: StyleBarModel, actions: StyleBarActions) {
+internal fun StylePanelContent(
+    model: StyleBarModel,
+    actions: StyleBarActions,
+    compactWhileTyping: Boolean = false,
+    imeVisible: Boolean = WindowInsets.isImeVisible,
+) {
     PanelHeader(
         title = stringResource(MaskStyleInfo.label(model.look.style)),
         onCollapse = actions::onCollapse,
         collapseLabel = stringResource(R.string.collapse_style_panel),
     )
-    StylePanelBody(model, actions)
+    StylePanelBody(model, actions, compactWhileTyping = compactWhileTyping && imeVisible)
 }
 
 /**
@@ -230,10 +282,20 @@ internal fun StylePanel(
     }
 }
 
-/** 面板的主体：当前样式能调的，底下是「恢复默认」。 */
+/**
+ * 面板的主体：当前样式能调的，底下是「恢复默认」。文本的最上面是它写的字。
+ *
+ * @param compactWhileTyping 输入法弹着：文本的输入框有焦点时只留它（见 [StylePanelContent]）
+ */
 @Composable
-private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions) {
+private fun StylePanelBody(model: StyleBarModel, actions: StyleBarActions, compactWhileTyping: Boolean = false) {
     val look = model.look
+    var typing by remember { mutableStateOf(false) }
+    if (look.style == MaskStyle.TEXT) {
+        Column(Modifier.padding(end = 12.dp)) { TextInput(model, actions, onFocus = { typing = it }) }
+        // 收起来时面板一点点变矮（PanelColumn 跟着里面的东西变高变矮），输入法收起后再长回来
+        if (compactWhileTyping && typing) return
+    }
     Column(Modifier.padding(end = 12.dp)) {
         StyleControls(look, model.colorPick, model.nearColors, actions)
     }
@@ -319,7 +381,61 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
             Colors(ColorTarget.PEN, PEN_PALETTE, stringResource(R.string.color))
             WidthSlider(options.penWidth, MaskOptions.PEN_WIDTH_RANGE, actions) { emit(options.copy(penWidth = it), inProgress = true) }
         }
+
+        // 写的字在这一段上面（见 TextInput）。字号改了，选中的文本当场变大变小
+        MaskStyle.TEXT -> {
+            Colors(ColorTarget.TEXT, PEN_PALETTE, stringResource(R.string.color))
+            SliderRow(
+                label = stringResource(R.string.text_size),
+                value = options.textSize,
+                range = MaskOptions.TEXT_SIZE_RANGE,
+                valueText = "${(options.textSize * REFERENCE_SHORT_SIDE).roundToInt()} px",
+                onChange = { emit(options.copy(textSize = it), inProgress = true) },
+                onValueChangeFinished = actions::onLookChangeFinished,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            PanelSwitchRow(stringResource(R.string.text_background), options.textBackground, { emit(options.copy(textBackground = it)) })
+        }
     }
+}
+
+/**
+ * 文本写的字，一行。改一个字，图上跟着变（见 EditorViewModel.setText）。
+ * 输入框自己持有正在编辑的字，不等 ViewModel 转一圈再回来；换了一块文本（[StyleBarModel.textKey]）就换成那一块的字，
+ * 没在打字时（撤销了）也跟着图上的字走。要它拿焦点时（点了图上一处要写字、要改选中的文本）拿焦点、弹出输入法。
+ */
+@Composable
+private fun TextInput(model: StyleBarModel, actions: StyleBarActions, onFocus: (Boolean) -> Unit) {
+    var draft by remember(model.textKey) { mutableStateOf(model.text) }
+    var focused by remember { mutableStateOf(false) }
+    val focus = LocalFocusManager.current
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(model.text, focused) { if (!focused) draft = model.text }
+    LaunchedEffect(model.textFocus) {
+        if (!model.textFocus) return@LaunchedEffect
+        requester.requestFocus()
+        actions.onTextFocusTaken()
+    }
+    PanelLabel(stringResource(R.string.text_content))
+    OutlinedTextField(
+        value = draft,
+        onValueChange = {
+            draft = it
+            actions.onTextChange(it)
+        },
+        singleLine = true,
+        // 和用途水印的输入框、「画法」那一排按钮一样是圆头的
+        shape = CircleShape,
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { focus.clearFocus() }),
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(requester)
+            .onFocusChanged {
+                focused = it.isFocused
+                onFocus(it.isFocused)
+            },
+    )
 }
 
 /**

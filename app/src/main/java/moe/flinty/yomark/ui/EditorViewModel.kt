@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui
 
 import android.graphics.PointF
+import android.graphics.RectF
 import android.net.Uri
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
@@ -16,6 +17,7 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
+import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskPlanFactory
 import moe.flinty.yomark.core.model.MaskStyle
@@ -32,6 +34,7 @@ import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.PurposeWatermarkStyle
+import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.batch.BatchItem
 import moe.flinty.yomark.ui.batch.BatchSession
 import moe.flinty.yomark.ui.canvas.GestureRules
@@ -56,6 +59,8 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.EmptyCoroutineContext
+import kotlin.math.abs
+import kotlin.math.ln
 import kotlin.math.min
 import moe.flinty.yomark.R
 
@@ -429,6 +434,8 @@ class EditorViewModel(
             aiReview = AiReview.Hidden,
             selectedManualId = null,
             colorPick = null,
+            textPlacement = null,
+            textFocus = false,
             canUndo = false,
             canRedo = false,
             batch = live.select(index),
@@ -739,6 +746,10 @@ class EditorViewModel(
      *
      * 吸管在等着取色时，这一下只取颜色。
      *
+     * 文本（2026-10-15）：选中的文本再点一下是改它的字（[editSelectedText]）。手里拿着文本时，点的不是哪一块码——
+     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码那一行：拿起文本就是要往图上写字。
+     * 这时选中着什么的话，这一下只是取消选中，和别的时候点空白一样：写完一块点一下别处，不会又开始写一块。
+     *
      * @param reach 点没落在任何一行字里时，离一行多近也算点中它（图像像素）
      */
     fun onTap(imagePoint: PointF, reach: Float = 0f) {
@@ -746,9 +757,23 @@ class EditorViewModel(
             pickColorAt(imagePoint)
             return
         }
-        val plan = _state.value.plan
+        val s = _state.value
+        val plan = s.plan
         val gone = dismissed.filter { plan.find(it.candidateId) == null }
-        when (val target = GestureRules.tapTarget(plan.items, lines, imagePoint, reach, gone)) {
+        val target = GestureRules.tapTarget(plan.items, lines, imagePoint, reach, gone)
+        if (target is GestureRules.TapTarget.Item && target.item.candidateId == s.selectedManualId &&
+            target.item.look.style == MaskStyle.TEXT
+        ) {
+            editSelectedText()
+            return
+        }
+        if (s.brush.style == MaskStyle.TEXT && target !is GestureRules.TapTarget.Item) {
+            if (s.selectedManualId != null) clearSelection() else placeText(imagePoint)
+            return
+        }
+        // 还没写字的那一处作罢：这一下点的是别的
+        if (s.textPlacement != null) _state.value = s.copy(textPlacement = null)
+        when (target) {
             is GestureRules.TapTarget.Item -> tapItem(target.item)
             is GestureRules.TapTarget.Dismissed -> {
                 mutate { it.add(target.item) }
@@ -777,7 +802,7 @@ class EditorViewModel(
     private fun tapItem(item: MaskItem) {
         if (item.source == DetectorSource.MANUAL) {
             finishLookEdit()
-            uiState = _state.value.copy(selectedManualId = item.candidateId)
+            uiState = _state.value.copy(selectedManualId = item.candidateId, textPlacement = null)
             return
         }
         // 点它们也算点了别处：选中态收起
@@ -800,7 +825,21 @@ class EditorViewModel(
         uiState = _state.value.copy(selectedManualId = null)
     }
 
+    /**
+     * 拉完一个框：落笔即打码（或标记），画完进选中态。
+     * 手里拿着文本时是在框里写字：字号照框的高（画笔从此也是这个字号），字以框的中心为中心（见 [placeText]）。
+     */
     fun onManualBox(quadInImageSpace: Quad) {
+        val s = _state.value
+        if (s.brush.style == MaskStyle.TEXT) {
+            val image = s.image ?: return
+            val box = quadInImageSpace.bounds()
+            val shortSide = min(image.width, image.height).toFloat()
+            val size = (TextStamp.sizeForHeight(box.height()) / shortSide).coerceIn(MaskOptions.TEXT_SIZE_RANGE)
+            setBrush(s.brush.copy(options = s.brush.options.copy(textSize = size)))
+            placeText(PointF(box.centerX(), box.centerY()))
+            return
+        }
         val item = MaskItem(
             candidateId = "manual-${UUID.randomUUID()}",
             quad = quadInImageSpace,
@@ -838,7 +877,7 @@ class EditorViewModel(
 
     fun clearSelection() {
         finishLookEdit()
-        uiState = _state.value.copy(selectedManualId = null)
+        uiState = _state.value.copy(selectedManualId = null, textPlacement = null)
     }
 
     /** 只有手动框删得掉；MaskPlan.remove 自己会拦住其余来源。 */
@@ -859,7 +898,36 @@ class EditorViewModel(
             finishLookEdit()
             dragOrigin = _state.value.plan
         }
-        uiState = _state.value.copy(plan = _state.value.plan.replace(item.copy(quad = quad)))
+        val next = if (item.look.style == MaskStyle.TEXT) resizedText(dragOrigin?.find(id) ?: item, quad) else item.copy(quad = quad)
+        uiState = _state.value.copy(plan = _state.value.plan.replace(next))
+    }
+
+    /**
+     * 拖文本的框（[proposed] 是照拖框的规矩算出来的，见 SelectionHandles）：拖框体是挪，照挪；
+     * 拖角是放大缩小，字不变形——按拖得多的那一边等比缩放，拖的那一角的对角不动。字号跟着改，面板上看得到。
+     * [origin] 是起手时的样子：每一帧都从它算，不在上一帧上接着缩。
+     */
+    private fun resizedText(origin: MaskItem, proposed: Quad): MaskItem {
+        val text = origin.text
+        val image = _state.value.image
+        val from = origin.quad.bounds()
+        val to = proposed.bounds()
+        val moved = abs(to.width() - from.width()) < SAME_EDGE && abs(to.height() - from.height()) < SAME_EDGE
+        if (text == null || image == null || moved) return origin.copy(quad = proposed)
+        val sw = to.width() / from.width()
+        val sh = to.height() / from.height()
+        val scale = if (abs(ln(sw)) >= abs(ln(sh))) sw else sh
+        val shortSide = min(image.width, image.height).toFloat()
+        val range = MaskOptions.TEXT_SIZE_RANGE
+        val size = (TextStamp.sizeIn(text, origin.quad) * scale).coerceIn(range.start * shortSide, range.endInclusive * shortSide)
+        val box = TextStamp.boxSize(text, size)
+        // 动了的那一边是拖的那一角所在的边，对边不动
+        val left = if (abs(to.left - from.left) > SAME_EDGE) from.right - box.width else from.left
+        val top = if (abs(to.top - from.top) > SAME_EDGE) from.bottom - box.height else from.top
+        return origin.copy(
+            quad = Quad.fromRect(RectF(left, top, left + box.width, top + box.height)),
+            look = origin.look.copy(options = origin.look.options.copy(textSize = size / shortSide)),
+        )
     }
 
     fun commitDrag() {
@@ -886,7 +954,7 @@ class EditorViewModel(
             return
         }
         if (style == s.barLook.style) {
-            _state.value = s.copy(stylePanelOpen = !s.stylePanelOpen, colorPick = null)
+            if (s.stylePanelOpen) dismissStylePanel() else _state.value = s.copy(stylePanelOpen = true, colorPick = null)
             return
         }
         setStyle(style)
@@ -910,8 +978,8 @@ class EditorViewModel(
      * 马克笔、画笔画的标注不跟着变，见 [MaskPlan.restyleRedactions]。
      *
      * 选中了手动框时，那个框也一起换成改后的样子（刚画完的框就是选中的，画完再调颜色是最顺手的用法）。
-     * 只限同一组：马克笔、画笔不往打码的框上用，打码的样式也不把画的线变成一块码。
-     * 换到另一组是换手里的工具，框原样留着，选中收起。
+     * 只限同一类（见 MaskStyle.restylesTo）：马克笔、画笔不往打码的框上用，打码的样式也不把画的线变成一块码，文本只和文本换。
+     * 换到另一类是换手里的工具，框原样留着，选中收起。文本换了字号，框跟着变大变小（见 [restyled]）。
      *
      * @param inProgress 滑条还没松手。拖动期间码跟着变，但不压撤销栈，松手时由 [finishLookEdit] 补一次，
      *   与拖框的 previewSelectedQuad / commitDrag 同一个道理。
@@ -920,17 +988,33 @@ class EditorViewModel(
         val next = look.normalized()
         if (_state.value.colorPick != null) _state.value = _state.value.copy(colorPick = null)
         val selected = _state.value.selectedItem
-        if (selected != null && selected.look.style.redacts != next.style.redacts) clearSelection()
+        if (selected != null && !selected.look.style.restylesTo(next.style)) clearSelection()
         setBrush(MaskLook(next.style, _state.value.brush.options.withParamsOf(next.style, next.options)))
+        // 还没写字的那一处：换成别的工具就作罢；它带着自己的样子（字删光了拿掉的那一块）时，面板上改的是它
+        _state.value.textPlacement?.let { at ->
+            _state.value = _state.value.copy(
+                textPlacement = if (next.style != MaskStyle.TEXT) null else if (at.look != null) at.copy(look = next) else at,
+            )
+        }
         val s = _state.value
         var plan = s.plan
-        s.selectedItem?.let { plan = plan.restyle(it.candidateId, next) }
+        s.selectedItem?.let { plan = plan.replace(restyled(it, next)) }
         if (restyleAll && next.style.redacts) plan = plan.restyleRedactions(next)
         if (plan != s.plan) {
             if (lookEditOrigin == null) lookEditOrigin = s.plan
             uiState = s.copy(plan = plan)
         }
         if (!inProgress) finishLookEdit()
+    }
+
+    /** 选中的那一块换成 [look]。文本换了字号，框跟着变大变小，中心不动。 */
+    private fun restyled(item: MaskItem, look: MaskLook): MaskItem {
+        val text = item.text
+        val image = _state.value.image
+        if (look.style != MaskStyle.TEXT || text == null || image == null || look.options.textSize == item.look.options.textSize) {
+            return item.copy(look = look)
+        }
+        return item.copy(look = look, quad = textBox(text, look, item.quad.center(), image))
     }
 
     /** 滑条松手：把这一段连续调节作为一步压进撤销栈。 */
@@ -950,7 +1034,7 @@ class EditorViewModel(
 
     fun dismissStylePanel() {
         finishLookEdit()
-        _state.value = _state.value.copy(stylePanelOpen = false, colorPick = null)
+        _state.value = _state.value.copy(stylePanelOpen = false, colorPick = null, textPlacement = null, textFocus = false)
     }
 
     /** 吸管：下一次点画布取那里的颜色，填进 [target]。 */
@@ -1004,14 +1088,94 @@ class EditorViewModel(
     fun undo() {
         finishLookEdit()
         val restored = undoStack.undo(_state.value.plan) ?: return
-        uiState = _state.value.copy(plan = restored).withHistoryFlags()
+        uiState = _state.value.copy(plan = restored, textPlacement = null).withHistoryFlags()
     }
 
     fun redo() {
         finishLookEdit()
         val restored = undoStack.redo(_state.value.plan) ?: return
-        uiState = _state.value.copy(plan = restored).withHistoryFlags()
+        uiState = _state.value.copy(plan = restored, textPlacement = null).withHistoryFlags()
     }
+
+    // ---------- 文本 ----------
+
+    /**
+     * 拿着文本点了图上一处（或拉了一个框）：在这儿写字。文本的面板长出来，输入框拿焦点、弹出输入法；
+     * 打下第一个字时这块文本才落下（见 [setText]），一个字没打就收起面板，什么也不留。
+     */
+    private fun placeText(center: PointF) {
+        finishLookEdit()
+        uiState = _state.value.copy(
+            selectedManualId = null,
+            textPlacement = TextPlacement("manual-${UUID.randomUUID()}", center),
+            stylePanelOpen = true,
+            purposeSheetVisible = false,
+            colorPick = null,
+            textFocus = true,
+        )
+    }
+
+    /** 改选中的文本：面板长出来，输入框拿焦点，改的字当场落在图上。再点一下选中的文本、选中时浮出来的「编辑」都是它。 */
+    fun editSelectedText() {
+        val s = _state.value
+        if (s.selectedText == null) return
+        _state.value = s.copy(stylePanelOpen = true, purposeSheetVisible = false, colorPick = null, textFocus = true)
+    }
+
+    /** 输入框拿到焦点了：放下 [EditorUiState.textFocus]，面板收起再打开不会又抢一次焦点。 */
+    fun textFocusTaken() {
+        if (_state.value.textFocus) _state.value = _state.value.copy(textFocus = false)
+    }
+
+    /**
+     * 文本面板的输入框改了。选中的文本当场换成这几个字，框跟着变宽变窄，中心不动；
+     * 还没写字的那一处（[EditorUiState.textPlacement]）打下第一个字时落下、选中；
+     * 都没有时（拿着文本点开面板就打字）写在图的正中。字删光了，那一块先拿掉，位置和样子留着，接着打还在原处。
+     *
+     * 只写一行：换行（粘贴进来的）换成空格。
+     * 打字和拖滑条一样是一段连续的调节，整段一步撤销：面板收起、点别处时收尾（见 [finishLookEdit]）。
+     */
+    fun setText(typed: String) {
+        val s = _state.value
+        val image = s.image ?: return
+        val editing = s.selectedText
+        if (editing == null && s.barLook.style != MaskStyle.TEXT) return
+        val text = typed.replace('\n', ' ')
+        val origin = lookEditOrigin ?: s.plan
+        val next = when {
+            editing != null && text.isBlank() -> s.copy(
+                plan = s.plan.remove(editing.candidateId),
+                selectedManualId = null,
+                textPlacement = TextPlacement(editing.candidateId, editing.quad.center(), editing.look),
+            )
+            editing != null -> s.copy(
+                plan = s.plan.replace(editing.copy(text = text, quad = textBox(text, editing.look, editing.quad.center(), image))),
+            )
+            text.isBlank() -> return
+            else -> {
+                val at = s.textPlacement ?: TextPlacement("manual-${UUID.randomUUID()}", PointF(image.width / 2f, image.height / 2f))
+                val look = at.look ?: s.brush
+                val item = MaskItem(
+                    candidateId = at.id,
+                    quad = textBox(text, look, at.center, image),
+                    kind = SensitiveKind.MANUAL,
+                    source = DetectorSource.MANUAL,
+                    look = look,
+                    text = text,
+                )
+                s.copy(plan = s.plan.add(item), selectedManualId = item.candidateId, textPlacement = null)
+            }
+        }
+        if (lookEditOrigin == null) lookEditOrigin = origin
+        // 撤销按钮不等收尾就亮：写了字就有得撤
+        uiState = next.copy(canUndo = undoStack.canUndo || next.plan != origin)
+    }
+
+    /** 照 [look] 的字号、以 [center] 为中心写下 [text] 的框，挪进图里（见 TextStamp.boxAt）。 */
+    private fun textBox(text: String, look: MaskLook, center: PointF, image: SourceImage): Quad =
+        TextStamp.boxAt(text, look.options.textSize * min(image.width, image.height), center, image.width, image.height)
+
+    private fun Quad.center(): PointF = bounds().let { PointF(it.centerX(), it.centerY()) }
 
     // ---------- 导出 ----------
 
@@ -1093,6 +1257,8 @@ class EditorViewModel(
             purposeSheetVisible = true,
             stylePanelOpen = false,
             colorPick = null,
+            textPlacement = null,
+            textFocus = false,
             purposeDraft = s.purposeDraft.ifBlank { lastPurposeText ?: defaultPurposeText },
         )
     }
@@ -1246,6 +1412,9 @@ class EditorViewModel(
         const val DEFAULT_PURPOSE_TEXT = "仅供办理 XX 使用"
         const val PURPOSE_STYLE_SAVE_DEBOUNCE_MS = 400L
         const val BRUSH_SAVE_DEBOUNCE_MS = 400L
+
+        /** 拖文本的框时，边挪了不到这么多（图像像素）算没动：浮点数加减出来的零头。 */
+        const val SAME_EDGE = 0.01f
     }
 
     @VisibleForTesting

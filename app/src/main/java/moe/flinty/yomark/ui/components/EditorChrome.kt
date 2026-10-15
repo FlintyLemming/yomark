@@ -203,7 +203,7 @@ fun EditorBottomBar(
             // 两种面板换着开时外面这一列不换，跟着里面的东西一点点变高变矮
             if (panelShown) PanelColumn(Modifier.layoutId(BarPart.CONTENT)) {
                 if (last.purpose) PurposePanelContent(purpose, purposeActions, compactWhileTyping = true)
-                else StylePanelContent(styleBar, styleActions)
+                else StylePanelContent(styleBar, styleActions, compactWhileTyping = true)
             }
             EditorToolbar(
                 open = toolGroup,

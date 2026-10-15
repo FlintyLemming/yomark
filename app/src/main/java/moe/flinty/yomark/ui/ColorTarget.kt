@@ -17,6 +17,9 @@ enum class ColorTarget {
     /** 画笔的颜色，不透明。 */
     PEN,
 
+    /** 文本的颜色，不透明；垫着底色时是底的颜色。 */
+    TEXT,
+
     /**
      * 用途水印的颜色，不透明，浓淡另外调。它不是打码的样子，不在 MaskOptions 里：
      * 在 PurposeWatermarkStyle.color，吸管取到的颜色交给 EditorViewModel.setPurposeStyle。
@@ -28,6 +31,7 @@ enum class ColorTarget {
         SOLID -> options.solidColor
         MARKER -> options.markerColor
         PEN -> options.penColor
+        TEXT -> options.textColor
         PURPOSE -> error("用途水印的颜色不在 MaskOptions 里")
     } or OPAQUE
 
@@ -39,6 +43,7 @@ enum class ColorTarget {
         SOLID -> options.copy(solidColor = rgb or OPAQUE, solidNear = false)
         MARKER -> options.copy(markerColor = MaskOptions.withAlpha(rgb, options.markerAlpha))
         PEN -> options.copy(penColor = rgb or OPAQUE)
+        TEXT -> options.copy(textColor = rgb or OPAQUE)
         PURPOSE -> error("用途水印的颜色不在 MaskOptions 里")
     }
 

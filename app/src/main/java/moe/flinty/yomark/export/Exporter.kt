@@ -76,7 +76,7 @@ class Exporter(
                     Triple(item, quad, MaskOrder.pinNearColor(options, bitmap, quad))
                 }
                 .forEach { (item, quad, options) ->
-                    registry[item.look.style].render(canvas, bitmap, quad, options, item.ink)
+                    registry[item.look.style].render(canvas, bitmap, quad, options, item.ink, item.text)
                     maskedBounds += quad.bounds()
                 }
 
