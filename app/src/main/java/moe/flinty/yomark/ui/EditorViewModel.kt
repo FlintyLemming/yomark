@@ -138,7 +138,7 @@ class EditorViewModel(
         /** 切走时增强识别到了哪一步，切回来照原样显示。跑到一半切走的算没跑过。 */
         var aiReview: AiReview = AiReview.Hidden
         /** 切走时这一张上点掉了哪些码（见 [dismissed]）。 */
-        var dismissed: List<Quad> = emptyList()
+        var dismissed: List<MaskItem> = emptyList()
     }
 
     /** 一次识别属于批量里的哪一张、是第几次。 */
@@ -622,11 +622,12 @@ class EditorViewModel(
         }
 
     /**
-     * 用户在这张图上点掉的识别结果（规则、聊天、AI 打上的码；自己点字打的、画的不算）的框。
-     * 点掉的多半是误报，「AI 增强识别」不该在同一处再打回来（见 RedactionEngine.refine 的 dismissed）。
+     * 用户在这张图上点掉的识别结果（规则、聊天、AI 打上的码；自己点字打的、画的不算），后点掉的在后。
+     * 点掉的多半是误报，「AI 增强识别」不该在同一处再打回来（见 RedactionEngine.refine 的 dismissed）；
+     * 误点掉的，原地再点一下原样打回去（见 GestureRules.tapTarget）。打回去了也留着：撤销那一下之后还点得回来。
      * 换了图才清空：改设置重跑识别、再撤销回重跑前，点掉的还是那几处。只活在内存里，和 [reviewLines] 一样。
      */
-    private var dismissed: List<Quad> = emptyList()
+    private var dismissed: List<MaskItem> = emptyList()
 
     /** 换上画布上这张图识别出的文字（没有就是 null）：增强识别要送的整页文字，点字打码要的每一行的框。 */
     private fun takeLines(found: List<TextLine>?) {
@@ -675,7 +676,7 @@ class EditorViewModel(
         val trace = if (debugTrace.value) traceLog.start("AI 增强识别") else null
         aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
             val extra = try {
-                ranOn.refine(lines, current.plan.items.map { it.quad }, dismissed)
+                ranOn.refine(lines, current.plan.items.map { it.quad }, dismissed.map { it.quad })
             } finally {
                 trace?.finish()
             }
@@ -702,7 +703,7 @@ class EditorViewModel(
 
     /**
      * 点一下（spec §7.3，2026-10-14 修订；点中了什么见 GestureRules.tapTarget）：
-     * - 识别出的码、点一行字打上的码：拿掉。撤销能回来，再点那行字打上的是整行；
+     * - 识别出的码、点一行字打上的码：拿掉。撤销能回来，识别出的原地再点一下也原样回来；
      * - 没打码的字：它所在的那一整行打上码，框是文字识别给的这一行，用「打码」里眼下的样式（[EditorUiState.maskLook]）。
      *   手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码；
      * - 手动框：不拿掉，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
@@ -717,8 +718,15 @@ class EditorViewModel(
             pickColorAt(imagePoint)
             return
         }
-        when (val target = GestureRules.tapTarget(_state.value.plan.items, lines, imagePoint, reach)) {
+        val plan = _state.value.plan
+        val gone = dismissed.filter { plan.find(it.candidateId) == null }
+        when (val target = GestureRules.tapTarget(plan.items, lines, imagePoint, reach, gone)) {
             is GestureRules.TapTarget.Item -> tapItem(target.item)
+            is GestureRules.TapTarget.Dismissed -> {
+                mutate { it.add(target.item) }
+                finishLookEdit()
+                uiState = _state.value.copy(selectedManualId = null)
+            }
             is GestureRules.TapTarget.Line -> maskLine(target.quad)
             null -> {
                 // 点空白算点了别处：选中态收起
@@ -745,7 +753,7 @@ class EditorViewModel(
             return
         }
         // 点它们也算点了别处：选中态收起
-        if (!item.byUser) dismissed = dismissed + item.quad
+        if (!item.byUser) dismissed = dismissed.filterNot { it.candidateId == item.candidateId } + item
         mutate { it.remove(item.candidateId) }
         finishLookEdit()
         uiState = _state.value.copy(selectedManualId = null)

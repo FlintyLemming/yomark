@@ -179,16 +179,39 @@ class EditorViewModelTapLineTest {
         assertThat(sink.writes).isEqualTo(1)
     }
 
-    /** 点识别出的码拿掉的是那一块，不是它那一行；再点那里，打上的是整行（撤销才回得到原来那块）。 */
-    @Test fun `tapping a detected mask takes off just that mask, a second tap masks the line`() = runTest(dispatcher) {
+    /** 点识别出的码拿掉的是那一块，不是它那一行；原地再点，回来的还是那一块；点它那行别处，才是整行。 */
+    @Test fun `tapping a detected mask takes off just that mask, a second tap puts it back`() = runTest(dispatcher) {
         val phone = candidate("phone", rect(150f, 60f, 290f, 90f), SensitiveKind.PHONE, masked = true)
         val vm = vm(listOf(phone))
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        val before = vm.items().single()
 
         vm.onTap(PointF(200f, 75f))
         assertThat(vm.items()).isEmpty()
         vm.onTap(PointF(200f, 75f))
+        assertThat(vm.items()).containsExactly(before)
+
+        vm.onTap(PointF(200f, 75f))
+        vm.onTap(PointF(50f, 75f))
         assertThat(vm.items().single().quad).isEqualTo(lower.quad)
+    }
+
+    /** 聊天头像这种底下没有字的：点掉了，原地再点照样打回去；撤销了打回去的那一下，还能再点回来。 */
+    @Test fun `a dismissed mask over no text comes back on a tap, even after undoing that`() = runTest(dispatcher) {
+        val avatar = candidate("avatar", rect(10f, 200f, 60f, 250f), SensitiveKind.CHAT_AVATAR, masked = true)
+        val vm = vm(listOf(avatar))
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        val before = vm.items().single()
+
+        vm.onTap(PointF(35f, 225f))
+        assertThat(vm.items()).isEmpty()
+        vm.onTap(PointF(35f, 225f))
+        assertThat(vm.items()).containsExactly(before)
+
+        vm.undo()
+        assertThat(vm.items()).isEmpty()
+        vm.onTap(PointF(35f, 225f))
+        assertThat(vm.items()).containsExactly(before)
     }
 
     @Test fun `a tap in the gap takes the nearer line within reach, blank space takes nothing`() = runTest(dispatcher) {
