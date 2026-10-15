@@ -47,7 +47,7 @@ object GestureRules {
         /** 一块码。 */
         data class Item(val item: MaskItem) : TapTarget
 
-        /** 没打码的一行字：框是文字识别给的这一行（TextLine.quad）。 */
+        /** 没打码的一段字：框是文字识别给的这一段（TextLine.segments 里的一个，不是拼好的整行）。 */
         data class Line(val quad: Quad) : TapTarget
 
         /** 点掉过的一块识别结果：原样打回去。 */
@@ -56,12 +56,12 @@ object GestureRules {
 
     /**
      * 点在 [p] 上点中了什么（spec §7.3，2026-10-14 修订）：先看码（[hitTest]），再看是不是点掉过的识别结果（[dismissed]），
-     * 都不是就看是不是没打码的一行字（[lines]）。都不是为 null：点了空白。
+     * 都不是就看是不是没打码的一段字（[lines]，每一段的框）。都不是为 null：点了空白。
      *
      * 点掉的码排在行前面：误点掉了，原地再点一下就是原来那块，不是整行；头像这种底下没字的，也只有这样才点得回来。
      *
      * @param dismissed 点掉过的识别结果，后点掉的在后
-     * @param reach 点没落在任何一行里时，离一行多近也算点中它（图像像素，见 [LINE_REACH_DP]）
+     * @param reach 点没落在任何一段里时，离一段多近也算点中它（图像像素，见 [LINE_REACH_DP]）
      */
     fun tapTarget(
         items: List<MaskItem>,
@@ -75,7 +75,7 @@ object GestureRules {
         return lineAt(lines, p, reach)?.let { TapTarget.Line(it) }
     }
 
-    /** [p] 所在的那一行：落在几行里（斜着的水印压在字上）取最小的那行；一行都不在，取 [reach] 以内最近的。 */
+    /** [p] 所在的那一段：落在几段里（斜着的水印压在字上）取最小的那段；一段都不在，取 [reach] 以内最近的。 */
     fun lineAt(lines: List<Quad>, p: PointF, reach: Float): Quad? =
         lines.filter { it.contains(p) }.minByOrNull { it.area() }
             ?: lines.map { it to it.distanceTo(p) }.filter { it.second <= reach }.minByOrNull { it.second }?.first

@@ -9,6 +9,8 @@ data class TextLine(
     val text: String,                 // elements 按阅读顺序拼接，见 MlKitTextRecognizer
     val confidence: Float,
     val elements: List<TextElement>,  // range 是该词在 text 中的字符区间
+    /** 拼成这一行的那几段各自的框，见 OcrLine.segments。ML Kit 的行没有拼过，就是 [quad]。 */
+    val segments: List<Quad> = listOf(quad),
 ) {
     /**
      * 把 text 上的匹配区间映射回像素四边形（spec §5.3）。

@@ -85,9 +85,9 @@ import moe.flinty.yomark.R
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
- * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一行多远还算点中它（图像像素）
+ * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一段字多远还算点中它（图像像素）
  * @param onInk 手画完一笔：手指走过的点，图像坐标
- * @param textBoxes 开发者里打开「显示识别框」时，文字识别认出的每一行的框；空的就不画
+ * @param textBoxes 开发者里打开「显示识别框」时，文字识别认出的每一段字的框（点字打码打的就是这些框）；空的就不画
  */
 @Composable
 fun ImageCanvas(
@@ -591,7 +591,7 @@ private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: S
 }
 
 /**
- * 开发者里的「显示识别框」：识别出的每一行一个框，盖在码上面，打了码的那几行也看得到。
+ * 开发者里的「显示识别框」：识别出的每一段字一个框，盖在码上面，打了码的那几段也看得到。
  * 用固定的品红，不跟主题色：要和选中框、草稿框分得开，在哪种图上都扎眼。
  */
 private fun drawTextBoxes(canvas: android.graphics.Canvas, boxes: List<Quad>, dp: Float) {

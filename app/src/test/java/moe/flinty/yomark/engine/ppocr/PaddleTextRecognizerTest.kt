@@ -1,10 +1,12 @@
 package moe.flinty.yomark.engine.ppocr
 
 import android.graphics.BitmapFactory
+import android.graphics.PointF
 import androidx.test.core.app.ApplicationProvider
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
+import moe.flinty.yomark.debug.textUnder
 import moe.flinty.yomark.rules.DefaultRuleSet
 import moe.flinty.yomark.rules.RuleClassifier
 import com.google.common.truth.Truth.assertThat
@@ -54,6 +56,21 @@ class PaddleTextRecognizerTest {
             line.elements.forEach { e ->
                 assertThat(e.range.first).isEqualTo(e.range.last)
                 assertThat(line.text.substring(e.range)).isEqualTo(e.text)
+            }
+        }
+    }
+
+    /**
+     * 拼成一行的「取件码 3-2-1234 复制」还留着检测切开的三段（TextLine.segments）：点字打码点中号码，只打码号码，
+     * 不连着字段名和「复制」。每个字都落在它那一行的某一段里，点哪个字都点得中。
+     */
+    @Test fun `a joined row keeps the segments detection cut it into`() {
+        val row = lines.single { it.text == "取件码 3-2-1234 复制" }
+        assertThat(row.segments.map { textUnder(it, listOf(row)) }).containsExactly("取件码", "3-2-1234", "复制").inOrder()
+        lines.forEach { line ->
+            line.elements.forEach { e ->
+                val c = e.quad.bounds()
+                assertThat(line.segments.any { it.contains(PointF(c.centerX(), c.centerY())) }).isTrue()
             }
         }
     }
