@@ -143,7 +143,7 @@ enum class ToolGroup(@StringRes val label: Int) {
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
- * @param purposeOn 设了用途水印：水印着主题色
+ * @param purposeOn 设了用途水印：读屏念「已开启」
  * @param purposeOpen 用途水印的面板开着：选中的是水印，不是当前的样式
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
@@ -408,8 +408,10 @@ private fun RedactTools(model: StyleBarModel, actions: StyleBarActions, purposeO
 
 /**
  * 编辑：马克笔、画笔是样式，和打码的几种一样是画笔（EditorUiState.brush）：都能拉框，也都能照手画（见 StrokeShape）；
- * 水印是用途水印，设了就着主题色。点它和点了再点马克笔、画笔一样，胶囊长出它的调节面板（见 EditorBottomBar），
+ * 水印是用途水印。点它和点了再点马克笔、画笔一样，胶囊长出它的调节面板（见 EditorBottomBar），
  * 不用先点一下选中：它不是一种样式，没有「换成它」这一步。面板开着时选中的是它，名字后面的小箭头朝下，再点一下收起。
+ * 设没设只有读屏念（「已开启」），颜色和别的工具一样只看选没选中：原先设了就着主题色，没选中也像选中了（2026-10-15）。
+ * 设了的话图上就有，看得见。
  */
 @Composable
 private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn: Boolean, purposeOpen: Boolean, onPurpose: () -> Unit) {
@@ -422,7 +424,6 @@ private fun EditTools(model: StyleBarModel, actions: StyleBarActions, purposeOn:
         selected = purposeOpen,
         // 选中就是面板开着：小箭头露出来时总是朝下
         panelOpen = true,
-        on = purposeOn,
         stateText = if (purposeOn) stringResource(R.string.tool_on) else null,
     ) { ink ->
         Icon(PurposeWatermarkIcon, contentDescription = null, modifier = Modifier.size(GLYPH_ICON), tint = ink)
@@ -783,7 +784,6 @@ private fun rememberHintPosition(): PopupPositionProvider {
  *
  * @param panelOpen 名字后面的小箭头：再点一下长出调节面板（开着时朝下）。只有选中时露出来；null 是没有小箭头的
  * @param enabled 点不动的灰掉
- * @param on 开着的开关（水印）：名字着主题色
  * @param stateText 读屏念的状态，如水印的「已开启」
  */
 @Composable
@@ -795,7 +795,6 @@ private fun ToolItem(
     panelOpen: Boolean? = null,
     enabled: Boolean = true,
     role: Role = Role.RadioButton,
-    on: Boolean = false,
     stateText: String? = null,
     glyph: @Composable (ink: Color) -> Unit,
 ) {
@@ -813,7 +812,7 @@ private fun ToolItem(
     // 撑开、收窄：GNav 的 curve（easeInCubic），选中时倒过来用，两头都是起步快
     val grow = if (selected) FLUTTER_EASE_IN_CUBIC.flipped().transform(pick) else FLUTTER_EASE_IN_CUBIC.transform(pick)
     val inked = if (selected) FLUTTER_EASE_OUT_CIRC.transform(pick) else FLUTTER_EASE_IN_EXPO.transform(pick)
-    val ink = if (on) colors.primary else lerp(colors.onSurfaceVariant, colors.primary, inked)
+    val ink = lerp(colors.onSurfaceVariant, colors.primary, inked)
     val style = MaterialTheme.typography.labelLarge
     Box(
         modifier
