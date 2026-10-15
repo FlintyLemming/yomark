@@ -8,6 +8,7 @@ import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
+import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.debug.TraceBlock
@@ -18,6 +19,7 @@ import moe.flinty.yomark.debug.currentTrace
 import moe.flinty.yomark.debug.describe
 import moe.flinty.yomark.debug.formatDuration
 import moe.flinty.yomark.engine.SensitivityClassifier
+import moe.flinty.yomark.rules.Rule
 import moe.flinty.yomark.rules.RuleClassifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,9 +32,9 @@ import kotlin.coroutines.cancellation.CancellationException
  * Gemini Nano 语义判定（spec §14「Gemini Nano 语义判定 | SensitivityClassifier」那一行）。
  *
  * 规则认的是形状：「收货人」后面、电话前面、门牌号那样的串。认不出的是**语义**——
- * 聊天里随口提到的「我住在XX小区」「让张伟来拿」。这一层把 OCR 出来的整页文字
+ * 聊天里随口提到的「我住在XX小区」「让张伟来拿」、@ 的人、短信里「凭 3-2-1234 取件」。这一层把 OCR 出来的整页文字
  * 交给设备上的 Gemini Nano（ML Kit GenAI Prompt API，经系统的 AICore 服务），
- * 让它把规则漏掉的人名、地址指出来。
+ * 让它把规则漏掉的指出来。问的是用户开着的每一类文字（[kinds]），聊天记录开着时也问昵称和聊天标题。
  *
  * - **全程在本机**：推理在 AICore 里跑，本应用不联网、不加 INTERNET 权限；
  * - **找到的直接打码**（2026-10-14 起没有「圈出」）：是用户点了才跑的，模型猜错的点一下就拿掉，整批不要撤销一下；
@@ -44,6 +46,17 @@ import kotlin.coroutines.cancellation.CancellationException
  * 调试信息开着时（见 debug/Trace.kt），每一段送了什么提示词、模型原样回了什么、解析出哪几处都记下来。
  */
 class GeminiNanoClassifier(
+    /**
+     * 问哪几类：app 里是用户开着的那些（见 EngineFactory 的 aiKinds），默认全问（单测用）。
+     * 提示词只列这几类，回答里别的类型不认。
+     */
+    private val kinds: Set<SensitiveKind> = SemanticPrompt.KINDS,
+    /**
+     * 用户关掉的那几类的规则。模型把关掉的那一类报成开着的另一类时（关了电话，它把手机号报成证件号；
+     * 日期出厂关着，它把下单时间报成取件码），拿它们认一遍原文：整段就是关掉那一类的东西，这一条不认。
+     * 生日、取件码（「3-2-2025」）也可能是日期的样子，关了日期不拦它们。
+     */
+    private val offRules: List<Rule> = emptyList(),
     /**
      * 问模型一句、拿回它的回答。默认是本机的 Gemini Nano；拆成参数是为了单测——
      * ML Kit 的 GenerativeModel 在 JVM 上造不出来。
@@ -57,19 +70,18 @@ class GeminiNanoClassifier(
 
     override suspend fun classify(lines: List<TextLine>): List<Candidate> {
         val trace = currentTrace()
-        val texts = lines.map { l -> l.text.takeIf { l.confidence >= RuleClassifier.MIN_LINE_CONFIDENCE && it.hasWords() } }
-        val chunks = SemanticPrompt.chunks(texts)
+        val texts = lines.map { l -> l.text.takeIf { l.confidence >= RuleClassifier.MIN_LINE_CONFIDENCE && it.hasContent() } }
+        val chunks = SemanticPrompt.chunks(texts, kinds)
         trace?.add(
             TraceSection(
                 TraceStage.CLASSIFY,
                 "Gemini Nano · 送去的文字",
                 "${lines.size} 行里送 ${texts.count { it != null }} 行，分 ${chunks.size} 段" +
-                    "（置信度不到 ${RuleClassifier.MIN_LINE_CONFIDENCE}、不到两个字母或汉字的行不送）",
+                    "（置信度不到 ${RuleClassifier.MIN_LINE_CONFIDENCE}、不到两个字母或数字的行不送）",
             )
         )
-        // 合并时同规则的候选一样按各自的阅读方向量：截图里转过的证件照上两行地址不拼成一块
-        val directions by lazy { RuleClassifier.readingDegrees(lines) }
-        return chunks.flatMapIndexed { n, chunk ->
+        val all = lines.map { it.text }
+        val findings = chunks.flatMapIndexed { n, chunk ->
             val started = trace?.now() ?: 0L
             val reply = try {
                 withTimeoutOrNull(TIMEOUT_MS) { ask(chunk.prompt) }
@@ -79,27 +91,46 @@ class GeminiNanoClassifier(
                 trace?.recordExchange(n, chunks.size, chunk, lines, started, reply = null, error = e)
                 throw e
             }
-            val findings = reply?.text?.let { SemanticPrompt.parse(it, chunk, lines.map { l -> l.text }) }.orEmpty()
-            trace?.recordExchange(n, chunks.size, chunk, lines, started, reply, findings = findings)
-            findings.map { f ->
-                Candidate(
-                    id = "llm-${f.lineIndex}-${f.range.first}-${f.kind}",
-                    quad = lines[f.lineIndex].quadForRange(f.range),
-                    kind = f.kind,
-                    source = DetectorSource.LLM,
-                    confidence = CONFIDENCE,
-                    readingDegrees = directions[f.lineIndex],
-                )
-            }
+            // 原文在整页里找：一段里说到的昵称，别的段里出现的那几处也算
+            val found = reply?.text?.let { SemanticPrompt.parse(it, all, kinds, ::vetoed) }.orEmpty()
+            trace?.recordExchange(n, chunks.size, chunk, lines, started, reply, findings = found)
+            found
+        }.let(SemanticPrompt::collapse)
+        // 合并时同规则的候选一样按各自的阅读方向量：截图里转过的证件照上两行地址不拼成一块
+        val directions by lazy { RuleClassifier.readingDegrees(lines) }
+        return findings.map { f ->
+            Candidate(
+                id = "llm-${f.lineIndex}-${f.range.first}-${f.kind}",
+                quad = lines[f.lineIndex].quadForRange(f.range),
+                kind = f.kind,
+                source = DetectorSource.LLM,
+                confidence = CONFIDENCE,
+                readingDegrees = directions[f.lineIndex],
+            )
         }
     }
 
-    /** 至少两个汉字或字母，纯数字、纯符号的行交给规则就够了。 */
-    private fun String.hasWords() = count { it.isLetter() } >= 2
+    /**
+     * 关掉的哪一条规则认得出整段原文。日期、IP（置信度 0.6）往上的算；没有校验位的长数字串、快递单号是猜的（0.4、0.5），
+     * 出厂又关着，拿它们来拦，银行账号报成银行卡也会被拦掉。网址规则只认 ? 和路径那一截，整段的网址拦不住。
+     */
+    private fun vetoed(kind: SensitiveKind, quote: String): Boolean = offRules.any { rule ->
+        !(rule.kind == SensitiveKind.DATETIME && kind in rule.yieldsTo) &&
+            rule.findIn(quote).any { m ->
+                m.confidence >= VETO_CONFIDENCE && !m.needsAnchor && !m.outlineOnly &&
+                    m.range.first == 0 && m.range.last == quote.lastIndex
+            }
+    }
 
     /**
-     * 一段的来回记成一节：送了几行、用了多久、结果如何；解析出的每一处写明是 OCR 的第几行（与「文字识别」那一节的行号一致）
-     * 和提示词里的第几行（模型回答里的行号）。提示词和回答原样收在下面。[reply] 为 null 而没有 [error] 是超时了。
+     * 至少两个字母、汉字或数字。纯数字的行也送：单独一行的取件码、手机号，模型要看到才认得出，
+     * 打了星的证件号也是上一行是人名的线索。纯符号、单个字的行没什么可看的。
+     */
+    private fun String.hasContent() = count { it.isLetterOrDigit() } >= 2
+
+    /**
+     * 一段的来回记成一节：送了几行、用了多久、结果如何；解析出的每一处写明是 OCR 的第几行（与「文字识别」那一节的行号一致）。
+     * 原文在整页里找，所以也可能落在别的段里的行上。提示词和回答原样收在下面。[reply] 为 null 而没有 [error] 是超时了。
      */
     private fun TraceRecorder.recordExchange(
         index: Int,
@@ -125,8 +156,7 @@ class GeminiNanoClassifier(
                 summary = "${formatDuration(now() - started)} · 送了 ${chunk.lineIndices.size} 行 · $outcome",
                 lines = findings.map { f ->
                     val quote = lines[f.lineIndex].text.substring(f.range.first, f.range.last + 1)
-                    "第 ${f.lineIndex + 1} 行（提示词里第 ${chunk.lineIndices.indexOf(f.lineIndex) + 1} 行）" +
-                        "  ${SensitiveKindLabels.debugName(f.kind)}  「$quote」"
+                    "第 ${f.lineIndex + 1} 行  ${SensitiveKindLabels.debugName(f.kind)}  「$quote」"
                 },
                 blocks = listOfNotNull(
                     TraceBlock("提示词", chunk.prompt),
@@ -140,6 +170,7 @@ class GeminiNanoClassifier(
     private companion object {
         const val TIMEOUT_MS = 20_000L
         const val CONFIDENCE = 0.5f
+        const val VETO_CONFIDENCE = 0.6f
     }
 }
 

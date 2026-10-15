@@ -1,8 +1,8 @@
-"""两种补充喂法，回答格式都还是 app 的「行号|类型|原文」：
+"""两种补充喂法，回答格式都还是 2026-10-03 那版的「行号|类型|原文」：
 
 text_all : 只给文字，但不做 hasWords() 过滤——纯数字、打星号的行也送（证件号就在名字下一行）
 hybrid   : 截图 + text_all 的文字一起给。图给版面，文字给逐字原文和行号，
-           解析、落到像素都还走 app 现成的 SemanticPrompt.parse + quadForRange。
+           解析、落到像素都走 run_eval 里 2026-10-03 那版的 parse（当时的 SemanticPrompt.parse）+ quadForRange。
 """
 import json, os, sys
 from run_eval import HERE, SAMPLES, chunks, parse, ask, image_part, start, peak_rss_mb

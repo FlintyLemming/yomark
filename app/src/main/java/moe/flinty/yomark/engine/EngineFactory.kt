@@ -2,12 +2,14 @@ package moe.flinty.yomark.engine
 
 import android.content.Context
 import moe.flinty.yomark.chat.ChatDetector
+import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.engine.mlkit.MlKitBarcodeDetector
 import moe.flinty.yomark.engine.mlkit.MlKitFaceDetector
 import moe.flinty.yomark.engine.mlkit.MlKitTextRecognizer
 import moe.flinty.yomark.engine.mlkit.TextScript
 import moe.flinty.yomark.engine.genai.GeminiNanoClassifier
 import moe.flinty.yomark.engine.ppocr.PaddleTextRecognizer
+import moe.flinty.yomark.rules.Rule
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.rules.RuleClassifier
 
@@ -31,14 +33,29 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
     classifiers = listOf(
         RuleClassifier(RuleCatalog.rulesFor(config), maskUnanchored = config.maskUnanchoredNames).traced(),
     ),
+    // 什么都没开就不摆「AI 增强识别」：没有可问的，点了也只会说「没有新发现」
     refiners = when (config.semantic) {
-        SemanticOption.GEMINI_NANO -> listOf(GeminiNanoClassifier().traced())
+        SemanticOption.GEMINI_NANO -> aiKinds(config).takeIf { it.isNotEmpty() }?.let { kinds ->
+            listOf(GeminiNanoClassifier(kinds, aiOffRules(config)).traced())
+        }.orEmpty()
         SemanticOption.OFF -> emptyList()
     },
     pageAnalyzers = if (config.chatState == RuleState.OFF) emptyList() else {
         listOf(ChatDetector().traced())
     },
 )
+
+/**
+ * AI 增强识别找哪几类：「文字」里开着的那些，聊天记录开着时再加上昵称和聊天标题（头像是图，读文字的模型看不到）。
+ * 它找到的直接打码，所以用户关掉的那一类它也不找，不能绕过设置。
+ */
+internal fun aiKinds(config: RecognitionConfig): Set<SensitiveKind> =
+    RuleCatalog.rulesFor(config).map { it.kind }.toSet() +
+        if (config.chatState == RuleState.OFF) emptySet() else setOf(SensitiveKind.CHAT_NAME, SensitiveKind.CHAT_TITLE)
+
+/** 用户关掉的那几类文字规则：AI 拿它们认一遍回答，关掉的那一类换个类型报上来也不认（见 GeminiNanoClassifier 的 offRules）。 */
+internal fun aiOffRules(config: RecognitionConfig): List<Rule> =
+    RuleCatalog.all.filter { RuleCatalog.stateOf(config, it.id) == RuleState.OFF }
 
 private fun textRecognizerFor(context: Context, option: TextEngineOption): TextRecognizer = when (option) {
     TextEngineOption.PADDLE -> PaddleTextRecognizer(context)

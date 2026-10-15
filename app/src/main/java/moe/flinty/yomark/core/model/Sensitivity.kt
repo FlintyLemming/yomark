@@ -24,7 +24,7 @@ enum class SensitiveKind {
 
     // PERSON_NAME / POSTAL_ADDRESS 不是 NER 产出的：标签锚定认字段名后面的值，
     // 另外人名认电话前面的那几个字、地址认门牌的形状（NameBeforePhone / AddressShape）。
-    // 自由行文里的人名地址仍然认不出，完整覆盖要等 NER（spec §14 的接口已留）。
+    // 自由行文里的人名地址规则认不全（AI 增强识别也报这两类），完整覆盖要等 NER（spec §14 的接口已留）。
     // ORG_NAME 至今没有产出方。
     POSTAL_ADDRESS, PERSON_NAME, ORG_NAME,
 
@@ -39,8 +39,9 @@ enum class SensitiveKind {
     VIN,
 
     /**
-     * 聊天截图里发言者的头像、昵称，和顶栏的聊天标题（对方名字或群名）。由版面认出（chat/ChatLayout）：
-     * 先判断这一页是不是聊天记录，是才认；三类共用设置里「聊天记录」一项的处理方式，出厂打码。
+     * 聊天截图里发言者的头像、昵称，和顶栏的聊天标题（对方名字或群名）。版面（chat/ChatLayout）先判断这一页是不是聊天记录，是才认；
+     * AI 增强识别（GeminiNanoClassifier）也从文字里报昵称和聊天标题，不看是不是聊天页。
+     * 三类共用设置里「聊天记录」一项的处理方式，出厂打码；关着时版面和 AI 都不找。
      */
     CHAT_AVATAR, CHAT_NAME, CHAT_TITLE,
 

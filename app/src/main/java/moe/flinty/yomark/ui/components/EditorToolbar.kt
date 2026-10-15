@@ -654,7 +654,7 @@ internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = 
 private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.04f))
 
 /**
- * 「AI 增强识别」：两颗星。跑的时候两颗星转着；跑完了换成对勾、点不动，新发现几处是角标上的数；没跑成星星是红的、还能点。
+ * 「AI 增强识别」：三颗星。跑的时候三颗星转着；跑完了换成对勾、点不动，新发现几处是角标上的数；没跑成星星是红的、还能点。
  * 圆钮上没有字，读屏念的是宽屏按钮上那句（见 [AiReviewButton]）；跑完那一下画布顶上会说一声（见 [AiReviewResultPill]）。
  */
 @Composable

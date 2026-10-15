@@ -1,6 +1,5 @@
 package moe.flinty.yomark
 
-import moe.flinty.yomark.engine.genai.SemanticPrompt
 import moe.flinty.yomark.engine.ppocr.PpOcrEngine
 import java.io.File
 import javax.imageio.ImageIO
@@ -10,12 +9,10 @@ import javax.imageio.ImageIO
  *
  * 每张图按设备口径先降采样（SourceImageLoader：2 的幂、长边 ≤ 2048，点采样），再跑随包的 PP-OCRv5，
  * 写出 <输出目录>/ocr/<名>.json 和同尺寸的 <输出目录>/analysis/<名>.png——看图的模型吃的也是这张。
- * 顺带把 app 里给 Gemini Nano 的提示词原样写到 <输出目录>/instructions.txt，脚本逐字复用，不手抄。
  */
 fun main(args: Array<String>) {
     val out = File(args[0])
     File(out, "ocr").mkdirs(); File(out, "analysis").mkdirs()
-    File(out, "instructions.txt").writeText(SemanticPrompt.INSTRUCTIONS)
     val assets = File("../../../app/src/main/assets/ppocr")
     val engine = PpOcrEngine(
         detModel = File(assets, "det.onnx").readBytes(),

@@ -17,7 +17,7 @@
 
 1. **随包的小模型要看图。** 同一个模型，看截图比读 OCR 文字好得多：Qwen3.5-2B 看图 18/22，读文字只有 4/22。
    2B 及以下的模型同时给图和文字反而更差（Qwen3.5-2B 5/22），4B 才能把两样都用好（19/22）。
-2. **文字模式差，有一半是 app 自己造成的。** 这两处不管最后用哪个模型都该修，Gemini Nano 也受益：
+2. **文字模式差，有一半是 app 自己造成的。** 这两处不管最后用哪个模型都该修，Gemini Nano 也受益（2026-10-15 已修，见下文「方案」第 2 条）：
    - `GeminiNanoClassifier` 只送「至少两个字母」的行。打了星的证件号一个字母都没有，模型根本看不到，
      而它恰恰是「上一行是人名」最强的线索。改成整页都送之后，Qwen3.5-0.8B 和 2B 只读文字就把这一页的名字和证件号都认出来了；
    - `SemanticPrompt.parse` 要求回答里的行号必须正好对上。小模型常常差一行（名字在第 19 行，它答 20），
@@ -93,7 +93,10 @@ HanLP（portable 1.8.4，Apache-2.0，jar 8 MB，纯 Java，能在 Android 上�
 1. **规则补强**（所有设备、毫秒级、不增加体积）：上面五种认法，再修掉日期被当成电话的误报。
    车票、订单、酒店、物流这类有固定版式的页面，规则能兜住；
 2. **保留 Gemini Nano 的 AI 复查**（有 Nano 的设备）：修掉 app 自己的两处问题，纯数字的行也送、行号对不上时在相邻几行里找。
-   可以在真机上试试给 Prompt API 加一张截图（`ImagePart`）会不会更好；
+   可以在真机上试试给 Prompt API 加一张截图（`ImagePart`）会不会更好。
+   **已实施（2026-10-15）**：纯数字的行也送；回答改成「类型|原文」，行号写了也不看（真机上 Nano 常把行号写成 1、2、3 往下数），
+   原文在整页里找、每一处都算。同时改为问设置里开着的每一类，见 `docs/superpowers/specs/2026-09-30-yomark-ppocr-gemini-nano-design.md`
+   文末「修订（2026-10-15）」；
 3. **可选：HanLP 人名识别**，做成识别设置里的实验开关，结果只圈不打码，专门补聊天句子里的人名。先在真机上量内存和首次加载时间。
    **已实施**：并在人名规则 `name` 里，从字面认出的只圈不打码（起初单独成规则 `name-text`，2026-10-04 并回「人名」一行），
    见 `docs/superpowers/specs/2026-10-03-yomark-name-from-text-design.md`。2026-10-09 起改为要旁证：附近有电话、证件号、
@@ -258,8 +261,10 @@ LLAMA_SERVER=/path/to/llama-server python3 run_hybrid.py qwen35-2b  # 文字·�
 python3 score_eval.py qwen35-2b
 ../../gradlew -p ocr-dump -q run -Pmain=moe.flinty.yomark.RuleProtoKt --args="../out/ocr ../out/rule-proto.json"
 python3 score_rules.py out/rule-proto.json   # 出厂规则、规则 + 补强、HanLP
+python3 nano_eval.py --serial <真机>          # Gemini Nano 真机，量 app 里的提示词；先装 debug 与 androidTest 两个 APK
 ```
 
-`ocr-dump` 直接编译 app 里 PP-OCR 和提示词的原文件，在桌面 JVM 上跑随包的同一套模型。它按设备口径降采样，
-写出 OCR 行和看图模式用的同尺寸截图，并把 `SemanticPrompt.INSTRUCTIONS` 原样导出，供脚本逐字复用。
+`ocr-dump` 直接编译 app 里 PP-OCR 的原文件，在桌面 JVM 上跑随包的同一套模型。它按设备口径降采样，
+写出 OCR 行和看图模式用的同尺寸截图。`run_eval.py` 的文字模式定在 2026-10-03 那一版提示词上（四类，回答「行号|类型|原文」），
+原样抄在脚本里，上文的数字就是它量的；app 现在的提示词不再导出，只用 `nano_eval.py` 在真机上量。
 自己的截图放进 `out/samples/`，在 `out/truth/` 里写同名真值即可加入评测。截图含个人信息时不要提交。

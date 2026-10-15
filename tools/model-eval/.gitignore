@@ -9,3 +9,4 @@ out-*.json
 fonts/
 out-stress/
 out-ner/
+out-nano/

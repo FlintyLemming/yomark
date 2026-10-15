@@ -137,6 +137,8 @@ class EditorViewModel(
         var lines: List<TextLine>? = null
         /** 切走时增强识别到了哪一步，切回来照原样显示。跑到一半切走的算没跑过。 */
         var aiReview: AiReview = AiReview.Hidden
+        /** 切走时这一张上点掉了哪些码（见 [dismissed]）。 */
+        var dismissed: List<Quad> = emptyList()
     }
 
     /** 一次识别属于批量里的哪一张、是第几次。 */
@@ -324,6 +326,7 @@ class EditorViewModel(
                 undoStack.clear()                     // 换图时两个栈都清空
                 lookEditOrigin = null
                 takeLines(null)                       // 上一张图的行，点在这张图上不作数
+                dismissed = emptyList()
                 uiState = EditorUiState(
                     image = image,
                     plan = MaskPlan.empty(),
@@ -366,6 +369,7 @@ class EditorViewModel(
         intake.clear()
         intakeResult = null
         takeLines(null)
+        dismissed = emptyList()
         undoStack = UndoStack()
         lookEditOrigin = null
         dragOrigin = null
@@ -404,13 +408,16 @@ class EditorViewModel(
         if (s.image != null) {
             batchUndo[batch.index] = undoStack
             // 增强识别跑到一半切走，就算没跑：任务已经取消了，回来时按钮还能点
-            batchScans.getOrPut(batch.index) { BatchScan() }.aiReview =
-                if (s.aiReview == AiReview.Running) AiReview.Ready else s.aiReview
+            batchScans.getOrPut(batch.index) { BatchScan() }.apply {
+                aiReview = if (s.aiReview == AiReview.Running) AiReview.Ready else s.aiReview
+                dismissed = this@EditorViewModel.dismissed
+            }
         }
         undoStack = UndoStack()
         // 载入期间进程被杀的话，宁可什么都不恢复，也不要把上一张的图配上这里的占位 plan
         intakeResult = null
         takeLines(null)
+        dismissed = emptyList()
         uiState = s.copy(
             image = null,
             plan = MaskPlan.empty(),
@@ -471,6 +478,7 @@ class EditorViewModel(
             dragOrigin = null
             analyzedWith = record?.ranWith
             takeLines(record?.lines)
+            dismissed = record?.dismissed.orEmpty()
             uiState = s.copy(
                 image = image,
                 plan = stored.plan ?: MaskPlan.empty(),
@@ -613,6 +621,13 @@ class EditorViewModel(
             savedState[KEY_LINES] = packQuads(value)
         }
 
+    /**
+     * 用户在这张图上点掉的识别结果（规则、聊天、AI 打上的码；自己点字打的、画的不算）的框。
+     * 点掉的多半是误报，「AI 增强识别」不该在同一处再打回来（见 RedactionEngine.refine 的 dismissed）。
+     * 换了图才清空：改设置重跑识别、再撤销回重跑前，点掉的还是那几处。只活在内存里，和 [reviewLines] 一样。
+     */
+    private var dismissed: List<Quad> = emptyList()
+
     /** 换上画布上这张图识别出的文字（没有就是 null）：增强识别要送的整页文字，点字打码要的每一行的框。 */
     private fun takeLines(found: List<TextLine>?) {
         reviewLines = found
@@ -660,7 +675,7 @@ class EditorViewModel(
         val trace = if (debugTrace.value) traceLog.start("AI 增强识别") else null
         aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
             val extra = try {
-                ranOn.refine(lines, current.plan.items.map { it.quad })
+                ranOn.refine(lines, current.plan.items.map { it.quad }, dismissed)
             } finally {
                 trace?.finish()
             }
@@ -730,6 +745,7 @@ class EditorViewModel(
             return
         }
         // 点它们也算点了别处：选中态收起
+        if (!item.byUser) dismissed = dismissed + item.quad
         mutate { it.remove(item.candidateId) }
         finishLookEdit()
         uiState = _state.value.copy(selectedManualId = null)

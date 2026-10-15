@@ -1,4 +1,4 @@
-// 独立的小工程，不进 app 的构建：直接编译 app 里的 PP-OCR 与提示词源码（原文件，不拷贝），
+// 独立的小工程，不进 app 的构建：直接编译 app 里的 PP-OCR 源码（原文件，不拷贝），
 // 在桌面 JVM 上跑随包的同一套模型，给 model-eval 的脚本出 OCR 行。
 plugins {
     kotlin("jvm") version "2.2.0"
@@ -15,7 +15,6 @@ sourceSets {
                 "moe/flinty/yomark/engine/ppocr/OcrTypes.kt", "moe/flinty/yomark/engine/ppocr/PpOcrEngine.kt",
                 "moe/flinty/yomark/engine/ppocr/WordGaps.kt", "moe/flinty/yomark/engine/ppocr/Pixels.kt",
                 "moe/flinty/yomark/engine/ppocr/TextAxis.kt",
-                "moe/flinty/yomark/engine/genai/SemanticPrompt.kt",
                 "moe/flinty/yomark/core/model/Sensitivity.kt",
                 // 规则原型要对照出厂规则表
                 "moe/flinty/yomark/rules/Rule.kt", "moe/flinty/yomark/rules/DefaultRuleSet.kt",
