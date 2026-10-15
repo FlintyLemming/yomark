@@ -71,19 +71,25 @@ class RedactionEngine(
     /**
      * 第二遍：在已有结果上跑慢的判定器，只返回**新增**的候选。
      *
-     * @param covered 画面上已经有框的地方：规则的候选，也包括用户自己画的手动框。
+     * @param covered 画面上已经有框的地方：规则、聊天的候选，点字打的码，也包括用户自己画的手动框。
      *   与其中任何一个大面积重叠的一律丢掉，不论类型——那块像素已经有人管了，
      *   再叠一个框只会让用户多点一下。
+     * @param dismissed 用户点掉的识别结果的框，多半是误报：模型在差不多同一处再报，只是同一个误报，丢掉。
+     *   只丢和它差不多一样大的（IoU 过半）：点掉的两个字的误报，不能把模型报的整段地址也带走。
      * @return null = 没有一个慢判定器真的跑完（不可用，或者抛了异常）。
      *   与 analyze 的「失败降级为空」不同：增强识别是用户点出来的，「没跑成」和「跑了没发现」
      *   必须分开告诉他，否则他会以为这一页已经被模型看过、是干净的。
      */
-    suspend fun refine(lines: List<TextLine>, covered: List<Quad>): List<Candidate>? {
+    suspend fun refine(lines: List<TextLine>, covered: List<Quad>, dismissed: List<Quad> = emptyList()): List<Candidate>? {
         val runs = refiners
             .filter { runCatching { it.isAvailable() }.getOrDefault(false) }
             .mapNotNull { r -> runCatching { r.classify(lines) }.getOrNull() }
         if (runs.isEmpty()) return null
-        return merger.merge(runs.flatten(), ReadingFrame.of(lines.map { it.quad })).filter { c -> covered.none { covers(it, c.quad) } }
+        val fresh = merger.merge(runs.flatten(), ReadingFrame.of(lines.map { it.quad }))
+            .filter { c -> covered.none { covers(it, c.quad) } && dismissed.none { it.iou(c.quad) > DISMISSED_IOU } }
+        // 这一遍报的几处之间也不叠：同一个名字既报成人名、又连着 @ 报成昵称时，只留大的那个（merge 已按面积从大到小排好）。
+        // 合并本身只在同类之间去重，这里不论类型，和 covered 一样
+        return fresh.fold(ArrayList<Candidate>()) { kept, c -> kept.apply { if (none { covers(it.quad, c.quad) }) add(c) } }
     }
 
     /** a 盖住了 b 的大半：交集超过两者中较小那个的一半。 */
@@ -94,5 +100,9 @@ class RedactionEngine(
         val h = minOf(ra.bottom, rb.bottom) - maxOf(ra.top, rb.top)
         if (w <= 0f || h <= 0f) return false
         return w * h > 0.5f * minOf(ra.width() * ra.height(), rb.width() * rb.height())
+    }
+
+    private companion object {
+        const val DISMISSED_IOU = 0.5f
     }
 }

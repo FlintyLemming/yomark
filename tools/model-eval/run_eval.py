@@ -1,6 +1,6 @@
 """端侧候选模型评测：同一个模型分别吃「PP-OCR 文字」和「截图」，外加条码判断题。
 
-文字模式逐字复用 app 的提示词（instructions.txt 由 SemanticPrompt.INSTRUCTIONS 导出）、
+文字模式逐字复用 2026-10-03 那时 app 的提示词（下面的 INSTRUCTIONS，即当时的 SemanticPrompt.INSTRUCTIONS）、
 切块规则（GeminiNanoClassifier：置信度 ≥ 0.5 且至少两个字母的行才送）和解析规则
 （SemanticPrompt.parse：行号|类型|原文，原文必须能在那一行里找到）。
 
@@ -28,7 +28,20 @@ SAMPLES = sorted(f[:-5] for f in os.listdir(os.path.join(HERE, "truth"))
                  if os.path.exists(os.path.join(HERE, "ocr", f)))
 PROBES = sorted(f for f in os.listdir(os.path.join(HERE, "probes")) if f.endswith(".png"))
 
-INSTRUCTIONS = open(os.path.join(HERE, "instructions.txt"), encoding="utf-8").read()
+# 2026-10-03 那一轮的提示词原样留着，旧数字才复现得出来；app 现在的提示词在真机上用 nano_eval.py 量
+INSTRUCTIONS = (
+    "你在帮用户给手机截图打码。下面是截图里识别出的文字，每行以「行号: 」开头。\n"
+    "请找出其中能指向具体某个人的隐私信息，只包括四类：\n"
+    "人名：真实姓名，或带姓的称呼（如「王先生」）\n"
+    "地址：住址、收货地址、小区楼栋门牌\n"
+    "电话：手机号、座机号，包括打了星号的\n"
+    "号码：身份证号、银行卡号、账号、取件码、验证码等个人号码\n"
+    "不要输出：店铺名、公司名、商品名、按钮和提示文字、城市名、日期时间、价格。\n"
+    "每找到一处输出一行，格式为：行号|类型|原文\n"
+    "原文必须从该行逐字复制，只复制隐私的那一段，不加引号、不加解释。\n"
+    "一处也没有就只输出：无\n"
+    "\n"
+)
 
 IMAGE_INSTRUCTIONS = (
     "你在帮用户给手机截图打码。请看这张截图，找出其中能指向具体某个人的隐私信息，只包括四类：\n"
