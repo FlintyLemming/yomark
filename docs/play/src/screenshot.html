@@ -41,17 +41,29 @@
     box-shadow: 0 0 0 1px rgba(16, 16, 20, 0.06), 0 6px 16px rgba(16, 60, 110, 0.10), 0 34px 70px rgba(16, 60, 110, 0.20);
   }
   .screen img { display: block; width: 100%; height: 100%; }
+  /* 点了哪儿（screenshots.json 的 tap，截图像素）：照系统「显示点按操作」画一个圆点 */
+  .tap {
+    position: absolute; width: 72px; height: 72px; margin: -36px 0 0 -36px; border-radius: 50%;
+    background: rgba(16, 16, 20, 0.22); box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.85);
+  }
 </style>
 </head>
 <body>
   <div class="cap"><h1 id="title"></h1><p id="subtitle"></p></div>
-  <div class="screen"><img id="shot" alt=""></div>
+  <div class="screen"><img id="shot" alt=""><span id="tap" class="tap" hidden></span></div>
   <script>
     // 标题里用 {} 括起来的是要加底色的关键词
     function show(shot) {
       const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
       document.getElementById('title').innerHTML = esc(shot.title).replace(/\{(.+?)\}/g, '<span class="hl">$1</span>');
       document.getElementById('subtitle').textContent = shot.subtitle;
+      const tap = document.getElementById('tap');
+      tap.hidden = !shot.tap;
+      if (shot.tap) {
+        const css = getComputedStyle(document.documentElement);
+        tap.style.left = (shot.tap[0] / css.getPropertyValue('--shot-w')) * 100 + '%';
+        tap.style.top = (shot.tap[1] / css.getPropertyValue('--shot-h')) * 100 + '%';
+      }
       const img = document.getElementById('shot');
       return new Promise((resolve, reject) => {
         img.onload = resolve;

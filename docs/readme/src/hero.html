@@ -1,7 +1,7 @@
 <!doctype html>
 <!-- README 头图。node docs/readme/src/render.cjs hero 渲染成 docs/readme/hero.png
-     右侧的两张卡片是同一份样图（order-page.html 的内容），左边原样，右边把默认打码的字段盖上色块、
-     默认只圈出的字段画上虚线框。颜色与形状照编辑器里的来：色块 #87CEEB，虚线框和类型标签 #FFB300。 -->
+     右侧的两张卡片是同一份样图（order-page.html 的内容），左边原样，右边把默认打码的字段盖上色块，
+     默认关闭的（日期、快递单号、订单编号）原样留着。色块照编辑器里的来：#87CEEB。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
@@ -14,7 +14,6 @@
     --faint: #9aa0aa;
     --line: #e6e8ec;
     --sky: #87ceeb;
-    --amber: #ffb300;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 1280px; height: 640px; overflow: hidden; }
@@ -90,15 +89,8 @@
   .btn { margin-left: auto; font-size: 12px; color: #5c6370; border: 1px solid #d5d8de; border-radius: 999px; padding: 2px 10px; }
   .hint { font-size: 12px; color: #8a8f99; margin-left: auto; }
 
-  /* 识别后：色块盖住、虚线框圈出。与应用里一致：实色块不透明，框带类型标签。 */
+  /* 识别后：色块盖住。与应用里一致：实色块不透明。 */
   .after .mask { color: transparent; background: var(--sky); box-shadow: 0 0 0 3px var(--sky); }
-  .after .outline { position: relative; outline: 2px dashed var(--amber); outline-offset: 3px; }
-  .after .outline::before {
-    content: attr(data-label);
-    position: absolute; left: -5px; top: -19px;
-    padding: 1px 4px; background: var(--amber); color: #000;
-    font-size: 10px; font-weight: 500; line-height: 12px; letter-spacing: 0.5px; white-space: nowrap;
-  }
 
   /* 两张卡片之间的箭头 */
   .arrow {
@@ -129,23 +121,23 @@
 
   <div class="card before">
     <span class="chip">原图</span>
-    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="state"><b>待取件</b><span>09-29 12:30</span></div>
     <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span><span class="btn">复制</span></div>
-    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v">773512046683217</span><span class="btn">复制</span></div>
     <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
     <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span><span class="hint">号码保护中</span></div>
-    <div class="row"><span class="k">订单编号</span><span class="v outline" data-label="长数字串">2026092912304518839201746355</span></div>
+    <div class="row"><span class="k">订单编号</span><span class="v">2026092912304518839201746355</span></div>
     <div class="row"><span class="k">联系邮箱</span><span class="v mask">wangxm@example.com</span></div>
   </div>
 
   <div class="card after">
     <span class="chip">识别后</span>
-    <div class="state"><b>待取件</b><span class="outline" data-label="日期时间">09-29 12:30</span></div>
+    <div class="state"><b>待取件</b><span>09-29 12:30</span></div>
     <div class="row"><span class="k">取件码</span><span class="v big mask">3-2-1234</span><span class="btn">复制</span></div>
-    <div class="row"><span class="k">顺达快递</span><span class="v outline" data-label="快递单号">773512046683217</span><span class="btn">复制</span></div>
+    <div class="row"><span class="k">顺达快递</span><span class="v">773512046683217</span><span class="btn">复制</span></div>
     <div class="row"><span class="k">送至</span><span class="v mask">长江路88号阳光新村5幢302室</span></div>
     <div class="row"><span class="k">收件人</span><span class="v mask">王小明</span><span class="v mask">86-139****5678</span><span class="hint">号码保护中</span></div>
-    <div class="row"><span class="k">订单编号</span><span class="v outline" data-label="长数字串">2026092912304518839201746355</span></div>
+    <div class="row"><span class="k">订单编号</span><span class="v">2026092912304518839201746355</span></div>
     <div class="row"><span class="k">联系邮箱</span><span class="v mask">wangxm@example.com</span></div>
   </div>
 
