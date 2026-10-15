@@ -171,7 +171,7 @@
     <string name="restore_unavailable">暂时连不上 Google Play，请联网后再试。</string>
     <string name="restored_toast">已恢复购买，导出不再带水印</string>
     <string name="free_edition_text">开源版可以免费去除水印。</string>
-    <string name="free_edition_unlocked_text">水印已去除，可在设置 → 导出里改回。</string>
+    <string name="free_edition_unlocked_text">水印已去除，可在设置 → 通用里改回。</string>
     <string name="free_edition_donate">如果有码帮到了你，欢迎打赏。</string>
     <string name="no_browser">没有找到可以打开网页的应用，请在浏览器里访问 %1$s</string>
     <string name="donate">打赏</string>
@@ -183,10 +183,10 @@
     <string name="settings_text">文字</string>
     <string name="settings_face">人脸</string>
     <string name="settings_barcode">条码</string>
-    <string name="settings_chat">聊天记录</string>
+    <string name="settings_chat">识别聊天记录</string>
     <string name="settings_ai">AI</string>
     <string name="settings_edit">编辑</string>
-    <string name="settings_export">导出</string>
+    <string name="settings_general">通用</string>
     <string name="settings_appearance">外观</string>
     <string name="settings_labs">实验室</string>
     <string name="settings_developer">开发者</string>
@@ -194,10 +194,9 @@
     <string name="settings_language_system">跟随系统</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
-    <string name="restyle_all_on">换样式时一起换</string>
-    <string name="restyle_all_off">换样式时只换选中的</string>
+    <string name="settings_general_summary">编辑、水印样式</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
-    <string name="settings_labs_summary">聊天记录、外部模型</string>
+    <string name="settings_labs_summary">识别聊天记录、外部模型</string>
     <string name="settings_developer_summary">调试信息、调试记录</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
@@ -224,7 +223,7 @@
     <string name="mask_unanchored_summary">会多遮到药名、品牌名</string>
     <string name="name_summary_mask">" · 没有旁证的也打码"</string>
     <string name="name_summary_skip">" · 没有旁证的不打码"</string>
-    <string name="anchor_note">旁证是%1$s。</string>
+    <string name="anchor_note">旁证是%1$s</string>
     <string name="anchor_attached">紧挨着名字的%1$s</string>
     <string name="anchor_nearby">同一行、上下相邻一行的%1$s</string>
     <string name="anchor_or">，或者</string>
@@ -237,26 +236,26 @@
     <string name="anchor_field">「收货人」「乘车人」这类字段</string>
     <string name="anchor_ticket">票种</string>
     <string name="anchor_english_field">「Passenger」「Ship to」这类英文字段</string>
-    <string name="rule_desc_card">13 到 19 位、通过 Luhn 校验的卡号，以及卡上「CVV」后面的安全码、「VALID THRU」后面的月/年。</string>
-    <string name="rule_desc_iban">国际银行账号，按国家核对长度和校验位。</string>
-    <string name="rule_desc_ssn">美国社会安全号，形如 123-45-6789，不会发放的号段不算。</string>
-    <string name="rule_desc_mac">网卡地址，形如 AA:BB:CC:DD:EE:FF。</string>
-    <string name="rule_desc_email">带常见域名后缀的邮箱地址。</string>
-    <string name="rule_desc_phone">按各地号码规则解析的电话号码，打了星的手机号也认。紧挨着「订单」「单号」的数字不算。</string>
-    <string name="rule_desc_passport">护照、身份证上的机读码，以及「Passport No.」这类字段旁边或下面的号码。机读码里的证件号印在别处也遮。</string>
-    <string name="rule_desc_idnumber">按地区码、出生日期和校验码核对的身份证号；「证件号码」「证号」「ID No.」这类字段后面的号码；通行证上的机读码和它印在别处的号码；香港、台湾、新加坡、韩国、马来西亚的身份证号，日本在留卡号，巴西 CPF，有的要页上写着是哪儿的证件。</string>
-    <string name="rule_desc_vin">第九位校验位对得上的 17 位车架号，以及「车辆识别代号」「VIN」「发动机号码」这类字段后面的号码。</string>
-    <string name="rule_desc_apikey">以 sk-、ghp_、AKIA、eyJ 等开头、足够随机的长串。</string>
-    <string name="rule_desc_name">「收货人」「姓名/Name」「Surname」「Ship to」这类字段后面或下面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，通行证上名字下面的拼音，身份证、香港身份证、毕业证上没有字段名的名字。没有字段名时从字面猜，要有旁证才算。</string>
-    <string name="rule_desc_address">「收货地址」「住址」「送至」这类字段后面的内容和它折到下面的几行，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，证件上的出生地，身份证上字段名没读出来的住址。</string>
-    <string name="rule_desc_pickup">「取件码」「取货码」这类字段后面的码。</string>
-    <string name="rule_desc_plate">写法独特的车牌（中国大陆、日本、英国、法国、意大利、俄罗斯、印度、巴西等）和「车牌号」「License plate」这类字段后面的车牌，上下两行的也认。德国、西班牙等其他写法的只圈出，而且只在周围没有别的字时才认，比如照片上的车。</string>
-    <string name="rule_desc_url">只遮路径和参数，域名保留。</string>
-    <string name="rule_desc_ip">IPv4 和 IPv6 地址。前面写着 v 或 version 的版本号不算。</string>
-    <string name="rule_desc_tracking">UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈。</string>
-    <string name="rule_desc_longnum">16 位以上、不属于其他任何一类的数字，比如交易号、订单号。没有校验位，可能误圈。</string>
-    <string name="rule_desc_datetime">日期、时间，英文的「Feb 5, 1965」「05 FEB 1965」也认。出生日期另算一类。</string>
-    <string name="rule_desc_birthdate">「出生日期」「出生年月」「Date of birth」「DOB」这类字段后面或下面的日期，只写到月的、民国、日本年号也认；和护照机读码、身份证号里的生日相同的日期；毕业证上「……日生」的日期。</string>
+    <string name="rule_desc_card">13 到 19 位、通过 Luhn 校验的卡号，以及卡上「CVV」后面的安全码、「VALID THRU」后面的月/年</string>
+    <string name="rule_desc_iban">国际银行账号，按国家核对长度和校验位</string>
+    <string name="rule_desc_ssn">美国社会安全号，形如 123-45-6789，不会发放的号段不算</string>
+    <string name="rule_desc_mac">网卡地址，形如 AA:BB:CC:DD:EE:FF</string>
+    <string name="rule_desc_email">带常见域名后缀的邮箱地址</string>
+    <string name="rule_desc_phone">按各地号码规则解析的电话号码，打了星的手机号也认；紧挨着「订单」「单号」的数字不算</string>
+    <string name="rule_desc_passport">护照、身份证上的机读码，以及「Passport No.」这类字段旁边或下面的号码；机读码里的证件号印在别处也遮</string>
+    <string name="rule_desc_idnumber">按地区码、出生日期和校验码核对的身份证号；「证件号码」「证号」「ID No.」这类字段后面的号码；通行证上的机读码和它印在别处的号码；香港、台湾、新加坡、韩国、马来西亚的身份证号，日本在留卡号，巴西 CPF，有的要页上写着是哪儿的证件</string>
+    <string name="rule_desc_vin">第九位校验位对得上的 17 位车架号，以及「车辆识别代号」「VIN」「发动机号码」这类字段后面的号码</string>
+    <string name="rule_desc_apikey">以 sk-、ghp_、AKIA、eyJ 等开头、足够随机的长串</string>
+    <string name="rule_desc_name">「收货人」「姓名/Name」「Surname」「Ship to」这类字段后面或下面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，通行证上名字下面的拼音，身份证、香港身份证、毕业证上没有字段名的名字；没有字段名时从字面猜，要有旁证才算</string>
+    <string name="rule_desc_address">「收货地址」「住址」「送至」这类字段后面的内容和它折到下面的几行，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，证件上的出生地，身份证上字段名没读出来的住址</string>
+    <string name="rule_desc_pickup">「取件码」「取货码」这类字段后面的码</string>
+    <string name="rule_desc_plate">写法独特的车牌（中国大陆、日本、英国、法国、意大利、俄罗斯、印度、巴西等）和「车牌号」「License plate」这类字段后面的车牌，上下两行的也认；德国、西班牙等其他写法的只认字段名后面的</string>
+    <string name="rule_desc_url">只遮路径和参数，域名保留</string>
+    <string name="rule_desc_ip">IPv4 和 IPv6 地址，前面写着 v 或 version 的版本号不算</string>
+    <string name="rule_desc_tracking">UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈</string>
+    <string name="rule_desc_longnum">16 位以上、不属于其他任何一类的数字，比如交易号、订单号；没有校验位，可能误圈</string>
+    <string name="rule_desc_datetime">日期、时间，英文的「Feb 5, 1965」「05 FEB 1965」也认；出生日期另算一类</string>
+    <string name="rule_desc_birthdate">「出生日期」「出生年月」「Date of birth」「DOB」这类字段后面或下面的日期，只写到月的、民国、日本年号也认；和护照机读码、身份证号里的生日相同的日期；毕业证上「……日生」的日期</string>
 
     <!-- settings: faces / barcodes -->
     <string name="detect_mode">识别模式</string>
@@ -266,34 +265,34 @@
     <string name="barcode_loose">宽松</string>
     <string name="barcode_strict_summary">只认能解码的条码，和紧挨着的同款码</string>
     <string name="barcode_loose_summary">解不出的疑似条码也打码，可能误遮</string>
-    <string name="barcode_footer">包括二维码和条形码。</string>
-    <string name="chat_footer">认出是聊天记录截图后，遮住每个发言者的头像和昵称，以及顶栏的聊天标题（对方名字或群名）。按版面认，不分是哪个应用：微信、QQ、Telegram、WhatsApp、iMessage、LINE、Messenger、Discord 等都适用。消息里的电话、地址等仍按「文字」里的各类处理。</string>
+    <string name="barcode_footer">包括二维码和条形码</string>
+    <string name="chat_footer">遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确</string>
 
     <!-- settings: AI -->
     <string name="ai_model">大模型</string>
     <string name="nano_checking">正在检测…</string>
-    <string name="nano_absent">本机没有</string>
+    <string name="nano_unavailable">不可用</string>
     <string name="nano_version_unknown">版本未知</string>
     <string name="nano_ready">已就绪</string>
     <string name="nano_downloading">下载中</string>
     <string name="nano_not_downloaded">未下载</string>
-    <string name="nano_footer">Google 的端侧大模型。</string>
+    <string name="nano_footer">Google 的端侧大模型</string>
     <string name="supported_devices_prefix">支持设备列表参考</string>
     <string name="official_docs">官方文档</string>
-    <string name="sentence_end">。</string>
-    <string name="aicore_error">AICore 返回错误码 %1$d。</string>
-    <string name="nano_download_hint">开着 AI 增强识别打开一张图，会请系统下载。</string>
+    <string name="clause_separator">，</string>
+    <string name="aicore_error">AICore 返回错误码 %1$d</string>
+    <string name="nano_download_hint">打开图片时由系统下载</string>
     <string name="ocr_models">文字识别模型</string>
     <string name="bundled">随安装包内置</string>
-    <string name="ppocr_footer">百度飞桨的开源文字识别模型。</string>
+    <string name="ppocr_footer">百度飞桨的开源文字识别模型</string>
     <string name="mlkit_models">ML Kit 模型</string>
-    <string name="mlkit_footer">Google 的端侧机器学习工具包。</string>
+    <string name="mlkit_footer">Google 的端侧机器学习工具包</string>
     <string name="mlkit_summary">文字 %1$s · 人脸 %2$s · 条码 %3$s</string>
     <string name="mlkit_text_versions">%1$s（英文）/ %2$s（中文）</string>
 
     <!-- settings: external model (Labs) -->
     <string name="external_model">外部模型</string>
-    <string name="external_model_footer">AI 增强识别改用你配置的大模型（OpenAI 兼容接口）。识别出的文字会发给它，规则已认出的号码先换成占位符。打开后在「AI」里填接口。</string>
+    <string name="external_model_footer">AI 增强识别改用 OpenAI 兼容接口，识别出的文字会发给它，在「AI」里配置</string>
     <string name="external_base_url">接口地址</string>
     <string name="external_api_key">API Key</string>
     <string name="external_model_name">模型</string>
@@ -307,7 +306,7 @@
     <string name="external_err_timeout">超时</string>
     <string name="external_err_network">连不上</string>
     <string name="external_err_reply">回答格式不对</string>
-    <string name="external_ai_footer">点编辑器里的「AI 增强识别」时，识别出的文字发到这个接口，不再用 Gemini Nano。接口地址写到 /v1 为止。</string>
+    <string name="external_ai_footer">代替 Gemini Nano，接口地址写到 /v1 为止</string>
     <string name="save">保存</string>
 
     <!-- settings: export / appearance -->
@@ -334,6 +333,7 @@
 
     <!-- settings: about / developer -->
     <string name="version">版本</string>
+    <string name="play_edition">Play 版</string>
     <string name="privacy_policy">隐私权政策</string>
     <string name="reset_settings">恢复默认设置</string>
     <string name="reset_settings_summary">除外观外，全部恢复出厂值</string>
@@ -345,7 +345,7 @@
     <string name="debug_taps_left">再点 %1$d 次即可打开调试信息</string>
     <string name="debug_log">调试记录</string>
     <string name="debug_log_summary">最近 %1$d 次识别</string>
-    <string name="debug_off_footer">记录已删除。要再打开，在「关于」里连点版本号七下。</string>
+    <string name="debug_off_footer">记录已删除，在「关于」里连点版本号七下可再打开</string>
     <string name="keep_runs">保留最近几次识别</string>
     <string name="runs_count">%1$d 次</string>
     <string name="rerun">重新识别</string>
@@ -358,7 +358,7 @@
     <string name="copied">已复制</string>
     <string name="share_debug">分享调试信息</string>
     <string name="clear">清空</string>
-    <string name="history_empty">还没有记录。</string>
+    <string name="history_empty">还没有记录</string>
     <string name="clear_confirm_title">清空调试记录？</string>
     <string name="clear_confirm_text">删掉这 %1$d 次识别的记录，调试信息仍然开着。</string>
 </resources>

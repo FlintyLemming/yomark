@@ -9,7 +9,7 @@ import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.debug.TraceLog
 import moe.flinty.yomark.engine.RecognitionConfig
-import moe.flinty.yomark.engine.SemanticOption
+import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.refinersFor
 import moe.flinty.yomark.rules.RuleCatalog
 import kotlinx.coroutines.delay
@@ -104,13 +104,18 @@ class ExternalModelClassifierTest {
 
     /** 外部模型开着、配好了：AI 增强识别用它，Nano 让开（不去碰 AICore）；没配好就还是 Nano。 */
     @Test fun `the nano backend steps aside when the external model is active`() = runTest {
-        val config = RecognitionConfig(semantic = SemanticOption.GEMINI_NANO)
+        val config = RecognitionConfig()
         val (external, nano) = refinersFor(config) { on }
         assertThat(external.isAvailable()).isTrue()
         assertThat(nano.isAvailable()).isFalse()
 
         val (externalOff, _) = refinersFor(config) { on.copy(enabled = false) }
         assertThat(externalOff.isAvailable()).isFalse()
-        assertThat(refinersFor(config.copy(semantic = SemanticOption.OFF)) { on }).isEmpty()
+    }
+
+    /** 文字各类全关了、聊天记录也没开：没有可找的，就不摆「AI 增强识别」。 */
+    @Test fun `nothing to look for means no ai review`() {
+        val allOff = RuleCatalog.all.fold(RecognitionConfig()) { c, rule -> c.withRule(rule.id, RuleState.OFF, RuleCatalog.factoryState(rule.id)) }
+        assertThat(refinersFor(allOff) { on }).isEmpty()
     }
 }

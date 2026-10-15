@@ -29,7 +29,7 @@ sealed interface EditorMessage {
  * 跑的结果就写在按钮上，不另弹提示。手机底栏的圆钮上写不下字，跑完那一下在画布顶上说一声（见 [EditorUiState.aiReviewsFinished]）。
  */
 sealed interface AiReview {
-    /** 不出现：设置里关了、机型不支持、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
+    /** 不出现：机型不支持（也没配外部模型）、文字各类全关了、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
     data object Hidden : AiReview
     data object Ready : AiReview
     data object Running : AiReview

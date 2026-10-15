@@ -24,7 +24,7 @@ internal fun inputSection(image: SourceImage, config: RecognitionConfig) = Trace
     lines = buildList {
         add("框的坐标都按分析图的像素算")
         add("文字识别 ${config.textEngine} · 人脸 ${config.faceState}/${config.face} · 条码 ${config.barcodeState}/${config.barcode}")
-        add("AI 增强识别 ${config.semantic} · 没有旁证的人名${if (config.maskUnanchoredNames) "打码" else "丢掉"}")
+        add("没有旁证的人名${if (config.maskUnanchoredNames) "打码" else "丢掉"}")
         if (config.ruleOverrides.isNotEmpty()) {
             add("改过的规则 " + config.ruleOverrides.entries.joinToString(" ") { "${it.key}=${it.value}" })
         }

@@ -171,7 +171,7 @@
     <string name="restore_unavailable">Can\'t reach Google Play. Try again when online.</string>
     <string name="restored_toast">Purchase restored, exports no longer carry the watermark</string>
     <string name="free_edition_text">The open-source edition can remove the watermark for free.</string>
-    <string name="free_edition_unlocked_text">Watermark removed. You can bring it back in Settings → Export.</string>
+    <string name="free_edition_unlocked_text">Watermark removed. You can bring it back in Settings → General.</string>
     <string name="free_edition_donate">If Yomark helped you, a tip is welcome.</string>
     <string name="no_browser">No browser found. Open %1$s yourself.</string>
     <string name="donate">Tip</string>
@@ -183,10 +183,10 @@
     <string name="settings_text">Text</string>
     <string name="settings_face">Faces</string>
     <string name="settings_barcode">Barcodes</string>
-    <string name="settings_chat">Chat screenshots</string>
+    <string name="settings_chat">Detect chat screenshots</string>
     <string name="settings_ai">AI</string>
     <string name="settings_edit">Editing</string>
-    <string name="settings_export">Export</string>
+    <string name="settings_general">General</string>
     <string name="settings_appearance">Appearance</string>
     <string name="settings_labs">Labs</string>
     <string name="settings_developer">Developer</string>
@@ -194,10 +194,9 @@
     <string name="settings_language_system">System default</string>
     <string name="settings_about">About</string>
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
-    <string name="restyle_all_on">Switching style changes all masks</string>
-    <string name="restyle_all_off">Switching style changes the selected mask only</string>
+    <string name="settings_general_summary">Editing, watermark style</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
-    <string name="settings_labs_summary">Chat screenshots, external model</string>
+    <string name="settings_labs_summary">Detect chat screenshots, external model</string>
     <string name="settings_developer_summary">Debug info, debug log</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
@@ -224,7 +223,7 @@
     <string name="mask_unanchored_summary">Also catches drug and brand names</string>
     <string name="name_summary_mask">" · no evidence: masked too"</string>
     <string name="name_summary_skip">" · no evidence: skip"</string>
-    <string name="anchor_note">Evidence: %1$s.</string>
+    <string name="anchor_note">Evidence: %1$s</string>
     <string name="anchor_attached">%1$s next to the name</string>
     <string name="anchor_nearby">%1$s on the same or an adjacent line</string>
     <string name="anchor_or">"; or "</string>
@@ -237,26 +236,26 @@
     <string name="anchor_field">a Chinese field like 收货人 or 乘车人</string>
     <string name="anchor_ticket">a ticket type</string>
     <string name="anchor_english_field">a field like “Passenger” or “Ship to”</string>
-    <string name="rule_desc_card">13 to 19 digits passing the Luhn check, plus the code after “CVV” and the month/year after “VALID THRU” on a card.</string>
-    <string name="rule_desc_iban">Length and check digits verified per country.</string>
-    <string name="rule_desc_ssn">US SSN like 123-45-6789; never-issued ranges don\'t count.</string>
-    <string name="rule_desc_mac">Like AA:BB:CC:DD:EE:FF.</string>
-    <string name="rule_desc_email">Addresses with a common domain suffix.</string>
-    <string name="rule_desc_phone">Parsed with regional number rules; starred mobile numbers count too. Digits next to “order” or “order no.” don\'t.</string>
-    <string name="rule_desc_passport">The MRZ on passports and ID cards, plus numbers beside or below fields like “Passport No.”. The MRZ\'s document number is masked wherever it\'s printed again.</string>
-    <string name="rule_desc_idnumber">Chinese ID numbers checked by region, birth date and check digit; numbers after fields like “证件号码”, “证号” or “ID No.”; the MRZ on Mainland travel permits and its number elsewhere; Hong Kong, Taiwan, Singapore, Korean and Malaysian IDs, Japanese residence cards and CPF. Some need the page to name the country.</string>
-    <string name="rule_desc_vin">17-character VINs whose check digit matches, plus values after fields like “车辆识别代号”, “VIN” or “Engine No.”.</string>
-    <string name="rule_desc_apikey">Long random strings starting with sk-, ghp_, AKIA, eyJ and the like.</string>
-    <string name="rule_desc_name">Names after or under fields like “Recipient”, “姓名/Name”, “Surname” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, the pinyin under a name on travel permits, and unlabelled names on Chinese and Hong Kong ID cards and diplomas. Without a field name they are guessed and need evidence.</string>
-    <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to” and the lines it wraps onto; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs; addresses on Chinese ID cards whose field names didn\'t scan.</string>
-    <string name="rule_desc_pickup">Codes after fields like “Pickup code”.</string>
-    <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more) and plates after fields like “License plate”, two-row plates included. Other formats, such as German or Spanish, are only outlined, and only when nothing else is written around them, as on a car in a photo.</string>
-    <string name="rule_desc_url">Only the path and query are masked; the domain stays.</string>
-    <string name="rule_desc_ip">IPv4 and IPv6. Version numbers after “v” or “version” don\'t count.</string>
-    <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives.</string>
-    <string name="rule_desc_longnum">16+ digits matching no other kind, such as transaction or order numbers. No check digit, may be false positives.</string>
-    <string name="rule_desc_datetime">Dates and times, including “Feb 5, 1965” and “05 FEB 1965”. Dates of birth are a separate kind.</string>
-    <string name="rule_desc_birthdate">Dates after or under fields like “Date of birth” or “DOB”, including year-month only, ROC and Japanese era years; dates matching the birth date in a passport MRZ or a Chinese ID number; dates followed by “生” on diplomas.</string>
+    <string name="rule_desc_card">13 to 19 digits passing the Luhn check, plus the code after “CVV” and the month/year after “VALID THRU” on a card</string>
+    <string name="rule_desc_iban">Length and check digits verified per country</string>
+    <string name="rule_desc_ssn">US SSN like 123-45-6789; never-issued ranges don\'t count</string>
+    <string name="rule_desc_mac">Like AA:BB:CC:DD:EE:FF</string>
+    <string name="rule_desc_email">Addresses with a common domain suffix</string>
+    <string name="rule_desc_phone">Parsed with regional number rules; starred mobile numbers count too; digits next to “order” or “order no.” don\'t</string>
+    <string name="rule_desc_passport">The MRZ on passports and ID cards, plus numbers beside or below fields like “Passport No.”; the MRZ\'s document number is masked wherever it\'s printed again</string>
+    <string name="rule_desc_idnumber">Chinese ID numbers checked by region, birth date and check digit; numbers after fields like “证件号码”, “证号” or “ID No.”; the MRZ on Mainland travel permits and its number elsewhere; Hong Kong, Taiwan, Singapore, Korean and Malaysian IDs, Japanese residence cards and CPF; some need the page to name the country</string>
+    <string name="rule_desc_vin">17-character VINs whose check digit matches, plus values after fields like “车辆识别代号”, “VIN” or “Engine No.”</string>
+    <string name="rule_desc_apikey">Long random strings starting with sk-, ghp_, AKIA, eyJ and the like</string>
+    <string name="rule_desc_name">Names after or under fields like “Recipient”, “姓名/Name”, “Surname” or “Ship to”, before a phone number, in “Hi David,” or “Mr. Patel”, the pinyin under a name on travel permits, and unlabelled names on Chinese and Hong Kong ID cards and diplomas; without a field name they are guessed and need evidence</string>
+    <string name="rule_desc_address">Text after fields like “Shipping address” or “Deliver to” and the lines it wraps onto; addresses with street numbers, buildings or rooms; English street, city and postcode; the place of birth on IDs; addresses on Chinese ID cards whose field names didn\'t scan</string>
+    <string name="rule_desc_pickup">Codes after fields like “Pickup code”</string>
+    <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more) and plates after fields like “License plate”, two-row plates included; other formats, such as German or Spanish, only after a field name</string>
+    <string name="rule_desc_url">Only the path and query are masked; the domain stays</string>
+    <string name="rule_desc_ip">IPv4 and IPv6; version numbers after “v” or “version” don\'t count</string>
+    <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives</string>
+    <string name="rule_desc_longnum">16+ digits matching no other kind, such as transaction or order numbers; no check digit, may be false positives</string>
+    <string name="rule_desc_datetime">Dates and times, including “Feb 5, 1965” and “05 FEB 1965”; dates of birth are a separate kind</string>
+    <string name="rule_desc_birthdate">Dates after or under fields like “Date of birth” or “DOB”, including year-month only, ROC and Japanese era years; dates matching the birth date in a passport MRZ or a Chinese ID number; dates followed by “生” on diplomas</string>
 
     <!-- settings: faces / barcodes -->
     <string name="detect_mode">Mode</string>
@@ -266,34 +265,34 @@
     <string name="barcode_loose">Loose</string>
     <string name="barcode_strict_summary">Only codes that decode, and similar codes right beside them</string>
     <string name="barcode_loose_summary">Also masks likely codes that don\'t decode; may be wrong</string>
-    <string name="barcode_footer">QR codes and barcodes.</string>
-    <string name="chat_footer">Once a screenshot is recognized as a chat, covers every sender\'s avatar and display name, plus the chat title at the top (the other person\'s name or the group name). It goes by the layout, not by the app, so it works for WeChat, QQ, Telegram, WhatsApp, iMessage, LINE, Messenger, Discord and the like. Phone numbers, addresses and other details inside messages are still handled under Text.</string>
+    <string name="barcode_footer">QR codes and barcodes</string>
+    <string name="chat_footer">Masks avatars, display names and the chat title in chat screenshots; not always accurate</string>
 
     <!-- settings: AI -->
     <string name="ai_model">Model</string>
     <string name="nano_checking">Checking…</string>
-    <string name="nano_absent">Not on this device</string>
+    <string name="nano_unavailable">Unavailable</string>
     <string name="nano_version_unknown">Unknown version</string>
     <string name="nano_ready">Ready</string>
     <string name="nano_downloading">Downloading</string>
     <string name="nano_not_downloaded">Not downloaded</string>
-    <string name="nano_footer">Google\'s on-device model.</string>
-    <string name="supported_devices_prefix">"Supported devices: see "</string>
+    <string name="nano_footer">Google\'s on-device model</string>
+    <string name="supported_devices_prefix">"supported devices are listed in "</string>
     <string name="official_docs">the official docs</string>
-    <string name="sentence_end">.</string>
-    <string name="aicore_error">" AICore error code %1$d."</string>
-    <string name="nano_download_hint">Open an image with AI review on and the system will download it.</string>
+    <string name="clause_separator">"; "</string>
+    <string name="aicore_error">AICore error code %1$d</string>
+    <string name="nano_download_hint">the system downloads it when you open an image</string>
     <string name="ocr_models">Text recognition model</string>
     <string name="bundled">Bundled</string>
-    <string name="ppocr_footer">Baidu PaddlePaddle\'s open-source OCR model.</string>
+    <string name="ppocr_footer">Baidu PaddlePaddle\'s open-source OCR model</string>
     <string name="mlkit_models">ML Kit models</string>
-    <string name="mlkit_footer">Google\'s on-device ML toolkit.</string>
+    <string name="mlkit_footer">Google\'s on-device ML toolkit</string>
     <string name="mlkit_summary">Text %1$s · Faces %2$s · Barcodes %3$s</string>
     <string name="mlkit_text_versions">%1$s (Latin) / %2$s (Chinese)</string>
 
     <!-- settings: external model (Labs) -->
     <string name="external_model">External model</string>
-    <string name="external_model_footer">AI review uses a model you set up (OpenAI-compatible API) instead. The recognized text is sent to it; numbers the rules already found are replaced with placeholders first. Set it up under AI.</string>
+    <string name="external_model_footer">AI review uses an OpenAI-compatible API instead and sends it the recognized text; set it up under AI</string>
     <string name="external_base_url">Base URL</string>
     <string name="external_api_key">API key</string>
     <string name="external_model_name">Model</string>
@@ -307,7 +306,7 @@
     <string name="external_err_timeout">timed out</string>
     <string name="external_err_network">can\'t connect</string>
     <string name="external_err_reply">unexpected reply</string>
-    <string name="external_ai_footer">When you tap AI review in the editor, the recognized text is sent to this API instead of Gemini Nano. Write the base URL up to /v1.</string>
+    <string name="external_ai_footer">Replaces Gemini Nano; write the base URL up to /v1</string>
     <string name="save">Save</string>
 
     <!-- settings: export / appearance -->
@@ -334,6 +333,7 @@
 
     <!-- settings: about / developer -->
     <string name="version">Version</string>
+    <string name="play_edition">Play edition</string>
     <string name="privacy_policy">Privacy policy</string>
     <string name="reset_settings">Reset settings</string>
     <string name="reset_settings_summary">Everything except appearance</string>
@@ -345,7 +345,7 @@
     <string name="debug_taps_left">%1$d more taps to turn on debug info</string>
     <string name="debug_log">Debug log</string>
     <string name="debug_log_summary">Last %1$d runs</string>
-    <string name="debug_off_footer">Log deleted. To turn it back on, tap the version in About seven times.</string>
+    <string name="debug_off_footer">Log deleted; tap the version in About seven times to turn it back on</string>
     <string name="keep_runs">Runs to keep</string>
     <string name="runs_count">%1$d</string>
     <string name="rerun">Re-run</string>
@@ -358,7 +358,7 @@
     <string name="copied">Copied</string>
     <string name="share_debug">Share debug info</string>
     <string name="clear">Clear</string>
-    <string name="history_empty">Nothing yet.</string>
+    <string name="history_empty">Nothing yet</string>
     <string name="clear_confirm_title">Clear debug log?</string>
     <string name="clear_confirm_text">Deletes these %1$d runs. Debug info stays on.</string>
 </resources>

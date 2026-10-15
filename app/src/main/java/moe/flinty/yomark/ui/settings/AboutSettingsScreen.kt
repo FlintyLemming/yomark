@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.BuildConfig
 import moe.flinty.yomark.R
+import moe.flinty.yomark.billing.Edition
 
 /**
  * 隐私权政策，Play 要求商品详情和应用内都能打开。页面源文件在 site/privacy/index.html，和落地页一起由 GitHub Pages 发布。
@@ -42,7 +43,9 @@ internal const val TAPS_TO_DEBUG = 7
  * 编辑页顶栏也多一个按钮（见 DebugTraceSheet）。
  *
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
+ * 写全 https://，末尾不带斜杠（2026-10-15 起）；打开的还是带斜杠的那个，GitHub Pages 不用再跳一次。
  *
+ * @param play 上架 Play 的内购版（见 Edition）：版本号后面写一句「Play 版」，和 GitHub 上发的开源版分得开。
  * @param notify 弹一句提示（连点版本号时的「还差几下」）。默认是系统的 Toast，单测里换掉。
  */
 @Composable
@@ -53,6 +56,7 @@ fun AboutSettingsScreen(
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
     version: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+    play: Boolean = !Edition.isFree,
     openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
     notify: (String) -> Unit = rememberToast(),
 ) {
@@ -66,7 +70,7 @@ fun AboutSettingsScreen(
             SettingsGroup {
                 SettingsRow(
                     title = stringResource(R.string.version),
-                    summary = version,
+                    summary = if (play) "$version · ${stringResource(R.string.play_edition)}" else version,
                     interaction = Modifier.clickable {
                         if (debugTrace) {
                             notify(context.getString(R.string.debug_already_on))
@@ -87,7 +91,7 @@ fun AboutSettingsScreen(
                 )
                 LinkRow(
                     title = stringResource(R.string.privacy_policy),
-                    summary = PRIVACY_POLICY_URL.removePrefix("https://"),
+                    summary = PRIVACY_POLICY_URL.removeSuffix("/"),
                     icon = Icons.Outlined.Policy,
                     onClick = { runCatching { openUrl(PRIVACY_POLICY_URL) } },
                 )

@@ -296,13 +296,13 @@ class EditorToolbarTest {
         compareButton.assertIsDisplayed()
     }
 
-    /** 跑着、跑完了都点不动；圆钮上写不下字，读屏念的是结果，新发现几处是角标上的数。没跑成是另一句话，还能点。 */
+    /** 跑着、跑完了都点不动；圆钮上写不下字，读屏念的是结果，对勾上不挂数量角标。没跑成是另一句话，还能点。 */
     @Test fun aiReviewShowsItsProgressAndResultInPlace() {
         ai = AiReview.Running
         show()
         compose.onNodeWithContentDescription("增强识别中…").assertIsNotEnabled()
         ai = AiReview.Done(found = 3)
-        compose.onNodeWithContentDescription("新发现 3 处").assertIsDisplayed().assertIsNotEnabled().assert(hasText("3"))
+        compose.onNodeWithContentDescription("新发现 3 处").assertIsDisplayed().assertIsNotEnabled().assert(!hasText("3"))
         ai = AiReview.Done(found = 0)
         compose.onNodeWithContentDescription("没有新发现").assertIsDisplayed().assert(!hasText("0"))
         ai = AiReview.Failed
