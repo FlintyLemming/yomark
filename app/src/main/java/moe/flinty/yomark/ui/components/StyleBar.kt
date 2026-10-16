@@ -342,12 +342,14 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
             // 滑条往右是更粗：divisor 越小块越大
             val finest = MaskOptions.PIXEL_DIVISOR_RANGE.last
             val coarsest = MaskOptions.PIXEL_DIVISOR_RANGE.first
+            val levels = PIXEL_LEVELS.map { stringResource(it) }
             SliderRow(
                 label = stringResource(R.string.grain),
                 value = (finest - options.pixelBlockDivisor).toFloat(),
                 range = 0f..(finest - coarsest).toFloat(),
                 steps = finest - coarsest - 1,
-                valueText = PIXEL_LEVELS.getOrNull(finest - options.pixelBlockDivisor)?.let { stringResource(it) }.orEmpty(),
+                valueText = levels.getOrNull(finest - options.pixelBlockDivisor).orEmpty(),
+                valueWidth = rememberValueWidth(levels),
                 onChange = { emit(options.copy(pixelBlockDivisor = finest - it.roundToInt()), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -356,12 +358,14 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
 
         MaskStyle.BLUR -> {
             val range = MaskOptions.BLUR_RATIO_RANGE
+            val levels = BLUR_LEVELS.map { stringResource(it) }
             SliderRow(
                 label = stringResource(R.string.strength),
                 value = options.blurRadiusRatio,
                 range = range,
                 steps = BLUR_LEVELS.size - 2,
-                valueText = stringResource(BLUR_LEVELS[blurLevel(options.blurRadiusRatio)]),
+                valueText = levels[blurLevel(options.blurRadiusRatio)],
+                valueWidth = rememberValueWidth(levels),
                 onChange = { emit(options.copy(blurRadiusRatio = it), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),

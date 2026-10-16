@@ -31,6 +31,9 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.width
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
@@ -41,6 +44,7 @@ import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.StylePanel
 import moe.flinty.yomark.ui.components.StylePanelContent
 import moe.flinty.yomark.ui.components.EditorBottomBar
+import moe.flinty.yomark.ui.components.MinSliderWidth
 import moe.flinty.yomark.ui.components.ToolGroup
 import org.junit.Rule
 import org.junit.Test
@@ -453,5 +457,104 @@ class StyleBarTest {
     @Test fun theShapeChoiceShowsNamesOnAPhone() {
         show(open(MaskStyle.PEN))
         listOf("框选", "手绘", "箭头").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+    }
+
+    /**
+     * 档位的名字写在滑条右边，不折成「Mediu」「m」：窄屏上英文最长的「Fairly coarse」也一行写得下。
+     * 那一格按最长的那一档留，拖到哪一档滑条都一样长。
+     */
+    @Test @Config(qualifiers = "en-w320dp-h640dp-xhdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 量字是假的
+    fun everyLevelNameFitsBesideTheSliderOnANarrowPhone() = assertBeside(everyLevel(ENGLISH_LEVELS))
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseLevelNamesFitBesideTheSlider() = assertBeside(everyLevel(CHINESE_LEVELS))
+
+    /** 中文的档位一两个字，字号调到两倍也还在滑条右边的一行里（原先那一格只有 48 dp，「适中」折成两行）。 */
+    @Test @Config(fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseLevelNamesFitBesideTheSliderAtDoubleFontSize() = assertBeside(everyLevel(CHINESE_LEVELS))
+
+    /**
+     * 窄屏上英文的字号调到两倍：「Fairly coarse」放在滑条右边的话滑条只剩一小截，挪到名字那一行的右头，
+     * 滑条独占下面一行。照样一行写得下。
+     */
+    @Test @Config(qualifiers = "en-w360dp-h800dp-xxhdpi", fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aDoubledFontOnANarrowPhoneMovesTheLevelAboveTheSlider() {
+        everyLevel(ENGLISH_LEVELS).forEach {
+            assertThat(it.name.bottom).isAtMost(it.track.top)
+            assertThat(it.label.bottom).isAtMost(it.track.top)
+            // 滑条有名字到档位名字那一整行宽
+            assertThat(it.track.width).isAtLeast(it.name.right - it.label.left)
+        }
+    }
+
+    /** 马赛克、模糊各有哪几档（和 StyleBar 里 PIXEL_LEVELS、BLUR_LEVELS 一个顺序），[slider] 是滑条的名字。 */
+    private class Levels(val style: MaskStyle, val slider: String, val names: List<String>)
+
+    /**
+     * 拖到某一档时，滑条的名字、滑条、那一档的名字在哪儿。
+     * 滑条是它给读屏的框：Material 给它左右各多加了一截（IncreaseHorizontalSemanticsBounds），比画出来的宽，横向的位置不拿它比。
+     */
+    private class Seen(val style: MaskStyle, val label: DpRect, val track: DpRect, val name: DpRect)
+
+    /** 马赛克、模糊各拖遍每一档：每一档的名字都一行写得下、没截。 */
+    private fun everyLevel(levels: List<Levels>): List<Seen> {
+        var model by mutableStateOf(open(MaskStyle.PIXELATE))
+        compose.setContent { MaterialTheme { Surface { PhoneBar(model, Recorder()) } } }
+        return levels.flatMap { l ->
+            l.names.mapIndexed { i, name ->
+                model = open(l.style, levelOptions(l.style, i, l.names.size))
+                Seen(
+                    l.style,
+                    label = compose.onNodeWithText(l.slider).getUnclippedBoundsInRoot(),
+                    track = compose.onNodeWithContentDescription(l.slider).getUnclippedBoundsInRoot(),
+                    name = wholeOnOneLine(name),
+                )
+            }
+        }
+    }
+
+    /** 第 [i] 档（共 [count] 档）：马赛克从最细往粗数，模糊从最轻往重数。 */
+    private fun levelOptions(style: MaskStyle, i: Int, count: Int): MaskOptions {
+        val blur = MaskOptions.BLUR_RATIO_RANGE
+        return if (style == MaskStyle.PIXELATE) MaskOptions(pixelBlockDivisor = MaskOptions.PIXEL_DIVISOR_RANGE.last - i)
+        else MaskOptions(blurRadiusRatio = blur.start + (blur.endInclusive - blur.start) * i / (count - 1))
+    }
+
+    /** [text] 写在一行里，整个放得下。 */
+    private fun wholeOnOneLine(text: String): DpRect {
+        val results = mutableListOf<TextLayoutResult>()
+        val node = compose.onNodeWithText(text).assertIsDisplayed()
+        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val r = results.single()
+        assertThat(r.lineCount).isEqualTo(1)
+        // 只许写一行，写不下是截掉而不是折行：直接看整个名字放不放得下
+        assertThat(r.multiParagraph.intrinsics.maxIntrinsicWidth).isAtMost(r.layoutInput.constraints.maxWidth.toFloat())
+        return node.getUnclippedBoundsInRoot()
+    }
+
+    /** 档位的名字和滑条同一行，在它右边，中间留给滑条的至少 MinSliderWidth；同一条滑条拖到哪一档都一样长。 */
+    private fun assertBeside(seen: List<Seen>) {
+        seen.forEach {
+            assertThat(it.name.top).isLessThan(it.track.bottom)
+            assertThat(it.name.bottom).isGreaterThan(it.track.top)
+            assertThat(it.label.top).isLessThan(it.track.bottom)
+            assertThat(it.label.bottom).isGreaterThan(it.track.top)
+            assertThat(it.name.left - it.label.right).isAtLeast(MinSliderWidth)
+        }
+        seen.groupBy { it.style }.values.forEach { same ->
+            assertThat(same.map { it.name.left }.toSet()).hasSize(1)
+            assertThat(same.map { it.track.width }.toSet()).hasSize(1)
+        }
+    }
+
+    private companion object {
+        val ENGLISH_LEVELS = listOf(
+            Levels(MaskStyle.PIXELATE, "Grain", listOf("Fine", "Fairly fine", "Medium", "Fairly coarse", "Coarse", "Very coarse")),
+            Levels(MaskStyle.BLUR, "Strength", listOf("Light", "Fairly light", "Medium", "Fairly heavy", "Heavy")),
+        )
+        val CHINESE_LEVELS = listOf(
+            Levels(MaskStyle.PIXELATE, "颗粒", listOf("细", "较细", "适中", "较粗", "粗", "很粗")),
+            Levels(MaskStyle.BLUR, "强度", listOf("轻", "较轻", "适中", "较重", "重")),
+        )
     }
 }

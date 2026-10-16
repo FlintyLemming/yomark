@@ -32,6 +32,7 @@ import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
@@ -51,6 +52,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * 用途水印的调节面板，和马克笔、画笔的一个样子：手机上从底栏的胶囊长出来（这里连底栏一起摆出来），宽屏上占列表的位置。
@@ -214,6 +216,23 @@ class PurposePanelTest {
         assertThat(angle).isEqualTo(PurposeWatermarkStyle(angle = 0f))
         assertThat(opacity.opacity).isWithin(0.001f).of(0.6f)
         assertThat(density.density).isWithin(0.001f).of(2f)
+    }
+
+    /**
+     * 三条滑条右边写值的那一格一样宽，按密度最长的那一档留：英文的「Medium」一行写得下（原先折成「Mediu」「m」），
+     * 三条滑条的右头照样对齐。
+     */
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 量字是假的
+    fun theSlidersEndTogetherAndTheDensityStaysOnOneLine() {
+        show(opened)
+        val results = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Medium").assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val r = results.single()
+        assertThat(r.lineCount).isEqualTo(1)
+        assertThat(r.multiParagraph.intrinsics.maxIntrinsicWidth).isAtMost(r.layoutInput.constraints.maxWidth.toFloat())
+        val ends = listOf("Angle", "Opacity", "Density").map { compose.onNodeWithContentDescription(it).getUnclippedBoundsInRoot().right }
+        assertThat(ends.toSet()).hasSize(1)
     }
 
     /** 吸管要点的是底下的图：等着取色时面板先缩回底栏，取完色（或取消了）再长出来。 */

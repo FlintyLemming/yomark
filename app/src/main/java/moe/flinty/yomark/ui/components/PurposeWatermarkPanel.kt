@@ -38,7 +38,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import kotlin.math.roundToInt
-import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
@@ -119,6 +118,9 @@ internal fun PurposePanelContent(
     // 收起来时面板一点点变矮（PanelColumn 跟着里面的东西变高变矮），输入法收起后再长回来
     if (compactWhileTyping && focused && imeVisible) return
 
+    val densityLevels = DENSITY_LEVELS.map { stringResource(it) }
+    // 三条滑条右边写值的那一格一样宽，按密度最长的那一档留：三条的右头对齐
+    val valueWidth = rememberValueWidth(densityLevels)
     Column(Modifier.padding(end = 12.dp)) {
         PanelLabel(stringResource(R.string.color))
         ColorPicker(
@@ -138,6 +140,7 @@ internal fun PurposePanelContent(
             steps = ((PurposeWatermarkStyle.ANGLE_RANGE.endInclusive -
                 PurposeWatermarkStyle.ANGLE_RANGE.start) / ANGLE_STEP).roundToInt() - 1,
             valueText = "${style.angle.roundToInt()}°",
+            valueWidth = valueWidth,
             onChange = { actions.onStyleChange(style.copy(angle = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -147,6 +150,7 @@ internal fun PurposePanelContent(
             value = style.opacity,
             range = PurposeWatermarkStyle.OPACITY_RANGE,
             valueText = "${(style.opacity * 100).roundToInt()}%",
+            valueWidth = valueWidth,
             onChange = { actions.onStyleChange(style.copy(opacity = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -154,7 +158,8 @@ internal fun PurposePanelContent(
             label = stringResource(R.string.density),
             value = style.density,
             range = PurposeWatermarkStyle.DENSITY_RANGE,
-            valueText = stringResource(densityText(style.density)),
+            valueText = densityLevels[densityLevel(style.density)],
+            valueWidth = valueWidth,
             onChange = { actions.onStyleChange(style.copy(density = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -197,11 +202,13 @@ internal fun PurposePanel(model: PurposePanelModel, actions: PurposePanelActions
     WidePanel(modifier) { PurposePanelContent(model, actions) }
 }
 
-@StringRes
-private fun densityText(density: Float): Int = when {
-    density < 0.8f -> R.string.density_sparse
-    density <= 1.25f -> R.string.level_medium
-    else -> R.string.density_dense
+/** 密度的三档：滑条不分档，右边写它落在哪一档。 */
+private val DENSITY_LEVELS = listOf(R.string.density_sparse, R.string.level_medium, R.string.density_dense)
+
+private fun densityLevel(density: Float): Int = when {
+    density < 0.8f -> 0
+    density <= 1.25f -> 1
+    else -> 2
 }
 
 private const val ANGLE_STEP = 15f
