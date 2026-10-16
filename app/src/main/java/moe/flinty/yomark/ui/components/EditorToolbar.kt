@@ -106,10 +106,15 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /** 手机底栏上点开的几组工具，和大爆炸占住这一行的那一种（[BIG_BANG]）。 */
 enum class ToolGroup(@StringRes val label: Int) {
@@ -188,6 +193,9 @@ fun EditorToolbar(
     canCompare: Boolean = false,
 ) {
     val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
+    // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走（见 contentFoldSpec），
+    // 胶囊缩回去的后半程上已经没有它们，不和淡回来的两组叠成一片
+    val toolsIn = animateFloatAsState(if (open != null) 1f else 0f, contentFoldSpec(open != null), label = "toolGroupTools")
     // 收回去的半路上 open 已经是 null，那一组的工具还要接着画完
     val last = remember { LastOpen() }
     if (open != null) last.group = open
@@ -380,12 +388,13 @@ fun EditorToolbar(
                 }
                 val shift = backAt - backX
                 divider?.let { it.placeWithLayer(backAt + backWidth + dividerGap, it.centerY()) { alpha = span(p, 0.45f, 0.8f) } }
-                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走。
+                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走，比胶囊快（见 toolsIn）。
                 // 胶囊还没撑到的地方不露出来：最右边那几个跟着胶囊的右沿一点点现出来
                 val stagger = if (tools.size > 1) (1f - TOOL_IN_START - TOOL_IN) / (tools.size - 1) else 0f
+                val shownTools = toolsIn.value
                 tools.forEachIndexed { i, tool ->
                     val start = TOOL_IN_START + i * stagger
-                    val t = span(p, start, start + TOOL_IN)
+                    val t = span(shownTools, start, start + TOOL_IN)
                     val x = toolX[i] + shift - ((1f - t) * slide).roundToInt()
                     tool.placeWithLayer(x, tool.centerY()) {
                         alpha = t
@@ -1078,25 +1087,48 @@ private const val EXPAND_MS = 350
 private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /**
- * 收回去比展开快一点，曲线是 ease-out cubic：起步快，尾巴不像标准曲线那样拖。
- * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）。
+ * 收回去是一根不回弹的弹簧（见 [SpringEasing]，照 FlClash 收起弹出菜单）：从静止起步，中段最快，落地缓，300 ms 停稳。
+ * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）；
+ * 300 ms 的 ease-out cubic 一下就是最快，头一帧就走掉一成半，还是生硬（2026-10-16）。
  */
 private const val COLLAPSE_MS = 300
-private val COLLAPSE_EASING = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
+private val COLLAPSE_EASING = SpringEasing(response = 0.27f, seconds = COLLAPSE_MS / 1000f)
 
-/** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
+/** 展开、收回各走各的：工具那一行的宽。面板的高见 [panelFoldSpec]，胶囊上的东西淡进淡出见 [contentFoldSpec]。 */
 internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
     if (opening) tween(EXPAND_MS, easing = EXPAND_EASING) else tween(COLLAPSE_MS, easing = COLLAPSE_EASING)
 
+/**
+ * 调节面板（胶囊往上长出来的那一截，见 EditorBottomBar）的高。展开和这一行的宽一起长；
+ * 收回去比这一行收窄快一点：先落回这一行，再跟着这一行缩回去，胶囊的角走一道弧，照 FlClash 收起弹出菜单横竖各走各的弹簧。
+ * 原先高和宽一条曲线，角斜着直线往回缩，像一块板整个缩小（2026-10-16）。
+ */
+internal fun panelFoldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) foldSpec(true) else tween(COLLAPSE_MS, easing = PANEL_COLLAPSE_EASING)
+
+private val PANEL_COLLAPSE_EASING = SpringEasing(response = 0.2f, seconds = COLLAPSE_MS / 1000f)
+
+/**
+ * 收回去时要走的东西（展开的工具、面板上的名字和参数）先淡掉，再缩胶囊，照 iOS 和 FlClash 收起菜单：
+ * 五十来 ms 面板上的就淡没了，工具右边的先走，最左边那个六十来 ms 也没了，「打码」「编辑」七十来 ms 才淡回来。
+ * 原先它们跟着胶囊的进度慢慢淡，半透明时就被往回收的胶囊边裁掉一截（「Medium」剩「Med」），又和淡回来的两组叠成一片（2026-10-16）。
+ * 展开时和胶囊一条曲线。
+ */
+internal fun contentFoldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) foldSpec(true) else tween(CONTENT_OUT_MS, easing = CONTENT_OUT_EASING)
+
+private const val CONTENT_OUT_MS = 150
+private val CONTENT_OUT_EASING = SpringEasing(response = 0.14f, seconds = CONTENT_OUT_MS / 1000f)
+
 /** 收着的那一排（两组、圆钮）在前半程让开。 */
-private const val FADE_OUT = 0.5f
+internal const val FADE_OUT = 0.5f
 
 /** 返回箭头在这一段里显出来：两组淡到一半时开始。 */
 private const val BACK_IN_START = 0.25f
 private const val BACK_IN_END = 0.75f
 
 /** 工具从这儿起一个个淡入，每个走这么一段，最后一个刚好走到头。 */
-private const val TOOL_IN_START = 0.25f
+internal const val TOOL_IN_START = 0.25f
 private const val TOOL_IN = 0.5f
 
 /** 胶囊展开后离屏幕两边多远；收着时整组也不比这更靠边。调节面板也是这么宽（见 EditorBottomBar）。 */
@@ -1171,6 +1203,27 @@ private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035
 
 /** Flutter 的 Curve.flipped：把曲线倒过来走。 */
 private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
+
+/**
+ * 一根弹簧从 0 弹到 1 走成的曲线，照 FlClash 的 SpringCurve（Flutter 的 SpringDescription.withDurationAndBounce）：
+ * [response] 是弹簧的感知时长（秒），[bounce] 是回弹多少（0 不回弹）。整条在 [seconds] 里放完：
+ * 到点时弹簧还差的那一点从头匀着补上，正好停在 1，时长是定的。
+ * 和 ease-out 不一样，弹簧从静止起步，头几帧走得少，中段最快，再慢慢落地。
+ */
+internal class SpringEasing(response: Float, bounce: Float = 0f, private val seconds: Float) : Easing {
+    private val omega = 2 * PI / response
+    private val zeta = 1.0 - bounce
+    private val residual = 1 - at(seconds.toDouble())
+
+    /** 弹簧放了 [t] 秒走到哪儿。 */
+    private fun at(t: Double): Double {
+        if (zeta >= 1) return 1 - (1 + omega * t) * exp(-omega * t)
+        val damped = omega * sqrt(1 - zeta * zeta)
+        return 1 - exp(-zeta * omega * t) * (cos(damped * t) + zeta * omega / damped * sin(damped * t))
+    }
+
+    override fun transform(fraction: Float) = (at(fraction.toDouble() * seconds) + residual * fraction).toFloat()
+}
 
 /** 小胶囊撑开、收窄，和分到的宽一起走的那一条（见 ToolItem）。 */
 private val GROW_EASING = FLUTTER_EASE_IN_CUBIC.flipped()
