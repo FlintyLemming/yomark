@@ -62,7 +62,8 @@ if ! running; then
   fi
 
   avd_dir=${ANDROID_AVD_HOME:-$HOME/.android/avd}/$AVD.avd
-  if [ ! -f "$avd_dir/config.ini" ]; then
+  # 没有，或者是拿别的系统镜像建的（改过上面的 IMAGE），都重新建
+  if ! grep -qsxF "image.sysdir.1=${IMAGE//;//}/" "$avd_dir/config.ini"; then
     echo "新建 AVD $AVD（Pixel 9 Pro 的屏幕，1280x2856，480dpi）" >&2
     echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n "$AVD" -k "$IMAGE" -d pixel_9_pro --force >/dev/null
     # 数据盘放大，装 140MB 的 debug 包还有余地；不要音频和摄像头
