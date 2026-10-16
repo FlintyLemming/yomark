@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- 英文聊天截图，给 DescendersOcrTest 用真模型读：app/src/test/resources/ppocr/descenders-chat.png（1080×1680，1 倍）
+       node tools/test-images/render-html.cjs tools/test-images/descenders-chat.html app/src/test/resources/ppocr/descenders-chat.png 1080 1680
+     要遮的地址、电话、邮箱、人名，大多带下伸的笔画（p g y j q、逗号、括号）：OCR 的框下沿正好落在它们的尖上，码下面露出一截。
+     上半截 Noto Sans（同首次引导的英文样图，「Maple Ave, Apt」是当时露出来的写法），下半截 Roboto（Android 的系统字体）。
+     人名、地址全是编的，电话在北美留给影视作品的 555-0100～0199 段里，邮箱用保留域名 example.com。
+     图已经提交，单测不依赖字体和网络。 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&family=Roboto:wght@400&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1680px; overflow: hidden; }
+  body {
+    font-family: 'Noto Sans', sans-serif;
+    background: #f2f3f5;
+    color: #1f2329;
+    font-size: 40px;
+    display: flex; flex-direction: column;
+  }
+  .status { height: 96px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 56px; font-size: 38px; font-weight: 500; background: #fff; }
+  .status .bat { width: 64px; height: 30px; border: 3px solid #1f2329; border-radius: 8px; position: relative; }
+  .status .bat::after { content: ''; position: absolute; inset: 4px 14px 4px 4px; background: #1f2329; border-radius: 3px; }
+  .bar { height: 132px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 48px; background: #fff; border-bottom: 2px solid #ebedf0; }
+  .bar .back { width: 30px; height: 30px; border-left: 6px solid #1f2329; border-bottom: 6px solid #1f2329; transform: rotate(45deg); margin-left: 12px; }
+  .bar .title { font-size: 46px; font-weight: 700; }
+  .bar .more { display: flex; gap: 10px; }
+  .bar .more i { width: 12px; height: 12px; border-radius: 50%; background: #1f2329; }
+
+  .chat { flex: 1; padding: 16px 32px 0; display: flex; flex-direction: column; gap: 24px; }
+  .time { align-self: center; font-size: 32px; color: #8a8f99; margin: 6px 0 0; }
+  .msg { display: flex; align-items: flex-start; gap: 22px; }
+  .msg.me { flex-direction: row-reverse; }
+  .avatar { width: 96px; height: 96px; border-radius: 50%; flex: none; background: linear-gradient(135deg, #ffd9a8, #f6a35c); }
+  .me .avatar { background: linear-gradient(135deg, #b9dcff, #6aa6f8); }
+  .bubble { max-width: 860px; padding: 20px 32px; border-radius: 30px; background: #fff; line-height: 1.45; }
+  .them .bubble { border-top-left-radius: 8px; }
+  .me .bubble { background: #2f7cf6; color: #fff; border-top-right-radius: 8px; }
+  .msg.cont .avatar { visibility: hidden; height: 0; }
+  .roboto { font-family: 'Roboto', sans-serif; }
+
+  .input { height: 140px; flex: none; display: flex; align-items: center; gap: 24px; padding: 0 32px; background: #fff; border-top: 2px solid #ebedf0; }
+  .input .field { flex: 1; height: 84px; border-radius: 42px; background: #f2f3f5; }
+</style>
+</head>
+<body>
+  <div class="status"><span>10:24</span><span class="bat"></span></div>
+  <div class="bar"><span class="back"></span><span class="title">Jordan Ellis</span><span class="more"><i></i><i></i><i></i></span></div>
+
+  <div class="chat">
+    <div class="msg them"><span class="avatar"></span><div class="bubble">We're at 2847 Maple Ave, Apt 12C</div></div>
+    <div class="msg them cont"><span class="avatar"></span><div class="bubble">Call me: +1 (202) 555-0147</div></div>
+    <div class="msg them cont"><span class="avatar"></span><div class="bubble">jordan.ellis@example.com</div></div>
+    <div class="msg them cont"><span class="avatar"></span><div class="bubble">Or ask Ms. Rivera at the front desk</div></div>
+    <div class="time">Today 9:12 AM</div>
+    <div class="msg them roboto"><span class="avatar"></span><div class="bubble">We're at 2847 Oak Ave, Unit 12C</div></div>
+    <div class="msg them cont roboto"><span class="avatar"></span><div class="bubble">peggy.quigley@example.org</div></div>
+    <div class="msg me roboto"><span class="avatar"></span><div class="bubble">My cell is +1 (415) 555-0199</div></div>
+    <div class="msg me cont roboto"><span class="avatar"></span><div class="bubble">Ship to 19 Spring Valley Rd, Apt 4B</div></div>
+  </div>
+
+  <div class="input"><span class="field"></span></div>
+</body>
+</html>
