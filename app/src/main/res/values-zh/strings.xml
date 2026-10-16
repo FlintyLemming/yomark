@@ -208,7 +208,7 @@
     <string name="settings_appearance_summary">主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录、外部模型</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
-    <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
+    <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 反馈 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
     <string name="summary_masked">打码</string>
     <string name="summary_off">关闭</string>
@@ -347,6 +347,12 @@
     <string name="version">版本</string>
     <string name="play_edition">Play 版</string>
     <string name="privacy_policy">隐私权政策</string>
+    <string name="feedback">反馈</string>
+    <string name="feedback_email">发邮件</string>
+    <string name="feedback_email_subject">有码反馈</string>
+    <string name="no_email_app">没有邮件应用，已复制邮箱地址</string>
+    <string name="github_issues">GitHub Issues</string>
+    <string name="github_issues_summary">公开，需要 GitHub 账号</string>
     <string name="reset_settings">恢复默认设置</string>
     <string name="reset_settings_summary">除外观外，全部恢复出厂值</string>
     <string name="reset_confirm_title">恢复默认设置？</string>

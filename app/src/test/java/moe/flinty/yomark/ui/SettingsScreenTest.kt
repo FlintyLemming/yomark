@@ -37,10 +37,12 @@ import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
 import moe.flinty.yomark.ui.settings.ExternalField
+import moe.flinty.yomark.ui.settings.FEEDBACK_EMAIL
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.GeneralSettingsScreen
 import moe.flinty.yomark.ui.settings.LabsSettingsScreen
 import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
+import moe.flinty.yomark.ui.settings.NEW_ISSUE_URL
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
 import moe.flinty.yomark.ui.settings.SettingsPage
 import moe.flinty.yomark.ui.settings.SettingsScreen
@@ -54,7 +56,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 
 /**
@@ -101,10 +107,10 @@ class SettingsScreenTest {
         compose.onNode(hasText("文字识别")).assertDoesNotExist()
     }
 
-    /** 隐私权政策、恢复默认都挪进了「关于」：一级页上那一行写着版本号，也提一句这两样在里面。 */
+    /** 隐私权政策、恢复默认都挪进了「关于」，反馈也在里面：一级页上那一行写着版本号，也提一句这几样在里面。 */
     @Test fun theAboutRowSaysTheVersionAndWhatMovedIn() {
         home()
-        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置").assertIsDisplayed()
+        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 反馈 · 恢复默认设置").assertIsDisplayed()
         compose.onNode(hasText("yomark.flinty.moe", substring = true)).assertDoesNotExist()
     }
 
@@ -559,6 +565,7 @@ class SettingsScreenTest {
         onDebugTraceChange: (Boolean) -> Unit = {},
         onReset: () -> Unit = {},
         openUrl: (String) -> Unit = {},
+        sendEmail: (Intent) -> Unit = {},
         notify: (String) -> Unit = {},
         play: Boolean = false,
     ) = show {
@@ -569,10 +576,14 @@ class SettingsScreenTest {
             onNavigateUp = {},
             version = "0.11.1 (19)",
             play = play,
+            device = pixel,
             openUrl = openUrl,
+            sendEmail = sendEmail,
             notify = notify,
         )
     }
+
+    private val pixel = "Google Pixel 10 Pro · Android 17 (API 37)"
 
     @Test fun theAboutPageShowsTheVersion() {
         about()
@@ -600,6 +611,47 @@ class SettingsScreenTest {
         about(openUrl = { throw IllegalStateException("no browser") })
         compose.onNodeWithText("隐私权政策").performClick()
         compose.onNodeWithText("隐私权政策").assertIsDisplayed()
+    }
+
+    /** 反馈一组：发邮件那一行写着地址，点了交给邮件应用，主题填好，正文最后是版本（带 Play 版）和机型。 */
+    @Test fun feedbackEmailGoesToTheMailAppWithVersionAndDevice() {
+        var sent: Intent? = null
+        about(play = true, sendEmail = { sent = it })
+        compose.onNodeWithText("反馈").assertIsDisplayed()
+        compose.onNodeWithText(FEEDBACK_EMAIL).assertIsDisplayed()
+        compose.onNodeWithText("发邮件").performClick()
+        val mail = sent!!
+        assertThat(mail.dataString).startsWith("mailto:$FEEDBACK_EMAIL?")
+        assertThat(mail.getStringExtra(Intent.EXTRA_SUBJECT)).isEqualTo("有码反馈")
+        assertThat(mail.getStringExtra(Intent.EXTRA_TEXT)).endsWith("\n有码 0.11.1 (19) · Play 版\n$pixel")
+    }
+
+    /** 手机上没有邮件应用：地址进剪贴板，说一句。 */
+    @Test fun feedbackEmailWithoutAMailAppCopiesTheAddress() {
+        val notes = mutableListOf<String>()
+        about(sendEmail = { throw ActivityNotFoundException() }, notify = { notes += it })
+        compose.onNodeWithText("发邮件").performClick()
+        assertThat(notes).containsExactly("没有邮件应用，已复制邮箱地址")
+        val clip = context.getSystemService(ClipboardManager::class.java).primaryClip!!
+        assertThat(clip.getItemAt(0).text.toString()).isEqualTo(FEEDBACK_EMAIL)
+    }
+
+    /** GitHub Issues 交给浏览器，先到选模板那页，版本和机型带过去预填；小字说清是公开的。 */
+    @Test fun githubIssuesOpenWithVersionAndDeviceFilledIn() {
+        var opened: String? = null
+        about(openUrl = { opened = it })
+        compose.onNodeWithText("公开，需要 GitHub 账号").assertIsDisplayed()
+        compose.onNodeWithText("GitHub Issues").performClick()
+        val url = Uri.parse(opened)
+        assertThat(url.buildUpon().clearQuery().build().toString()).isEqualTo(NEW_ISSUE_URL)
+        assertThat(url.getQueryParameter("version")).isEqualTo("0.11.1 (19)")
+        assertThat(url.getQueryParameter("device")).isEqualTo(pixel)
+    }
+
+    @Test fun githubIssuesSurviveHavingNoBrowser() {
+        about(openUrl = { throw IllegalStateException("no browser") })
+        compose.onNodeWithText("GitHub Issues").performClick()
+        compose.onNodeWithText("GitHub Issues").assertIsDisplayed()
     }
 
     /** 恢复默认在「关于」里也是普通的一行，误点一下不能就把设置全清了。 */
