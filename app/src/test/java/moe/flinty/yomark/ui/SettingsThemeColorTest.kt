@@ -34,7 +34,7 @@ class SettingsThemeColorTest {
                 Surface {
                     AppearanceSettingsScreen(
                         themeColor = themeColor, onThemeColorChange = onThemeColorChange,
-                        scanStyle = ScanStyle.SWEEP, onScanStyleChange = {},
+                        scanStyle = ScanStyle.FROST, onScanStyleChange = {},
                         onNavigateUp = {},
                     )
                 }

@@ -682,8 +682,8 @@ internal fun barcodeModeLabel(option: BarcodeOption): Int = when (option) {
 
 @StringRes
 internal fun scanStyleLabel(style: ScanStyle): Int = when (style) {
-    ScanStyle.SWEEP -> R.string.scan_sweep
     ScanStyle.FROST -> R.string.scan_frost
+    ScanStyle.SWEEP -> R.string.scan_sweep
 }
 
 @StringRes

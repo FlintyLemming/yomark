@@ -119,7 +119,7 @@ fun ImageCanvas(
     onCommitDrag: () -> Unit,
     onDeleteSelected: () -> Unit,
     modifier: Modifier = Modifier,
-    scanStyle: ScanStyle = ScanStyle.SWEEP,
+    scanStyle: ScanStyle = ScanStyle.FROST,
     showOriginal: Boolean = false,
     onInk: (List<PointF>) -> Unit = {},
     onEditSelected: () -> Unit = {},
