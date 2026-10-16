@@ -4,13 +4,13 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 /**
- * 展开后各项工具怎么分宽度（见 toolWidths）。下面的数按 dp 想：小样子连两边的空 36，选中那一项的小箭头 18；
+ * 展开后各项工具怎么分宽度（见 toolRooms、spread）。下面的数按 dp 想：小样子连两边的空 36，选中那一项的小箭头 18；
  * 每一项拿到的宽够它本来的宽就画全，不够就少画（选中的先去小箭头，没选中的只留小样子）。
  */
 class ToolWidthsTest {
 
     private fun widths(natural: List<Int>, room: Int, picked: Int = 0) =
-        toolWidths(natural, room, picked = picked, chevron = CHEVRON, bare = BARE)
+        spread(toolRooms(natural, room, picked = picked, chevron = CHEVRON, bare = BARE), room)
 
     @Test fun `room to spare is shared out evenly`() {
         assertThat(widths(listOf(90, 80, 70), 300)).containsExactly(110, 100, 90).inOrder()

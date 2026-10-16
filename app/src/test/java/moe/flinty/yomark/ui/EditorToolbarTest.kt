@@ -2,6 +2,7 @@ package moe.flinty.yomark.ui
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.interaction.Interaction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
@@ -29,11 +30,15 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
+import kotlin.math.abs
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.ui.components.EditorToolbar
@@ -75,6 +80,7 @@ class EditorToolbarTest {
     private var purposeOpen by mutableStateOf(false)
     private var purposeClicks = 0
     private var aiClicks = 0
+    private var rowWidth by mutableStateOf<Dp?>(null)
 
     private fun show(
         actions: StyleBarActions = Recorder(),
@@ -97,6 +103,7 @@ class EditorToolbarTest {
                         onAiReview = { aiClicks++ },
                         compare = compare,
                         canCompare = canCompare,
+                        modifier = rowWidth?.let { Modifier.width(it) } ?: Modifier,
                     )
                     LaunchedEffect(compare) { compare.interactions.collect { compareEvents += it } }
                 }
@@ -188,6 +195,46 @@ class EditorToolbarTest {
         assertThat(halfway.first).isGreaterThan(after.first)
         assertThat(halfway.second).isGreaterThan(before.second)
         assertThat(halfway.second).isLessThan(after.second)
+    }
+
+    /**
+     * 名字差一点写不下时来回换选中的那一项：每一格一路往一个方向变宽或变窄，不先缩一下再弹回来。
+     * 原先每一帧按各项眼下的宽重新分，半路上谁写得下谁写不下一会儿一个样：名字藏了又露，整排跟着来回抽（2026-10-16）。
+     * 字宽各机器不一样，一串宽度都试一遍，总有几个落在差一点写不下的地方。
+     */
+    @Test fun switchingToolsOnACrowdedRowMovesEachOneWay() {
+        look = MaskLook(MaskStyle.MARKER)
+        show(initial = ToolGroup.EDIT)
+        val names = listOf("马克笔", "画笔", "文本", "水印")
+        fun widths() = names.map { compose.onNodeWithText(it).getUnclippedBoundsInRoot().width.value }
+        val switches = listOf<() -> Unit>(
+            { look = MaskLook(MaskStyle.PEN) },
+            { look = MaskLook(MaskStyle.TEXT) },
+            { purposeOpen = true },
+            { purposeOpen = false; look = MaskLook(MaskStyle.MARKER) },
+        )
+        for (width in 380..450 step 5) {
+            rowWidth = width.dp
+            compose.waitForIdle()
+            for (switch in switches) {
+                compose.mainClock.autoAdvance = false
+                val frames = mutableListOf(widths())
+                switch()
+                compose.waitForIdle()
+                repeat(17) { compose.mainClock.advanceTimeBy(16); frames += widths() }
+                compose.mainClock.autoAdvance = true
+                compose.waitForIdle()
+                for (i in names.indices) {
+                    val track = frames.map { it[i] }
+                    // 1 dp 以内是取整
+                    val steps = track.zipWithNext { a, b -> b - a }.filter { abs(it) > 1f }
+                    assertWithMessage("$width dp 宽，${names[i]}：$track").that(steps.all { it > 0 } || steps.all { it < 0 }).isTrue()
+                    // 是一点点挪过去的，不是头一帧就跳过去一大截
+                    assertWithMessage("$width dp 宽，${names[i]} 一帧跳了一大截：$track")
+                        .that(steps.all { abs(it) <= abs(track.last() - track.first()) * 0.4f }).isTrue()
+                }
+            }
+        }
     }
 
     /**
