@@ -101,13 +101,23 @@ data class RecognitionConfig(
         /**
          * 逐项容错：认不出的条目直接丢掉，不抛。枚举名是持久化格式的一部分，
          * 删掉一个选项不该让老安装打不开（与 SettingsStore.lastStyle 同一条理由）。
+         *
+         * 快递单号原先单独一类（tracking），2026-10-16 并进了长数字串（longnum）：打开过快递单号、长数字串没改过的，
+         * 读成长数字串打开——不迁的话，升级后快递单号就不打码了。
          */
-        fun parseOverrides(raw: String): Map<String, RuleState> =
-            raw.split(SEP).mapNotNull { entry ->
+        fun parseOverrides(raw: String): Map<String, RuleState> {
+            val parsed = raw.split(SEP).mapNotNull { entry ->
                 val parts = entry.split(KV)
                 if (parts.size != 2 || parts[0].isBlank()) return@mapNotNull null
                 val state = RuleState.fromName(parts[1]) ?: return@mapNotNull null
                 parts[0] to state
             }.toMap()
+            val tracking = parsed[LEGACY_TRACKING] ?: return parsed
+            val rest = parsed - LEGACY_TRACKING
+            return if (tracking == RuleState.MASKED && LONG_NUMBER !in rest) rest + (LONG_NUMBER to RuleState.MASKED) else rest
+        }
+
+        private const val LEGACY_TRACKING = "tracking"
+        private const val LONG_NUMBER = "longnum"
     }
 }

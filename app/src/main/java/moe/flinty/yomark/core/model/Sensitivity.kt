@@ -2,9 +2,12 @@ package moe.flinty.yomark.core.model
 
 enum class SensitiveKind {
     PHONE, EMAIL, PAYMENT_CARD, IBAN, SSN, PASSPORT,
-    TRACKING_NO, IP_ADDR, MAC_ADDR, URL, API_KEY,
+    IP_ADDR, MAC_ADDR, URL, API_KEY,
 
-    /** 兜底：一串长得像标识符、但不属于上面任何一类的数字。出厂关着。 */
+    /**
+     * 兜底：一串长得像标识符、但不属于其他任何一类的数字，快递单号、订单号都在这里。出厂关着。
+     * 快递单号原先单独一类（TRACKING_NO），2026-10-16 并了进来。
+     */
     LONG_NUMBER,
 
     /** 日期与时间。出厂关着——时间在截图里无处不在，默认打码会打扰所有人。 */

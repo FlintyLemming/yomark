@@ -15,7 +15,6 @@ object SensitiveKindLabels {
         SensitiveKind.IBAN -> R.string.kind_iban
         SensitiveKind.SSN -> R.string.kind_ssn
         SensitiveKind.PASSPORT -> R.string.kind_passport
-        SensitiveKind.TRACKING_NO -> R.string.kind_tracking
         SensitiveKind.IP_ADDR -> R.string.kind_ip
         SensitiveKind.MAC_ADDR -> R.string.kind_mac
         SensitiveKind.URL -> R.string.kind_url
@@ -59,7 +58,6 @@ object SensitiveKindLabels {
         SensitiveKind.IBAN -> "IBAN"
         SensitiveKind.SSN -> "社保号"
         SensitiveKind.PASSPORT -> "护照"
-        SensitiveKind.TRACKING_NO -> "快递单号"
         SensitiveKind.IP_ADDR -> "IP 地址"
         SensitiveKind.MAC_ADDR -> "MAC 地址"
         SensitiveKind.URL -> "网址"

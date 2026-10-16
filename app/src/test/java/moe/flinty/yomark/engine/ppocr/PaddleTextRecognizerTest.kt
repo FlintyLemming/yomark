@@ -90,7 +90,7 @@ class PaddleTextRecognizerTest {
             SensitiveKind.POSTAL_ADDRESS,
             SensitiveKind.PICKUP_CODE,
             SensitiveKind.DATETIME,
-            SensitiveKind.TRACKING_NO,
+            SensitiveKind.LONG_NUMBER,
         )
     }
 

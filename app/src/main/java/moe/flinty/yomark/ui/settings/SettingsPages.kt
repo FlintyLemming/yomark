@@ -33,7 +33,6 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lan
 import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Person
@@ -547,7 +546,6 @@ internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.IBAN -> Icons.Outlined.AccountBalance
     SensitiveKind.SSN -> Icons.Outlined.Badge
     SensitiveKind.PASSPORT -> Icons.Outlined.FlightTakeoff
-    SensitiveKind.TRACKING_NO -> Icons.Outlined.LocalShipping
     SensitiveKind.IP_ADDR -> Icons.Outlined.Lan
     SensitiveKind.MAC_ADDR -> Icons.Outlined.Router
     SensitiveKind.URL -> Icons.Outlined.Link

@@ -34,7 +34,7 @@ class RecognitionConfigTest {
         assertThat(rules.map { it.id })
             .containsExactlyElementsIn(RuleCatalog.all.filter { it.enabledByDefault }.map { it.id })
         assertThat(rules.all { it.enabledByDefault }).isTrue()
-        assertThat(rules.map { it.id }).containsNoneOf("url", "ip", "tracking", "longnum", "datetime")
+        assertThat(rules.map { it.id }).containsNoneOf("url", "ip", "longnum", "datetime")
     }
 
     @Test fun `OFF removes the rule from the engine entirely`() {
@@ -108,6 +108,16 @@ class RecognitionConfigTest {
     @Test fun `garbage in the persisted overrides is dropped, not thrown`() {
         val parsed = RecognitionConfig.parseOverrides("url:MASKED;garbage;card:NOT_A_STATE;longnum:OFF")
         assertThat(parsed).containsExactly("url", RuleState.MASKED, "longnum", RuleState.OFF)
+    }
+
+    /** 快递单号并进了长数字串：打开过快递单号的，读成长数字串打开；长数字串自己改过的照旧。 */
+    @Test fun `a tracking override carries over to long numbers`() {
+        assertThat(RecognitionConfig.parseOverrides("tracking:MASKED;url:MASKED"))
+            .containsExactly("longnum", RuleState.MASKED, "url", RuleState.MASKED)
+        assertThat(RecognitionConfig.parseOverrides("tracking:OFF")).isEmpty()
+        assertThat(RecognitionConfig.parseOverrides("tracking:MASKED;longnum:OFF")).containsExactly("longnum", RuleState.OFF)
+        assertThat(RuleCatalog.stateOf(RecognitionConfig(ruleOverrides = RecognitionConfig.parseOverrides("tracking:MASKED")), "longnum"))
+            .isEqualTo(RuleState.MASKED)
     }
 
     /** 去掉了的「仅圈出」读成关闭：它本来就不打码。 */

@@ -74,7 +74,6 @@
     <string name="kind_iban">IBAN</string>
     <string name="kind_ssn">SSN</string>
     <string name="kind_passport">Passport</string>
-    <string name="kind_tracking">Tracking number</string>
     <string name="kind_ip">IP address</string>
     <string name="kind_mac">MAC address</string>
     <string name="kind_url">URL</string>
@@ -263,8 +262,7 @@
     <string name="rule_desc_plate">Plates in a distinctive format (mainland China, Japan, UK, France, Italy, Russia, India, Brazil and more) and plates after fields like “License plate”, two-row plates included; other formats, such as German or Spanish, only after a field name</string>
     <string name="rule_desc_url">Only the path and query are masked; the domain stays</string>
     <string name="rule_desc_ip">IPv4 and IPv6; version numbers after “v” or “version” don\'t count</string>
-    <string name="rule_desc_tracking">UPS numbers are check-digit verified; the rest are 12, 15, 20 or 22 plain digits and may be false positives</string>
-    <string name="rule_desc_longnum">16+ digits matching no other kind, such as transaction or order numbers; no check digit, may be false positives</string>
+    <string name="rule_desc_longnum">Strings of 8+ digits, possibly with hyphens and capital letters, such as tracking or order numbers; no check digit, may be false positives</string>
     <string name="rule_desc_datetime">Dates and times, including “Feb 5, 1965” and “05 FEB 1965”; dates of birth are a separate kind</string>
     <string name="rule_desc_birthdate">Dates after or under fields like “Date of birth” or “DOB”, including year-month only, ROC and Japanese era years; dates matching the birth date in a passport MRZ or a Chinese ID number; dates followed by “生” on diplomas</string>
 

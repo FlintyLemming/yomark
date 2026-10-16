@@ -201,7 +201,7 @@ class PlayScreenshots {
         return bmp
     }
 
-    /** 快递详情页识别完：手机号、地址这些打上码，出厂关着的几类（快递单号、日期时间……）原样留着。 */
+    /** 快递详情页识别完：手机号、地址这些打上码，出厂关着的几类（快递单号这些长数字串、日期时间……）原样留着。 */
     @Test fun auto() {
         open(sample("/readme/order-page.png"))
         shoot("auto")
@@ -275,7 +275,7 @@ class PlayScreenshots {
 
     /**
      * 设置 › 文字：每一类一行，小字是它眼下打码还是关闭，点进去能改。出厂配置，列表滚到「取件码」，
-     * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（快递单号、日期时间、网址……）同在一屏。
+     * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（长数字串、日期时间、网址……）同在一屏。
      */
     @Test fun rules() {
         show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenEngine = {}, onOpenRule = {}, onNavigateUp = {}) }
