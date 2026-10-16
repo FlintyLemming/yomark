@@ -123,6 +123,7 @@ class SettingsPageActivity : YomarkActivity() {
             }
             SettingsPage.GENERAL -> {
                 val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
+                val fullResolution by store.fullResolutionOcr.collectAsStateWithLifecycle(initialValue = null)
                 // 水印的三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
                 val watermark by remember {
                     combine(
@@ -133,10 +134,13 @@ class SettingsPageActivity : YomarkActivity() {
                 }.collectAsStateWithLifecycle(initialValue = null)
                 val restyle = restyleAll
                 val mark = watermark
-                if (restyle != null && mark != null) {
+                val fullRes = fullResolution
+                if (restyle != null && mark != null && fullRes != null) {
                     GeneralSettingsScreen(
                         restyleAll = restyle,
                         onRestyleAllChange = { next -> lifecycleScope.launch { store.setRestyleAllMasks(next) } },
+                        fullResolution = fullRes,
+                        onFullResolutionChange = { next -> lifecycleScope.launch { store.setFullResolutionOcr(next) } },
                         watermarkStyle = mark.style,
                         onWatermarkStyleChange = { next ->
                             lifecycleScope.launch { store.setBrandWatermarkStyle(next, mark.unlocked) }

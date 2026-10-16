@@ -329,7 +329,7 @@ class EditorViewModel(
         val savedLines = savedState.get<FloatArray>(KEY_LINES)?.let(::unpackQuads).orEmpty()
         viewModelScope.launch {
             val image = runCatching {
-                SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher)
+                loadForAnalysis(file, mime)
             }.getOrElse {
                 clearSavedState()
                 uiState = uiState.copy(restoring = false)
@@ -345,6 +345,10 @@ class EditorViewModel(
         }
         return true
     }
+
+    /** 每次载入时读一遍「按原分辨率识别」：改了从下一张图起生效。 */
+    private suspend fun loadForAnalysis(file: java.io.File, mime: String) =
+        SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher, settings.fullResolutionOcr.first())
 
     private fun clearSavedState() {
         savedState.remove<String>(KEY_FILE)
@@ -366,7 +370,7 @@ class EditorViewModel(
             intakeResult = null
             runCatching {
                 val result = intake.copyToPrivate(uri, ioDispatcher)
-                val image = SourceImageLoader.loadForAnalysis(result.file, result.mimeType, ioDispatcher)
+                val image = loadForAnalysis(result.file, result.mimeType)
                 result to image
             }.onSuccess { (result, image) ->
                 intakeResult = result
@@ -500,7 +504,7 @@ class EditorViewModel(
                             uiState = _state.value.copy(batch = b.withFile(index, copied.file, copied.mimeType))
                         }
                     }
-                taken to SourceImageLoader.loadForAnalysis(taken.file, taken.mimeType, ioDispatcher)
+                taken to loadForAnalysis(taken.file, taken.mimeType)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {

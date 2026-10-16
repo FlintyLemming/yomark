@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import moe.flinty.yomark.core.DevicePerformance
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
@@ -42,9 +43,14 @@ class SettingsStore internal constructor(
     private val store: DataStore<Preferences>,
     /** 系统语言，品牌水印字样没选过时按它定。测试换成固定值。 */
     private val locale: () -> Locale = Locale::getDefault,
+    /** 机器够不够快，「按原分辨率识别」没选过时按它定。测试换成固定值。 */
+    private val fastDevice: () -> Boolean = { true },
 ) {
 
-    constructor(context: Context) : this(context.applicationContext.settingsDataStore)
+    constructor(context: Context) : this(
+        context.applicationContext.settingsDataStore,
+        fastDevice = { DevicePerformance.fast(context.applicationContext) },
+    )
 
     /**
      * 「打码」里上次选的样式：识别出来直接打码的用它，下次打开编辑器时画笔也是它。
@@ -163,6 +169,18 @@ class SettingsStore internal constructor(
 
     suspend fun setRestyleAllMasks(on: Boolean) {
         store.edit { it[KEY_RESTYLE_ALL] = on }
+    }
+
+    /**
+     * 截图按原分辨率识别（见 SourceImageLoader.sampleSizeForAnalysis）：小字认得全，识别慢一倍多。
+     * 关掉就和照片一样缩到长边 2048 再认。没选过按机器快不快定（见 DevicePerformance），同样不在第一次读时写下。
+     *
+     * 不放进 RecognitionConfig：它管的是怎么解码识别图，改了从下一张图起生效，不让编辑器重跑。
+     */
+    val fullResolutionOcr: Flow<Boolean> = store.data.map { it[KEY_FULL_RESOLUTION] ?: fastDevice() }
+
+    suspend fun setFullResolutionOcr(on: Boolean) {
+        store.edit { it[KEY_FULL_RESOLUTION] = on }
     }
 
     /**
@@ -316,7 +334,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值，「按原分辨率识别」重新按机器定。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。实验室里的外部模型关掉，填过的接口地址、key、模型留着，再打开不用重填。
@@ -335,6 +353,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
+            it.remove(KEY_FULL_RESOLUTION)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
             it.remove(KEY_EXTERNAL_ON)
@@ -424,6 +443,7 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_RESTYLE_ALL = booleanPreferencesKey("restyle_all_masks")
+        val KEY_FULL_RESOLUTION = booleanPreferencesKey("full_resolution_ocr")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")

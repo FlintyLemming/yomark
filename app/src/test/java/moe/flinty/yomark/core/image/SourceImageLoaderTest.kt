@@ -113,6 +113,16 @@ class SourceImageLoaderTest {
         }
     }
 
+    /** 设置里关掉「按原分辨率识别」：截图也按照片的缩法，长边缩到 2048 以内。 */
+    @Test
+    fun `screenshots are downsampled like photos when full resolution is off`() {
+        fun sample(w: Int, h: Int) = SourceImageLoader.sampleSizeForAnalysis(w, h, fullResolution = false)
+        assertThat(sample(1080, 2400)).isEqualTo(2)
+        assertThat(sample(1080, 5148)).isEqualTo(4)
+        assertThat(sample(1080, 1920)).isEqualTo(1)
+        assertThat(sample(4624, 3472)).isEqualTo(4)
+    }
+
     @Test
     fun `a long screenshot is analysed at full size`() = runTest {
         val f = writeJpeg("long.jpg", 1080, 5148)

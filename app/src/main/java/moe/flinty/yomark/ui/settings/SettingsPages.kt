@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lan
@@ -408,6 +409,8 @@ fun AiSettingsScreen(
  *
  * 编辑：「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
  *
+ * 识别：「按原分辨率识别」，出厂按机器快不快定（见 SettingsStore.fullResolutionOcr）。不在识别页：它管的是快慢，不是认什么。
+ *
  * 导出：品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
  * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
  * 原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
@@ -416,6 +419,8 @@ fun AiSettingsScreen(
 fun GeneralSettingsScreen(
     restyleAll: Boolean,
     onRestyleAllChange: (Boolean) -> Unit,
+    fullResolution: Boolean,
+    onFullResolutionChange: (Boolean) -> Unit,
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     /** 能不能去水印。false 时没有「无水印」这一项。 */
@@ -437,6 +442,18 @@ fun GeneralSettingsScreen(
                     icon = Icons.Outlined.DoneAll,
                     checked = restyleAll,
                     onCheckedChange = onRestyleAllChange,
+                )
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.settings_recognize))
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.full_resolution_ocr),
+                    summary = stringResource(R.string.full_resolution_ocr_summary),
+                    icon = Icons.Outlined.HighQuality,
+                    checked = fullResolution,
+                    onCheckedChange = onFullResolutionChange,
                 )
             }
         }

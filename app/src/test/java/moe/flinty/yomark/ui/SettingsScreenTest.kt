@@ -126,7 +126,7 @@ class SettingsScreenTest {
         )
         compose.onNodeWithText("打码 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("编辑、水印样式").assertIsDisplayed()
+        compose.onNodeWithText("编辑、识别、水印样式").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
         val off = RuleCatalog.all.size - masked
         compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类 · PP-OCR").assertIsDisplayed()
@@ -715,6 +715,8 @@ class SettingsScreenTest {
     private fun general(
         restyleAll: Boolean = true,
         onRestyleAllChange: (Boolean) -> Unit = {},
+        fullResolution: Boolean = true,
+        onFullResolutionChange: (Boolean) -> Unit = {},
         watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
         onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
         watermarkUnlocked: Boolean = false,
@@ -723,6 +725,7 @@ class SettingsScreenTest {
     ) = show {
         GeneralSettingsScreen(
             restyleAll = restyleAll, onRestyleAllChange = onRestyleAllChange,
+            fullResolution = fullResolution, onFullResolutionChange = onFullResolutionChange,
             watermarkStyle = watermarkStyle, onWatermarkStyleChange = onWatermarkStyleChange,
             watermarkUnlocked = watermarkUnlocked, watermarkOff = watermarkOff, onWatermarkOff = onWatermarkOff,
             onNavigateUp = {},
@@ -732,11 +735,18 @@ class SettingsScreenTest {
     /** 原先「编辑」「导出」两页的项，一项一组；导出前提醒和「圈出」一起去掉了。 */
     @Test fun theGeneralPageHoldsWhatEditAndExportHad() {
         general()
-        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "水印样式", "图标 + 有码 Yomark").map {
+        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "识别", "按原分辨率识别", "水印样式", "图标 + 有码 Yomark").map {
             compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
         }
         assertThat(tops).isInOrder()
         compose.onNodeWithText("导出前提醒").assertDoesNotExist()
+    }
+
+    @Test fun theFullResolutionSwitchTurnsItOn() {
+        var latest: Boolean? = null
+        general(fullResolution = false, onFullResolutionChange = { latest = it })
+        compose.onNodeWithText("按原分辨率识别").performClick()
+        assertThat(latest).isTrue()
     }
 
     @Test fun theRestyleAllSwitchTurnsItOff() {

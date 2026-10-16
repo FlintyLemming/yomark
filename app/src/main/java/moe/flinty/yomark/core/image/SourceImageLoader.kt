@@ -40,15 +40,17 @@ object SourceImageLoader {
     /**
      * @param dispatcher 解码跑在哪个调度器上。默认 IO；调用方（如 EditorViewModel）
      * 传入自己的调度器，测试里就能用 TestDispatcher 把这段异步工作纳入调度控制。
+     * @param fullResolution 截图按原图识别（设置里的「按原分辨率识别」）。false 时截图也和照片一样缩到长边 [ANALYSIS_MAX_EDGE]。
      */
     suspend fun loadForAnalysis(
         file: File,
         mimeType: String,
         dispatcher: CoroutineDispatcher = Dispatchers.IO,
+        fullResolution: Boolean = true,
     ): SourceImage = withContext(dispatcher) {
         val (rawW, rawH) = readSize(file)
         val orientation = readOrientation(file)
-        val sample = sampleSizeForAnalysis(rawW, rawH)
+        val sample = sampleSizeForAnalysis(rawW, rawH, fullResolution)
 
         val decoded = decode(file, sample)
         val upright = applyOrientation(decoded, orientation)
@@ -117,10 +119,12 @@ object SourceImageLoader {
      * 截图不能这样缩：1080×2400 的截图会缩到 540 宽，1080×5148 的长截图缩到 270 宽，字只读对一半，聊天截图的头像一个也找不到。
      * 所以截图按原图识别，像素超过 [ANALYSIS_MAX_PIXELS] 或长边超过 [ANALYSIS_MAX_LONG_EDGE] 的才缩一半（还超再缩）。
      * 这样缩出来的不会比照片的缩法还小。文字检测在竖长的大图上分条跑，见 DetBands。
+     *
+     * 慢的机器上原图识别要等太久，设置里可以关掉（[fullResolution] = false），截图就也按照片的缩法。
      */
-    internal fun sampleSizeForAnalysis(width: Int, height: Int): Int {
+    internal fun sampleSizeForAnalysis(width: Int, height: Int, fullResolution: Boolean = true): Int {
         val long = max(width, height)
-        if (min(width, height) >= PHOTO_MIN_SHORT_EDGE) return sampleSizeForEdge(long, ANALYSIS_MAX_EDGE)
+        if (!fullResolution || min(width, height) >= PHOTO_MIN_SHORT_EDGE) return sampleSizeForEdge(long, ANALYSIS_MAX_EDGE)
         var s = 1
         while (long / s > ANALYSIS_MAX_LONG_EDGE || (width / s).toLong() * (height / s) > ANALYSIS_MAX_PIXELS) s *= 2
         return s
