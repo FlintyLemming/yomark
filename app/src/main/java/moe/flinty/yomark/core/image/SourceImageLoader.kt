@@ -120,7 +120,7 @@ object SourceImageLoader {
      * 所以截图按原图识别，像素超过 [ANALYSIS_MAX_PIXELS] 或长边超过 [ANALYSIS_MAX_LONG_EDGE] 的才缩一半（还超再缩）。
      * 这样缩出来的不会比照片的缩法还小。文字检测在竖长的大图上分条跑，见 DetBands。
      *
-     * 慢的机器上原图识别要等太久，设置里可以关掉（[fullResolution] = false），截图就也按照片的缩法。
+     * 原图识别慢一倍多，设置里的「按原分辨率识别」出厂关着（[fullResolution] = false），截图就也按照片的缩法；用户打开了才按上面的缩法。
      */
     internal fun sampleSizeForAnalysis(width: Int, height: Int, fullResolution: Boolean = true): Int {
         val long = max(width, height)

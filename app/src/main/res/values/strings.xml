@@ -323,7 +323,7 @@
     <string name="restyle_all_summary">Solid, mosaic and blur</string>
     <string name="settings_recognize">Recognition</string>
     <string name="full_resolution_ocr">Recognize at full resolution</string>
-    <string name="full_resolution_ocr_summary">Screenshots aren\'t scaled down first, so small text is caught more often; over twice as slow</string>
+    <string name="full_resolution_ocr_summary">When on, scanning slows down by about half or more</string>
     <string name="watermark_style">Watermark style</string>
     <string name="watermark_style_option">Icon + %1$s</string>
     <string name="watermark_none">No watermark</string>

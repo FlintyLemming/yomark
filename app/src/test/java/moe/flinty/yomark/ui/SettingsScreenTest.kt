@@ -715,7 +715,7 @@ class SettingsScreenTest {
     private fun general(
         restyleAll: Boolean = true,
         onRestyleAllChange: (Boolean) -> Unit = {},
-        fullResolution: Boolean = true,
+        fullResolution: Boolean = false,
         onFullResolutionChange: (Boolean) -> Unit = {},
         watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
         onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
