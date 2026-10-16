@@ -17,10 +17,11 @@ import kotlin.math.roundToInt
  * 输入是 ARGB 像素数组而不是 Bitmap：核心不碰 android.graphics，单测才能在 JVM 上跑真模型。
  *
  * 流程与 PaddleOCR 的 predict_system 对齐：检测 → 按阅读顺序排框 → 逐框切图识别 →
- * 丢掉置信度 < 0.5 的行。另加两步 PaddleOCR 没有、而规则层需要的：
+ * 丢掉置信度 < 0.5 的行。另加三步 PaddleOCR 没有、而规则层、遮罩需要的：
  * - 字符级的框：由 CTC 时间步推出每个字的横向位置，字与字的分界再落到像素空当上（WordGaps.boundary），
  *   遮罩能精确到字（ML Kit 只到词）；
- * - 词界空格：见 WordGaps。
+ * - 词界空格：见 WordGaps；
+ * - 字母文字的行，框的下沿挪到下伸的笔画下面：检测出的框正好落在 p、g、y 的尖上，码下面露一截，见 Descenders。
  * 最后把同一行上被检测拆开的几段拼回一条（RowGrouper），「取件码」和「1-58908」
  * 被拆成两个框时，标签锚定照样接得上。
  *
@@ -570,7 +571,9 @@ class PpOcrEngine(
             CtcDecoder.decode(buf, shape[1].toInt(), shape[2].toInt(), dict).let { it to shape[1].toInt() }
         }
         val empty = result.chars.none { it.isNotBlank() }
-        val line = if (empty || result.confidence < DROP_SCORE) null else line(box, w, result, steps, gray)
+        // 切图按检测的框，出来的框盖住下伸的笔画
+        val line = if (empty || result.confidence < DROP_SCORE) null
+        else line(Descenders.cover(image, box, result.chars.joinToString(""), gray), w, result, steps, gray)
         return Read(line, if (empty) 0f else result.confidence, box.width)
     }
 
