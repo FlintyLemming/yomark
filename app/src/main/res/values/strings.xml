@@ -212,12 +212,14 @@
     <string name="settings_developer">Developer</string>
     <string name="settings_language">Language</string>
     <string name="settings_language_system">System default</string>
+    <string name="settings_help">Help</string>
     <string name="settings_about">About</string>
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
     <string name="settings_general_summary">Editing, recognition, watermark style</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
     <string name="settings_labs_summary">Detect chat screenshots, external model</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
+    <string name="settings_help_summary">Replay the intro tour</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Feedback · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
     <string name="summary_masked">masked</string>

@@ -90,7 +90,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "通用", "外观", "实验室", "语言", "关于").forEach {
+        listOf("文字", "人脸", "条码", "AI", "通用", "外观", "实验室", "语言", "帮助", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -229,6 +229,24 @@ class SettingsScreenTest {
         assertThat(language.bottom).isAtMost(about.top)
         compose.onNodeWithText("语言").performClick()
         assertThat(opened).containsExactly(SettingsPage.LANGUAGE)
+    }
+
+    // ---------- 帮助 ----------
+
+    /** 帮助在语言和关于之间，点了重新放一遍引导，不进设置的哪一页。 */
+    @Test fun helpReplaysTheTour() {
+        val opened = mutableListOf<SettingsPage>()
+        var replays = 0
+        show { SettingsScreen(RecognitionConfig(), { opened += it }, onNavigateUp = {}, onReplayTour = { replays++ }) }
+        compose.onNodeWithText("重新观看引导").assertIsDisplayed()
+        val language = compose.onNodeWithText("语言").fetchSemanticsNode().boundsInRoot
+        val help = compose.onNodeWithText("帮助").fetchSemanticsNode().boundsInRoot
+        val about = compose.onNodeWithText("关于").fetchSemanticsNode().boundsInRoot
+        assertThat(language.bottom).isAtMost(help.top)
+        assertThat(help.bottom).isAtMost(about.top)
+        compose.onNodeWithText("帮助").performClick()
+        assertThat(replays).isEqualTo(1)
+        assertThat(opened).isEmpty()
     }
 
     @Test fun theLanguageRowSaysSystemDefaultWhenNothingWasPicked() {

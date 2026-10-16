@@ -212,12 +212,14 @@
     <string name="settings_developer">开发者</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_system">跟随系统</string>
+    <string name="settings_help">帮助</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
     <string name="settings_general_summary">编辑、识别、水印样式</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录、外部模型</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
+    <string name="settings_help_summary">重新观看引导</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 反馈 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
     <string name="summary_masked">打码</string>
