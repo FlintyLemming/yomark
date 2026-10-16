@@ -204,7 +204,7 @@
     <string name="settings_language_system">跟随系统</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
-    <string name="settings_general_summary">编辑、水印样式</string>
+    <string name="settings_general_summary">编辑、识别、水印样式</string>
     <string name="settings_appearance_summary">主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录、外部模型</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
@@ -321,6 +321,9 @@
     <!-- settings: export / appearance -->
     <string name="restyle_all">换样式时一起换掉已有的打码</string>
     <string name="restyle_all_summary">色块、马赛克、模糊</string>
+    <string name="settings_recognize">识别</string>
+    <string name="full_resolution_ocr">按原分辨率识别</string>
+    <string name="full_resolution_ocr_summary">截图不缩小再识别，小字认得更全，慢一倍多</string>
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>

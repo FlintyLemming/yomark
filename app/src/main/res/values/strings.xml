@@ -204,7 +204,7 @@
     <string name="settings_language_system">System default</string>
     <string name="settings_about">About</string>
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
-    <string name="settings_general_summary">Editing, watermark style</string>
+    <string name="settings_general_summary">Editing, recognition, watermark style</string>
     <string name="settings_appearance_summary">Theme color, scan effect</string>
     <string name="settings_labs_summary">Detect chat screenshots, external model</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
@@ -321,6 +321,9 @@
     <!-- settings: export / appearance -->
     <string name="restyle_all">Change existing masks when switching style</string>
     <string name="restyle_all_summary">Solid, mosaic and blur</string>
+    <string name="settings_recognize">Recognition</string>
+    <string name="full_resolution_ocr">Recognize at full resolution</string>
+    <string name="full_resolution_ocr_summary">Screenshots aren\'t scaled down first, so small text is caught more often; over twice as slow</string>
     <string name="watermark_style">Watermark style</string>
     <string name="watermark_style_option">Icon + %1$s</string>
     <string name="watermark_none">No watermark</string>
