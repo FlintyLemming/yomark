@@ -235,7 +235,7 @@ val PanelTop = HorizontalAlignmentLine(::min)
  *
  * 胶囊就画在这里，只有这一块：上沿跟着面板长到哪儿，左右跟着工具那一行说的走（见 PillLeft），
  * 面板收着时它就是工具那一行的胶囊。长出来、缩回去的半路上也只有这一圈边、一层投影，看着是整个胶囊在变大变小；
- * 开着面板点返回收起这一组，胶囊一边往下缩一边往回收窄。
+ * 开着面板点返回收起这一组，面板上的东西先淡掉，胶囊一边往下缩一边往回收窄，往下比收窄快一点（见 panelFoldSpec）。
  *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param bigBangReady 大爆炸点得动（见 [EditorToolbar]）
@@ -271,7 +271,9 @@ fun EditorBottomBar(
     val bigBangRow = toolGroup == ToolGroup.TOOLS || toolGroup == ToolGroup.BIG_BANG
     val wanted = (bigBang != null && bigBangRow) ||
         ((styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null)
-    val grow = animateFloatAsState(if (wanted) 1f else 0f, foldSpec(wanted), label = "stylePanel")
+    val grow = animateFloatAsState(if (wanted) 1f else 0f, panelFoldSpec(wanted), label = "stylePanel")
+    // 面板上的东西淡进淡出走这一条：收回去时先淡没，胶囊再往回缩，不被它的边裁着走（见 contentFoldSpec）
+    val contentIn = animateFloatAsState(if (wanted) 1f else 0f, contentFoldSpec(wanted), label = "stylePanelContent")
     val shown by remember { derivedStateOf { grow.value > 0f } }
     val panelShown = wanted || shown
     // 收回去的半路上几样都已经关了，刚才开着的那一个还要接着画完
@@ -379,7 +381,7 @@ fun EditorBottomBar(
             // （圆角和胶囊一样，见 floatingSurface：不超过它窄的那一边的一半）
             val radius = min(PANEL_RADIUS.toPx(), min(pill.width, pill.height) / 2f)
             content?.placeWithLayer(margin, pillTop) {
-                alpha = span(p, CONTENT_IN_START, 1f)
+                alpha = span(contentIn.value, CONTENT_IN_START, 1f)
                 clip = true
                 shape = AbovePill(
                     left = (pillLeft - margin).toFloat(),

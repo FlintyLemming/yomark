@@ -193,13 +193,9 @@ fun EditorToolbar(
     canCompare: Boolean = false,
 ) {
     val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
-    // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走，比胶囊快，
-    // 胶囊缩回去的后半程上已经没有它们，不和淡回来的两组叠成一片（照 FlClash 收起弹出菜单、底栏换按钮）
-    val toolsIn = animateFloatAsState(
-        if (open != null) 1f else 0f,
-        if (open != null) foldSpec(true) else tween(TOOLS_OUT_MS, easing = TOOLS_OUT_EASING),
-        label = "toolGroupTools",
-    )
+    // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走（见 contentFoldSpec），
+    // 胶囊缩回去的后半程上已经没有它们，不和淡回来的两组叠成一片
+    val toolsIn = animateFloatAsState(if (open != null) 1f else 0f, contentFoldSpec(open != null), label = "toolGroupTools")
     // 收回去的半路上 open 已经是 null，那一组的工具还要接着画完
     val last = remember { LastOpen() }
     if (open != null) last.group = open
@@ -1098,26 +1094,41 @@ private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 private const val COLLAPSE_MS = 300
 private val COLLAPSE_EASING = SpringEasing(response = 0.27f, seconds = COLLAPSE_MS / 1000f)
 
-/**
- * 收回去时展开的工具走得比胶囊快（见 EditorToolbar 的 toolsIn）：右边的先走，九十来 ms 都淡没了，两组差不多这时才淡回来。
- * 原先它们和胶囊一条进度，「打码」「编辑」淡进来时工具的名字还在原处，叠成一片（2026-10-16）。
- */
-private const val TOOLS_OUT_MS = 200
-private val TOOLS_OUT_EASING = SpringEasing(response = 0.2f, seconds = TOOLS_OUT_MS / 1000f)
-
-/** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
+/** 展开、收回各走各的：工具那一行的宽。面板的高见 [panelFoldSpec]，胶囊上的东西淡进淡出见 [contentFoldSpec]。 */
 internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
     if (opening) tween(EXPAND_MS, easing = EXPAND_EASING) else tween(COLLAPSE_MS, easing = COLLAPSE_EASING)
 
+/**
+ * 调节面板（胶囊往上长出来的那一截，见 EditorBottomBar）的高。展开和这一行的宽一起长；
+ * 收回去比这一行收窄快一点：先落回这一行，再跟着这一行缩回去，胶囊的角走一道弧，照 FlClash 收起弹出菜单横竖各走各的弹簧。
+ * 原先高和宽一条曲线，角斜着直线往回缩，像一块板整个缩小（2026-10-16）。
+ */
+internal fun panelFoldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) foldSpec(true) else tween(COLLAPSE_MS, easing = PANEL_COLLAPSE_EASING)
+
+private val PANEL_COLLAPSE_EASING = SpringEasing(response = 0.2f, seconds = COLLAPSE_MS / 1000f)
+
+/**
+ * 收回去时要走的东西（展开的工具、面板上的名字和参数）先淡掉，再缩胶囊，照 iOS 和 FlClash 收起菜单：
+ * 五十来 ms 面板上的就淡没了，工具右边的先走，最左边那个六十来 ms 也没了，「打码」「编辑」七十来 ms 才淡回来。
+ * 原先它们跟着胶囊的进度慢慢淡，半透明时就被往回收的胶囊边裁掉一截（「Medium」剩「Med」），又和淡回来的两组叠成一片（2026-10-16）。
+ * 展开时和胶囊一条曲线。
+ */
+internal fun contentFoldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) foldSpec(true) else tween(CONTENT_OUT_MS, easing = CONTENT_OUT_EASING)
+
+private const val CONTENT_OUT_MS = 150
+private val CONTENT_OUT_EASING = SpringEasing(response = 0.14f, seconds = CONTENT_OUT_MS / 1000f)
+
 /** 收着的那一排（两组、圆钮）在前半程让开。 */
-private const val FADE_OUT = 0.5f
+internal const val FADE_OUT = 0.5f
 
 /** 返回箭头在这一段里显出来：两组淡到一半时开始。 */
 private const val BACK_IN_START = 0.25f
 private const val BACK_IN_END = 0.75f
 
 /** 工具从这儿起一个个淡入，每个走这么一段，最后一个刚好走到头。 */
-private const val TOOL_IN_START = 0.25f
+internal const val TOOL_IN_START = 0.25f
 private const val TOOL_IN = 0.5f
 
 /** 胶囊展开后离屏幕两边多远；收着时整组也不比这更靠边。调节面板也是这么宽（见 EditorBottomBar）。 */
