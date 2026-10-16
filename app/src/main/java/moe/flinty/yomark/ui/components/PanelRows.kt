@@ -24,6 +24,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +32,14 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
+import kotlin.math.roundToInt
 
 /*
  * 编辑器里两种调节面板（打码样式、用途水印）共用的架子和行：外面那一列、宽屏上垫的底、顶上的名字和收起、
@@ -101,10 +104,11 @@ internal fun PanelLabel(text: String) {
 /**
  * 名字、滑条、右边写着当前值的一行。
  *
- * 值不折成两行（「Mediu」「m」）：右边那一格留 [valueWidth]，留了它滑条剩不到 [MinSliderWidth] 时（字号调大、屏幕又窄），
- * 值挪到名字那一行的右头，滑条独占下面一行——挤成一小截的滑条拖不准。
+ * 名字和值都一行写全，不折成两行（「Mediu」「m」）：左边那一列、右边那一格按 [widths] 留。
+ * 留了它们滑条剩不到 [MinSliderWidth] 时（字号调大、屏幕又窄），值挪到名字那一行的右头，滑条独占下面一行——挤成一小截的滑条拖不准。
  *
- * @param valueWidth 右边那一格的宽。写的是档位的名字时按最长的那一档留（见 [rememberValueWidth]），拖到哪一档滑条都一样长
+ * @param widths 名字那一列、写值那一格的宽，一个面板里的滑条用同一份（见 [rememberSliderWidths]）：滑条的头尾对齐，
+ *   挤不下时一起换成上下两行
  * @param onValueChangeFinished 松手。拖动期间每一帧都走 [onChange]，要把整段拖动记成一步（撤销）的，在这里收尾。
  */
 @Composable
@@ -114,10 +118,9 @@ internal fun SliderRow(
     range: ClosedFloatingPointRange<Float>,
     valueText: String,
     onChange: (Float) -> Unit,
+    widths: SliderWidths,
     modifier: Modifier = Modifier,
     steps: Int = 0,
-    labelWidth: Dp = PanelLabelWidth,
-    valueWidth: Dp = PanelValueWidth,
     onValueChangeFinished: (() -> Unit)? = null,
 ) {
     @Composable
@@ -135,11 +138,11 @@ internal fun SliderRow(
         Text(valueText, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.End, maxLines = 1, modifier = modifier)
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        if (valueBesideSlider(maxWidth, labelWidth, valueWidth)) {
+        if (widths.fitOneRow(maxWidth)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(labelWidth))
+                Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(widths.label))
                 Track(Modifier.weight(1f))
-                Value(Modifier.width(valueWidth))
+                Value(Modifier.width(widths.value))
             }
         } else {
             Column {
@@ -153,23 +156,48 @@ internal fun SliderRow(
     }
 }
 
-/**
- * 右边写值的那一格要多宽：放得下 [texts] 里最长的那个，前面再空 [PanelValueGap]，不贴着滑条的头；至少 [PanelValueWidth]（数字有这么宽就够）。
- * 写的是档位的名字时传每一档的名字，拖到哪一档滑条都一样长；一个面板里几条滑条用同一个宽，右头对齐。
- */
-@Composable
-internal fun rememberValueWidth(texts: List<String>): Dp {
-    val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.labelLarge
-    val density = LocalDensity.current
-    return remember(texts, style, measurer, density) {
-        val widest = texts.maxOfOrNull { measurer.measure(it, style, maxLines = 1).size.width } ?: 0
-        max(with(density) { widest.toDp() } + PanelValueGap, PanelValueWidth)
+/** 滑条那一行左边名字那一列 [label]、右边写值那一格 [value] 的宽（见 [SliderRow]、[rememberSliderWidths]）。 */
+@Immutable
+internal data class SliderWidths(val label: Dp, val value: Dp) {
+
+    /** 一行宽 [row] 时名字、滑条、值还排在一行里：滑条至少留 [MinSliderWidth]。 */
+    fun fitOneRow(row: Dp): Boolean = row - label - value >= MinSliderWidth
+
+    companion object {
+        /**
+         * 名字最宽 [label]、值最宽 [value] 时两格各留多宽：字和滑条之间再空 [PanelSliderGap]，不贴着滑条的头尾；
+         * 名字那一列至少 [PanelLabelWidth]，写值那一格至少 [PanelValueWidth]，字短的面板和原先一样。
+         */
+        fun fitting(label: Dp, value: Dp) =
+            SliderWidths(max(label + PanelSliderGap, PanelLabelWidth), max(value + PanelSliderGap, PanelValueWidth))
     }
 }
 
-/** 一行宽 [row]，名字占 [label]、值占 [value] 时，值还放不放在滑条右边：滑条至少留 [MinSliderWidth]（见 [SliderRow]）。 */
-internal fun valueBesideSlider(row: Dp, label: Dp, value: Dp): Boolean = row - label - value >= MinSliderWidth
+/**
+ * 一个面板里滑条的名字那一列、写值那一格各留多宽：放得下 [labels] 里最长的名字、[values] 里最宽的值（量出来的，跟着字号走）。
+ * 一个面板里的滑条用同一份，自定义颜色的三条也是：滑条的头尾对齐。
+ *
+ * @param labels 这个面板里每一条滑条的名字，一时没摆出来的也算上（自定义颜色还收着、马克笔拉框时没有粗细）：摆出来时别的滑条不挪
+ * @param values 每一条会写出来的值里最宽的：档位传每一档的名字，数字传两头的（见 [endTexts]）。拖到哪儿滑条都一样长
+ */
+@Composable
+internal fun rememberSliderWidths(labels: List<String>, values: List<String>): SliderWidths {
+    val measurer = rememberTextMeasurer()
+    val labelStyle = MaterialTheme.typography.bodyMedium
+    val valueStyle = MaterialTheme.typography.labelLarge
+    val density = LocalDensity.current
+    return remember(labels, values, labelStyle, valueStyle, measurer, density) {
+        fun widest(texts: List<String>, style: TextStyle): Dp =
+            with(density) { (texts.maxOfOrNull { measurer.measure(it, style, maxLines = 1).size.width } ?: 0).toDp() }
+        SliderWidths.fitting(widest(labels, labelStyle), widest(values, valueStyle))
+    }
+}
+
+/** 数字的滑条两头写的值：数字一样宽，拖到中间写出来的不比两头宽。 */
+internal fun ClosedFloatingPointRange<Float>.endTexts(text: (Float) -> String): List<String> = listOf(text(start), text(endInclusive))
+
+/** 滑条右边写的百分数。 */
+internal fun percentText(fraction: Float): String = "${(fraction * 100).roundToInt()}%"
 
 /** 名字和开关的一行，整行都能点。开关和用途水印的「应用」一样，开着时滑块上有个对勾。 */
 @Composable
@@ -196,9 +224,9 @@ internal fun PanelSwitchRow(label: String, checked: Boolean, onChange: (Boolean)
     }
 }
 
-internal val PanelLabelWidth = 72.dp
+private val PanelLabelWidth = 72.dp
 private val PanelValueWidth = 48.dp
-private val PanelValueGap = 8.dp
+private val PanelSliderGap = 8.dp
 
 /**
  * 滑条至少这么长：六档之间还隔着 18 dp 上下，拖得准。

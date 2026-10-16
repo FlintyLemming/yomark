@@ -10,12 +10,12 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -75,6 +75,7 @@ import moe.flinty.yomark.R
  * 它选中时色板上哪一格都不算选中；点了色板、自定义或吸管，就换回固定的颜色。
  *
  * @param onColor 选了颜色。inProgress = 自定义的滑条还没松手，松手时另有 [onColorFinished]。
+ * @param sliderWidths 自定义那三条滑条的名字那一列多宽，和同一面板里别的滑条用同一份（名字算上 [hsvLabels]，见 rememberSliderWidths）
  * @param near 只有色块有；null 时没有这一颗
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -86,6 +87,7 @@ internal fun ColorPicker(
     onColor: (rgb: Int, inProgress: Boolean) -> Unit,
     onColorFinished: () -> Unit,
     onEyedropper: () -> Unit,
+    sliderWidths: SliderWidths,
     near: NearChoice? = null,
     onNear: () -> Unit = {},
 ) {
@@ -117,10 +119,16 @@ internal fun ColorPicker(
             color = color,
             onChange = { onColor(it, true) },
             onFinished = onColorFinished,
+            widths = sliderWidths,
             modifier = Modifier.padding(top = 8.dp),
         )
     }
 }
+
+/** 自定义颜色那三条滑条的名字：色相、饱和度、亮度。和它们在一个面板里的滑条，名字那一列也要放得下它们（见 rememberSliderWidths）。 */
+@Composable
+internal fun hsvLabels(): List<String> =
+    listOf(stringResource(R.string.hue), stringResource(R.string.saturation), stringResource(R.string.brightness))
 
 /**
  * 「自定义」那一格：一圈彩虹。当前颜色不在色板上时它是选中的，圈里填着这个颜色。
@@ -257,6 +265,7 @@ internal fun HsvSliders(
     color: Int,
     onChange: (Int) -> Unit,
     onFinished: () -> Unit,
+    widths: SliderWidths,
     modifier: Modifier = Modifier,
 ) {
     var hsv by remember { mutableStateOf(Hsv.of(color)) }
@@ -271,28 +280,32 @@ internal fun HsvSliders(
         dragging = false
         onFinished()
     }
+    val (hue, saturation, brightness) = hsvLabels()
     Column(modifier) {
         GradientSlider(
-            label = stringResource(R.string.hue),
+            label = hue,
             value = hsv.h / 360f,
             track = RAINBOW,
             thumb = Color(hsv.copy(s = 1f, v = 1f).toArgb()),
+            widths = widths,
             onChange = { set(hsv.copy(h = it * 360f)) },
             onFinished = finish,
         )
         GradientSlider(
-            label = stringResource(R.string.saturation),
+            label = saturation,
             value = hsv.s,
             track = listOf(Color(hsv.copy(s = 0f).toArgb()), Color(hsv.copy(s = 1f).toArgb())),
             thumb = Color(hsv.toArgb()),
+            widths = widths,
             onChange = { set(hsv.copy(s = it)) },
             onFinished = finish,
         )
         GradientSlider(
-            label = stringResource(R.string.brightness),
+            label = brightness,
             value = hsv.v,
             track = listOf(Color.Black, Color(hsv.copy(v = 1f).toArgb())),
             thumb = Color(hsv.toArgb()),
+            widths = widths,
             onChange = { set(hsv.copy(v = it)) },
             onFinished = finish,
         )
@@ -302,6 +315,9 @@ internal fun HsvSliders(
 /**
  * 轨道是一道渐变的滑条。Material 的 Slider 换不了轨道的画法，这里自己画；
  * 读屏照样能读出、能调进度（progressBarRangeInfo / setProgress）。
+ *
+ * 名字那一列按 [widths] 留，和同一面板里的 SliderRow 一起：头对齐，挤不下时一起换成上下两行（名字在上，滑条在下）。
+ * 这一行右头不写值，写值那一格的宽只拿来算换不换。
  */
 @Composable
 private fun GradientSlider(
@@ -309,65 +325,91 @@ private fun GradientSlider(
     value: Float,
     track: List<Color>,
     thumb: Color,
+    widths: SliderWidths,
     onChange: (Float) -> Unit,
     onFinished: () -> Unit,
+) {
+    @Composable
+    fun Name(modifier: Modifier) = Text(label, style = MaterialTheme.typography.bodyMedium, modifier = modifier)
+
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        if (widths.fitOneRow(maxWidth)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Name(Modifier.width(widths.label))
+                GradientTrack(label, value, track, thumb, onChange, onFinished, Modifier.weight(1f))
+            }
+        } else {
+            Column {
+                Name(Modifier)
+                GradientTrack(label, value, track, thumb, onChange, onFinished, Modifier.fillMaxWidth())
+            }
+        }
+    }
+}
+
+/** [GradientSlider] 的轨道和滑块，40 dp 高。 */
+@Composable
+private fun GradientTrack(
+    label: String,
+    value: Float,
+    track: List<Color>,
+    thumb: Color,
+    onChange: (Float) -> Unit,
+    onFinished: () -> Unit,
+    modifier: Modifier,
 ) {
     val change by rememberUpdatedState(onChange)
     val finished by rememberUpdatedState(onFinished)
     val ring = MaterialTheme.colorScheme.outline
-    Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(PanelLabelWidth))
-        Box(
-            Modifier
-                .weight(1f)
-                .fillMaxHeight()
-                .semantics {
-                    contentDescription = label
-                    progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(0f, 1f), 0f..1f)
-                    setProgress { target ->
-                        change(target.coerceIn(0f, 1f))
-                        finished()
-                        true
-                    }
+    Box(
+        modifier
+            .height(40.dp)
+            .semantics {
+                contentDescription = label
+                progressBarRangeInfo = ProgressBarRangeInfo(value.coerceIn(0f, 1f), 0f..1f)
+                setProgress { target ->
+                    change(target.coerceIn(0f, 1f))
+                    finished()
+                    true
                 }
-                .pointerInput(Unit) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        val inset = THUMB_RADIUS.toPx()
-                        fun at(x: Float) = ((x - inset) / (size.width - 2f * inset)).coerceIn(0f, 1f)
-                        change(at(down.position.x))
-                        down.consume()
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val c = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!c.pressed) break
-                            if (c.positionChanged()) {
-                                change(at(c.position.x))
-                                c.consume()
-                            }
-                        }
-                        finished()
-                    }
-                }
-                .drawBehind {
+            }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown()
                     val inset = THUMB_RADIUS.toPx()
-                    val h = TRACK_HEIGHT.toPx()
-                    val left = inset - h / 2f
-                    val right = size.width - inset + h / 2f
-                    val top = (size.height - h) / 2f
-                    drawRoundRect(
-                        Brush.horizontalGradient(track, startX = inset, endX = size.width - inset),
-                        topLeft = Offset(left, top),
-                        size = Size(right - left, h),
-                        cornerRadius = CornerRadius(h / 2f),
-                    )
-                    val center = Offset(inset + value.coerceIn(0f, 1f) * (size.width - 2f * inset), size.height / 2f)
-                    drawCircle(Color.White, radius = inset, center = center)
-                    drawCircle(thumb, radius = inset - 3.dp.toPx(), center = center)
-                    drawCircle(ring, radius = inset, center = center, style = Stroke(1.dp.toPx()))
-                },
-        )
-    }
+                    fun at(x: Float) = ((x - inset) / (size.width - 2f * inset)).coerceIn(0f, 1f)
+                    change(at(down.position.x))
+                    down.consume()
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val c = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!c.pressed) break
+                        if (c.positionChanged()) {
+                            change(at(c.position.x))
+                            c.consume()
+                        }
+                    }
+                    finished()
+                }
+            }
+            .drawBehind {
+                val inset = THUMB_RADIUS.toPx()
+                val h = TRACK_HEIGHT.toPx()
+                val left = inset - h / 2f
+                val right = size.width - inset + h / 2f
+                val top = (size.height - h) / 2f
+                drawRoundRect(
+                    Brush.horizontalGradient(track, startX = inset, endX = size.width - inset),
+                    topLeft = Offset(left, top),
+                    size = Size(right - left, h),
+                    cornerRadius = CornerRadius(h / 2f),
+                )
+                val center = Offset(inset + value.coerceIn(0f, 1f) * (size.width - 2f * inset), size.height / 2f)
+                drawCircle(Color.White, radius = inset, center = center)
+                drawCircle(thumb, radius = inset - 3.dp.toPx(), center = center)
+                drawCircle(ring, radius = inset, center = center, style = Stroke(1.dp.toPx()))
+            },
+    )
 }
 
 /**

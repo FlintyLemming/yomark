@@ -235,6 +235,42 @@ class PurposePanelTest {
         assertThat(ends.toSet()).hasSize(1)
     }
 
+    /**
+     * 三条滑条和自定义颜色的三条，名字都一行写全（原先那一列固定 72 dp，字号调大后「不透明度」「Brightness」折成两行）：
+     * 名字那一列按最长的那个留，滑条的头对齐（见 assertSliderNamesFit）。
+     */
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWhole() = assertNamesFit(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi", fontScale = 1.3f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWholeAtALargerFont() = assertNamesFit(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi", fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWholeAtDoubleFontSize() = assertNamesFit(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWhole() = assertNamesFit(CHINESE_SLIDERS, "自定义颜色")
+
+    @Test @Config(fontScale = 1.3f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWholeAtALargerFont() = assertNamesFit(CHINESE_SLIDERS, "自定义颜色")
+
+    @Test @Config(fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWholeAtDoubleFontSize() = assertNamesFit(CHINESE_SLIDERS, "自定义颜色")
+
+    /** 360 dp 宽的手机、字号两倍：放了名字和「Medium」滑条只剩一小截，六条一起换成上下两行，头还是对齐的。 */
+    @Test @Config(qualifiers = "en-w360dp-h800dp-xxhdpi", fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aDoubledFontOnANarrowPhoneStacksEverySlider() {
+        show(opened)
+        compose.onNodeWithContentDescription("Custom color").performClick()
+        assertThat(compose.assertSliderNamesFit(ENGLISH_SLIDERS)).isFalse()
+    }
+
+    private fun assertNamesFit(names: List<String>, customColor: String) {
+        show(opened)
+        compose.onNodeWithContentDescription(customColor).performClick()
+        compose.assertSliderNamesFit(names)
+    }
+
     /** 吸管要点的是底下的图：等着取色时面板先缩回底栏，取完色（或取消了）再长出来。 */
     @Test fun thePanelStepsAsideWhileTheEyedropperWaits() {
         val actions = Recorder()
@@ -322,5 +358,11 @@ class PurposePanelTest {
         model = model.copy(picking = true)
         compose.onNodeWithContentDescription("从图上取色").performClick()
         assertThat(actions.picks).containsExactly(true, false).inOrder()
+    }
+
+    private companion object {
+        /** 角度、不透明度、密度，自定义颜色的三条。 */
+        val ENGLISH_SLIDERS = listOf("Angle", "Opacity", "Density", "Hue", "Saturation", "Brightness")
+        val CHINESE_SLIDERS = listOf("角度", "不透明度", "密度", "色相", "饱和度", "亮度")
     }
 }
