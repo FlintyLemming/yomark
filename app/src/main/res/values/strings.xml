@@ -29,6 +29,8 @@
     <string name="onboarding_sample">Sample chat screenshot</string>
     <string name="onboarding_sample_masked">%1$d masked</string>
     <string name="onboarding_mask_link">Mask the link</string>
+    <!-- 不给人看：引导的样图 tour_chat.webp 是哪一张，和图跟着同一个语言限定符换（见 TourSample.of） -->
+    <string name="tour_sample">en</string>
     <string name="pick_image">Choose image</string>
     <string name="home_share_hint">You can also share images here from your gallery, several at once</string>
     <string name="free_edition">Free edition</string>

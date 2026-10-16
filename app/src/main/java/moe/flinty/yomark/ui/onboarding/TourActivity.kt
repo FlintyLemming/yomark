@@ -49,6 +49,7 @@ class TourActivity : YomarkActivity() {
             val tour by produceState<Tour?>(null) {
                 value = Tour(
                     sample = withContext(Dispatchers.Default) { TourSample.load(resources) },
+                    boxes = TourSample.of(resources),
                     scanStyle = settings.scanStyle.first(),
                     chatOn = settings.recognitionConfig.first().chatState != RuleState.OFF,
                 )
@@ -60,6 +61,7 @@ class TourActivity : YomarkActivity() {
                     val current = tour ?: return@Surface
                     OnboardingTour(
                         sample = current.sample,
+                        boxes = current.boxes,
                         scanStyle = current.scanStyle,
                         chatOn = config?.let { it.chatState != RuleState.OFF } ?: current.chatOn,
                         onChatChange = { on -> lifecycleScope.launch { settings.setTourChat(on) } },
@@ -72,7 +74,7 @@ class TourActivity : YomarkActivity() {
         }
     }
 
-    private class Tour(val sample: SourceImage, val scanStyle: ScanStyle, val chatOn: Boolean)
+    private class Tour(val sample: SourceImage, val boxes: TourSample, val scanStyle: ScanStyle, val chatOn: Boolean)
 
     companion object {
         fun intent(context: Context): Intent = Intent(context, TourActivity::class.java)

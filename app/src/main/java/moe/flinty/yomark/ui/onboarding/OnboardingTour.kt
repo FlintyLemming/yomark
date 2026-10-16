@@ -104,6 +104,8 @@ import kotlin.math.min
  * 图走得最慢、最底下的走得最快，翻页时拉开、停下时对齐。三页看的是同一张图上的同一份码：
  * 前一页点上的、点掉的，翻过去还在。返回键回上一页，第一页时交给系统。
  *
+ * @param sample 样图（TourSample.load）
+ * @param boxes 这张样图上量好的框（TourSample.of），和图出自同一套资源
  * @param chatOn 实验室里的「识别聊天记录」眼下开着没有（设置里存的那一份）
  * @param onChatChange 第三步的开关拨了：写进设置
  * @param interactive false 时正在退场淡出：不接触摸、读屏看不见它、返回键不归它
@@ -112,6 +114,7 @@ import kotlin.math.min
 @Composable
 internal fun OnboardingTour(
     sample: SourceImage,
+    boxes: TourSample,
     scanStyle: ScanStyle,
     chatOn: Boolean,
     onChatChange: (Boolean) -> Unit,
@@ -122,7 +125,7 @@ internal fun OnboardingTour(
     interactive: Boolean = true,
     animate: Boolean = remember { ValueAnimator.areAnimatorsEnabled() },
 ) {
-    val state = rememberTourState(chatOn, animate)
+    val state = rememberTourState(boxes, chatOn, animate)
     val pager = rememberPagerState(initialPage = state.progress.step) { TourState.STEPS }
     val scope = rememberCoroutineScope()
     // 翻到哪一页记进进度（转屏、进程被杀后接着来）

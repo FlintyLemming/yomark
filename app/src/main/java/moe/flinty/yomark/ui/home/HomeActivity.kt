@@ -85,6 +85,7 @@ class HomeActivity : YomarkActivity() {
                 } else {
                     Launch.Tour(
                         sample = withContext(Dispatchers.Default) { TourSample.load(resources) },
+                        boxes = TourSample.of(resources),
                         scanStyle = settings.scanStyle.first(),
                         chatOn = settings.recognitionConfig.first().chatState != RuleState.OFF,
                     )
@@ -120,6 +121,7 @@ class HomeActivity : YomarkActivity() {
                         AnimatedVisibility(tour, enter = EnterTransition.None, exit = fadeOut(foldTween(false))) {
                             OnboardingTour(
                                 sample = current.sample,
+                                boxes = current.boxes,
                                 scanStyle = current.scanStyle,
                                 chatOn = config?.let { it.chatState != RuleState.OFF } ?: current.chatOn,
                                 onChatChange = ::setChat,
@@ -172,6 +174,6 @@ class HomeActivity : YomarkActivity() {
     /** 这一页一打开是首页还是引导。 */
     private sealed interface Launch {
         data object Home : Launch
-        class Tour(val sample: SourceImage, val scanStyle: ScanStyle, val chatOn: Boolean) : Launch
+        class Tour(val sample: SourceImage, val boxes: TourSample, val scanStyle: ScanStyle, val chatOn: Boolean) : Launch
     }
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.unit.height
 import android.graphics.PointF
 import com.google.common.truth.Truth.assertThat
+import moe.flinty.yomark.R
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.canvas.Viewport
@@ -61,6 +62,7 @@ class OnboardingTourTest {
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
     private val sample: SourceImage by lazy { TourSample.load(compose.activity.resources) }
+    private val boxes: TourSample by lazy { TourSample.of(compose.activity.resources) }
 
     private var skipped = 0
     private var picked = 0
@@ -80,6 +82,7 @@ class OnboardingTourTest {
             Surface {
                 OnboardingTour(
                     sample = sample,
+                    boxes = boxes,
                     scanStyle = ScanStyle.FROST,
                     chatOn = chat,
                     onChatChange = { chat = it },
@@ -118,7 +121,7 @@ class OnboardingTourTest {
         const val PAGE_TURN_MS = 600L
     }
 
-    private val stage get() = compose.onNodeWithContentDescription("示例聊天截图")
+    private val stage get() = compose.onNodeWithContentDescription(compose.activity.getString(R.string.onboarding_sample))
 
     private fun stageSays(text: String) = stage.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text))
 
@@ -155,12 +158,12 @@ class OnboardingTourTest {
         compose.onNodeWithText("下一步").performClick()
         advance(PAGE_TURN_MS)
         compose.onNodeWithText("点一下框出的链接试试").assertIsDisplayed()
-        tapImage(TourSample.LINK_CENTER)
+        tapImage(boxes.linkCenter)
         advance(400)
         stageSays("遮住了 5 处")
         compose.onNodeWithText("点一下框出的链接试试").assertDoesNotExist()
         // 再点一下取消
-        tapImage(TourSample.LINK_CENTER)
+        tapImage(boxes.linkCenter)
         advance(400)
         stageSays("遮住了 4 处")
     }
@@ -200,7 +203,7 @@ class OnboardingTourTest {
         compose.onNodeWithText("遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确").assertIsDisplayed()
         compose.onNodeWithText("识别聊天记录").performClick()
         assertThat(chat).isTrue()
-        advance(TourSample.CHAT.size * CHAT_STAGGER_MS + 600)
+        advance(boxes.chat.size * CHAT_STAGGER_MS + 600)
         stageSays("遮住了 9 处")
         compose.onNodeWithText("识别聊天记录").performClick()
         assertThat(chat).isFalse()
@@ -278,7 +281,7 @@ class OnboardingTourTest {
         settle()
         compose.onNodeWithText("下一步").performClick()
         advance(PAGE_TURN_MS)
-        tapImage(TourSample.LINK_CENTER)
+        tapImage(boxes.linkCenter)
         advance(400)
         restore.emulateSavedInstanceStateRestore()
         idle()
@@ -355,6 +358,23 @@ class OnboardingTourTest {
         assertThat(image.endInclusive).isGreaterThan(0f)
         assertThat(title.right.value).isLessThan(image.endInclusive)
         assertThat(body.right.value).isLessThan(title.right.value)
+    }
+
+    /** 英文环境下换成英文的样图和它的框：码的处数是它的，框出的链接点得中。 */
+    @Config(qualifiers = "en-rUS-w412dp-h915dp-xxhdpi")
+    @Test fun `in english the tour runs on the english sample`() {
+        assertThat(boxes).isSameInstanceAs(TourSample.EN)
+        val auto = TourSample.EN.auto.size
+        show()
+        settle()
+        stageSays("$auto masked")
+        compose.onNodeWithText("Next").performClick()
+        advance(PAGE_TURN_MS)
+        compose.onNodeWithText("Try tapping the outlined link").assertIsDisplayed()
+        tapImage(boxes.linkCenter)
+        advance(400)
+        stageSays("${auto + 1} masked")
+        compose.onNodeWithText("Try tapping the outlined link").assertDoesNotExist()
     }
 
     /** 小屏、字放大：按钮还在屏幕里。 */
