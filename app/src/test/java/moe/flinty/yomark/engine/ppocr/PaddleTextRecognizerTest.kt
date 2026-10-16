@@ -1,6 +1,8 @@
 package moe.flinty.yomark.engine.ppocr
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.graphics.PointF
 import androidx.test.core.app.ApplicationProvider
 import moe.flinty.yomark.core.image.SourceImage
@@ -10,7 +12,10 @@ import moe.flinty.yomark.debug.textUnder
 import moe.flinty.yomark.rules.DefaultRuleSet
 import moe.flinty.yomark.rules.RuleClassifier
 import com.google.common.truth.Truth.assertThat
+import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.runBlocking
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.junit.BeforeClass
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,11 +34,13 @@ class PaddleTextRecognizerTest {
 
     companion object {
         private lateinit var lines: List<TextLine>
+        private lateinit var page: Bitmap
 
         /** 识别一次要一两秒，整个类共用一份结果。 */
         @BeforeClass @JvmStatic fun recognizeOnce() = runBlocking {
             val bytes = PaddleTextRecognizerTest::class.java.getResourceAsStream("/ppocr/logistics-page.png")!!.readBytes()
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            page = bmp
             lines = PaddleTextRecognizer(ApplicationProvider.getApplicationContext())
                 .recognize(SourceImage(bmp, 1f, bmp.width, bmp.height, "image/png"))
         }
@@ -85,6 +92,25 @@ class PaddleTextRecognizerTest {
             SensitiveKind.DATETIME,
             SensitiveKind.TRACKING_NO,
         )
+    }
+
+    /**
+     * 字和字的分界落在像素空当里（WordGaps.boundary），不是 CTC 两个中心的中点：「号码保护中」原先每条分界都往右偏，
+     * 只遮「保」会露出它的单人旁、盖住「护」的提手旁。现在每两个字之间的那一列上没有笔画（和 WordGaps 同一个墨迹口径）。
+     */
+    @Test fun `character boundaries fall in the gaps between glyphs`() {
+        val line = lines.single { it.text.startsWith("王小明") }
+        val start = line.text.indexOf("号码保护中")
+        assertThat(start).isAtLeast(0)
+        fun luma(argb: Int) = (0.299f * Color.red(argb) + 0.587f * Color.green(argb) + 0.114f * Color.blue(argb)) / 255f
+        val background = luma(page.getPixel(page.width - 2, page.height - 2))
+        for (i in start until start + 4) {
+            val box = line.elements.single { it.range.first == i }.quad
+            val x = box.p1.x.roundToInt()
+            val rows = box.bounds().top.roundToInt()..box.bounds().bottom.roundToInt()
+            val inked = rows.count { y -> abs(luma(page.getPixel(x, y)) - background) > 0.25f }
+            assertWithMessage("「${line.text[i]}${line.text[i + 1]}」之间那一列").that(inked).isEqualTo(0)
+        }
     }
 
     /** 字符级的框：名字与紧挨着它的号码各遮各的，框互不重叠。 */

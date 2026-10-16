@@ -49,11 +49,13 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalViewConfiguration
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.core.geometry.Quad
@@ -71,6 +73,7 @@ import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.EditorUiState
 import moe.flinty.yomark.ui.TextPlacement
+import moe.flinty.yomark.ui.components.DETENT
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -88,6 +91,8 @@ import moe.flinty.yomark.R
  * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。缩放只用两指，没有双击放大（2026-10-15 去掉）。
  * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
  * 拿着文本点图上一处是在那儿写字（见 EditorViewModel.onTap）：字还没打时那儿立着一道光标。
+ * 按在字上不动、过了长按的时间，打开大爆炸（[onLongPress]），手指不抬接着划是接着选字；大爆炸开着时一指点字、划字都是选字，
+ * 选中的字连成的块画在图上（见 ui/bigbang）。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
@@ -97,6 +102,12 @@ import moe.flinty.yomark.R
  * @param plainSelection 选中框只描一圈线，不画手柄、不浮工具条：手机上写文本时面板开着，点画布只是收起面板，
  *   手柄和工具条点不到，倒把缩小了的图上正在打的字盖住了
  * @param textBoxes 开发者里打开「显示识别框」时，文字识别认出的每一段字的框（点字打码打的就是这些框）；空的就不画
+ * @param onLongPress 按着不动过了长按的时间：按在哪儿（图像坐标）、离一个字多远还算按中它（图像像素）。
+ *   返回打开了大爆炸没有；没有的话这一下照旧，松手算点一下，拖开是画框
+ * @param onBigBangSweepStart 大爆炸开着时一指划字，第一个经过的字（Glyph.id）：它定这一划是选还是取消
+ * @param onBigBangSweep 这一划接着经过的字，按经过的先后
+ * @param onBigBangRelease 长按打开了大爆炸的那根手指抬起来了（见 BigBangState.holding）
+ * @param onBigBangRestore 一指划着字、第二根手指落下来变成了缩放平移：选中的字回到这一划起手前的样子
  */
 @Composable
 fun ImageCanvas(
@@ -114,11 +125,17 @@ fun ImageCanvas(
     onEditSelected: () -> Unit = {},
     plainSelection: Boolean = false,
     textBoxes: List<Quad> = emptyList(),
+    onLongPress: (PointF, Float) -> Boolean = { _, _ -> false },
+    onBigBangSweepStart: (Int) -> Unit = {},
+    onBigBangSweep: (List<Int>) -> Unit = {},
+    onBigBangRelease: () -> Unit = {},
+    onBigBangRestore: (Set<Int>) -> Unit = {},
 ) {
     val image = state.image ?: return
     val density = LocalDensity.current
     val touchSlopPx = LocalViewConfiguration.current.touchSlop
     val minBoxPx = with(density) { GestureRules.MIN_BOX_DP.dp.toPx() }
+    val haptics = LocalHapticFeedback.current
 
     var viewSize by remember { mutableStateOf(0 to 0) }
     var viewport by remember(image) { mutableStateOf(Viewport(1f, 0f, 0f)) }
@@ -251,6 +268,9 @@ fun ImageCanvas(
     // 草稿框每一帧都在变；工具条只关心「是不是正在画」，不跟着每帧重组
     val drafting by remember { derivedStateOf { draftQuad != null || inkTick > 0 } }
 
+    // 大爆炸里选中的字连成的块：打码时打的就是这几块
+    val bigBangRuns = remember(state.bigBang) { state.bigBang?.let { it.page.runQuads(it.selected) }.orEmpty() }
+
     // 选中框、草稿框与手柄用主题色，与应用其余部分一致
     val colorScheme = MaterialTheme.colorScheme
     val selectionColors = remember(colorScheme.primary, colorScheme.surface) {
@@ -266,10 +286,12 @@ fun ImageCanvas(
                         val down = awaitFirstDown(requireUnconsumed = false)
                         // 一指按着「对比」看原图时，另一指在画布上只能缩放平移，不改码：改了也看不见
                         val editable = !latestShowOriginal
+                        // 大爆炸开着时一指点的、划的是字（见 Mode.SWEEP），不画框、不拖框
+                        val bigBangOpen = latest.bigBang != null
 
                         // 选中态优先：手柄 > 框体，都不中才轮到画框 / 点击。
                         // 删除在框上方的工具条里，那是叠在画布上的另一个控件，按它的手势到不了这里
-                        val selected = latest.selectedManualId?.takeIf { editable }?.let { latest.plan.find(it) }
+                        val selected = latest.selectedManualId?.takeIf { editable && !bigBangOpen }?.let { latest.plan.find(it) }
                         val downImage = viewport.screenToImage(PointF(down.position.x, down.position.y))
                         var grabbedHandle: HandleCorner? = null
                         var grabOffset = PointF(0f, 0f)
@@ -296,9 +318,49 @@ fun ImageCanvas(
                         var last = down.position
                         var pointerCount = 1
                         var mode = Mode.UNDECIDED
+                        // 点字时手指偏出一个字多远还算点中它（图像像素），长按、划字也用它
+                        val reach = { GestureRules.LINE_REACH_DP * density.density / viewport.scale }
+
+                        // 长按：按下去之后一指不动，等到长按的时间。按在手柄、框体上的是要拖框，不等
+                        var longPressArmed = editable && !bigBangOpen && grabbedHandle == null && !grabbingBody
+                        val longPressAt = down.uptimeMillis + viewConfiguration.longPressTimeoutMillis
+                        var lastEventAt = down.uptimeMillis
+                        // 划字：上一次看到哪儿了（图像坐标），这一划起手了没有（第一个经过的字定这一划是选还是取消）、已经经过的字
+                        var sweepFrom: PointF? = null
+                        var sweepStarted = false
+                        val swept = HashSet<Int>()
+                        // 长按选上的那个字在哪儿：这一下 latest 里还没有大爆炸（要等下一次重组），等划起来时再记进 swept
+                        var pressedGlyphAt: PointF? = null
+                        // 这一下长按打开了大爆炸：手指抬起来时说一声，面板才出来
+                        var openedBigBang = false
+                        // 大爆炸开着时划字之前选中的是哪几个：第二根手指落下来变成缩放平移，这一划作罢，回到它
+                        var sweepBefore: Set<Int>? = null
+                        // 这一划看过了起点没有：接着上一段划的不再看起点
+                        var sweepFromSeen = false
 
                         while (true) {
-                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val event = if (longPressArmed && mode == Mode.UNDECIDED && pointerCount == 1) {
+                                withTimeoutOrNull((longPressAt - lastEventAt).coerceAtLeast(0L)) {
+                                    awaitPointerEvent(PointerEventPass.Main)
+                                }
+                            } else {
+                                awaitPointerEvent(PointerEventPass.Main)
+                            }
+                            if (event == null) {
+                                // 按住不动到了时候：按在字上就打开大爆炸，按着的字已经选上了，接着划是接着选
+                                longPressArmed = false
+                                val p = viewport.screenToImage(PointF(last.x, last.y))
+                                if (onLongPress(p, reach())) {
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    mode = Mode.SWEEP
+                                    sweepFrom = p
+                                    sweepStarted = true
+                                    pressedGlyphAt = p
+                                    openedBigBang = true
+                                }
+                                continue
+                            }
+                            lastEventAt = event.changes.maxOf { it.uptimeMillis }
                             val pressed = event.changes.filter { it.pressed }
                             pointerCount = maxOf(pointerCount, pressed.size)
 
@@ -311,6 +373,8 @@ fun ImageCanvas(
                                     draftInk.points = null
                                     inkTick = 0
                                 }
+                                sweepBefore?.let(onBigBangRestore)
+                                sweepBefore = null
                                 val a = pressed[0]; val b = pressed[1]
                                 val prevCentroid = Offset(
                                     (a.previousPosition.x + b.previousPosition.x) / 2f,
@@ -334,7 +398,38 @@ fun ImageCanvas(
                                 if (mode == Mode.UNDECIDED &&
                                     GestureRules.isDrag(c.position.x - start.x, c.position.y - start.y, touchSlopPx)
                                 ) {
-                                    mode = Mode.DRAG
+                                    if (bigBangOpen && editable) {
+                                        mode = Mode.SWEEP
+                                        // 起手那一段 touch slop 也算：从手指按下的那个字划起
+                                        sweepFrom = viewport.screenToImage(PointF(start.x, start.y))
+                                        sweepBefore = latest.bigBang?.selected
+                                    } else {
+                                        mode = Mode.DRAG
+                                    }
+                                }
+                                if (mode == Mode.SWEEP) {
+                                    val page = latest.bigBang?.page
+                                    if (page != null) {
+                                        pressedGlyphAt?.let { at -> page.glyphAt(at, reach())?.let { swept += it.id } }
+                                        pressedGlyphAt = null
+                                        val step = SWEEP_STEP_DP * density.density / viewport.scale
+                                        val points = c.historical.map { it.position } + c.position
+                                        for (pos in points) {
+                                            val to = viewport.screenToImage(PointF(pos.x, pos.y))
+                                            val hit = page.glyphsAlong(sweepFrom ?: to, to, reach(), step, withStart = !sweepFromSeen).map { it.id }
+                                            sweepFrom = to
+                                            sweepFromSeen = true
+                                            if (hit.isEmpty()) continue
+                                            if (!sweepStarted) {
+                                                sweepStarted = true
+                                                onBigBangSweepStart(hit.first())
+                                            }
+                                            onBigBangSweep(hit)
+                                            // 每经过一个新的字轻轻震一下，和胶片条上划过一张一样
+                                            if (swept.addAll(hit)) haptics.performHapticFeedback(DETENT)
+                                        }
+                                    }
+                                    if (c.positionChanged()) c.consume()
                                 }
                                 // 过了 touch slop 才动手，没动的话这一下是点击。
                                 // 改框一律按起手那一刻的框加手指的总位移算：框紧跟手指，不丢 slop 那一段
@@ -371,6 +466,7 @@ fun ImageCanvas(
                         }
 
                         editingSelection = false
+                        if (openedBigBang) onBigBangRelease()
                         // 整段拖动只压一个快照。没真拖起来的话 ViewModel 那边什么也没记，这一下什么都不做
                         if (grabbedHandle != null || grabbingBody) onCommitDrag()
 
@@ -387,10 +483,11 @@ fun ImageCanvas(
                                 if (ink != null && Ink.length(ink) >= minInImage) onInk(ink.toList())
                             }
                             // 点了一下手柄没拖：什么都不做。手柄的命中区探出框外，当成点空白会把选中态点没了。
-                            // 按得久的一下也是点击（Android 上没有长按动作的控件都这样）
+                            // 按得久的一下：按在字上的打开了大爆炸（Mode.SWEEP），到不了这里；没按在字上的照旧是点击。
+                            // 大爆炸开着时点一下是点字（见 EditorViewModel.onTap）
                             mode == Mode.UNDECIDED && pointerCount == 1 && grabbedHandle == null && editable -> {
                                 val p = viewport.screenToImage(PointF(last.x, last.y))
-                                onTap(p, GestureRules.LINE_REACH_DP * density.density / viewport.scale)
+                                onTap(p, reach())
                             }
                         }
                     }
@@ -404,6 +501,12 @@ fun ImageCanvas(
                 // 原本就是整图适配（或第一次摆）就按新尺寸重新适配；用户放大过的保留缩放，只收回边界
                 val wasFit = oldW == 0 || viewport == Viewport.fit(image.width, image.height, oldW, oldH)
                 viewport = if (wasFit) fit else viewport.clamped(image.width, image.height, w, h, fit.scale)
+                // 大爆炸的面板出来、画布变矮了：放大着看的图上选中的那几块可能落到了画布下面，挪上来
+                if (!wasFit && bigBangRuns.isNotEmpty()) {
+                    val area = android.graphics.RectF(bigBangRuns.first().bounds()).apply { bigBangRuns.forEach { union(it.bounds()) } }
+                    viewport = viewport.revealing(area, w, h, REVEAL_MARGIN_DP * density.density)
+                        .clamped(image.width, image.height, w, h, fit.scale)
+                }
                 laidOutFor = viewSize
             }
 
@@ -442,6 +545,7 @@ fun ImageCanvas(
                 }
                 val dp = density.density / viewport.scale
                 if (textBoxes.isNotEmpty()) drawTextBoxes(canvas, textBoxes, dp)
+                bigBangRuns.forEach { drawBigBangRun(canvas, it, selectionColors, dp) }
                 state.selectedManualId?.let { id ->
                     state.plan.find(id)?.let { drawSelection(canvas, it.quad, selectionColors, dp, handles = !plainSelection) }
                 }
@@ -556,7 +660,14 @@ private fun drawInkDraft(
     registry[brush.style].render(canvas, image.bitmap, quad, options, ink)
 }
 
-private enum class Mode { UNDECIDED, DRAG, NAVIGATE }
+/** 一手势走的是哪一种：还没定（点击）、一指拖（画框、手画、拖框）、两指导航、划字（大爆炸）。 */
+private enum class Mode { UNDECIDED, DRAG, NAVIGATE, SWEEP }
+
+/** 划字时沿着手指走过的路每隔多远（dp）看一次经过了哪个字：比最小的字窄，快划也不漏字。 */
+private const val SWEEP_STEP_DP = 3f
+
+/** 画布变矮后把选中的块挪进来时，离画布边至少多远（dp）。 */
+private const val REVEAL_MARGIN_DP = 16f
 
 /** 手柄直径（dp），含外面那一圈。画的时候按缩放反算到图像坐标，视觉大小恒定。 */
 private const val HANDLE_DP = 16f
@@ -661,6 +772,24 @@ private fun drawTextBoxes(canvas: android.graphics.Canvas, boxes: List<Quad>, dp
 
 private const val TEXT_BOX_COLOR = 0xFFFF00FF.toInt()
 private const val TEXT_BOX_LINE_DP = 1f
+
+/**
+ * 大爆炸里选中的一块字：铺一层主题色，描一圈实线。打码打的就是这一块，连着的字是一整块，不是一个字一个框。
+ * 比草稿框的底色浓一些：字常常只有十几 dp 高，太淡了看不出选到了哪个字。
+ */
+private fun drawBigBangRun(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
+    val path = quad.toPath()
+    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.FILL
+        color = (colors.primary and 0x00FFFFFF) or (BIG_BANG_FILL_ALPHA shl 24)
+    }
+    canvas.drawPath(path, fill)
+    canvas.drawPath(path, haloPaint(colors, dp))
+    canvas.drawPath(path, linePaint(colors, dp))
+}
+
+/** 大爆炸选中的块里那层主题色的不透明度，约 30%。 */
+private const val BIG_BANG_FILL_ALPHA = 0x4D
 
 /** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
 private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {

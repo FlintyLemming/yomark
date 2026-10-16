@@ -37,6 +37,8 @@ import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.batch.BatchItem
 import moe.flinty.yomark.ui.batch.BatchSession
+import moe.flinty.yomark.ui.bigbang.BigBangPage
+import moe.flinty.yomark.ui.bigbang.BigBangSelection
 import moe.flinty.yomark.ui.canvas.GestureRules
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import kotlinx.coroutines.CancellationException
@@ -263,7 +265,8 @@ class EditorViewModel(
         // 打到一半的字先收尾，算它自己一步：不然它起手前的那一份压在重跑这一步上面，撤销的先后就乱了
         finishLookEdit()
         undoStack.push(_state.value.plan)
-        uiState = _state.value.copy(analyzing = true, aiReview = AiReview.Hidden).withHistoryFlags()
+        // 大爆炸摆的是这一遍之前识别出的字，重跑完就对不上了
+        uiState = _state.value.copy(analyzing = true, aiReview = AiReview.Hidden, bigBang = null).withHistoryFlags()
         val index = _state.value.batch?.index
         if (index != null) scanBatchItem(index, image, keepOnlyManual = true)
         else viewModelScope.launch { analyze(image, keepOnlyManual = true) }
@@ -343,7 +346,7 @@ class EditorViewModel(
     fun onImageChosen(uri: Uri) {
         endBatch()
         aiReviewJob?.cancel()                             // 上一张图的增强识别作废，按钮随之收起
-        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden)
+        uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden, bigBang = null)
         viewModelScope.launch {
             // 换图时先清掉上一张的私有副本。清理时机从 onCleared 挪到这里：
             // onCleared 会在 Activity 重建时把副本一起删掉，恢复就无从谈起了
@@ -461,6 +464,7 @@ class EditorViewModel(
             colorPick = null,
             textPlacement = null,
             textFocus = false,
+            bigBang = null,
             canUndo = false,
             canRedo = false,
             batch = live.select(index),
@@ -575,7 +579,7 @@ class EditorViewModel(
         analyzedWith = ranWith
         takeLines(result?.lines)
         rebaseOpenEdits { it.copy(items = detected + keep(it.items)) }
-        uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged)
+        uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged, bigBang = null)
         if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
     }
 
@@ -629,6 +633,7 @@ class EditorViewModel(
             analyzing = false,
             aiReview = AiReview.Hidden,
             plan = current.plan.copy(items = detected + keep(current.plan.items)),
+            bigBang = null,
         )
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn, trace)
     }
@@ -792,11 +797,17 @@ class EditorViewModel(
      * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字。
      * 这时选中着什么的话，这一下只是取消选中，和别的时候点空白一样：写完一块点一下别处，不会又开始写一块。
      *
+     * 大爆炸开着时，点的是字：选上或取消那一个字（[toggleBigBangGlyph]），不打码、不写字。
+     *
      * @param reach 点没落在任何一段字里时，离一段多近也算点中它（图像像素）
      */
     fun onTap(imagePoint: PointF, reach: Float = 0f) {
         if (_state.value.colorPick != null) {
             pickColorAt(imagePoint)
+            return
+        }
+        _state.value.bigBang?.let { bang ->
+            bang.page.glyphAt(imagePoint, reach)?.let { toggleBigBangGlyph(it.id) }
             return
         }
         val s = _state.value
@@ -867,12 +878,127 @@ class EditorViewModel(
         uiState = _state.value.copy(selectedManualId = null)
     }
 
+    // ---------- 大爆炸（2026-10-16，见 ui/bigbang） ----------
+
+    /** [reviewLines] 拆成的字，和拆的是哪一份。同一份文字长按几次只拆一遍。 */
+    private var bigBangPage: Pair<List<TextLine>, BigBangPage>? = null
+
+    /** 这一划是在选字还是在取消（起手那个字定的，见 BigBangSelection.sweep）。 */
+    private var bigBangSweepSelects = true
+
+    /**
+     * 长按（spec §7.3，2026-10-16 增补）：按在识别出的字上（离一个字 [reach] 以内也算），打开大爆炸，按着的那个字先选上，
+     * 手指不抬接着划是接着选（[sweepBigBang]）。返回打开了没有：没按在字上、还没识别完、识别结果是从重建里恢复的
+     * （只留下了每一段的框，没有字），都不打开，这一下照旧——松手是点一下，拖开是画框。
+     *
+     * 打开时收起别的：选中的框、写到一半的字、吸管、样式和用途水印的面板，面板的位置这时归大爆炸。
+     */
+    fun onLongPress(imagePoint: PointF, reach: Float): Boolean {
+        val s = _state.value
+        if (s.image == null || s.loading || s.analyzing || s.colorPick != null || s.bigBang != null) return false
+        val page = currentBigBangPage() ?: return false
+        val glyph = page.glyphAt(imagePoint, reach) ?: return false
+        commitDrag()
+        finishLookEdit()
+        bigBangSweepSelects = true
+        uiState = _state.value.copy(
+            bigBang = BigBangState(page, selected = setOf(glyph.id), focusLine = glyph.line, holding = true),
+            selectedManualId = null,
+            textPlacement = null,
+            textFocus = false,
+            stylePanelOpen = false,
+            purposeSheetVisible = false,
+        )
+        return true
+    }
+
+    /** 长按打开大爆炸的那根手指抬起来了：面板这时才出来（见 BigBangState.holding）。 */
+    fun releaseBigBang() {
+        val bang = _state.value.bigBang ?: return
+        if (bang.holding) uiState = _state.value.copy(bigBang = bang.copy(holding = false))
+    }
+
+    private fun currentBigBangPage(): BigBangPage? {
+        val lines = reviewLines ?: return null
+        bigBangPage?.takeIf { it.first === lines }?.let { return it.second }
+        return BigBangPage.of(lines).also { bigBangPage = lines to it }
+    }
+
+    /** 点了一个字（面板上的字块，或画布上的字）：没选中的选上，选中的取消。 */
+    fun toggleBigBangGlyph(id: Int) {
+        val bang = _state.value.bigBang ?: return
+        if (id !in bang.page.glyphs.indices) return
+        uiState = _state.value.copy(bigBang = bang.copy(selected = BigBangSelection.toggle(bang.selected, id)))
+    }
+
+    /** 一划从字 [id] 起手：它没选中，这一划就是选字，选中了就是取消；它自己先照这个改。 */
+    fun startBigBangSweep(id: Int) {
+        val bang = _state.value.bigBang ?: return
+        if (id !in bang.page.glyphs.indices) return
+        bigBangSweepSelects = id !in bang.selected
+        sweepBigBang(listOf(id))
+    }
+
+    /** 这一划又经过了 [ids] 这几个字：照起手时定下的（[startBigBangSweep]、长按）选上或取消。 */
+    fun sweepBigBang(ids: List<Int>) {
+        val bang = _state.value.bigBang ?: return
+        val next = BigBangSelection.sweep(bang.selected, ids.filter { it in bang.page.glyphs.indices }, bigBangSweepSelects)
+        if (next != bang.selected) uiState = _state.value.copy(bigBang = bang.copy(selected = next))
+    }
+
+    /**
+     * 画布上一指划着字、第二根手指落下来变成了缩放平移：这一划作罢，选中的字回到它起手前的样子（[ids]），
+     * 和画到一半的框、线一样。
+     */
+    fun restoreBigBangSelection(ids: Set<Int>) {
+        val bang = _state.value.bigBang ?: return
+        val next = ids.filterTo(HashSet()) { it in bang.page.glyphs.indices }
+        if (next != bang.selected) uiState = _state.value.copy(bigBang = bang.copy(selected = next))
+    }
+
+    /** 一下子全选上，或全取消（面板上的「全选」）。 */
+    fun selectAllBigBang(all: Boolean) {
+        val bang = _state.value.bigBang ?: return
+        uiState = _state.value.copy(bigBang = bang.copy(selected = if (all) bang.page.glyphs.indices.toSet() else emptySet()))
+    }
+
+    /**
+     * 面板上的「打码」：选中的字打上码，挨着的连成一块（BigBangPage.runQuads），用「打码」里眼下的样式，和点字打码一样是
+     * [DetectorSource.LINE]：点一下拿掉，换方案重跑时留着。整批是一步，撤销一下全拿掉。
+     * 已经被一块码整个盖住的那几块不再打一遍。打完收起大爆炸。
+     */
+    fun maskBigBang() {
+        val s = _state.value
+        val bang = s.bigBang ?: return
+        val masks = s.plan.items.filter { it.look.style.redacts }.map { it.quad }
+        val look = s.maskLook
+        val items = bang.page.runQuads(bang.selected)
+            .filterNot { run -> masks.any { mask -> run.points().all(mask::contains) } }
+            .map { quad ->
+                MaskItem(
+                    candidateId = "line-${UUID.randomUUID()}",
+                    quad = quad,
+                    kind = SensitiveKind.MANUAL,
+                    source = DetectorSource.LINE,
+                    look = look,
+                )
+            }
+        if (items.isNotEmpty()) mutate { plan -> plan.copy(items = plan.items + items) }
+        uiState = _state.value.copy(bigBang = null, selectedManualId = null)
+    }
+
+    /** 收起大爆炸，什么也不打。 */
+    fun closeBigBang() {
+        if (_state.value.bigBang != null) uiState = _state.value.copy(bigBang = null)
+    }
+
     /**
      * 拉完一个框：落笔即打码（或标记），画完进选中态。
      * 手里拿着文本时是在框里写字：字号照框的高（画笔从此也是这个字号），字以框的中心为中心（见 [placeText]）。
      */
     fun onManualBox(quadInImageSpace: Quad) {
         val s = _state.value
+        if (s.bigBang != null) return               // 大爆炸开着时一指划的是字（见 sweepBigBang）
         if (s.brush.style == MaskStyle.TEXT) {
             val image = s.image ?: return
             val box = quadInImageSpace.bounds()
@@ -900,6 +1026,7 @@ class EditorViewModel(
      */
     fun onInk(pointsInImageSpace: List<PointF>) {
         val s = _state.value
+        if (s.bigBang != null) return
         val image = s.image ?: return
         if (pointsInImageSpace.isEmpty()) return
         val brush = s.brush
@@ -1319,6 +1446,8 @@ class EditorViewModel(
      * 它和样式的调节面板是同一块地方（手机上都是底栏的胶囊长出来的），一次只开一个：样式面板开着就换成它。
      */
     fun showPurposeSheet() {
+        // 大爆炸开着时面板的位置归它，开出来也看不见（顶栏的按钮这时也收起来了）
+        if (_state.value.bigBang != null) return
         finishLookEdit()
         val s = _state.value
         _state.value = s.copy(

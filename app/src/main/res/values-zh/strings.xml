@@ -54,6 +54,13 @@
     <string name="purpose_default">仅供办理 XX 使用</string>
     <string name="filmstrip_item">第 %1$d 张，共 %2$d 张</string>
 
+    <!-- big bang -->
+    <string name="big_bang_title">大爆炸</string>
+    <string name="big_bang_count">已选 %1$d 字</string>
+    <string name="big_bang_select_all">全选</string>
+    <string name="big_bang_select_none">全不选</string>
+    <string name="big_bang_mask">打码</string>
+
     <!-- box list -->
     <string name="list_title">框出的内容</string>
     <string name="list_count">框出 %1$d 处</string>

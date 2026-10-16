@@ -57,17 +57,17 @@ class MlKitTextRecognizer(
     private fun Text.Line.toTextLine(): TextLine? {
         val els = elements.mapNotNull { el ->
             val q = el.quad() ?: return@mapNotNull null
-            el.text to q
+            Triple(el.text, q, el.symbolQuads())
         }
         if (els.isEmpty()) return null
 
         val sb = StringBuilder()
         val out = ArrayList<TextElement>(els.size)
-        els.forEachIndexed { i, (text, quad) ->
+        els.forEachIndexed { i, (text, quad, chars) ->
             if (i > 0) sb.append(' ')
             val start = sb.length
             sb.append(text)
-            out += TextElement(quad, text, start until sb.length)
+            out += TextElement(quad, text, start until sb.length, chars)
         }
 
         return TextLine(
@@ -80,6 +80,15 @@ class MlKitTextRecognizer(
 
     private fun Text.Line.quad(): Quad? = cornerPoints?.toQuad() ?: boundingBox?.let { Quad.fromRect(RectF(it)) }
     private fun Text.Element.quad(): Quad? = cornerPoints?.toQuad() ?: boundingBox?.let { Quad.fromRect(RectF(it)) }
+
+    /**
+     * 词里每个字的框（ML Kit 的 Symbol），大爆炸按字选时用（TextElement.chars）。一个字一个 Symbol、每个都有框才算数，
+     * 对不上就是 null，那边按字宽把词框分开。
+     */
+    private fun Text.Element.symbolQuads(): List<Quad>? {
+        val quads = symbols.map { s -> s.cornerPoints?.toQuad() ?: s.boundingBox?.let { Quad.fromRect(RectF(it)) } ?: return null }
+        return quads.takeIf { it.isNotEmpty() && it.size == text.codePointCount(0, text.length) }
+    }
 
     private fun Array<android.graphics.Point>.toQuad(): Quad? {
         if (size < 4) return null

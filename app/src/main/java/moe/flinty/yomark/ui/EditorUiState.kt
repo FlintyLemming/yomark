@@ -10,6 +10,7 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.batch.BatchSession
+import moe.flinty.yomark.ui.bigbang.BigBangPage
 import androidx.annotation.StringRes
 
 sealed interface EditorMessage {
@@ -48,6 +49,19 @@ sealed interface AiReview {
  * （[index]，-1 是排到最后），接着打还在原处、还在原来那一层。
  */
 data class TextPlacement(val id: String, val center: PointF, val look: MaskLook? = null, val index: Int = -1)
+
+/**
+ * 大爆炸开着（2026-10-16，见 ui/bigbang）：长按图上的字打开，这张图识别出的字一个个摆在面板上。
+ * [selected] 是选中的字（Glyph.id），画布上照它们连成的块预览；[focusLine] 是长按的那一行，面板打开时滚到它。
+ * [holding]：长按的那根手指还没抬，接着划是接着选。面板等它抬起来再出来：面板一出来画布就变矮、图跟着挪，
+ * 手指底下就不是刚才那几个字了。
+ */
+data class BigBangState(
+    val page: BigBangPage,
+    val selected: Set<Int> = emptySet(),
+    val focusLine: Int = 0,
+    val holding: Boolean = false,
+)
 
 data class EditorUiState(
     val image: SourceImage? = null,
@@ -89,6 +103,8 @@ data class EditorUiState(
     val textFocus: Boolean = false,
     /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
     val colorPick: ColorTarget? = null,
+    /** 大爆炸开着：面板顶替底栏，画布上点字、划字是选字（见 [BigBangState]）。不开着是 null。 */
+    val bigBang: BigBangState? = null,
     /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
     val unopenedDialogVisible: Boolean = false,
     /** 用途水印面板里的文字（「仅供办理 XX 使用」）。打开面板只填上它，开关打开才画到图上（见 [purposeText]）。 */

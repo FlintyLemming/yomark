@@ -80,6 +80,9 @@ import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
 import moe.flinty.yomark.ui.components.AiReviewResultPill
 import moe.flinty.yomark.ui.components.BatchFilmstrip
+import moe.flinty.yomark.ui.components.BigBangActions
+import moe.flinty.yomark.ui.components.BigBangPanel
+import moe.flinty.yomark.ui.components.BigBangPlacement
 import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
@@ -121,6 +124,7 @@ fun EditorScreen(
     val snackbar = remember { SnackbarHostState() }
     val styleActions = remember(vm) { ViewModelStyleActions(vm) }
     val purposeActions = remember(vm) { ViewModelPurposeActions(vm) }
+    val bigBangActions = remember(vm) { ViewModelBigBangActions(vm) }
     // 批量里各张的缩略图：胶片条上画它，切图时画布载入的那一下也先垫上它
     val context = LocalContext.current
     val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
@@ -208,8 +212,9 @@ fun EditorScreen(
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
-                    // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角
-                    onPurpose = if (phone) null else vm::togglePurposeSheet,
+                    // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角。
+                    // 大爆炸开着时这两个收起来：面板的位置归它，水印面板开出来看不见；选着的字还没打码，这时导出就漏出去了
+                    onPurpose = if (phone || state.bigBang != null) null else vm::togglePurposeSheet,
                     purposeOn = state.purposeText != null,
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                     onSettings = onSettings,
@@ -219,7 +224,7 @@ fun EditorScreen(
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
                     compare = if (phone) null else compare,
                     canCompare = canCompare,
-                    onExport = if (phone) onExport else null,
+                    onExport = if (phone && state.bigBang == null) onExport else null,
                     exportLabel = exportLabel,
                     exporting = state.exporting,
                 )
@@ -250,6 +255,8 @@ fun EditorScreen(
                 enabled = phone && toolGroup != null && state.colorPick == null && !panelOpen,
                 onBack = { toolGroup = null },
             )
+            // 大爆炸开着时返回先收起它，什么也不打。放在最后：后登记的先拦，底栏展开着一组时也先收它
+            BackHandler(enabled = state.bigBang != null, onBack = vm::closeBigBang)
             CanvasAndPanel(
                 panelAtSide = atSide,
                 // 用途水印面板开着时输入法弹起来，整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
@@ -278,6 +285,11 @@ fun EditorScreen(
                             scanStyle = scanStyle,
                             showOriginal = comparing,
                             textBoxes = if (showTextBoxes) textBoxes else emptyList(),
+                            onLongPress = vm::onLongPress,
+                            onBigBangSweepStart = vm::startBigBangSweep,
+                            onBigBangSweep = vm::sweepBigBang,
+                            onBigBangRelease = vm::releaseBigBang,
+                            onBigBangRestore = vm::restoreBigBangSelection,
                         )
                         Column(
                             Modifier.align(Alignment.TopCenter).padding(top = 12.dp),
@@ -312,7 +324,22 @@ fun EditorScreen(
                         open = state.purposeSheetVisible,
                         picking = state.colorPick == ColorTarget.PURPOSE,
                     )
+                    val bang = state.bigBang
                     when {
+                        // 大爆炸开着时顶替底栏（宽屏上是样式、列表那一块），画布让到它上面。长按的手指抬起来才出来
+                        bang != null && !bang.holding -> {
+                            val covered = remember(bang.page, state.plan.items) { bang.page.covered(state.plan.items) }
+                            BigBangPanel(
+                                bang = bang,
+                                covered = covered,
+                                actions = bigBangActions,
+                                placement = when {
+                                    phone -> BigBangPlacement.PHONE
+                                    atSide -> BigBangPlacement.SIDE
+                                    else -> BigBangPlacement.BOTTOM
+                                },
+                            )
+                        }
                         layout == EditorLayout.PHONE -> EditorBottomBar(
                             toolGroup = toolGroup,
                             onToolGroup = onToolGroup,
@@ -450,6 +477,16 @@ private class ViewModelPurposeActions(private val vm: EditorViewModel) : Purpose
     override fun onApply(on: Boolean) = vm.setPurposeOn(on)
     override fun onCollapse() = vm.dismissPurposeSheet()
     override fun onPickColor(pick: Boolean) = if (pick) vm.startColorPick(ColorTarget.PURPOSE) else vm.cancelColorPick()
+}
+
+/** 大爆炸面板的动作都交给 ViewModel。 */
+private class ViewModelBigBangActions(private val vm: EditorViewModel) : BigBangActions {
+    override fun onToggle(id: Int) = vm.toggleBigBangGlyph(id)
+    override fun onSweepStart(id: Int) = vm.startBigBangSweep(id)
+    override fun onSweep(ids: List<Int>) = vm.sweepBigBang(ids)
+    override fun onSelectAll(all: Boolean) = vm.selectAllBigBang(all)
+    override fun onMask() = vm.maskBigBang()
+    override fun onClose() = vm.closeBigBang()
 }
 
 /** 样式栏的动作都交给 ViewModel。 */
