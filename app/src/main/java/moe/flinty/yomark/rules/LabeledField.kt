@@ -414,7 +414,7 @@ class LabeledField(
         }
 
         /** 汉字字段名的字与字之间允许空格（半角、全角都行）。 */
-        private fun alternatives(labels: List<String>): String =
+        internal fun alternatives(labels: List<String>): String =
             labels.sortedByDescending { it.length }.joinToString("|") { l ->
                 if (l.none { it.isHan() }) Regex.escape(l)
                 else l.map { Regex.escape(it.toString()) }.joinToString("[ 　]*")

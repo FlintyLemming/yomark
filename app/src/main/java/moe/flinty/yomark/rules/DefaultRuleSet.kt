@@ -544,6 +544,9 @@ object DefaultRuleSet {
             """(?:add )?(?:delivery )?instructions|edit|change|copy)\b|(?:home|work|personal|office|other|main|primary|default)$)"""
     )
 
+    /** 取件码的字段名。 */
+    private val PICKUP_LABELS = listOf("取件码", "取货码", "提货码", "取件号", "自提码", "取餐码")
+
     /** 取件码的样子：至多三个字母打头，有数字，可用连字符分段（「1-58908」「A12-3-4567」「B3-1107」「36920471」）。 */
     private const val PICKUP_VALUE = """[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""
 
@@ -574,18 +577,22 @@ object DefaultRuleSet {
      *
      * 短信、聊天里字段名写在句子中间（测评页上漏的）：「凭取件码36920471取件」「柜子取餐码 5-0318」前面紧挨着汉字，
      * 「您的取件码为 6-2-3001」隔着「为」，照认（LabeledField 的 inSentence）。
+     *
+     * 字段名自己成一段、码在它下面或者同一排右边另成一段的（测评页上漏的：短信卡片上「取件码」下面一行大字的「8-5-2001」），
+     * 见 [LoneLabel]。只认整段就是字段名的：「复制取件码」「出示取件码」这些按钮下面的不算。
      */
     private val PICKUP_CODE = CompositeRule(
         id = "pickup",
         kind = SensitiveKind.PICKUP_CODE,
         enabledByDefault = true,
         LabeledField(
-            labels = listOf("取件码", "取货码", "提货码", "取件号", "自提码", "取餐码"),
+            labels = PICKUP_LABELS,
             value = Regex(PICKUP_VALUE),
             confidence = 0.8f,
             inSentence = true,
         ),
         collectWithCode(confidence = 0.7f),
+        LoneLabel(PICKUP_LABELS, Regex(PICKUP_VALUE), confidence = 0.8f),
     )
 
     private val BIRTH_DATE_LABELS = listOf(
