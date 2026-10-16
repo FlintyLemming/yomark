@@ -113,9 +113,11 @@ class PenRendererTest {
         val back = Ink.toImage(ink, quad, margin)
         assertThat(back.first().x).isWithin(0.01f).of(30f)
         assertThat(back.last().y).isWithin(0.01f).of(90f)
+        // 框拖宽了，头尾按比例跟着走：框宽了几成，离左边就远了几成
         val b = quad.bounds()
         val wider = Quad.fromRect(RectF(b.left, b.top, b.right + 90f, b.bottom))
-        assertThat(Ink.toImage(ink, wider, margin).last().x).isWithin(0.01f).of(210f)
+        val stretch = (b.width() + 90f) / b.width()
+        assertThat(Ink.toImage(ink, wider, margin).last().x).isWithin(0.01f).of(b.left + (120f - b.left) * stretch)
     }
 
     /** 很短的箭头：头跟着缩，不比线还长，看着还是一支箭头。 */
@@ -127,5 +129,28 @@ class PenRendererTest {
         PenRenderer().render(Canvas(bmp), bmp, quad, thick, ink)
         assertThat(bmp.getPixel(84, 100)).isEqualTo(MaskOptions.DEFAULT_PEN_COLOR)   // 尾巴那一截还是线
         assertThat(bmp.getPixel(84, 107)).isEqualTo(Color.WHITE)                     // 头没有伸到尾巴上
+    }
+
+    /** 箭头的框拖小了：头尾按比例跟着收，框还不小的时候箭头不会先缩成一个点。 */
+    @Test fun `shrinking an arrow box shrinks the arrow in proportion`() {
+        val thick = MaskOptions(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)
+        val margin = Ink.margin(thick.halfWidth(MaskStyle.PEN, 200f), arrow = true)
+        val (quad, ink) = Ink.fit(listOf(PointF(40f, 100f), PointF(160f, 100f)), margin, arrow = true)
+        val b = quad.bounds()
+        val half = Quad.fromRect(RectF(b.left, b.top, b.left + b.width() / 2f, b.bottom))
+        val (tail, tip) = Ink.toImage(ink, half, margin).let { it.first() to it.last() }
+        assertThat(tip.x - tail.x).isWithin(0.01f).of(60f)                 // 原来 120，框窄一半就短一半
+    }
+
+    /** 又短又粗的箭头：线跟着头变细，圆头藏在头里，箭尖外面什么也没有。 */
+    @Test fun `a short thick arrow keeps its line inside the head`() {
+        val bmp = white()
+        val thick = MaskOptions(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)
+        val half = thick.halfWidth(MaskStyle.PEN, 200f)                     // 2.5 像素
+        val (quad, ink) = Ink.fit(listOf(PointF(90f, 100f), PointF(98f, 100f)), Ink.margin(half, arrow = true), arrow = true)
+        PenRenderer().render(Canvas(bmp), bmp, quad, thick, ink)
+        assertThat(bmp.getPixel(92, 100)).isEqualTo(MaskOptions.DEFAULT_PEN_COLOR)
+        assertThat(bmp.getPixel(100, 100)).isEqualTo(Color.WHITE)           // 箭尖外面
+        assertThat(bmp.getPixel(92, 102)).isEqualTo(Color.WHITE)            // 线比原来的笔宽（5 像素）细
     }
 }

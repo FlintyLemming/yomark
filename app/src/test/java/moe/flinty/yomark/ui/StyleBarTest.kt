@@ -47,6 +47,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /**
  * 样式的调节面板（spec §7.5 修订）：手机上弹出来的那个、宽屏上占列表位置的那个。面板只发出新的样子，
@@ -424,5 +425,33 @@ class StyleBarTest {
         show(open(MaskStyle.MARKER))
         compose.onNodeWithText("手绘").assertIsDisplayed()
         compose.onNodeWithText("箭头").assertDoesNotExist()
+    }
+
+    /**
+     * 窄屏上的英文：三段放不下图标加名字时先让开图标，名字也写不全就只画图标、名字给读屏念。
+     * 哪一种都不把名字截成「Freeha」。
+     */
+    @Test @Config(qualifiers = "en-w320dp-h640dp-xhdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)   // LEGACY 量字是假的
+    fun narrowScreensNeverCutAShapeName() {
+        show(open(MaskStyle.PEN))
+        listOf("Box", "Freehand", "Arrow").forEach { name ->
+            if (compose.onAllNodesWithText(name).fetchSemanticsNodes().isEmpty()) {
+                compose.onNodeWithContentDescription(name).assertIsDisplayed()
+                return@forEach
+            }
+            val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            compose.onNodeWithText(name).assertIsDisplayed()
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+            // 单行加省略号时 hasVisualOverflow 不准（排版宽取的是最大宽），直接看截没截、整个名字放不放得下
+            val r = results.single()
+            assertThat(r.isLineEllipsized(0)).isFalse()
+            assertThat(r.multiParagraph.intrinsics.maxIntrinsicWidth).isAtMost(r.layoutInput.constraints.maxWidth.toFloat())
+        }
+    }
+
+    /** 手机竖着拿时中文三段都放得下图标加名字。 */
+    @Test fun theShapeChoiceShowsNamesOnAPhone() {
+        show(open(MaskStyle.PEN))
+        listOf("框选", "手绘", "箭头").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
     }
 }

@@ -52,7 +52,7 @@ internal object InkStroke {
     /**
      * 一支箭头（[ink] 的第一个点是尾、最后一个点是箭尖）：一条直线，箭尖上一个实心的三角，和线一个颜色。
      * 三角的大小按笔宽算（见 Ink.ARROW_HEAD_LENGTH），箭头太短时头跟着缩，最长占全长的 [MAX_HEAD_SHARE]，看着还是一支箭头。
-     * 线只画到三角的底边：圆头藏在三角里，不从箭尖上冒出来。
+     * 线只画到三角的底边：圆头藏在三角里，不从箭尖上冒出来。头缩了线也跟着变细，不比头还宽。
      */
     fun drawArrow(canvas: Canvas, ink: InkPath, quad: Quad, halfWidth: Float, paint: Paint) {
         val pts = Ink.toImage(ink, quad, Ink.margin(halfWidth, arrow = true))
@@ -69,7 +69,9 @@ internal object InkStroke {
         val side = head * Ink.ARROW_HEAD_HALF / Ink.ARROW_HEAD_LENGTH
         val baseX = tip.x - ux * head
         val baseY = tip.y - uy * head
-        canvas.drawLine(tail.x, tail.y, baseX, baseY, paint)
+        // 线的圆头在底边中点上，半径不超过底边中点到两条斜边的距离，整个落在三角里
+        val shaft = min(halfWidth, head * side / hypot(head, side))
+        canvas.drawLine(tail.x, tail.y, baseX, baseY, if (shaft < halfWidth) Paint(paint).apply { strokeWidth = shaft * 2f } else paint)
         val triangle = Path().apply {
             moveTo(tip.x, tip.y)
             lineTo(baseX - uy * side, baseY + ux * side)

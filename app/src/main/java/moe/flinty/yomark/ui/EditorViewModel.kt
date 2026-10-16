@@ -1066,10 +1066,22 @@ class EditorViewModel(
         if (!inProgress) finishLookEdit()
     }
 
-    /** 选中的那一块换成 [look]。文本换了字号，框跟着变大变小，中心不动（见 [textAnchor]）。 */
+    /**
+     * 选中的那一块换成 [look]。文本换了字号，框跟着变大变小，中心不动（见 [textAnchor]）。
+     * 手画的一笔、箭头换了笔宽，框让出的那一圈跟着变（见 Ink.margin），线还在原处：箭头指的地方不动。
+     */
     private fun restyled(item: MaskItem, look: MaskLook): MaskItem {
-        val text = item.text
+        val ink = item.ink
         val image = _state.value.image
+        if (ink != null && image != null) {
+            val shortSide = min(image.width, image.height).toFloat()
+            val was = Ink.margin(item.look.options.halfWidth(item.look.style, shortSide), ink.arrow)
+            val now = Ink.margin(look.options.halfWidth(look.style, shortSide), ink.arrow)
+            if (was == now) return item.copy(look = look)
+            val (quad, refit) = Ink.fit(Ink.toImage(ink, item.quad, was), now, ink.arrow)
+            return item.copy(look = look, quad = quad, ink = refit)
+        }
+        val text = item.text
         if (look.style != MaskStyle.TEXT || text == null || image == null || look.options.textSize == item.look.options.textSize) {
             return item.copy(look = look)
         }

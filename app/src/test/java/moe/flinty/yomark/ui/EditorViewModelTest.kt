@@ -735,4 +735,41 @@ class EditorViewModelTest {
         assertThat(vm.state.value.selectedManualId).isNull()
         assertThat(vm.state.value.plan.find(arrow)!!.look.style).isEqualTo(MaskStyle.PEN)
     }
+
+    /** 选着一支箭头调粗细：框跟着放宽收窄，箭头指的地方不动。手画的一笔也一样。 */
+    @Test
+    fun `a new width keeps an arrow pointing where it was drawn`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        val pen = vm.state.value.brush
+        vm.editLook(pen.copy(options = pen.options.copy(penShape = StrokeShape.ARROW)))
+        vm.onInk(listOf(PointF(100f, 200f), PointF(300f, 250f)))
+        val id = vm.state.value.selectedManualId!!
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)), inProgress = true)
+        vm.editLook(vm.state.value.barLook.copy(options = vm.state.value.barLook.options.copy(penWidth = MaskOptions.PEN_WIDTH_RANGE.start)))
+
+        val item = vm.state.value.plan.find(id)!!
+        val half = item.look.options.halfWidth(MaskStyle.PEN, 400f)
+        val (tail, tip) = Ink.toImage(item.ink!!, item.quad, Ink.margin(half, arrow = true)).let { it.first() to it.last() }
+        assertThat(tail.x).isWithin(0.01f).of(100f)
+        assertThat(tail.y).isWithin(0.01f).of(200f)
+        assertThat(tip.x).isWithin(0.01f).of(300f)
+        assertThat(tip.y).isWithin(0.01f).of(250f)
+        assertThat(item.quad.bounds().right).isWithin(0.01f).of(300f + half * Ink.ARROW_HEAD_HALF)
+
+        vm.clearSelection()
+        vm.editLook(vm.state.value.brush.copy(options = vm.state.value.brush.options.copy(penShape = StrokeShape.FREEHAND)))
+        vm.onInk(listOf(PointF(50f, 50f), PointF(90f, 80f), PointF(150f, 60f)))
+        val stroke = vm.state.value.selectedItem!!
+        val before = Ink.toImage(stroke.ink!!, stroke.quad, stroke.look.options.halfWidth(MaskStyle.PEN, 400f))
+        vm.editLook(vm.state.value.barLook.copy(options = vm.state.value.barLook.options.copy(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)))
+        val after = vm.state.value.selectedItem!!
+        val moved = Ink.toImage(after.ink!!, after.quad, after.look.options.halfWidth(MaskStyle.PEN, 400f))
+        before.zip(moved).forEach { (a, b) ->
+            assertThat(b.x).isWithin(0.01f).of(a.x)
+            assertThat(b.y).isWithin(0.01f).of(a.y)
+        }
+    }
 }

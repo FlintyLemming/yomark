@@ -4,6 +4,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
@@ -53,10 +54,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.takeOrElse
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
@@ -464,46 +468,68 @@ private fun atEnd(text: String) = TextFieldValue(text, TextRange(text.length))
 /**
  * 马克笔、画笔下一笔怎么画：拉框，照着手指画，画笔还能拉箭头（见 StrokeShape）。管的是下一笔，画好的不变。
  * [shapes] 是这一种笔有的几种，按这个顺序排。
+ *
+ * 放不下时一步步让，三段一个样：先不画图标，名字写全；名字也写不全（窄屏上的英文）就只画图标，名字给读屏念。
+ * 不截成「Freeha」：截了的名字比没有名字还难认。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ShapeChoice(shape: StrokeShape, shapes: List<StrokeShape>, onShape: (StrokeShape) -> Unit) {
     PanelLabel(stringResource(R.string.stroke_shape))
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        shapes.forEachIndexed { i, value ->
-            SegmentedButton(
-                selected = shape == value,
-                onClick = { if (shape != value) onShape(value) },
-                shape = SegmentedButtonDefaults.itemShape(i, shapes.size),
-                icon = {},
-            ) {
-                // 按钮里的东西是叠着摆的，图标和字自己排成一行
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        when (value) {
-                            StrokeShape.BOX -> Icons.Outlined.CropSquare
-                            StrokeShape.FREEHAND -> Icons.Outlined.Gesture
-                            StrokeShape.ARROW -> Icons.Outlined.NorthEast
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        stringResource(
-                            when (value) {
-                                StrokeShape.BOX -> R.string.stroke_shape_box
-                                StrokeShape.FREEHAND -> R.string.stroke_shape_freehand
-                                StrokeShape.ARROW -> R.string.stroke_shape_arrow
-                            },
-                        ),
-                        maxLines = 1,
-                    )
+    val labels = shapes.map {
+        stringResource(
+            when (it) {
+                StrokeShape.BOX -> R.string.stroke_shape_box
+                StrokeShape.FREEHAND -> R.string.stroke_shape_freehand
+                StrokeShape.ARROW -> R.string.stroke_shape_arrow
+            },
+        )
+    }
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.labelLarge
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        // 每一段里能放名字的宽：按钮左右各 12 的内边距，带图标时再去掉图标 18 加 6 的空
+        val segment = (maxWidth - SEGMENT_OVERLAP * (shapes.size - 1)) / shapes.size
+        val density = LocalDensity.current
+        val widest = labels.maxOf { measurer.measure(it, style, maxLines = 1).size.width }
+        fun fits(room: Dp) = widest <= with(density) { room.roundToPx() }
+        val icons = !fits(segment - SEGMENT_PADDING) || fits(segment - SEGMENT_PADDING - SHAPE_ICON - SHAPE_ICON_GAP)
+        val names = fits(segment - SEGMENT_PADDING)
+        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+            shapes.forEachIndexed { i, value ->
+                SegmentedButton(
+                    selected = shape == value,
+                    onClick = { if (shape != value) onShape(value) },
+                    shape = SegmentedButtonDefaults.itemShape(i, shapes.size),
+                    icon = {},
+                ) {
+                    // 按钮里的东西是叠着摆的，图标和字自己排成一行
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (icons) {
+                            Icon(
+                                when (value) {
+                                    StrokeShape.BOX -> Icons.Outlined.CropSquare
+                                    StrokeShape.FREEHAND -> Icons.Outlined.Gesture
+                                    StrokeShape.ARROW -> Icons.Outlined.NorthEast
+                                },
+                                contentDescription = if (names) null else labels[i],
+                                modifier = Modifier.size(SHAPE_ICON),
+                            )
+                        }
+                        if (icons && names) Spacer(Modifier.width(SHAPE_ICON_GAP))
+                        if (names) Text(labels[i], maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
     }
 }
+
+/** 分段按钮里一段的左右内边距（Material 3 的 TextButton，各 12）、相邻两段压着的那一条边。 */
+private val SEGMENT_PADDING = 24.dp
+private val SEGMENT_OVERLAP = 1.dp
+private val SHAPE_ICON = 18.dp
+private val SHAPE_ICON_GAP = 6.dp
 
 /** 马克笔没有箭头：半透明的粗箭头看不清头。 */
 private val MARKER_SHAPES = listOf(StrokeShape.BOX, StrokeShape.FREEHAND)

@@ -16,7 +16,7 @@ enum class StrokeShape { BOX, FREEHAND, ARROW }
 
 /**
  * 手画的一笔：手指走过的点，按这一笔的外接框归一化到 0～1（见 [Ink.fit]）。
- * [arrow] 时是一支箭头：两个点，尾在前、箭尖在后。
+ * [arrow] 时是一支箭头：两个点，尾在前、箭尖在后；归一化的是整个框（连让出来的那一圈），框拖大拖小，头尾按比例跟着走。
  *
  * 存相对外接框的位置，不存图上的坐标：这一笔和框一样能拖着走、拖角改大小（SelectionHandles 只改框），
  * 导出时框按比例换到原图上，这一笔跟着到位，不用另算一遍。
@@ -29,6 +29,7 @@ object Ink {
     /**
      * 手画的一笔放进图上：外接框四边各往外让出 [margin]（笔是圆头的，画在框里不出框；箭头还要让出箭头的半宽，见 [margin]），
      * 点按外接框归一化。框外面多出来的这一圈，渲染时再按同样的 [margin] 让回去（见 [toImage]）。
+     * 箭头按整个框归一化：让出来的那一圈是头的地方，框拖小了头尾跟着按比例收，不会框还很大箭头先缩成一个点。
      *
      * @param margin 与 [points] 同一坐标系
      */
@@ -37,23 +38,26 @@ object Ink {
         val top = points.minOf { it.y }
         val right = points.maxOf { it.x }
         val bottom = points.maxOf { it.y }
-        val w = right - left
-        val h = bottom - top
-        val normalized = points.map {
-            PointF(if (w > 0f) (it.x - left) / w else 0.5f, if (h > 0f) (it.y - top) / h else 0.5f)
-        }
         val box = RectF(left - margin, top - margin, right + margin, bottom + margin)
+        val inner = if (arrow) box else RectF(left, top, right, bottom)
+        val normalized = points.map {
+            PointF(
+                if (inner.width() > 0f) (it.x - inner.left) / inner.width() else 0.5f,
+                if (inner.height() > 0f) (it.y - inner.top) / inner.height() else 0.5f,
+            )
+        }
         return Quad.fromRect(box) to InkPath(normalized, arrow)
     }
 
     /**
      * [ink] 在 [quad] 里的位置：框四边各让回 [margin]（框太窄时最多让到正中），点按让完的框摆回去。
-     * 框被拖大拖小，这一笔跟着拉伸。
+     * 框被拖大拖小，这一笔跟着拉伸。箭头不让：它是按整个框归一化的（见 [fit]）。
      */
     fun toImage(ink: InkPath, quad: Quad, margin: Float): List<PointF> {
         val b = quad.bounds()
-        val dx = margin.coerceAtMost(b.width() / 2f)
-        val dy = margin.coerceAtMost(b.height() / 2f)
+        val inset = if (ink.arrow) 0f else margin
+        val dx = inset.coerceAtMost(b.width() / 2f)
+        val dy = inset.coerceAtMost(b.height() / 2f)
         val left = b.left + dx
         val top = b.top + dy
         val w = b.width() - dx * 2f
