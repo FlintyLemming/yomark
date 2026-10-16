@@ -82,6 +82,7 @@ import moe.flinty.yomark.ui.components.AiReviewResultPill
 import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.BigBangActions
 import moe.flinty.yomark.ui.components.BigBangPanel
+import moe.flinty.yomark.ui.components.BigBangPanelModel
 import moe.flinty.yomark.ui.components.BigBangPlacement
 import moe.flinty.yomark.ui.components.DebugTraceSheet
 import moe.flinty.yomark.ui.components.EditorActionRow
@@ -119,6 +120,7 @@ fun EditorScreen(
     val debugTrace by vm.debugTrace.collectAsStateWithLifecycle()
     val showTextBoxes by vm.showTextBoxes.collectAsStateWithLifecycle()
     val textBoxes by vm.textBoxes.collectAsStateWithLifecycle()
+    val hasText by vm.hasText.collectAsStateWithLifecycle()
     var debugSheetOpen by rememberSaveable { mutableStateOf(false) }
     val registry = remember { RendererRegistry.default() }
     val snackbar = remember { SnackbarHostState() }
@@ -132,8 +134,13 @@ fun EditorScreen(
     // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
-    // 手机底栏展开着的那一组（打码、编辑）。只是界面上的事，不进 ViewModel
+    // 手机底栏展开着的那一组（打码、编辑、工具）。只是界面上的事，不进 ViewModel
     var toolGroup by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
+    // 大爆炸开着、长按的手指也抬起来了：手机上它的面板从「工具」长出来，那时展开着「工具」是因为它（见下面的 LaunchedEffect），
+    // 收起时回到打开前展开着的那一组
+    val bigBangUp = state.bigBang?.holding == false
+    var bigBangHoldsRow by rememberSaveable { mutableStateOf(false) }
+    var rowBeforeBigBang by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -199,9 +206,13 @@ fun EditorScreen(
             val canCompare = state.image != null &&
                 (state.purposeText != null || state.plan.items.isNotEmpty())
             val onToolGroup: (ToolGroup?) -> Unit = {
-                // 收起这一组，从它长出来的调节面板（样式的、用途水印的）也一起收
+                // 收起这一组，从它长出来的调节面板（样式的、用途水印的、大爆炸的）也一起收
                 if (it == null && state.stylePanelOpen) vm.dismissStylePanel()
                 if (it == null && state.purposeSheetVisible) vm.dismissPurposeSheet()
+                if (it == null && state.bigBang != null) {
+                    bigBangHoldsRow = false
+                    vm.closeBigBang()
+                }
                 toolGroup = it
             }
             val panelOpen = state.stylePanelOpen || state.purposeSheetVisible
@@ -241,6 +252,21 @@ fun EditorScreen(
                     else -> return@LaunchedEffect
                 }
                 if (toolGroup != own) toolGroup = own
+            }
+            // 大爆炸的面板也是从胶囊长出来的（见 EditorBottomBar）。用得了 AI 时从「工具」那一行长出来：开着时展开「工具」，
+            // 从收着的那一行打开的（长按图上的字）胶囊从「工具」那颗圆钮撑开。用不了 AI 时「工具」里只有它，
+            // 面板直接从大爆炸那颗圆钮长出来，不带工具那一行（ToolGroup.BIG_BANG）。打开时定下用哪一种，开着时不换。
+            // 收起时回到打开前那样，原先展开着哪一组还是哪一组
+            LaunchedEffect(phone, bigBangUp) {
+                if (!phone) return@LaunchedEffect
+                if (bigBangUp && !bigBangHoldsRow) {
+                    rowBeforeBigBang = toolGroup
+                    bigBangHoldsRow = true
+                    toolGroup = if (state.aiReview == AiReview.Hidden) ToolGroup.BIG_BANG else ToolGroup.TOOLS
+                } else if (!bigBangUp && bigBangHoldsRow) {
+                    bigBangHoldsRow = false
+                    toolGroup = rowBeforeBigBang
+                }
             }
             // 吸管在等取色时，返回先收吸管；样式面板、用途水印面板开着时，返回先收面板，不直接退出编辑器。
             // 都不拦的时候不常驻 BackHandler（见 EditorActivity）
@@ -298,7 +324,7 @@ fun EditorScreen(
                         ) {
                             OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
-                            // 宽屏的 AI 按钮上写着结果；手机底栏的圆钮上写不下，跑完在这儿说一声
+                            // 宽屏的 AI 按钮上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
                             if (phone) AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
@@ -324,22 +350,11 @@ fun EditorScreen(
                         open = state.purposeSheetVisible,
                         picking = state.colorPick == ColorTarget.PURPOSE,
                     )
-                    val bang = state.bigBang
+                    // 长按的手指抬起来面板才出来
+                    val bang = state.bigBang?.takeIf { !it.holding }
+                    val covered = remember(bang?.page, state.plan.items) { bang?.page?.covered(state.plan.items).orEmpty() }
                     when {
-                        // 大爆炸开着时顶替底栏（宽屏上是样式、列表那一块），画布让到它上面。长按的手指抬起来才出来
-                        bang != null && !bang.holding -> {
-                            val covered = remember(bang.page, state.plan.items) { bang.page.covered(state.plan.items) }
-                            BigBangPanel(
-                                bang = bang,
-                                covered = covered,
-                                actions = bigBangActions,
-                                placement = when {
-                                    phone -> BigBangPlacement.PHONE
-                                    atSide -> BigBangPlacement.SIDE
-                                    else -> BigBangPlacement.BOTTOM
-                                },
-                            )
-                        }
+                        // 手机上大爆炸的面板从底栏的胶囊长出来，画布跟着让到它上面
                         layout == EditorLayout.PHONE -> EditorBottomBar(
                             toolGroup = toolGroup,
                             onToolGroup = onToolGroup,
@@ -349,10 +364,22 @@ fun EditorScreen(
                             canCompare = canCompare,
                             aiReview = state.aiReview,
                             onAiReview = vm::runAiReview,
+                            bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing,
+                            // 和「编辑」里的水印一样，再点一下收起
+                            onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
+                            bigBang = bang?.let { BigBangPanelModel(it, covered) },
+                            bigBangActions = bigBangActions,
                             purpose = purpose,
                             purposeActions = purposeActions,
                             filmstrip = filmstrip,
                             pushCanvas = writingText(state),
+                        )
+                        // 宽屏上大爆炸开着时顶替样式、列表那一块，画布让到它上面（左边）
+                        bang != null -> BigBangPanel(
+                            bang = bang,
+                            covered = covered,
+                            actions = bigBangActions,
+                            placement = if (atSide) BigBangPlacement.SIDE else BigBangPlacement.BOTTOM,
                         )
                         else -> WideEditorPanel(
                             atSide = atSide,

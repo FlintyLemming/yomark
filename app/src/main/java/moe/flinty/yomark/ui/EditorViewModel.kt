@@ -124,6 +124,14 @@ class EditorViewModel(
     /** 画布上这张图识别出的每一段字的框，就是 [lines]（init 里恢复时就要写它，所以放在前面）。开发者里打开「显示识别框」时画出来。 */
     val textBoxes: StateFlow<List<Quad>> = _textBoxes.asStateFlow()
 
+    private val _hasText = MutableStateFlow(false)
+
+    /**
+     * 画布上这张图识别出了字（[reviewLines] 里有不是空白的）：底栏的大爆炸点得动（还得识别完，见 EditorScreen）。
+     * 不进 EditorUiState：它跟着 [takeLines] 变，那几处随后都拿换线之前的那一份 state 去 copy。
+     */
+    val hasText: StateFlow<Boolean> = _hasText.asStateFlow()
+
     /**
      * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——
      * 持久化因此不依赖「记得在每个改动点补一行」，加新的编辑动作也不会漏掉。
@@ -691,6 +699,7 @@ class EditorViewModel(
     private fun takeLines(found: List<TextLine>?) {
         reviewLines = found
         lines = found.orEmpty().flatMap { it.segments }
+        _hasText.value = found.orEmpty().any { it.text.isNotBlank() }
     }
 
     private var aiReviewJob: Job? = null
@@ -909,28 +918,47 @@ class EditorViewModel(
      * 手指不抬接着划是接着打（[sweepBigBang]）。返回打开了没有：没按在字上、还没识别完、识别结果是从重建里恢复的
      * （只留下了每一段的框，没有字），都不打开，这一下照旧——松手是点一下，拖开是画框。
      *
-     * 打开时收起别的：选中的框、写到一半的字、吸管、样式和用途水印的面板，面板的位置这时归大爆炸。
+     * 打开时收起别的（见 [beginBigBang]）。
      */
     fun onLongPress(imagePoint: PointF, reach: Float): Boolean {
-        val s = _state.value
-        if (s.image == null || s.loading || s.analyzing || s.colorPick != null || s.bigBang != null) return false
-        val page = currentBigBangPage() ?: return false
+        val page = bigBangPageToOpen() ?: return false
         val glyph = page.glyphAt(imagePoint, reach) ?: return false
+        beginBigBang(BigBangState(page, focusLine = glyph.line, holding = true))
+        selectBigBang(setOf(glyph.id))
+        return true
+    }
+
+    /**
+     * 底栏点了大爆炸（2026-10-16，「工具」里的，或用不了 AI 时那颗圆钮）：长按要先知道有这回事，点按钮不用。不从哪个字起手，面板马上出来，
+     * 从第一行字摆起，一个字也没打。打不开的时候和长按一样（没识别完、没认出字、从重建里恢复的），按钮这时灰着。
+     */
+    fun openBigBang() {
+        val page = bigBangPageToOpen() ?: return
+        beginBigBang(BigBangState(page))
+    }
+
+    /** 眼下能打开大爆炸的话，这张图拆好的字；不能就是 null。 */
+    private fun bigBangPageToOpen(): BigBangPage? {
+        val s = _state.value
+        if (s.image == null || s.loading || s.analyzing || s.colorPick != null || s.bigBang != null) return null
+        return currentBigBangPage()?.takeUnless { it.isEmpty }
+    }
+
+    /** 打开大爆炸，收起别的：选中的框、写到一半的字、吸管、样式和用途水印的面板，面板的位置这时归大爆炸。 */
+    private fun beginBigBang(bang: BigBangState) {
         commitDrag()
         finishLookEdit()
         bigBangSweepSelects = true
         bigBangOrigin = _state.value.plan
         bigBangRuns = emptyList()
         uiState = _state.value.copy(
-            bigBang = BigBangState(page, focusLine = glyph.line, holding = true),
+            bigBang = bang,
             selectedManualId = null,
             textPlacement = null,
             textFocus = false,
             stylePanelOpen = false,
             purposeSheetVisible = false,
         )
-        selectBigBang(setOf(glyph.id))
-        return true
     }
 
     /** 长按打开大爆炸的那根手指抬起来了：面板这时才出来（见 BigBangState.holding）。 */

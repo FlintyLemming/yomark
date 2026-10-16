@@ -100,6 +100,7 @@
     <!-- tool groups -->
     <string name="tool_group_redact">打码</string>
     <string name="tool_group_edit">编辑</string>
+    <string name="toolbox">工具</string>
     <string name="tool_group_expand">展开</string>
     <string name="tool_group_collapse">收起</string>
     <string name="tool_watermark">水印</string>

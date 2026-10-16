@@ -100,6 +100,7 @@
     <!-- tool groups -->
     <string name="tool_group_redact">Redact</string>
     <string name="tool_group_edit">Edit</string>
+    <string name="toolbox">Tools</string>
     <string name="tool_group_expand">Expand</string>
     <string name="tool_group_collapse">Collapse</string>
     <string name="tool_watermark">Watermark</string>

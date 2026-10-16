@@ -2,6 +2,7 @@ package moe.flinty.yomark.ui
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.RectF
 import android.view.View
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.MaterialTheme
@@ -10,16 +11,31 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.click
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.google.common.truth.Truth.assertThat
+import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.MaskLook
+import moe.flinty.yomark.core.model.TextElement
+import moe.flinty.yomark.core.model.TextLine
+import moe.flinty.yomark.ui.bigbang.BigBangPage
+import moe.flinty.yomark.ui.components.BigBangPanelModel
 import moe.flinty.yomark.ui.components.EditorBottomBar
+import moe.flinty.yomark.ui.components.PanelTop
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
@@ -109,6 +125,132 @@ class EditorBottomBarTest {
         assertThat(hex(shot.getPixel(shot.width / 2, y))).isEqualTo(hex(fill))
         // 面板满宽时离右边 12 dp
         assertThat(hex(shot.getPixel(shot.width - px(18.dp), y))).isNotEqualTo(hex(fill))
+    }
+
+    // ---------- 大爆炸：面板从胶囊长出来，画布跟着让 ----------
+
+    /** 「收货人张三」一行，一字一个 element（和 PP-OCR 一样）。 */
+    private val page = run {
+        val text = "收货人张三"
+        val els = text.indices.map { i ->
+            TextElement(Quad.fromRect(RectF(40f + i * 20f, 100f, 60f + i * 20f, 120f)), text[i].toString(), i..i)
+        }
+        BigBangPage.of(listOf(TextLine(Quad.fromRect(RectF(40f, 100f, 140f, 120f)), text, 0.95f, els)))
+    }
+
+    /**
+     * 打开大爆炸：面板和别的面板一样从胶囊一点点长出来，画布跟着胶囊的上沿往上让（选字时看得到图上选中的是哪几块）；
+     * 收起时倒过来，画布回到原处。点面板外面不收起它：点图上是点字。
+     */
+    @Test fun bigBangGrowsOutOfTheCapsuleAndPushesTheCanvas() {
+        var canvasEnd = 0
+        var bang by mutableStateOf<BigBangPanelModel?>(null)
+        val folded = mutableListOf<ToolGroup?>()
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    Layout(content = {
+                        EditorBottomBar(
+                            toolGroup = ToolGroup.TOOLS,
+                            onToolGroup = { folded += it },
+                            styleBar = model,
+                            styleActions = object : StyleBarActions {},
+                            compare = remember { MutableInteractionSource() },
+                            canCompare = false,
+                            aiReview = AiReview.Ready,
+                            bigBangReady = true,
+                            bigBang = bang,
+                        )
+                    }) { measurables, constraints ->
+                        val bar = measurables.single().measure(constraints)
+                        canvasEnd = bar[PanelTop]
+                        layout(bar.width, bar.height) { bar.place(0, 0) }
+                    }
+                }
+            }
+        }
+        val resting = canvasEnd
+        compose.onNodeWithText("已选 0 字").assertDoesNotExist()
+
+        compose.mainClock.autoAdvance = false
+        bang = BigBangPanelModel(BigBangState(page), emptySet())
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(HALFWAY_MS)
+        val halfway = canvasEnd
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        val open = canvasEnd
+        assertThat(halfway).isLessThan(resting)
+        assertThat(open).isLessThan(halfway)
+        compose.onNodeWithText("已选 0 字").assertIsDisplayed()
+        // 字块整块自己画，读屏念的是整页的字
+        compose.onNodeWithContentDescription("收货人张三").assertIsDisplayed()
+
+        compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
+        assertThat(folded).isEmpty()
+
+        compose.mainClock.autoAdvance = false
+        bang = null
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(HALFWAY_MS)
+        assertThat(canvasEnd).isGreaterThan(open)
+        assertThat(canvasEnd).isLessThan(resting)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(canvasEnd).isEqualTo(resting)
+        compose.onNodeWithText("已选 0 字").assertDoesNotExist()
+    }
+
+    /**
+     * 用不了 AI 时大爆炸占住工具那一行（ToolGroup.BIG_BANG）：面板占到胶囊最底下，底下没有「工具」那一行，
+     * 比带着「工具」那一行时整块低一行，图让得少一行。
+     */
+    @Test fun withoutAiTheBigBangPanelTakesTheWholeCapsule() {
+        var canvasEnd = 0
+        var row by mutableStateOf<ToolGroup?>(ToolGroup.TOOLS)
+        var ai by mutableStateOf<AiReview>(AiReview.Ready)
+        var bang by mutableStateOf<BigBangPanelModel?>(null)
+        val open = BigBangPanelModel(BigBangState(page), emptySet())
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    Layout(content = {
+                        EditorBottomBar(
+                            toolGroup = row,
+                            onToolGroup = {},
+                            styleBar = model,
+                            styleActions = object : StyleBarActions {},
+                            compare = remember { MutableInteractionSource() },
+                            canCompare = false,
+                            aiReview = ai,
+                            bigBangReady = true,
+                            bigBang = bang,
+                        )
+                    }) { measurables, constraints ->
+                        val bar = measurables.single().measure(constraints)
+                        canvasEnd = bar[PanelTop]
+                        layout(bar.width, bar.height) { bar.place(0, 0) }
+                    }
+                }
+            }
+        }
+        // 带着「工具」那一行打开：标题一个、底下工具里一个
+        bang = open
+        compose.waitForIdle()
+        compose.onAllNodesWithText("大爆炸").assertCountEquals(2)
+        val withRow = canvasEnd
+        bang = null
+        row = null
+        compose.waitForIdle()
+
+        // 用不了 AI：外面让大爆炸占住这一行再打开（见 EditorScreen）
+        ai = AiReview.Hidden
+        row = ToolGroup.BIG_BANG
+        bang = open
+        compose.waitForIdle()
+        compose.onAllNodesWithText("大爆炸").assertCountEquals(1)
+        compose.onNodeWithText("完成").assertIsDisplayed()
+        assertThat(canvasEnd - withRow).isAtLeast(px(48.dp))
     }
 
     private fun px(dp: Dp) = with(compose.density) { dp.roundToPx() }
