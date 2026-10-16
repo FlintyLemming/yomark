@@ -278,7 +278,7 @@ class PlayScreenshots {
      * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（长数字串、日期时间、网址……）同在一屏。
      */
     @Test fun rules() {
-        show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenEngine = {}, onOpenRule = {}, onNavigateUp = {}) }
+        show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenRule = {}, onNavigateUp = {}) }
         compose.waitForIdle()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("pickup")
         compose.waitForIdle()

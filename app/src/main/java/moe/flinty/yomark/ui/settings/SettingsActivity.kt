@@ -91,7 +91,6 @@ class SettingsPageActivity : YomarkActivity() {
                 TextSettingsScreen(
                     config = config,
                     onChange = onChange,
-                    onOpenEngine = { startActivity(intent(this, SettingsPage.TEXT_ENGINE)) },
                     onOpenRule = { id -> startActivity(intent(this, SettingsPage.TEXT_RULE, id)) },
                     onNavigateUp = ::finish,
                 )
@@ -112,15 +111,19 @@ class SettingsPageActivity : YomarkActivity() {
                 // 进页时问一次 AICore；只看不下，见 NanoStatus
                 val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
                 val external by store.externalModel.collectAsStateWithLifecycle(initialValue = null)
-                external?.let { ext ->
-                    AiSettingsScreen(
-                        nano = nano,
-                        onNavigateUp = ::finish,
-                        external = ext.takeIf { it.enabled },
-                        onExternalChange = { change -> lifecycleScope.launch { store.updateExternalModel(change) } },
-                        // 测的是眼下存着的设置，不是画面上那一份：弹框保存之后才算数
-                        onTestExternal = { ExternalModelClient.check(store.externalModel.first()) },
-                    )
+                WithRecognitionConfig(store) { config, _ ->
+                    external?.let { ext ->
+                        AiSettingsScreen(
+                            nano = nano,
+                            textEngine = config.textEngine,
+                            onOpenEngine = { startActivity(intent(this, SettingsPage.TEXT_ENGINE)) },
+                            onNavigateUp = ::finish,
+                            external = ext.takeIf { it.enabled },
+                            onExternalChange = { change -> lifecycleScope.launch { store.updateExternalModel(change) } },
+                            // 测的是眼下存着的设置，不是画面上那一份：弹框保存之后才算数
+                            onTestExternal = { ExternalModelClient.check(store.externalModel.first()) },
+                        )
+                    }
                 }
             }
             SettingsPage.GENERAL -> {

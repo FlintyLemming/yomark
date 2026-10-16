@@ -73,9 +73,7 @@ internal fun aiOffRules(config: RecognitionConfig): List<Rule> =
 
 private fun textRecognizerFor(context: Context, option: TextEngineOption): TextRecognizer = when (option) {
     TextEngineOption.PADDLE -> PaddleTextRecognizer(context)
-    TextEngineOption.LATIN -> MlKitTextRecognizer(TextScript.LATIN)
-    TextEngineOption.CHINESE -> MlKitTextRecognizer(TextScript.CHINESE)
-    TextEngineOption.BOTH -> CompositeTextRecognizer(
+    TextEngineOption.MLKIT -> CompositeTextRecognizer(
         listOf(MlKitTextRecognizer(TextScript.LATIN), MlKitTextRecognizer(TextScript.CHINESE))
     )
 }

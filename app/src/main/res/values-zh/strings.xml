@@ -232,13 +232,9 @@
     <string name="engine">识别引擎</string>
     <string name="sensitive_info">敏感信息</string>
     <string name="engine_paddle">PP-OCR</string>
-    <string name="engine_latin">ML Kit 英文</string>
-    <string name="engine_chinese">ML Kit 中文</string>
-    <string name="engine_both">ML Kit 中英</string>
+    <string name="engine_mlkit">ML Kit</string>
     <string name="engine_paddle_summary">中文最准，速度稍慢</string>
-    <string name="engine_latin_summary">不支持中文</string>
-    <string name="engine_chinese_summary">中英文都能认</string>
-    <string name="engine_both_summary">两个模型一起跑，最慢</string>
+    <string name="engine_mlkit_summary">中英文都能认</string>
     <string name="when_found">识别到%1$s时</string>
     <string name="guessed_names">从字面猜出的人名</string>
     <string name="mask_unanchored">没有旁证的也打码</string>

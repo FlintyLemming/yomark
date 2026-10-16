@@ -2,9 +2,23 @@ package moe.flinty.yomark.engine
 
 /**
  * OCR 后端。PADDLE = PP-OCRv6 small（ONNX Runtime，随包发行）；
- * 其余三档是 ML Kit：BOTH 并行跑两个再取并集，去重交给 CandidateMerger。
+ * MLKIT = ML Kit 的英文、中文两个识别器并行跑再取并集，去重交给 CandidateMerger。
+ *
+ * 声明顺序就是设置页上的排列顺序；持久化存的是名字。
+ * ML Kit 原先分英文、中文、中英三档（LATIN、CHINESE、BOTH），2026-10-16 并成一档，做法是原先的中英：
+ * 存着这三个名字的老设置读成 MLKIT（[fromName]）——选过哪一档 ML Kit 的，升级后还是 ML Kit。
  */
-enum class TextEngineOption { PADDLE, LATIN, CHINESE, BOTH }
+enum class TextEngineOption {
+    PADDLE, MLKIT;
+
+    companion object {
+        /** 持久化的名字读回来。认不出的为 null，由调用方退回出厂值。 */
+        fun fromName(name: String): TextEngineOption? =
+            if (name in LEGACY_MLKIT) MLKIT else entries.firstOrNull { it.name == name }
+
+        private val LEGACY_MLKIT = setOf("LATIN", "CHINESE", "BOTH")
+    }
+}
 
 /**
  * 条码的识别模式。认出来之后打不打码，由 [RecognitionConfig.barcodeState] 管。
@@ -49,7 +63,7 @@ enum class RuleState {
 data class RecognitionConfig(
     /**
      * 出厂是 PP-OCR：真机截图上中文识别明显好于 ML Kit（打了星的号码、生僻字人名都认得出），
-     * 而且能给出字符级的框。ML Kit 三档留着，逐项开关的意义就在于能切回去对比。
+     * 而且能给出字符级的框。ML Kit 留着，逐项开关的意义就在于能切回去对比。
      */
     val textEngine: TextEngineOption = TextEngineOption.PADDLE,
     /** 出厂是 STRICT（2026-10-04 起）：不误圈花纹，代价是歪斜、模糊的码可能漏掉。 */

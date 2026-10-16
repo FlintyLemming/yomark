@@ -34,7 +34,7 @@ import java.util.Locale
 import kotlin.coroutines.cancellation.CancellationException
 
 /**
- * AI 页最上面的「外部模型」一组（实验室里打开了才有）：接口地址、API Key、模型，点一行弹框改，保存才写进设置；
+ * AI 页识别引擎下面的「外部模型」一组（实验室里打开了才有）：接口地址、API Key、模型，点一行弹框改，保存才写进设置；
  * 下面一行测试连接，问一句最短的话，说可用不可用、用了几秒。
  *
  * 改动在弹框里点保存才写：边打字边写的话，编辑器每收到一次就要重新探测一遍。
@@ -52,7 +52,7 @@ internal fun ExternalModelGroup(
     val scope = rememberCoroutineScope()
     val notSet = stringResource(R.string.external_not_set)
 
-    SectionHeader(stringResource(R.string.external_model), first = true)
+    SectionHeader(stringResource(R.string.external_model))
     SettingsGroup {
         LinkRow(
             title = stringResource(R.string.external_base_url),
