@@ -305,24 +305,30 @@ class StyleBarTest {
         assertThat(reset.bottom).isAtMost(tool.top)
     }
 
-    /** 面板开着时点它外面（画布那一块）：和点左下角的返回一样，面板连这一组一起收起。 */
-    @Test fun tappingOutsideThePanelFoldsEverything() {
-        show(open(MaskStyle.SOLID))
+    /** 面板开着时点它外面（画布那一块）：和点面板右上角的箭头一样，只收面板，这一组还展开着。 */
+    @Test fun tappingOutsideThePanelFoldsJustThePanel() {
+        val actions = Recorder()
+        show(open(MaskStyle.SOLID), actions)
         compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
-        assertThat(toolGroups).containsExactly(null)
+        assertThat(actions.collapsed).isEqualTo(1)
+        assertThat(toolGroups).isEmpty()
     }
 
     /** 点在面板上，没有控件的地方也不收起。 */
     @Test fun tappingThePanelItselfKeepsItOpen() {
-        show(open(MaskStyle.SOLID))
+        val actions = Recorder()
+        show(open(MaskStyle.SOLID), actions)
         compose.onNodeWithText("颜色").performClick()
+        assertThat(actions.collapsed).isEqualTo(0)
         assertThat(toolGroups).isEmpty()
     }
 
     /** 吸管等着取色时面板缩回去了，点的是图：不收起。 */
     @Test fun whileTheEyedropperWaitsTappingTheImageDoesNotFold() {
-        show(open(MaskStyle.SOLID).copy(colorPick = ColorTarget.SOLID))
+        val actions = Recorder()
+        show(open(MaskStyle.SOLID).copy(colorPick = ColorTarget.SOLID), actions)
         compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
+        assertThat(actions.collapsed).isEqualTo(0)
         assertThat(toolGroups).isEmpty()
     }
 

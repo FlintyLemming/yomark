@@ -141,6 +141,9 @@ fun EditorScreen(
     val bigBangUp = state.bigBang?.holding == false
     var bigBangHoldsRow by rememberSaveable { mutableStateOf(false) }
     var rowBeforeBigBang by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
+    // 调节面板（样式的、用途水印的）开着：手机上它从所在的那一组长出来，收起时底栏回到打开它之前那样（见下面的 LaunchedEffect）
+    var panelHoldsRow by rememberSaveable { mutableStateOf(false) }
+    var rowBeforePanel by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -216,9 +219,10 @@ fun EditorScreen(
                 toolGroup = it
             }
             val panelOpen = state.stylePanelOpen || state.purposeSheetVisible
-            // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点底栏左下角的返回一样（见 FoldOnTouch）。
+            // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点面板右上角的箭头一样，只收面板（见 FoldOnTouch）。
             // 画布那一块由底栏铺（见 EditorBottomBar），顶栏这一截铺在这里：这一下只收起，不撤销、不导出
             val panelUp = phone && toolGroup != null && panelOpen && state.colorPick == null
+            val foldPanel = { if (state.purposeSheetVisible) vm.dismissPurposeSheet() else vm.dismissStylePanel() }
             Box {
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
@@ -239,19 +243,34 @@ fun EditorScreen(
                     exportLabel = exportLabel,
                     exporting = state.exporting,
                 )
-                if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
+                if (panelUp) FoldOnTouch(foldPanel, Modifier.matchParentSize())
             }
             // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
             // 用途水印在「编辑」里，样式在它自己那一组。展开着另一组时也换过去：
-            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来
+            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来。
+            // 收起面板（箭头、返回键、点它外面）时底栏回到打开它之前那样（2026-10-16）：展开着「编辑」写完一处字点一下图，
+            // 还在「编辑」里；从收着的底栏点两下图上的字打开的，这一组跟着收回去。开着面板换了一样工具，这一组就是自己挑的，留着
             LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
                 if (!phone) return@LaunchedEffect
                 val own = when {
                     state.purposeSheetVisible -> ToolGroup.EDIT
                     state.stylePanelOpen -> ToolGroup.of(state.barLook.style)
-                    else -> return@LaunchedEffect
+                    else -> null
                 }
+                if (own == null) {
+                    // 点底栏的返回收起这一组时已经收了，不再展开回去；大爆炸借着这一行时由它收回去
+                    if (panelHoldsRow && toolGroup != null && !bigBangHoldsRow) toolGroup = rowBeforePanel
+                    panelHoldsRow = false
+                    return@LaunchedEffect
+                }
+                rowBeforePanel = if (panelHoldsRow) own else toolGroup
+                panelHoldsRow = true
                 if (toolGroup != own) toolGroup = own
+            }
+            // 「编辑」里的马克笔、画笔、文本只在「编辑」展开着时拿在手里（2026-10-16）：收起「编辑」（或者展开着别的组）就放下，
+            // 换回「打码」里上次用的样式（见 EditorViewModel.backToRedact），收着的底栏点图、拖框总是打码。大爆炸借走这一行时不算
+            LaunchedEffect(phone, toolGroup, bigBangHoldsRow, state.brush.style) {
+                if (phone && toolGroup != ToolGroup.EDIT && !bigBangHoldsRow) vm.backToRedact()
             }
             // 大爆炸的面板也是从胶囊长出来的（见 EditorBottomBar）。用得了 AI 时从「工具」那一行长出来：开着时展开「工具」，
             // 从收着的那一行打开的（长按图上的字）胶囊从「工具」那颗圆钮撑开。用不了 AI 时「工具」里只有它，

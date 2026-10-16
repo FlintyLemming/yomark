@@ -40,6 +40,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
@@ -277,7 +278,7 @@ class EditorScreenLayoutTest {
         compose.onNodeWithContentDescription("白色").assertIsSelected()
     }
 
-    /** 水印的面板也是：右上角的箭头、系统返回只收面板，这一组还展开着；点它外面连这一组一起收起。 */
+    /** 水印的面板也是：右上角的箭头、系统返回、点它外面都只收面板，这一组还展开着。 */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the arrow, back, or a tap outside folds the watermark panel`() {
         val vm = open()
@@ -302,8 +303,8 @@ class EditorScreenLayoutTest {
         compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.purposeSheetVisible).isFalse()
-        compose.onNodeWithText("马克笔").assertDoesNotExist()
-        compose.onNodeWithText("编辑").assertIsDisplayed()
+        compose.onNodeWithText("用途水印").assertDoesNotExist()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
     }
 
     /** 手机上样式的调节面板从底栏往上长出来盖在图上：工具那一行不动。 */
@@ -344,16 +345,19 @@ class EditorScreenLayoutTest {
         compose.onNodeWithContentDescription("白色").assertIsSelected()
     }
 
-    /** 面板右上角的箭头、系统返回、底栏上的返回（连这一组一起收），都把面板收起。 */
+    /** 面板右上角的箭头、系统返回只收面板，这一组还展开着；底栏上的返回连这一组一起收。 */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
     @Test fun `on a phone the arrow, back, or folding the group folds the panel`() {
         val vm = open()
+        compose.onNodeWithText("打码").performClick()
+        frames(SETTLE_FRAMES)
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
         frames(SETTLE_FRAMES)
         compose.onNodeWithContentDescription("收起样式面板").performClick()
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
 
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
         frames(SETTLE_FRAMES)
@@ -375,12 +379,14 @@ class EditorScreenLayoutTest {
     }
 
     /**
-     * 面板开着时点它外面，图上、顶栏上都一样：和点底栏左下角的返回一样，面板连这一组一起收起。
+     * 面板开着时点它外面，图上、顶栏上都一样：和点面板右上角的箭头一样，只收面板，这一组还展开着（2026-10-16）。
      * 这一下只收起：点在顶栏的撤销上也不撤销。
      */
     @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
-    @Test fun `on a phone tapping outside the panel folds it and the group`() {
+    @Test fun `on a phone tapping outside the panel folds just the panel`() {
         val vm = open()
+        compose.onNodeWithText("打码").performClick()
+        frames(SETTLE_FRAMES)
         compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("恢复默认").assertIsDisplayed()
@@ -389,8 +395,7 @@ class EditorScreenLayoutTest {
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
-        compose.onNodeWithText("马赛克").assertDoesNotExist()
-        compose.onNodeWithText("打码").assertIsDisplayed()
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
 
         // 先拿掉一块码，撤销点得动
         compose.runOnUiThread { vm.onTap(PointF(160f, 135f)) }
@@ -402,8 +407,88 @@ class EditorScreenLayoutTest {
         compose.onNodeWithContentDescription("撤销").assertIsEnabled().performClick()
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.stylePanelOpen).isFalse()
-        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
         assertThat(vm.state.value.plan.find(url.candidateId)).isNull()       // 只收起，没撤销
+    }
+
+    /**
+     * 「编辑」里拿着文本（2026-10-16）：写完一处点一下图只收面板，还在「编辑」里，点图接着写；
+     * 点底栏的返回收起「编辑」，文本放下，换回打码的样式，点图不再写字。
+     */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone the text tool stays in hand until edit folds`() {
+        val vm = open()
+        compose.onNodeWithText("编辑").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("文本").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.TEXT)
+        compose.runOnUiThread {
+            vm.onTap(PointF(200f, 300f))
+            vm.setText("签收")
+        }
+        frames(SETTLE_FRAMES)
+        compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.TEXT)
+        // 头一下取消选中写好的那一块，再点就是接着写
+        compose.runOnUiThread {
+            vm.onTap(PointF(200f, 370f))
+            vm.onTap(PointF(200f, 370f))
+        }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.textPlacement?.center).isEqualTo(PointF(200f, 370f))
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+
+        compose.onNode(SemanticsMatcher("点了是收起") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "收起" }).performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("编辑").assertIsDisplayed()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.SOLID)
+        compose.runOnUiThread { vm.onTap(PointF(200f, 370f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.textPlacement).isNull()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+    }
+
+    /**
+     * 从收着的底栏点两下图上的字改它：面板从「编辑」长出来，收起面板时这一组也收回去，回到打开前那样。
+     * 改了它的颜色，画笔跟着成了文本（见 EditorViewModel.editLook），收回去也就放下了。
+     */
+    @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
+    @Test fun `on a phone a panel opened from the folded bar folds the bar back`() {
+        val vm = open()
+        val note = MaskItem(
+            candidateId = "manual-note",
+            quad = Quad.fromRect(RectF(40f, 250f, 200f, 290f)),
+            kind = SensitiveKind.MANUAL,
+            source = DetectorSource.MANUAL,
+            look = MaskLook(MaskStyle.TEXT),
+            text = "签收",
+        )
+        compose.runOnUiThread { vm.replacePlanForTest(MaskPlan(listOf(phone, url, note))) }
+        frames(SETTLE_FRAMES)
+        compose.runOnUiThread {
+            vm.onTap(PointF(120f, 270f))      // 选中
+            vm.onTap(PointF(120f, 270f))      // 再点一下：改字
+        }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+        compose.runOnUiThread { vm.editLook(note.look.copy(options = note.look.options.copy(textColor = Color.BLUE))) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.TEXT)
+
+        compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+        compose.onNodeWithText("马克笔").assertDoesNotExist()
+        // 「编辑」两处都有：底栏那一组，和选中的字上浮出来的那一颗
+        compose.onNodeWithText("打码").assertIsDisplayed()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.SOLID)
     }
 
     /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */

@@ -813,7 +813,8 @@ class EditorViewModel(
      * 吸管在等着取色时，这一下只取颜色。
      *
      * 文本（2026-10-15）：选中的文本再点一下是改它的字（[editSelectedText]）。手里拿着文本时，点的不是哪一块码——
-     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字。
+     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字
+     * （手机上只在「编辑」展开着时拿着它，见 [backToRedact]）。
      * 这时选中着什么的话，这一下只是取消选中，和别的时候点空白一样：写完一块点一下别处，不会又开始写一块。
      *
      * 大爆炸开着时，点的是字：选上或取消那一个字（[toggleBigBangGlyph]），不打码、不写字。
@@ -1217,6 +1218,19 @@ class EditorViewModel(
     fun setStyle(style: MaskStyle) {
         val s = _state.value
         editLook(MaskLook(style, s.barLook.options.withParamsOf(style, s.brush.options)))
+    }
+
+    /**
+     * 放下「编辑」里的马克笔、画笔、文本：画笔换回「打码」里上次用的样式，各样式调好的参数照旧（2026-10-16）。
+     * 手机上它们只在「编辑」展开着时拿在手里，收起「编辑」就放下（见 EditorScreen）：收着的底栏点图、拖框总是打码。
+     * 原先收起后还拿着文本，点图哪儿都是写字，要回去打码得展开「打码」重新挑一种样式。
+     * 只换画笔，不像 [setStyle] 那样连选中的框、已经打好的码一起换；还没写字的那一处作罢。
+     */
+    fun backToRedact() {
+        val s = _state.value
+        if (s.brush.style.redacts) return
+        setBrush(s.maskLook)
+        if (_state.value.textPlacement != null) _state.value = _state.value.copy(textPlacement = null)
     }
 
     /**

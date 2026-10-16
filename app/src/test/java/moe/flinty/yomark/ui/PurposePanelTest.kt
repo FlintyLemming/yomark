@@ -280,13 +280,15 @@ class PurposePanelTest {
 
     // ---------- 手机上和样式面板同一块地方 ----------
 
-    /** 面板开着时点它外面（画布那一块）：和点左下角的返回一样，面板连这一组一起收起。点在面板上不收。 */
-    @Test fun tappingOutsideThePanelFoldsEverything() {
-        show(opened)
+    /** 面板开着时点它外面（画布那一块）：和点面板右上角的箭头一样，只收面板，「编辑」还展开着。点在面板上不收。 */
+    @Test fun tappingOutsideThePanelFoldsJustThePanel() {
+        val actions = Recorder()
+        show(opened, actions)
         compose.onNodeWithText("颜色").performClick()
-        assertThat(toolGroups).isEmpty()
+        assertThat(actions.collapsed).isEqualTo(0)
         compose.onRoot().performTouchInput { click(Offset(centerX, 10f)) }
-        assertThat(toolGroups).containsExactly(null)
+        assertThat(actions.collapsed).isEqualTo(1)
+        assertThat(toolGroups).isEmpty()
     }
 
     /** 马克笔的面板开着时点水印：同一块面板换上水印的东西，跟着变高变矮，不先缩回底栏再长出来。 */

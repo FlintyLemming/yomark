@@ -226,7 +226,8 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * 胶囊不收回去，面板换成另一个的，一点点变高变矮。
  * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
  * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
- * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点左下角的返回一样：面板和这一组一起收起。
+ * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点面板右上角的箭头一样，只收面板（2026-10-16，原先连这一组一起收）：
+ * 展开着「编辑」写完一处字点一下图，还在「编辑」里，文本还拿在手里。收了面板底栏回到打开它之前那样（见 EditorScreen）。
  *
  * 大爆炸的面板（2026-10-16）也是这样从胶囊长出来、缩回去，原先是一下顶替整个底栏。用得了 AI 时从「工具」那一行长出来，
  * 那一行还在面板最底下；用不了 AI 时「工具」里只有它，面板直接从它那颗圆钮长出来，占到胶囊最底下，没有工具那一行
@@ -299,7 +300,9 @@ fun EditorBottomBar(
         content = {
             // 垫在最底下，铺满底栏这一整块（画布那一块都是它的）：落在胶囊外面的手指都归它。顶栏那一截见 EditorScreen。
             // 大爆炸开着时不垫：点图上是点字
-            if (wanted && bigBang == null) FoldOnTouch({ onToolGroup(null) }, Modifier.layoutId(BarPart.SCRIM))
+            if (wanted && bigBang == null) {
+                FoldOnTouch({ if (purpose.open) purposeActions.onCollapse() else styleActions.onCollapse() }, Modifier.layoutId(BarPart.SCRIM))
+            }
             filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
             // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框。
             // 面板收着时不接：两组只有 40 dp 高，按在它们上下边外面一点也算按到，胶囊接了就按不着了
@@ -436,7 +439,7 @@ private class AbovePill(
 }
 
 /**
- * 调节面板开着时铺在它外面的一层，看不见：手指一落下就等于点了底栏左下角的返回，面板和这一组一起收起（[onFold]）。
+ * 调节面板开着时铺在它外面的一层，看不见：手指一落下就等于点了面板右上角的箭头，收起面板（[onFold]）。
  * 这一下只收起，不往下传：不在画布上画框，顶栏的按钮也不响应。
  * 吸管等着取色时面板缩回去了，没有这一层，点的是图（见 EditorBottomBar 的 wanted）。
  */
