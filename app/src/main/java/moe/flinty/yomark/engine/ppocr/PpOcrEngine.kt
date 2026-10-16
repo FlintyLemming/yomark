@@ -18,7 +18,8 @@ import kotlin.math.roundToInt
  *
  * 流程与 PaddleOCR 的 predict_system 对齐：检测 → 按阅读顺序排框 → 逐框切图识别 →
  * 丢掉置信度 < 0.5 的行。另加两步 PaddleOCR 没有、而规则层需要的：
- * - 字符级的框：由 CTC 时间步推出每个字的横向位置，遮罩能精确到字（ML Kit 只到词）；
+ * - 字符级的框：由 CTC 时间步推出每个字的横向位置，字与字的分界再落到像素空当上（WordGaps.boundary），
+ *   遮罩能精确到字（ML Kit 只到词）；
  * - 词界空格：见 WordGaps。
  * 最后把同一行上被检测拆开的几段拼回一条（RowGrouper），「取件码」和「1-58908」
  * 被拆成两个框时，标签锚定照样接得上。
@@ -579,6 +580,12 @@ class PpOcrEngine(
         val gaps = WordGaps.find(gray, w, REC_HEIGHT)
         val glyphs = result.chars.indices.filter { result.chars[it] != " " }
 
+        // 字与字的分界：落在两个字中心之间的像素空当里（WordGaps.boundary），不是中点。首尾两个字延伸到框边，遮罩不会漏掉笔画边缘。
+        // 相邻两个字共用一条分界，字框首尾相接
+        val bounds = FloatArray(glyphs.size + 1)
+        bounds[glyphs.size] = w.toFloat()
+        for (n in 1 until glyphs.size) bounds[n] = WordGaps.boundary(centers[glyphs[n - 1]], centers[glyphs[n]], gaps)
+
         val text = StringBuilder()
         val boxes = ArrayList<Box?>()
         glyphs.forEachIndexed { n, i ->
@@ -590,10 +597,7 @@ class PpOcrEngine(
                     boxes += null
                 }
             }
-            // 字的左右边界取与邻字中心的中点；首尾两个字延伸到框边，遮罩不会漏掉笔画边缘
-            val left = if (n == 0) 0f else (centers[glyphs[n - 1]] + centers[i]) / 2
-            val right = if (n == glyphs.lastIndex) w.toFloat() else (centers[i] + centers[glyphs[n + 1]]) / 2
-            val charBox = box.slice(left / w, right / w)
+            val charBox = box.slice(bounds[n] / w, bounds[n + 1] / w)
             val ch = result.chars[i]
             text.append(ch)
             repeat(ch.length) { boxes += charBox }          // 字典里 BMP 以外的字占两个 UTF-16 单元

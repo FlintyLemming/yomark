@@ -351,9 +351,9 @@ private const val SHORT_DRAG = 2f
 
 /**
  * 经过一张时的那一下。Android 14 起有专为「在一长串选项里挪动」准备的轻震，连着来也不扎手；
- * 之前的系统不认它，用拖文字光标的那一下代替，同样很轻。
+ * 之前的系统不认它，用拖文字光标的那一下代替，同样很轻。大爆炸里划过一个字也是这一下。
  */
-private val DETENT: HapticFeedbackType =
+internal val DETENT: HapticFeedbackType =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) HapticFeedbackType.SegmentFrequentTick
     else HapticFeedbackType.TextHandleMove
 

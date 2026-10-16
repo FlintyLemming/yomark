@@ -2,7 +2,11 @@ package moe.flinty.yomark.core.model
 
 import moe.flinty.yomark.core.geometry.Quad
 
-data class TextElement(val quad: Quad, val text: String, val range: IntRange)
+/**
+ * @param chars 这个词里每个字的框，按字（码点）的先后，识别器给了才有：ML Kit 的 element 是一个词，它的 Symbol 是一个个字。
+ *   规则不用它（规则按词遮），大爆炸按字选时用（见 BigBangPage）。PP-OCR 的 element 本来就是一个字，是 null
+ */
+data class TextElement(val quad: Quad, val text: String, val range: IntRange, val chars: List<Quad>? = null)
 
 data class TextLine(
     val quad: Quad,

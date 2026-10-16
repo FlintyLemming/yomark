@@ -54,6 +54,10 @@
     <string name="purpose_default">For XX use only</string>
     <string name="filmstrip_item">Image %1$d of %2$d</string>
 
+    <!-- big bang -->
+    <string name="big_bang_title">Big Bang</string>
+    <string name="big_bang_count">%1$d selected</string>
+
     <!-- box list -->
     <string name="list_title">Boxes</string>
     <string name="list_count">%1$d boxes</string>

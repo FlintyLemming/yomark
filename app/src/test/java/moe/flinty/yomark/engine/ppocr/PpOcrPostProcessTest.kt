@@ -109,6 +109,29 @@ class PpOcrPostProcessTest {
         assertThat(WordGaps.isBreak("E", "R", 15f, 55f, wide)).isTrue()
     }
 
+    /** 字和字的分界落在两个字中心之间的空当正中，不是两个中心的中点（大爆炸、规则的码边都落在它上面）。 */
+    @Test fun `a character boundary snaps into the blank columns between the glyphs`() {
+        // 两个字 [10, 40) 和 [44, 74)，中心按 CTC 偏到 22、64：中点 43 压在右边那个字上，空当是 40..44
+        val found = WordGaps.find(strip(100, 10 until 40, 44 until 74), 100, 48)
+        assertThat(WordGaps.boundary(22f, 64f, found)).isEqualTo(42f)
+    }
+
+    /** 两个中心之间有几段空当（「川」这种字自己中间就空着），取正中离中点最近的那一段。 */
+    @Test fun `the gap nearest the midpoint wins`() {
+        val found = WordGaps.find(strip(120, 10 until 20, 24 until 30, 34 until 40, 50 until 80), 120, 48)
+        // 空当 20..24、30..34、40..50；中点 (25 + 65) / 2 = 45 落在 40..50 里
+        assertThat(WordGaps.boundary(25f, 65f, found)).isEqualTo(45f)
+    }
+
+    /** 字挨着字，一列空当也没有：取中间那一半里墨迹最少的那一列。 */
+    @Test fun `touching glyphs split at the thinnest column`() {
+        val gray = strip(100, 10 until 90)
+        // 第 52 列只有上半截有墨（行 10..20），是两个字挨着的地方
+        for (y in 21..37) gray[y * 100 + 52] = 1f
+        val found = WordGaps.find(gray, 100, 48)
+        assertThat(WordGaps.boundary(30f, 70f, found)).isEqualTo(52.5f)
+    }
+
     /** 挨着 ASCII 标点不按像素补：机读码的「<」、打了星的号码、「3-2-1234」都不该被拆开。 */
     @Test fun `no pixel space next to ascii punctuation`() {
         val wide = WordGaps.find(strip(200, 10 until 20, 40 until 70), 200, 48)

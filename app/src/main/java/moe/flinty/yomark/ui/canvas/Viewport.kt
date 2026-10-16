@@ -56,6 +56,20 @@ data class Viewport(val scale: Float, val offsetX: Float, val offsetY: Float) {
         return Viewport(s, ox, oy)
     }
 
+    /**
+     * 平移到让图像上的 [area] 落进 viewW × viewH 的视口里（四边各留 [margin]），已经在里面就不动；放不下时让它的左上角露出来。
+     * 大爆炸的面板出来、画布变矮时用：放大着看的图上，选中的字可能落到了画布下面。之后照常要 [clamped]。
+     */
+    fun revealing(area: RectF, viewW: Int, viewH: Int, margin: Float): Viewport {
+        val r = imageToScreen(area)
+        fun shift(lo: Float, hi: Float, size: Int): Float = when {
+            hi > size - margin -> maxOf(size - margin - hi, margin - lo)
+            lo < margin -> margin - lo
+            else -> 0f
+        }
+        return pan(shift(r.left, r.right, viewW), shift(r.top, r.bottom, viewH))
+    }
+
     companion object {
         const val MAX_SCALE_FACTOR = 8f
 

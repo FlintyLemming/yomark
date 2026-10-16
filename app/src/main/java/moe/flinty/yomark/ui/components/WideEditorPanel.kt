@@ -114,9 +114,9 @@ fun WideEditorPanel(
 /**
  * 横着拿时右边那一栏的宽度：画布能用的宽度的三成，夹在 320～400 dp 之间。
  * 320 时调节面板里的滑条还有一百多 dp 能拖；再宽列表也只是空着，不如留给画布。
- * 手机横着拿时三成不到 320，就是 320。
+ * 手机横着拿时三成不到 320，就是 320。大爆炸的面板在右边时也是这么宽（见 BigBangPanel）。
  */
-private fun Modifier.wideSidePanelWidth(): Modifier = layout { measurable, constraints ->
+internal fun Modifier.wideSidePanelWidth(): Modifier = layout { measurable, constraints ->
     val available = constraints.maxWidth
     val target = if (available == Constraints.Infinity) SIDE_MIN.roundToPx() else {
         (available * SIDE_FRACTION).roundToInt()

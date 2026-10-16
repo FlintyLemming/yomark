@@ -25,6 +25,24 @@ class ViewportTest {
         assertThat(v.offsetY).isWithin(1e-3f).of(0f)
     }
 
+    /** 大爆炸的面板出来、画布变矮：放大着看的图上选中的块落到了画布下面，挪上来（spec §7.3，2026-10-16）。 */
+    @Test
+    fun `revealing pans an area below the view back into it`() {
+        val v = Viewport(scale = 2f, offsetX = 0f, offsetY = 0f)
+        // 图上 100..120 在屏幕上是 200..240，画布只有 180 高
+        val moved = v.revealing(android.graphics.RectF(10f, 100f, 50f, 120f), viewW = 400, viewH = 180, margin = 10f)
+        assertThat(moved.offsetY).isWithin(1e-3f).of(-70f)       // 240 - 70 = 170 = 180 - 10
+        assertThat(moved.offsetX).isWithin(1e-3f).of(0f)
+        assertThat(v.revealing(android.graphics.RectF(10f, 10f, 50f, 20f), 400, 180, 10f)).isEqualTo(v)
+    }
+
+    @Test
+    fun `revealing an area taller than the view shows its top`() {
+        val v = Viewport(scale = 1f, offsetX = 0f, offsetY = 0f)
+        val moved = v.revealing(android.graphics.RectF(0f, 300f, 50f, 900f), viewW = 400, viewH = 400, margin = 10f)
+        assertThat(moved.offsetY).isWithin(1e-3f).of(-290f)
+    }
+
     @Test
     fun `imageToScreen and screenToImage round trip`() {
         val v = Viewport(scale = 0.5f, offsetX = 30f, offsetY = 40f)
