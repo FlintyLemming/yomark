@@ -27,6 +27,7 @@ import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
+import moe.flinty.yomark.ui.onboarding.TourActivity
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -52,6 +53,7 @@ class SettingsActivity : YomarkActivity() {
                     config = current,
                     onOpen = { page -> startActivity(SettingsPageActivity.intent(this, page)) },
                     onNavigateUp = ::finish,
+                    onReplayTour = { startActivity(TourActivity.intent(this)) },
                     developer = developer,
                     // 改了语言 Activity 会重建，这里读一次就够
                     language = remember { AppLocale.current(this) },

@@ -125,6 +125,11 @@
             android:name=".ui.settings.SettingsActivity"
             android:exported="false" />
 
+        <!-- 设置「帮助」里重新放一遍首次引导（见 ui/onboarding/TourActivity） -->
+        <activity
+            android:name=".ui.onboarding.TourActivity"
+            android:exported="false" />
+
         <!-- 买成后的感谢页：首页或编辑器在前台时放（见 ui/thanks/ThanksActivity） -->
         <activity
             android:name=".ui.thanks.ThanksActivity"

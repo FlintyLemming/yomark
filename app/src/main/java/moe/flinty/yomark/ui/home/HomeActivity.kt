@@ -35,6 +35,7 @@ import moe.flinty.yomark.ui.components.restorePurchase
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
 import moe.flinty.yomark.ui.onboarding.OnboardingTour
 import moe.flinty.yomark.ui.onboarding.TourSample
+import moe.flinty.yomark.ui.onboarding.setTourChat
 import moe.flinty.yomark.ui.settings.SettingsActivity
 import moe.flinty.yomark.ui.thanks.showThanksWhenPurchased
 import moe.flinty.yomark.ui.theme.YomarkTheme
@@ -164,12 +165,8 @@ class HomeActivity : YomarkActivity() {
         startActivity(Intent(this, SettingsActivity::class.java))
     }
 
-    /** 引导第三步的「识别聊天记录」：和实验室页上的同一个开关，写法也一样（见 SettingsActivity）。 */
     private fun setChat(on: Boolean) {
-        lifecycleScope.launch {
-            val config = settings.recognitionConfig.first()
-            settings.setRecognitionConfig(config.copy(chatState = if (on) RuleState.MASKED else RuleState.OFF))
-        }
+        lifecycleScope.launch { settings.setTourChat(on) }
     }
 
     /** 这一页一打开是首页还是引导。 */

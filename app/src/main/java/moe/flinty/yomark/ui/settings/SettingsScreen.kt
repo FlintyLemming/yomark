@@ -1,6 +1,7 @@
 package moe.flinty.yomark.ui.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Face
@@ -37,7 +38,7 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, GENER
  * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、通用和外观。
  * 「通用」是 2026-10-15 由「编辑」「导出」两项并成的，那两页各只有一项。
  * 最后是关于：版本号、隐私权政策、恢复默认设置（隐私权政策原先单独一行，恢复默认原先是一级页的最后一项，2026-10-11 都挪了进去）。
- * 关于上面是「语言」（2026-10-12 起），小字写着眼下的界面语言。
+ * 关于上面是「语言」（2026-10-12 起），小字写着眼下的界面语言；再往下是「帮助」（2026-10-16 起），点了重新放一遍首次引导。
  * 在关于里连点版本号打开调试信息之后（[developer]），语言上面再多一项「开发者」，照着 Android 系统设置里开发者选项的样子。
  * 最后一组打头是「实验室」（2026-10-15 起）：还不够稳、出厂关着的功能，眼下只有聊天记录（原先在第一组）。
  *
@@ -50,6 +51,7 @@ fun SettingsScreen(
     onOpen: (SettingsPage) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
+    onReplayTour: () -> Unit = {},
     developer: Boolean = false,
     language: AppLanguage = AppLanguage.SYSTEM,
 ) {
@@ -133,6 +135,13 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Language,
                     iconColors = SettingsIconColors.indigo,
                     onClick = { onOpen(SettingsPage.LANGUAGE) },
+                )
+                NavigationRow(
+                    title = stringResource(R.string.settings_help),
+                    summary = stringResource(R.string.settings_help_summary),
+                    icon = Icons.AutoMirrored.Outlined.HelpOutline,
+                    iconColors = SettingsIconColors.blue,
+                    onClick = onReplayTour,
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_about),
