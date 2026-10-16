@@ -12,10 +12,13 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotSelected
+import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
@@ -37,6 +40,7 @@ import androidx.compose.ui.unit.height
 import android.graphics.PointF
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.canvas.Viewport
 import moe.flinty.yomark.ui.theme.ThemeColor
@@ -50,8 +54,10 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 首次引导：先演识别动效再落码，第二步点链接打上码，第三步的开关是真的；跳过、选图、去设置各走各的。
- * 识别中的光、框的一明一暗每帧都在走，自动推帧等不到空闲：要动效的用例手动推时间。
+ * 首次引导：欢迎页之后先演识别动效再落码，点文字那一页点链接打上码，识别引擎按测速选好，最后一页的开关是真的；
+ * 跳过、选图、去设置各走各的。识别中的光、框的一明一暗每帧都在走，自动推帧等不到空闲：要动效的用例手动推时间。
+ *
+ * [advice] 为 null 时是设置里「帮助」重放的那种，没有识别引擎那一页；首次打开的给它一个测速结论。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -67,6 +73,9 @@ class OnboardingTourTest {
     private var opened = 0
     private var chat by mutableStateOf(false)
     private var interactive by mutableStateOf(true)
+    private var advice by mutableStateOf<EngineAdvice?>(null)
+    private var engine by mutableStateOf(TextEngineOption.PADDLE)
+    private val chosen = mutableListOf<TextEngineOption>()
 
     private var direction = LayoutDirection.Ltr
 
@@ -86,6 +95,12 @@ class OnboardingTourTest {
                     onSkip = { skipped++ },
                     onPickImage = { picked++ },
                     onOpenSettings = { opened++ },
+                    engineAdvice = advice,
+                    engine = engine,
+                    onEngineChange = {
+                        engine = it
+                        chosen += it
+                    },
                     interactive = interactive,
                     animate = animate,
                 )
@@ -113,14 +128,30 @@ class OnboardingTourTest {
     /** 等识别动效演完、码落稳。 */
     private fun settle() = advance(SCAN_MS + 1_200)
 
+    /** 点「下一步」翻过去：要动效的推着时间等它翻完，关了动画的一下就到。 */
+    private fun next(animate: Boolean = true) {
+        compose.onNodeWithText("下一步").performClick()
+        if (animate) advance(PAGE_TURN_MS) else compose.waitForIdle()
+    }
+
+    /** 从欢迎页翻到「识别引擎」那一页（关了动画）。 */
+    private fun toEnginePage() {
+        repeat(3) { next(animate = false) }
+        compose.onNodeWithContentDescription("第 4 步，共 5 步：识别引擎").assertExists()
+    }
+
     private companion object {
         /** 翻一页的动画（450 ms）加点余量。 */
         const val PAGE_TURN_MS = 600L
+
+        const val MEASURING = "正在测这台手机跑 PP-OCR 有多快"
     }
 
     private val stage get() = compose.onNodeWithContentDescription("示例聊天截图")
 
     private fun stageSays(text: String) = stage.assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text))
+
+    private fun engineRow(label: String) = compose.onNode(hasText(label) and isSelectable())
 
     /** 在样图上点图像坐标 [p]：和手指点一样，经过画布上那层只认点一下的。 */
     private fun tapImage(p: PointF) {
@@ -131,9 +162,18 @@ class OnboardingTourTest {
         idle()
     }
 
-    @Test fun `the scan plays first and the masks land after it`() {
+    @Test fun `the welcome page comes first and the scan waits for its own page`() {
         show()
-        advance(1_000)
+        // 欢迎页上待多久都不演：没有样图，是原先那一屏的内容
+        advance(3_000)
+        compose.onNodeWithText("有码").assertIsDisplayed()
+        compose.onNodeWithText("自动找出截图里的手机号、地址、人脸并打码").assertIsDisplayed()
+        compose.onNodeWithText("默认不联网，图片不离开手机").assertIsDisplayed()
+        compose.onNodeWithText("导出时去掉位置、机型等隐藏信息").assertIsDisplayed()
+        compose.onNodeWithContentDescription("第 1 步，共 4 步：欢迎").assertExists()
+        stage.assertDoesNotExist()
+        next()
+        advance(400)
         stageSays("识别中…")
         compose.onNodeWithText("自动打码").assertIsDisplayed()
         settle()
@@ -142,18 +182,19 @@ class OnboardingTourTest {
 
     @Test fun `next during the scan lands the masks at once`() {
         show()
-        advance(500)
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
+        next()
+        advance(200)
+        stageSays("识别中…")
+        next()
         compose.onNodeWithText("点文字打码").assertIsDisplayed()
         stageSays("遮住了 4 处")
     }
 
     @Test fun `tapping the outlined link masks it`() {
         show()
+        next()
         settle()
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
+        next()
         compose.onNodeWithText("点一下框出的链接试试").assertIsDisplayed()
         tapImage(TourSample.LINK_CENTER)
         advance(400)
@@ -167,7 +208,8 @@ class OnboardingTourTest {
 
     @Test fun `a screen reader can mask the link too`() {
         show(animate = false)
-        compose.onNodeWithText("下一步").performClick()
+        next(animate = false)
+        next(animate = false)
         stage.performSemanticsAction(SemanticsActions.OnClick)
         stageSays("遮住了 5 处")
         stage.performSemanticsAction(SemanticsActions.OnClick)
@@ -178,24 +220,27 @@ class OnboardingTourTest {
         show(animate = false)
         val back = compose.activity.onBackPressedDispatcher
         assertThat(back.hasEnabledCallbacks()).isFalse()
-        compose.onNodeWithText("下一步").performClick()
-        compose.onNodeWithContentDescription("第 2 步，共 3 步：点文字打码").assertExists()
+        next(animate = false)
+        next(animate = false)
+        compose.onNodeWithContentDescription("第 3 步，共 4 步：点文字打码").assertExists()
         assertThat(back.hasEnabledCallbacks()).isTrue()
         compose.runOnUiThread { back.onBackPressed() }
         compose.waitForIdle()
-        compose.onNodeWithContentDescription("第 1 步，共 3 步：自动打码").assertExists()
+        compose.onNodeWithContentDescription("第 2 步，共 4 步：自动打码").assertExists()
         compose.onNodeWithText("自动打码").assertIsDisplayed()
         compose.onNodeWithText("点文字打码").assertDoesNotExist()
+        compose.runOnUiThread { back.onBackPressed() }
+        compose.waitForIdle()
+        compose.onNodeWithContentDescription("第 1 步，共 4 步：欢迎").assertExists()
         assertThat(back.hasEnabledCallbacks()).isFalse()
     }
 
     @Test fun `the labs switch is the real setting and masks the chat`() {
         show()
+        next()
         settle()
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
+        next()
+        next()
         compose.onNodeWithText("设置 › 实验室").assertIsDisplayed()
         compose.onNodeWithText("遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确").assertIsDisplayed()
         compose.onNodeWithText("识别聊天记录").performClick()
@@ -210,14 +255,14 @@ class OnboardingTourTest {
 
     @Test fun `skip works on every step and the last step offers the picker and settings`() {
         show(animate = false)
+        repeat(3) {
+            compose.onNodeWithText("跳过").performClick()
+            compose.onNodeWithText("选择图片").assertDoesNotExist()
+            compose.onNodeWithText("打开设置").assertDoesNotExist()
+            next(animate = false)
+        }
         compose.onNodeWithText("跳过").performClick()
-        compose.onNodeWithText("选择图片").assertDoesNotExist()
-        compose.onNodeWithText("打开设置").assertDoesNotExist()
-        compose.onNodeWithText("下一步").performClick()
-        compose.onNodeWithText("跳过").performClick()
-        compose.onNodeWithText("下一步").performClick()
-        compose.onNodeWithText("跳过").performClick()
-        assertThat(skipped).isEqualTo(3)
+        assertThat(skipped).isEqualTo(4)
         compose.onNodeWithText("选择图片").performClick()
         compose.onNodeWithText("打开设置").performClick()
         assertThat(picked).isEqualTo(1)
@@ -226,13 +271,15 @@ class OnboardingTourTest {
 
     @Test fun `with animations off there is no scan`() {
         show(animate = false)
+        next(animate = false)
         stageSays("遮住了 4 处")
     }
 
-    /** 划开第一页时识别动效还在演：码当场落下，下一页的图上不再从头演一遍。 */
+    /** 划开「自动打码」时识别动效还在演：码当场落下，下一页的图上不再从头演一遍。 */
     @Test fun `swiping away during the scan lands the masks`() {
         show()
-        advance(500)
+        next()
+        stageSays("识别中…")
         stage.performTouchInput { swipeLeft() }
         advance(PAGE_TURN_MS)
         compose.onNodeWithText("点文字打码").assertIsDisplayed()
@@ -242,9 +289,9 @@ class OnboardingTourTest {
     /** 快点两下「下一步」：第二下落在正滑进来的最后一页上，不算「选择图片」，引导不能就这么没了。 */
     @Test fun `a quick double tap on next does not leave the tour`() {
         show()
+        next()
         settle()
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
+        next()
         compose.onNodeWithText("下一步").performClick()
         advance(100)
         compose.onNode(hasClickAction() and hasText("选择图片")).performClick()
@@ -258,12 +305,13 @@ class OnboardingTourTest {
     @Test fun `chat masks are there from the start when the setting is already on`() {
         chat = true
         show(animate = false)
+        next(animate = false)
         stageSays("遮住了 9 处")
     }
 
     @Test fun `leaving hides it from the screen reader and from back`() {
         show(animate = false)
-        compose.onNodeWithText("下一步").performClick()
+        next(animate = false)
         interactive = false
         compose.waitForIdle()
         compose.onNodeWithText("跳过").assertDoesNotExist()
@@ -275,9 +323,9 @@ class OnboardingTourTest {
         compose.mainClock.autoAdvance = false
         restore.setContent(content(animate = true))
         idle()
+        next()
         settle()
-        compose.onNodeWithText("下一步").performClick()
-        advance(PAGE_TURN_MS)
+        next()
         tapImage(TourSample.LINK_CENTER)
         advance(400)
         restore.emulateSavedInstanceStateRestore()
@@ -288,10 +336,104 @@ class OnboardingTourTest {
         stageSays("遮住了 5 处")
     }
 
+    /** 测得快：说用了多久，替人选上 PP-OCR。 */
+    @Test fun `a fast phone keeps PP-OCR and says how long it took`() {
+        advice = EngineAdvice.Fast(1_234)
+        show(animate = false)
+        assertThat(chosen).isEmpty()
+        toEnginePage()
+        compose.onNodeWithText("PP-OCR 识别这张图用了 1.2 秒，默认用效果更好的 PP-OCR；觉得慢可以换成 ML Kit").assertIsDisplayed()
+        compose.onNodeWithText("设置 › AI › 识别引擎").assertIsDisplayed()
+        assertThat(chosen).containsExactly(TextEngineOption.PADDLE)
+        engineRow("PP-OCR").assertIsSelected()
+        engineRow("ML Kit").assertIsNotSelected()
+    }
+
+    /** 测得慢：建议 ML Kit、替人选上，说效果不好去哪儿换回来。 */
+    @Test fun `a slow phone gets ML Kit and is told where to switch back`() {
+        advice = EngineAdvice.Slow(4_210)
+        show(animate = false)
+        toEnginePage()
+        compose.onNodeWithText("PP-OCR 识别这张图用了 4.3 秒，建议用更快的 ML Kit；效果不好可以在「设置 › AI」里换回")
+            .assertIsDisplayed()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+        engineRow("ML Kit").assertIsSelected()
+    }
+
+    @Test fun `a phone that cannot run PP-OCR gets ML Kit`() {
+        advice = EngineAdvice.Failed
+        show(animate = false)
+        toEnginePage()
+        compose.onNodeWithText("PP-OCR 在这台手机上跑不起来，建议用 ML Kit").assertIsDisplayed()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+    }
+
+    /** 到了这一页还在测：先说在测；3 秒一到就建议 ML Kit，跑完再补上用了多久，选只选一次。 */
+    @Test fun `the verdict lands on the page when it comes and is applied once`() {
+        advice = EngineAdvice.Measuring
+        show(animate = false)
+        toEnginePage()
+        compose.onNodeWithText(MEASURING).assertIsDisplayed()
+        assertThat(chosen).isEmpty()
+        advice = EngineAdvice.Slow(null)
+        compose.waitForIdle()
+        compose.onNodeWithText("PP-OCR 识别这张图超过了 3 秒，建议用更快的 ML Kit；效果不好可以在「设置 › AI」里换回")
+            .assertIsDisplayed()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+        advice = EngineAdvice.Slow(5_000)
+        compose.waitForIdle()
+        compose.onNodeWithText("PP-OCR 识别这张图用了 5.0 秒，建议用更快的 ML Kit；效果不好可以在「设置 › AI」里换回")
+            .assertIsDisplayed()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+    }
+
+    /** 没等结论就自己点了一个：结论来了也不替人改。 */
+    @Test fun `a pick made before the verdict is kept`() {
+        advice = EngineAdvice.Measuring
+        show(animate = false)
+        toEnginePage()
+        engineRow("ML Kit").performClick()
+        assertThat(engine).isEqualTo(TextEngineOption.MLKIT)
+        advice = EngineAdvice.Fast(800)
+        compose.waitForIdle()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+        engineRow("ML Kit").assertIsSelected()
+    }
+
+    /** 结论来时不在这一页上（跳过了、翻过去了）：不替人改；翻回来看到了再选。 */
+    @Test fun `the verdict waits until the page is seen`() {
+        advice = EngineAdvice.Measuring
+        show(animate = false)
+        toEnginePage()
+        next(animate = false)
+        advice = EngineAdvice.Slow(null)
+        compose.waitForIdle()
+        assertThat(chosen).isEmpty()
+        assertThat(engine).isEqualTo(TextEngineOption.PADDLE)
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        compose.waitForIdle()
+        assertThat(chosen).containsExactly(TextEngineOption.MLKIT)
+    }
+
+    /** 测出结论前后字数不一样：图不跟着跳。 */
+    @Test fun `the engine page keeps the sample still when the text changes`() {
+        advice = EngineAdvice.Measuring
+        show(animate = false)
+        toEnginePage()
+        val before = stage.getBoundsInRoot()
+        advice = EngineAdvice.Slow(10_000)
+        compose.waitForIdle()
+        val after = stage.getBoundsInRoot()
+        assertThat(after.top.value).isWithin(0.5f).of(before.top.value)
+        assertThat(after.height.value).isWithin(0.5f).of(before.height.value)
+    }
+
     /** 横着放：图在左，说明在右，按钮都在屏幕里。 */
     @Config(qualifiers = "zh-rCN-w915dp-h412dp-xxhdpi")
     @Test fun `landscape puts the sample beside the text`() {
         show(animate = false)
+        compose.onNodeWithText("有码").assertIsDisplayed()
+        next(animate = false)
         val image = stage.getBoundsInRoot()
         val title = compose.onNodeWithText("自动打码").getBoundsInRoot()
         assertThat(image.right).isAtMost(title.left)
@@ -299,17 +441,18 @@ class OnboardingTourTest {
         compose.onNodeWithText("下一步").assertIsDisplayed()
     }
 
-    /** 竖着放：图在上，说明在下；前两页的图一样大、一样高（平移时不上下跳），第三页说明高，图小一些。 */
-    @Test fun `portrait stacks the sample above the text and keeps it level between the first two pages`() {
+    /** 竖着放：图在上，说明在下；自动打码、点文字打码两页的图一样大、一样高（平移时不上下跳），最后一页说明高，图小一些。 */
+    @Test fun `portrait stacks the sample above the text and keeps it level between the two tap pages`() {
         show(animate = false)
+        next(animate = false)
         val image = stage.getBoundsInRoot()
         val title = compose.onNodeWithText("自动打码").getBoundsInRoot()
         assertThat(image.bottom).isAtMost(title.top)
-        compose.onNodeWithText("下一步").performClick()
+        next(animate = false)
         val second = stage.getBoundsInRoot()
         assertThat(second.top.value).isWithin(0.5f).of(image.top.value)
         assertThat(second.height.value).isWithin(0.5f).of(image.height.value)
-        compose.onNodeWithText("下一步").performClick()
+        next(animate = false)
         assertThat(stage.getBoundsInRoot().height).isLessThan(image.height)
         compose.onNodeWithText("选择图片").assertIsDisplayed()
     }
@@ -329,6 +472,7 @@ class OnboardingTourTest {
     /** 翻页途中：两页的图都在屏幕上，进来的那一页从上到下一层比一层落在后面（视差），停下时对齐。 */
     @Test fun `turning a page slides it with the lower layers further out`() {
         show()
+        next()
         settle()
         val width = compose.onRoot().getBoundsInRoot().width.value
         compose.onNodeWithText("下一步").performClick()
@@ -348,6 +492,7 @@ class OnboardingTourTest {
     @Test fun `in right to left layouts the lower layers trail on the left`() {
         direction = LayoutDirection.Rtl
         show()
+        next()
         settle()
         compose.onNodeWithText("下一步").performClick()
         advance(PAGE_TURN_MS / 3)
@@ -357,12 +502,18 @@ class OnboardingTourTest {
         assertThat(body.right.value).isLessThan(title.right.value)
     }
 
-    /** 小屏、字放大：按钮还在屏幕里。 */
+    /** 小屏、字放大：每一页的按钮都还在屏幕里，识别引擎那一页也是。 */
     @Config(qualifiers = "en-rUS-w360dp-h640dp-xhdpi", fontScale = 1.3f)
     @Test fun `a small phone with large text still reaches every button`() {
+        advice = EngineAdvice.Slow(4_200)
         show(animate = false)
+        compose.onNodeWithText("Yomark").assertIsDisplayed()
+        compose.onNodeWithText("Next").performClick()
         compose.onNodeWithText("Masked automatically").assertIsDisplayed()
         compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Next").performClick()
+        compose.onNodeWithText("Engine").assertIsDisplayed()
+        compose.onNodeWithText("Skip").assertIsDisplayed()
         compose.onNodeWithText("Next").performClick()
         compose.onNodeWithText("Choose image").assertIsDisplayed()
         compose.onNodeWithText("Skip").assertIsDisplayed()

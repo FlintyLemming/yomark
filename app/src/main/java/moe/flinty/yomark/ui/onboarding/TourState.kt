@@ -24,12 +24,19 @@ import moe.flinty.yomark.ui.canvas.ScanEffect
 import moe.flinty.yomark.ui.canvas.ScanStyle
 
 /**
+ * 引导的几页，按先后排：欢迎、自动打码、点文字打码、识别引擎、设置里还有更多。
+ * 识别引擎只在首次引导里有（见 EngineProbe），设置里「帮助」重放的没有这一页。
+ */
+internal enum class TourPage { WELCOME, AUTO, TAP, ENGINE, MORE }
+
+/**
  * 引导走到哪儿了，转屏、进程被杀都要留着的那一份。码不存：由 [toggled] 和聊天开没开现算（见 TourSample.plan）。
  *
- * @param step 第几步（0 起）
- * @param revealed 识别动效演完了没有（或者没等它演完就按了「下一步」）。演完了的，回来时码直接在图上，不再演一遍
+ * @param step 第几步（0 起），是 [TourState.pages] 里的第几页
+ * @param revealed 识别动效演完了没有（或者没等它演完就翻走了）。演完了的，回来时码直接在图上，不再演一遍
  * @param toggled 点过、和出厂不一样的码，按点的先后：识别出的是点掉了，「line-」开头的是点上了
- * @param tapped 点字打上过码：第二步的提示就不用再框了
+ * @param tapped 点字打上过码：「点文字打码」的提示就不用再框了
+ * @param engineChosen 「识别引擎」那一页已经选过了（按测速预先选好，或者点了一个）：之后不再按测速改
  */
 @Parcelize
 internal data class TourProgress(
@@ -37,16 +44,24 @@ internal data class TourProgress(
     val revealed: Boolean = false,
     val toggled: List<String> = emptyList(),
     val tapped: Boolean = false,
+    val engineChosen: Boolean = false,
 ) : Parcelable
 
 /**
  * 引导页的状态：第几步、图上的码，点一下怎么变。点一下的规矩照编辑器（EditorViewModel.onTap）：
  * 点码拿掉，原地再点一下打回来，点没打码的一段字就把这一段遮住；没有撤销、没有手动框。
+ *
+ * @param pages 这一回有哪几页（见 [TourPage]）
  */
 @Stable
-internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
+internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean, val pages: List<TourPage> = ALL_PAGES) {
 
     var progress by saved
+
+    val lastStep: Int get() = pages.lastIndex
+
+    /** 「自动打码」是第几页：识别动效在这一页上演。 */
+    val autoStep: Int = pages.indexOf(TourPage.AUTO)
 
     /** 落码那一遍演完了，图上点得动了。编辑器识别中也点不了字（还没有字）。不存：回来时演完了的直接就是 true。 */
     var settled by mutableStateOf(progress.revealed)
@@ -63,11 +78,16 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
         if (!progress.revealed) progress = progress.copy(revealed = true)
     }
 
-    /** 翻到了第 [page] 页。识别动效还没演完就翻走了，码跟着落下来：不让人等。 */
+    /** 翻到了第 [page] 页。翻过了「自动打码」，识别动效还没演完的也收尾、码跟着落下来：不让人等。 */
     fun goTo(page: Int) {
-        val step = page.coerceIn(0, LAST_STEP)
+        val step = page.coerceIn(0, lastStep)
         if (step == progress.step) return
-        progress = progress.copy(step = step, revealed = progress.revealed || step > 0)
+        progress = progress.copy(step = step, revealed = progress.revealed || step > autoStep)
+    }
+
+    /** 「识别引擎」那一页选定了一个（预先选好的，或者点的）。 */
+    fun chooseEngine() {
+        if (!progress.engineChosen) progress = progress.copy(engineChosen = true)
     }
 
     /**
@@ -125,16 +145,18 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
     }
 
     companion object {
-        const val STEPS = 3
-        const val LAST_STEP = STEPS - 1
+        val ALL_PAGES: List<TourPage> = TourPage.entries
+
+        /** 没有「识别引擎」那一页：设置里「帮助」重放的。 */
+        val WITHOUT_ENGINE: List<TourPage> = ALL_PAGES - TourPage.ENGINE
     }
 }
 
 /** 记住引导的进度（转屏、进程被杀后接着来）。[animate] 为 false 时一开始就是演完了的样子。 */
 @Composable
-internal fun rememberTourState(chatOn: Boolean, animate: Boolean): TourState {
+internal fun rememberTourState(chatOn: Boolean, animate: Boolean, pages: List<TourPage>): TourState {
     val saved = rememberSaveable { mutableStateOf(TourProgress(revealed = !animate)) }
-    return remember { TourState(saved, chatOn) }
+    return remember { TourState(saved, chatOn, pages) }
 }
 
 /** 识别动效（磨砂）演多久再落码。扫光那种别取 2 秒整：结果正好卡在一遍光扫完时，收尾要多扫一遍（见 ScanEffect.settleMs）。 */
