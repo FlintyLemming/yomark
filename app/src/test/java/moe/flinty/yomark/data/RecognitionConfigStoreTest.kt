@@ -133,12 +133,12 @@ class RecognitionConfigStoreTest {
     @Test fun `reset leaves the appearance alone`() = runTest {
         val store = store()
         store.setThemeColor(ThemeColor.GREEN)
-        store.setScanStyle(ScanStyle.FROST)
+        store.setScanStyle(ScanStyle.SWEEP)
 
         store.resetSettings()
 
         assertThat(store.themeColor.first()).isEqualTo(ThemeColor.GREEN)
-        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.FROST)
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
     }
 
     /** 老安装存着 OFF 时点恢复默认，人脸要回到打码，不能被老值再迁成「关」。 */

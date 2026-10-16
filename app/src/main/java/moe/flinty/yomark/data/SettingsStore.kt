@@ -196,12 +196,12 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 识别动效：扫光或磨砂（见 ScanStyle）。出厂是扫光。
+     * 识别动效：磨砂或扫光（见 ScanStyle）。出厂是磨砂。
      *
      * 同样不放进 RecognitionConfig：它只是识别时画面上的过渡，放进去的话一换样式编辑器就会重跑识别。
-     * 认不出的值退回扫光，理由与 lastStyle 一致。
+     * 认不出的值退回磨砂，理由与 lastStyle 一致。
      */
-    val scanStyle: Flow<ScanStyle> = store.data.map { it[KEY_SCAN_STYLE].toEnum(ScanStyle.SWEEP) }
+    val scanStyle: Flow<ScanStyle> = store.data.map { it[KEY_SCAN_STYLE].toEnum(ScanStyle.FROST) }
 
     suspend fun setScanStyle(style: ScanStyle) {
         store.edit { it[KEY_SCAN_STYLE] = style.name }

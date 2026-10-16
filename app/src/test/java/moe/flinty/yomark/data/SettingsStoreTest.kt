@@ -200,18 +200,18 @@ class SettingsStoreTest {
     }
 
     @Test
-    fun `scan effect defaults to the sweep and remembers the choice`() = runTest {
+    fun `scan effect defaults to the frost and remembers the choice`() = runTest {
         val store = store()
-        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
-        store.setScanStyle(ScanStyle.FROST)
         assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.FROST)
+        store.setScanStyle(ScanStyle.SWEEP)
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
     }
 
     @Test
-    fun `an unknown stored scan effect falls back to the sweep rather than crashing`() = runTest {
+    fun `an unknown stored scan effect falls back to the frost rather than crashing`() = runTest {
         val store = store()
         store.writeRawScanStyleForTest("NOT_AN_EFFECT")
-        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.SWEEP)
+        assertThat(store.scanStyle.first()).isEqualTo(ScanStyle.FROST)
     }
 
     @Test

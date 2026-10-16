@@ -778,16 +778,16 @@ class SettingsScreenTest {
         assertThat(off).isTrue()
     }
 
-    @Test fun pickingTheFrostedScanEffectEmitsIt() {
+    @Test fun pickingTheSweepScanEffectEmitsIt() {
         var latest: ScanStyle? = null
         show {
             AppearanceSettingsScreen(
                 themeColor = ThemeColor.SYSTEM, onThemeColorChange = {},
-                scanStyle = ScanStyle.SWEEP, onScanStyleChange = { latest = it },
+                scanStyle = ScanStyle.FROST, onScanStyleChange = { latest = it },
                 onNavigateUp = {},
             )
         }
-        compose.onNodeWithText("磨砂").performClick()
-        assertThat(latest).isEqualTo(ScanStyle.FROST)
+        compose.onNodeWithText("扫光").performClick()
+        assertThat(latest).isEqualTo(ScanStyle.SWEEP)
     }
 }

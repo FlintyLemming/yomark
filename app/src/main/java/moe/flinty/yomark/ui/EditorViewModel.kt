@@ -99,10 +99,10 @@ class EditorViewModel(
 
     /**
      * 识别动效的样式（设置里选的）。只影响画布上的过渡，所以不进 EditorUiState——那里每换一张图就整个重建，
-     * 购买态、水印外观都得一路手动带着；这个直接跟着设置走。设置还没读到时按出厂的扫光算。
+     * 购买态、水印外观都得一路手动带着；这个直接跟着设置走。设置还没读到时按出厂的磨砂算。
      */
     val scanStyle: StateFlow<ScanStyle> =
-        settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.SWEEP)
+        settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.FROST)
 
     /**
      * 调试信息开着没有（设置 → 关于，连点版本号）。开着时顶栏多一个按钮，每次识别都在 [traceLog] 里记一份。
