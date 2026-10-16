@@ -308,7 +308,7 @@ class EditorViewModelTapLineTest {
         vm.onTap(PointF(100f, 25f))
         val id = vm.items().single { it.source == DetectorSource.LINE }.candidateId
 
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
         assertThat(vm.items().map { it.candidateId }).contains(id)
     }
 }

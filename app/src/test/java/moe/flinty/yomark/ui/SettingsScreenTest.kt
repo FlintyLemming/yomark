@@ -3,15 +3,18 @@ package moe.flinty.yomark.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -135,7 +138,7 @@ class SettingsScreenTest {
         compose.onNodeWithText("编辑、识别、水印样式").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
         val off = RuleCatalog.all.size - masked
-        compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类 · PP-OCR").assertIsDisplayed()
+        compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类").assertIsDisplayed()
     }
 
     @Test fun tappingATopicOpensItsPage() {
@@ -327,14 +330,17 @@ class SettingsScreenTest {
     private fun textPage(
         config: RecognitionConfig = RecognitionConfig(),
         onChange: (RecognitionConfig) -> Unit = {},
-        onOpenEngine: () -> Unit = {},
         onOpenRule: (String) -> Unit = {},
-    ) = show { TextSettingsScreen(config, onChange, onOpenEngine, onOpenRule, onNavigateUp = {}) }
+    ) = show { TextSettingsScreen(config, onChange, onOpenRule, onNavigateUp = {}) }
 
-    /** 识别引擎在上面，下面是各类；每类一行，小字是它眼下怎么处理。AI 增强识别没有开关了，总是开着。 */
-    @Test fun theTextPageReadsTextAndListsEveryKind() {
+    /**
+     * 每类一行，小字是它眼下怎么处理。识别引擎挪去了「AI」页，AI 增强识别没有开关了（总是开着），
+     * 上面原先的「文字识别」一组都不在了。
+     */
+    @Test fun theTextPageListsEveryKind() {
         textPage()
-        compose.onNodeWithText("识别引擎").assertIsDisplayed()
+        compose.onNodeWithText("识别引擎").assertDoesNotExist()
+        compose.onNodeWithText("文字识别").assertDoesNotExist()
         compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
         compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
@@ -356,13 +362,6 @@ class SettingsScreenTest {
         compose.onNode(hasTestTag("rule-name") and hasText("打码 · 没有旁证的不打码")).assertExists()
     }
 
-    @Test fun tappingTheEngineOpensItsPage() {
-        var opened = false
-        textPage(onOpenEngine = { opened = true })
-        compose.onNodeWithText("识别引擎").performClick()
-        assertThat(opened).isTrue()
-    }
-
     @Test fun tappingAKindOpensItsPage() {
         var opened: String? = null
         textPage(onOpenRule = { opened = it })
@@ -371,18 +370,26 @@ class SettingsScreenTest {
         assertThat(opened).isEqualTo("url")
     }
 
-    /** 恢复默认管这一页和它下面的各页：引擎、各类、人名的开关。人脸、条码不动。 */
-    @Test fun resettingTheTextPageKeepsFacesAndBarcodes() {
+    /** 恢复默认管这一页和它下面的各页：各类、人名的开关。人脸、条码不动，挪去了「AI」页的识别引擎也不动。 */
+    @Test fun resettingTheTextPageKeepsFacesBarcodesAndTheEngine() {
         var latest: RecognitionConfig? = null
         val config = RecognitionConfig(
-            textEngine = TextEngineOption.LATIN,
+            textEngine = TextEngineOption.MLKIT,
             faceState = RuleState.OFF,
             barcodeState = RuleState.OFF,
             maskUnanchoredNames = true,
         ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
         textPage(config, onChange = { latest = it })
         compose.onNodeWithText("恢复默认").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OFF, barcodeState = RuleState.OFF))
+        assertThat(latest).isEqualTo(
+            RecognitionConfig(textEngine = TextEngineOption.MLKIT, faceState = RuleState.OFF, barcodeState = RuleState.OFF),
+        )
+    }
+
+    /** 只改了识别引擎，「文字」页就是出厂的样子：恢复默认点不了。 */
+    @Test fun theEngineAloneLeavesTheTextPageAtFactory() {
+        textPage(RecognitionConfig(textEngine = TextEngineOption.MLKIT))
+        compose.onNodeWithText("恢复默认").assertIsNotEnabled()
     }
 
     @Test fun resetIsDisabledWhenTheTextPageIsAtFactory() {
@@ -390,12 +397,15 @@ class SettingsScreenTest {
         compose.onNodeWithText("恢复默认").assertIsNotEnabled()
     }
 
+    /** 只有 PP-OCR 和 ML Kit 两项：ML Kit 原先分英文、中文、中英三档，并成了一档，中英文都认。 */
     @Test fun pickingAnEngineEmitsIt() {
         var latest: RecognitionConfig? = null
         show { TextEngineSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("PP-OCR").assertIsSelected()
-        compose.onNodeWithText("ML Kit 英文").performClick()
-        assertThat(latest?.textEngine).isEqualTo(TextEngineOption.LATIN)
+        compose.onNode(hasText("PP-OCR") and hasText("中文最准，速度稍慢")).assertIsSelected()
+        compose.onAllNodes(isSelectable()).assertCountEquals(2)
+        listOf("ML Kit 英文", "ML Kit 中文", "ML Kit 中英").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        compose.onNode(hasText("ML Kit") and hasText("中英文都能认")).performClick()
+        assertThat(latest?.textEngine).isEqualTo(TextEngineOption.MLKIT)
     }
 
     // ---------- 文字里的一类 ----------
@@ -468,7 +478,7 @@ class SettingsScreenTest {
 
     /** 填了什么一看就知道，key 只说填没填；没填完不能测。 */
     @Test fun theExternalGroupSaysWhatIsFilledInWithoutShowingTheKey() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(model = "")) }
+        show { AiSettingsScreen(null, TextEngineOption.PADDLE, onOpenEngine = {}, onNavigateUp = {}, external = filled.copy(model = "")) }
         compose.onNodeWithText("外部模型").assertIsDisplayed()
         compose.onNodeWithText("https://api.example.com/v1").assertIsDisplayed()
         compose.onNodeWithText("已填写").assertIsDisplayed()
@@ -489,13 +499,13 @@ class SettingsScreenTest {
     }
 
     @Test fun anHttpAddressIsTurnedDownBeforeTesting() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(baseUrl = "http://192.168.1.2/v1")) }
+        show { AiSettingsScreen(null, TextEngineOption.PADDLE, onOpenEngine = {}, onNavigateUp = {}, external = filled.copy(baseUrl = "http://192.168.1.2/v1")) }
         compose.onNodeWithText("接口地址要以 https:// 开头").assertIsDisplayed()
         compose.onNodeWithTag("external-test").assertIsNotEnabled()
     }
 
     @Test fun testingTheConnectionSaysHowLongItTook() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = { 1400L }) }
+        show { AiSettingsScreen(null, TextEngineOption.PADDLE, onOpenEngine = {}, onNavigateUp = {}, external = filled, onTestExternal = { 1400L }) }
         compose.onNodeWithTag("external-test").performClick()
         compose.onNodeWithText("可用 · 1.4 秒").assertIsDisplayed()
     }
@@ -503,7 +513,7 @@ class SettingsScreenTest {
     /** 401、404 带着接口自己说的那句：一看就知道是 key 还是地址填错了。 */
     @Test fun aFailedTestSaysWhy() {
         show {
-            AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = {
+            AiSettingsScreen(null, TextEngineOption.PADDLE, onOpenEngine = {}, onNavigateUp = {}, external = filled, onTestExternal = {
                 throw ExternalModelException(ExternalModelException.Reason.HTTP, 401, "Invalid API key")
             })
         }
@@ -513,7 +523,28 @@ class SettingsScreenTest {
 
     // ---------- AI ----------
 
-    private fun ai(nano: NanoStatus?) = show { AiSettingsScreen(nano, onNavigateUp = {}) }
+    private fun ai(
+        nano: NanoStatus?,
+        textEngine: TextEngineOption = RecognitionConfig().textEngine,
+        onOpenEngine: () -> Unit = {},
+    ) = show { AiSettingsScreen(nano, textEngine, onOpenEngine, onNavigateUp = {}) }
+
+    /** 识别引擎从「文字」挪到了这里，在最上面：小字是眼下用的那个，点了进识别引擎页。 */
+    @Test fun theAiPageSaysWhichEngineIsInUseAndOpensIt() {
+        var opened = false
+        ai(nano = null, textEngine = TextEngineOption.MLKIT, onOpenEngine = { opened = true })
+        compose.onNode(hasTestTag("engine") and hasText("识别引擎") and hasText("ML Kit")).assertIsDisplayed()
+        compose.onNodeWithTag("engine").performClick()
+        assertThat(opened).isTrue()
+    }
+
+    /** 实验室里打开了外部模型，那一组排在识别引擎下面。 */
+    @Test fun theExternalGroupSitsBelowTheEngine() {
+        show { AiSettingsScreen(null, TextEngineOption.PADDLE, onOpenEngine = {}, onNavigateUp = {}, external = filled) }
+        val engine = compose.onNodeWithTag("engine").getUnclippedBoundsInRoot()
+        val external = compose.onNodeWithText("外部模型").getUnclippedBoundsInRoot()
+        assertThat(external.top).isGreaterThan(engine.bottom)
+    }
 
     /** 进页时先问 AICore，问完之前不能空着，也不能先说「没有」。 */
     @Test fun theAiPageSaysItIsStillChecking() {
@@ -557,7 +588,6 @@ class SettingsScreenTest {
     /** 随包的 PP-OCR 不用问谁：版本是打包时定的，进页就写出来。 */
     @Test fun theAiPageShowsTheBundledPpOcrVersion() {
         ai(nano = null)
-        compose.onNodeWithText("PP-OCR").assertIsDisplayed()
         compose.onNodeWithText("PP-OCRv6 small · 随安装包内置").assertIsDisplayed()
     }
 

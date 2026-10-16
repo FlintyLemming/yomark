@@ -24,7 +24,7 @@ import moe.flinty.yomark.ui.AppLanguage
 
 /**
  * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
- * TEXT_ENGINE 与 TEXT_RULE 从「文字」页点进去；TEXT_RULE 另带一个规则 id，说明是哪一类。
+ * TEXT_ENGINE 从「AI」页点进去（2026-10-16 前在「文字」页）；TEXT_RULE 从「文字」页点进去，另带一个规则 id，说明是哪一类。
  */
 enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, GENERAL, APPEARANCE, LABS, DEVELOPER, LANGUAGE, ABOUT, DEBUG_TRACE }
 
@@ -34,8 +34,9 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, GENER
  * 只是一张目录：每一项点进去是一页，一级页上不直接摆选项。原先文字识别、条码、人脸这几根轴的选项
  * 直接铺在一级页上，规则却收在二级页里，层级对不齐；现在一律收进二级页，一级页每一项下面写着它眼下的状态。
  *
- * 第一组是截图里认得出的三样东西：文字、人脸、条码。怎么认、认出来怎么办，都在各自那一页里——
- * 「文字识别」原先单独一项，2026-10-09 并进了「文字」。第二组是 AI（本机的 Gemini Nano）、通用和外观。
+ * 第一组是截图里认得出的三样东西：文字、人脸、条码，认出来怎么办都在各自那一页里。
+ * 「文字识别」原先单独一项，2026-10-09 并进了「文字」；其中的识别引擎 2026-10-16 又挪去了「AI」。
+ * 第二组是 AI（识别引擎，本机的 Gemini Nano 和随包的识别模型）、通用和外观。
  * 「通用」是 2026-10-15 由「编辑」「导出」两项并成的，那两页各只有一项。
  * 最后是关于：版本号、隐私权政策、恢复默认设置（隐私权政策原先单独一行，恢复默认原先是一级页的最后一项，2026-10-11 都挪了进去）。
  * 关于上面是「语言」（2026-10-12 起），小字写着眼下的界面语言；再往下是「帮助」（2026-10-16 起），点了重新放一遍首次引导。
@@ -155,17 +156,16 @@ fun SettingsScreen(
     }
 }
 
-/** 「打码 15 类 · 关闭 5 类 · PP-OCR」：没有关掉的就只写打码几类，最后是识别引擎。 */
+/** 「打码 15 类 · 关闭 5 类」：没有关掉的就只写打码几类。识别引擎原先也写在最后，2026-10-16 跟着挪去了「AI」。 */
 @Composable
 internal fun textSummary(config: RecognitionConfig): String {
     val counts = RuleCatalog.all.groupingBy { RuleCatalog.stateOf(config, it.id) }.eachCount()
-    val parts = listOf(
+    return listOf(
         RuleState.MASKED to R.string.summary_masked,
         RuleState.OFF to R.string.summary_off,
     ).mapNotNull { (state, label) ->
         counts[state]?.let { stringResource(R.string.count_kinds, it, stringResource(label)) }
-    }
-    return (parts + stringResource(textEngineLabel(config.textEngine))).joinToString(" · ")
+    }.joinToString(" · ")
 }
 
 /** 人脸、条码那一行：「打码 · 快速」；关掉了就只写「关闭」，模式无所谓了。 */

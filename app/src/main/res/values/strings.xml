@@ -232,13 +232,9 @@
     <string name="engine">Engine</string>
     <string name="sensitive_info">Sensitive information</string>
     <string name="engine_paddle">PP-OCR</string>
-    <string name="engine_latin">ML Kit Latin</string>
-    <string name="engine_chinese">ML Kit Chinese</string>
-    <string name="engine_both">ML Kit both</string>
+    <string name="engine_mlkit">ML Kit</string>
     <string name="engine_paddle_summary">Best for Chinese, a bit slower</string>
-    <string name="engine_latin_summary">No Chinese</string>
-    <string name="engine_chinese_summary">Chinese and English</string>
-    <string name="engine_both_summary">Runs both models, slowest</string>
+    <string name="engine_mlkit_summary">Chinese and English</string>
     <string name="when_found">When %1$s is found</string>
     <string name="guessed_names">Names guessed from text</string>
     <string name="mask_unanchored">Mask those without evidence too</string>

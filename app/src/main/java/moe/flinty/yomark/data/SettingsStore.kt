@@ -295,11 +295,12 @@ class SettingsStore internal constructor(
      * 现在挪到了各自的处理方式。老安装里存着 OFF、还没有处理方式这一项的，读成「关」，
      * 识别模式退回出厂值——不迁的话，关掉过人脸的用户升级后会突然又被打码。
      * 处理方式里存着已经去掉的「仅圈出」的，同样读成「关」（见 RuleState.fromName），不落回出厂的打码。
+     * 识别引擎存着并掉了的 ML Kit 英文、中文、中英的，读成 ML Kit（见 TextEngineOption.fromName），不落回出厂的 PP-OCR。
      */
     val recognitionConfig: Flow<RecognitionConfig> = store.data.map { prefs ->
         val fallback = RecognitionConfig()
         RecognitionConfig(
-            textEngine = prefs[KEY_TEXT_ENGINE].toEnum(fallback.textEngine),
+            textEngine = prefs[KEY_TEXT_ENGINE]?.let { TextEngineOption.fromName(it) } ?: fallback.textEngine,
             barcode = prefs[KEY_BARCODE].toEnum(fallback.barcode),
             barcodeState = prefs[KEY_BARCODE_STATE].toRuleState(
                 if (prefs[KEY_BARCODE] == LEGACY_OFF) RuleState.OFF else fallback.barcodeState,

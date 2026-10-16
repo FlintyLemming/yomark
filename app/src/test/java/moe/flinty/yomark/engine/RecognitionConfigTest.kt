@@ -7,8 +7,22 @@ import org.junit.Test
 class RecognitionConfigTest {
 
     @Test fun `factory default is pp-ocr`() {
-        // 真机截图上中文识别明显好于 ML Kit，且能给出字符级的框；ML Kit 三档留作对比
+        // 真机截图上中文识别明显好于 ML Kit，且能给出字符级的框；ML Kit 留作对比
         assertThat(RecognitionConfig().textEngine).isEqualTo(TextEngineOption.PADDLE)
+    }
+
+    /** 识别引擎只有 PP-OCR 和 ML Kit 两项，设置页上按这个顺序排。 */
+    @Test fun `the engines are pp-ocr and ml kit`() {
+        assertThat(TextEngineOption.entries).containsExactly(TextEngineOption.PADDLE, TextEngineOption.MLKIT).inOrder()
+    }
+
+    /** ML Kit 原先分英文、中文、中英三档，2026-10-16 并成一档：选过哪一档的都读成 ML Kit，不落回出厂的 PP-OCR。 */
+    @Test fun `the old ml kit engines read as ml kit`() {
+        listOf("LATIN", "CHINESE", "BOTH").forEach {
+            assertThat(TextEngineOption.fromName(it)).isEqualTo(TextEngineOption.MLKIT)
+        }
+        TextEngineOption.entries.forEach { assertThat(TextEngineOption.fromName(it.name)).isEqualTo(it) }
+        assertThat(TextEngineOption.fromName("NOT_AN_ENGINE")).isNull()
     }
 
     @Test fun `factory default keeps barcode strict and face fast`() {
@@ -92,7 +106,7 @@ class RecognitionConfigTest {
 
     @Test fun `overrides survive a serialization round trip`() {
         val cfg = RecognitionConfig(
-            textEngine = TextEngineOption.CHINESE,
+            textEngine = TextEngineOption.MLKIT,
             barcode = BarcodeOption.STRICT,
             faceState = RuleState.OFF,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),

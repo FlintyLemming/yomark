@@ -244,11 +244,11 @@ class EditorViewModelBatchTest {
     fun `an image scanned before the settings changed is scanned again when you come back`() = runTest(dispatcher) {
         val vm = open("h", 2)
         vm.selectImage(1); advanceUntilIdle()
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
-        assertThat(vm.found()).containsExactly("found-LATIN")       // 画布上这张当场重跑
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
+        assertThat(vm.found()).containsExactly("found-MLKIT")       // 画布上这张当场重跑
 
         vm.selectImage(0); advanceUntilIdle()
-        assertThat(vm.found()).containsExactly("found-LATIN")       // 切回来的那张也按新方案
+        assertThat(vm.found()).containsExactly("found-MLKIT")       // 切回来的那张也按新方案
         assertThat(vm.state.value.canUndo).isTrue()                 // 和单张一样，撤销一下回到换方案之前
     }
 
