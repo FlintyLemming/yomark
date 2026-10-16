@@ -5,11 +5,15 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.fadeOut
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -18,21 +22,29 @@ import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.billing.BillingRepository
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.billing.PurchaseStore
+import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.data.SettingsStore
+import moe.flinty.yomark.engine.RecognitionConfig
+import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.ui.EditorActivity
+import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.PaywallDialog
+import moe.flinty.yomark.ui.components.foldTween
 import moe.flinty.yomark.ui.components.restorePurchase
 import moe.flinty.yomark.ui.enableLightEdgeToEdge
-import moe.flinty.yomark.ui.onboarding.OnboardingScreen
+import moe.flinty.yomark.ui.onboarding.OnboardingTour
+import moe.flinty.yomark.ui.onboarding.TourSample
 import moe.flinty.yomark.ui.settings.SettingsActivity
 import moe.flinty.yomark.ui.thanks.showThanksWhenPurchased
 import moe.flinty.yomark.ui.theme.YomarkTheme
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * 启动器入口：首页（第一次打开时先是引导页）。
+ * 启动器入口：首页（第一次打开时先是三步引导，见 OnboardingTour）。
  *
  * 选好图交给 EditorActivity，编辑器、设置都是压在它上面的独立 Activity，
  * 返回一律交给系统处理（finish 回到下面那一层），预见式返回的跨 Activity 动画才放得出来。
@@ -60,34 +72,70 @@ class HomeActivity : YomarkActivity() {
         showThanksWhenPurchased(billing)
 
         setContent {
-            // null = 还没读到设置。这一瞬间什么都不画：先画首页再切引导页会闪一下，
-            // 而这一屏恰恰是用户对这个 app 的第一印象。
-            val seen by produceState<Boolean?>(initialValue = null) {
-                value = settings.onboardingSeen.first()
-            }
-            // 点过「选择图片」之后就不该再回到引导页。onboardingSeen 是异步写的，
-            // 光靠上面那一次读回来的值，从编辑器返回时又会把引导页画出来。
+            // 走完、跳过引导就不该再回到引导。onboardingSeen 是异步写的，
+            // 光靠读回来的值，从编辑器、设置返回时（换语言会重建这一页）又会把引导画出来。
             var dismissed by rememberSaveable { mutableStateOf(false) }
+            // null = 还没读到设置。这一瞬间什么都不画：先画首页再切引导会闪一下，
+            // 而这一屏恰恰是用户对这个 app 的第一印象。引导要的样图也在这时解好，引导的头一帧就有图
+            var launch by remember { mutableStateOf<Launch?>(null) }
+            LaunchedEffect(Unit) {
+                launch = if (dismissed || settings.onboardingSeen.first()) {
+                    Launch.Home
+                } else {
+                    Launch.Tour(
+                        sample = withContext(Dispatchers.Default) { TourSample.load(resources) },
+                        scanStyle = settings.scanStyle.first(),
+                        chatOn = settings.recognitionConfig.first().chatState != RuleState.OFF,
+                    )
+                }
+            }
+            val config by settings.recognitionConfig.collectAsStateWithLifecycle(initialValue = null as RecognitionConfig?)
             var paywall by rememberSaveable { mutableStateOf(false) }
             val isPro by billing.isPro.collectAsStateWithLifecycle()
             // 买成了（或者联网校验发现早就买过）：购买框跟着关掉。入口按钮都没了，框不能还开着
             LaunchedEffect(isPro) { if (isPro && !Edition.isFree) paywall = false }
 
+            val finishTour = {
+                dismissed = true
+                lifecycleScope.launch { settings.markOnboardingSeen() }
+                Unit
+            }
+
             YomarkTheme(settings) {
                 Surface {
-                    when {
-                        seen == null -> Unit
-                        seen == false && !dismissed -> OnboardingScreen {
-                            dismissed = true
-                            lifecycleScope.launch { settings.markOnboardingSeen() }
-                            pickImage()
-                        }
-                        else -> HomeScreen(
+                    val current = launch ?: return@Surface
+                    // 引导走完（跳过、选图、去设置）时淡出，首页先垫在底下
+                    val tour = remember { MutableTransitionState(current is Launch.Tour && !dismissed) }
+                    tour.targetState = current is Launch.Tour && !dismissed
+                    if (!tour.currentState || !tour.targetState) {
+                        HomeScreen(
                             onPickImage = ::pickImage,
-                            onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
+                            onSettings = ::openSettings,
                             // 已购用户不该再看见购买入口；开源版留着它，点开是去除水印与打赏
                             onRemoveWatermark = if (isPro && !Edition.isFree) null else ({ paywall = true }),
                         )
+                    }
+                    if (current is Launch.Tour) {
+                        AnimatedVisibility(tour, enter = EnterTransition.None, exit = fadeOut(foldTween(false))) {
+                            OnboardingTour(
+                                sample = current.sample,
+                                scanStyle = current.scanStyle,
+                                chatOn = config?.let { it.chatState != RuleState.OFF } ?: current.chatOn,
+                                onChatChange = ::setChat,
+                                onSkip = finishTour,
+                                onPickImage = {
+                                    finishTour()
+                                    pickImage()
+                                },
+                                onOpenSettings = {
+                                    finishTour()
+                                    openSettings()
+                                },
+                                interactive = tour.targetState,
+                            )
+                        }
+                        // 淡完了就放掉样图（一张 1080×1680 的位图）
+                        if (tour.isIdle && !tour.currentState) LaunchedEffect(Unit) { launch = Launch.Home }
                     }
                     if (paywall && Edition.isFree) {
                         FreeEditionDialog(unlocked = isPro, onUnlock = billing::unlockFree, onDismiss = { paywall = false })
@@ -110,5 +158,23 @@ class HomeActivity : YomarkActivity() {
 
     private fun pickImage() {
         picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+    }
+
+    private fun openSettings() {
+        startActivity(Intent(this, SettingsActivity::class.java))
+    }
+
+    /** 引导第三步的「识别聊天记录」：和实验室页上的同一个开关，写法也一样（见 SettingsActivity）。 */
+    private fun setChat(on: Boolean) {
+        lifecycleScope.launch {
+            val config = settings.recognitionConfig.first()
+            settings.setRecognitionConfig(config.copy(chatState = if (on) RuleState.MASKED else RuleState.OFF))
+        }
+    }
+
+    /** 这一页一打开是首页还是引导。 */
+    private sealed interface Launch {
+        data object Home : Launch
+        class Tour(val sample: SourceImage, val scanStyle: ScanStyle, val chatOn: Boolean) : Launch
     }
 }
