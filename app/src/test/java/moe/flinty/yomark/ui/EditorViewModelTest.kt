@@ -16,6 +16,8 @@ import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.core.model.Ink
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
@@ -684,5 +686,53 @@ class EditorViewModelTest {
         vm.onImageChosen(sampleUri("two.jpg")); advanceUntilIdle()
         assertThat(vm.state.value.canUndo).isFalse()
         assertThat(vm.state.value.plan.items).isEmpty()
+    }
+
+    // ---------- 画笔的箭头 ----------
+
+    /** 画笔选了箭头：拉一下就是一支箭头，只记头尾两个点，外接框把头也框进去；和别的一笔一样选中、一步撤销。 */
+    @Test
+    fun `a pen set to arrow draws an arrow from where the finger went down to where it lifted`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        val pen = vm.state.value.brush
+        vm.editLook(pen.copy(options = pen.options.copy(penShape = StrokeShape.ARROW)))
+        vm.onInk(listOf(PointF(40f, 300f), PointF(100f, 250f), PointF(300f, 100f)))
+
+        val item = vm.state.value.plan.items.single()
+        assertThat(item.look.style).isEqualTo(MaskStyle.PEN)
+        assertThat(item.ink!!.arrow).isTrue()
+        assertThat(item.ink!!.points).hasSize(2)
+        val half = item.look.options.halfWidth(MaskStyle.PEN, 400f)
+        val back = Ink.toImage(item.ink!!, item.quad, Ink.margin(half, arrow = true))
+        assertThat(back.first().x).isWithin(0.01f).of(40f)
+        assertThat(back.last().y).isWithin(0.01f).of(100f)
+        assertThat(item.quad.bounds().right).isAtLeast(300f + half * Ink.ARROW_HEAD_HALF - 0.01f)
+        assertThat(vm.state.value.selectedManualId).isEqualTo(item.candidateId)
+        vm.undo()
+        assertThat(vm.state.value.plan.items).isEmpty()
+    }
+
+    /** 选着一支箭头拿起马克笔：马克笔画不出箭头，箭头原样留着，选中收起。换成画笔的拉框、手画，它还是箭头。 */
+    @Test
+    fun `an arrow never turns into a marker stroke`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.setStyle(MaskStyle.PEN)
+        val pen = vm.state.value.brush
+        vm.editLook(pen.copy(options = pen.options.copy(penShape = StrokeShape.ARROW)))
+        vm.onInk(listOf(PointF(40f, 300f), PointF(300f, 100f)))
+        val arrow = vm.state.value.selectedManualId!!
+
+        val bar = vm.state.value.barLook
+        vm.editLook(bar.copy(options = bar.options.copy(penShape = StrokeShape.BOX, penColor = Color.BLACK)))
+        val kept = vm.state.value.plan.find(arrow)!!
+        assertThat(kept.ink!!.arrow).isTrue()
+        assertThat(kept.look.options.penColor).isEqualTo(Color.BLACK)
+
+        vm.setStyle(MaskStyle.MARKER)
+        assertThat(vm.state.value.selectedManualId).isNull()
+        assertThat(vm.state.value.plan.find(arrow)!!.look.style).isEqualTo(MaskStyle.PEN)
     }
 }

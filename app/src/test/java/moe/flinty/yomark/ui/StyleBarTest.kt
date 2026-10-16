@@ -411,4 +411,18 @@ class StyleBarTest {
         compose.onNode(hasSetTextAction()).assertIsFocused().performTextInput("!")
         assertThat(actions.texts.last()).isEqualTo("Hi!")
     }
+
+    /** 画笔的画法有三种：框选、手绘、箭头。马克笔只有前两种。 */
+    @Test fun thePenCanDrawAnArrowButTheMarkerCannot() {
+        val actions = Recorder()
+        show(open(MaskStyle.PEN), actions)
+        compose.onNodeWithText("箭头").performClick()
+        assertThat(actions.looks.single().first.options.penShape).isEqualTo(StrokeShape.ARROW)
+    }
+
+    @Test fun theMarkerHasNoArrow() {
+        show(open(MaskStyle.MARKER))
+        compose.onNodeWithText("手绘").assertIsDisplayed()
+        compose.onNodeWithText("箭头").assertDoesNotExist()
+    }
 }

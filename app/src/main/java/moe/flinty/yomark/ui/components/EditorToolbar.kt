@@ -405,7 +405,7 @@ private fun RedactTools(model: StyleBarModel, actions: StyleBarActions, purposeO
 }
 
 /**
- * 编辑：马克笔、画笔是样式，和打码的几种一样是画笔（EditorUiState.brush）：都能拉框，也都能照手画（见 StrokeShape）；
+ * 编辑：马克笔、画笔是样式，和打码的几种一样是画笔（EditorUiState.brush）：都能拉框，也都能照手画，画笔还能拉箭头（见 StrokeShape）；
  * 文本也是样式：拿着它点图上一处就在那儿写字（见 EditorViewModel.onTap），写的字在它的调节面板里；
  * 水印是用途水印。点它和点了再点马克笔、画笔一样，胶囊长出它的调节面板（见 EditorBottomBar），
  * 不用先点一下选中：它不是一种样式，没有「换成它」这一步。面板开着时选中的是它，名字后面的小箭头朝下，再点一下收起。

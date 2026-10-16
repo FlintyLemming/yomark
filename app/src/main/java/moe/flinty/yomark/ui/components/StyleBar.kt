@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.outlined.CropSquare
 import androidx.compose.material.icons.outlined.Gesture
+import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -151,14 +152,16 @@ internal fun StyleGlyph(
                 .size(width = 22.dp * scale, height = 12.dp * scale)
                 .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
         )
-        // 画笔：手画是一道弯线，拉框是一个空心框，都是画笔的颜色
-        MaskStyle.PEN -> if (options.penShape == StrokeShape.FREEHAND) {
-            Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
-        } else Box(
-            Modifier
-                .size(width = 20.dp * scale, height = 14.dp * scale)
-                .border(2.dp * scale, Color(options.penColor), RoundedCornerShape(2.dp * scale)),
-        )
+        // 画笔：手画是一道弯线，拉框是一个空心框，箭头是一支斜着的箭头，都是画笔的颜色
+        MaskStyle.PEN -> when (options.penShape) {
+            StrokeShape.FREEHAND -> Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
+            StrokeShape.ARROW -> Icon(Icons.Outlined.NorthEast, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
+            StrokeShape.BOX -> Box(
+                Modifier
+                    .size(width = 20.dp * scale, height = 14.dp * scale)
+                    .border(2.dp * scale, Color(options.penColor), RoundedCornerShape(2.dp * scale)),
+            )
+        }
         // 文本：一个 T，是文本的颜色；垫着底色时是那个颜色的一块底，上面的 T 和图上的字一样取黑或白
         MaskStyle.TEXT -> if (options.textBackground) Box(
             Modifier
@@ -362,7 +365,7 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         }
 
         MaskStyle.MARKER -> {
-            ShapeChoice(options.markerShape) { emit(options.copy(markerShape = it)) }
+            ShapeChoice(options.markerShape, MARKER_SHAPES) { emit(options.copy(markerShape = it)) }
             Colors(ColorTarget.MARKER, MARKER_PALETTE, stringResource(R.string.color))
             SliderRow(
                 label = stringResource(R.string.marker_opacity),
@@ -380,7 +383,7 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         }
 
         MaskStyle.PEN -> {
-            ShapeChoice(options.penShape) { emit(options.copy(penShape = it)) }
+            ShapeChoice(options.penShape, PEN_SHAPES) { emit(options.copy(penShape = it)) }
             Colors(ColorTarget.PEN, PEN_PALETTE, stringResource(R.string.color))
             WidthSlider(options.penWidth, MaskOptions.PEN_WIDTH_RANGE, actions) { emit(options.copy(penWidth = it), inProgress = true) }
         }
@@ -459,38 +462,52 @@ private fun TextInput(model: StyleBarModel, actions: StyleBarActions, onFocus: (
 private fun atEnd(text: String) = TextFieldValue(text, TextRange(text.length))
 
 /**
- * 马克笔、画笔下一笔怎么画：拉框，还是照着手指画（见 StrokeShape）。管的是下一笔，画好的不变。
+ * 马克笔、画笔下一笔怎么画：拉框，照着手指画，画笔还能拉箭头（见 StrokeShape）。管的是下一笔，画好的不变。
+ * [shapes] 是这一种笔有的几种，按这个顺序排。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ShapeChoice(shape: StrokeShape, onShape: (StrokeShape) -> Unit) {
+private fun ShapeChoice(shape: StrokeShape, shapes: List<StrokeShape>, onShape: (StrokeShape) -> Unit) {
     PanelLabel(stringResource(R.string.stroke_shape))
-    val choices = listOf(
-        StrokeShape.BOX to stringResource(R.string.stroke_shape_box),
-        StrokeShape.FREEHAND to stringResource(R.string.stroke_shape_freehand),
-    )
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        choices.forEachIndexed { i, (value, label) ->
+        shapes.forEachIndexed { i, value ->
             SegmentedButton(
                 selected = shape == value,
                 onClick = { if (shape != value) onShape(value) },
-                shape = SegmentedButtonDefaults.itemShape(i, choices.size),
+                shape = SegmentedButtonDefaults.itemShape(i, shapes.size),
                 icon = {},
             ) {
                 // 按钮里的东西是叠着摆的，图标和字自己排成一行
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
-                        if (value == StrokeShape.BOX) Icons.Outlined.CropSquare else Icons.Outlined.Gesture,
+                        when (value) {
+                            StrokeShape.BOX -> Icons.Outlined.CropSquare
+                            StrokeShape.FREEHAND -> Icons.Outlined.Gesture
+                            StrokeShape.ARROW -> Icons.Outlined.NorthEast
+                        },
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                     )
                     Spacer(Modifier.width(6.dp))
-                    Text(label)
+                    Text(
+                        stringResource(
+                            when (value) {
+                                StrokeShape.BOX -> R.string.stroke_shape_box
+                                StrokeShape.FREEHAND -> R.string.stroke_shape_freehand
+                                StrokeShape.ARROW -> R.string.stroke_shape_arrow
+                            },
+                        ),
+                        maxLines = 1,
+                    )
                 }
             }
         }
     }
 }
+
+/** 马克笔没有箭头：半透明的粗箭头看不清头。 */
+private val MARKER_SHAPES = listOf(StrokeShape.BOX, StrokeShape.FREEHAND)
+private val PEN_SHAPES = listOf(StrokeShape.BOX, StrokeShape.FREEHAND, StrokeShape.ARROW)
 
 /** 笔宽：滑条往右更粗，旁边写着按 1080 宽的截图算是几像素，心里有个数。 */
 @Composable
