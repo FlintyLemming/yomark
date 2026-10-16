@@ -15,6 +15,7 @@ import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
+import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.ui.EditorActivity
 import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.ui.canvas.ScanStyle
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 /**
  * 设置里「帮助」重新放一遍首次引导。压在设置上面单独一个 Activity，不回首页：
  * 设置也可能是从编辑器进来的，回首页就把编辑器里的图丢了。
+ * 不测速，也没有「识别引擎」那一页：用了一阵的人自己知道快慢，要换在「AI」里换。
  *
  * 走完的去处跟着变：跳过、打开设置都是 finish 回到设置；选择图片照常进编辑器（Picker 里取消也回设置）。
  */
@@ -79,8 +81,14 @@ class TourActivity : YomarkActivity() {
     }
 }
 
-/** 引导第三步的「识别聊天记录」：和实验室页上的同一个开关，写法也一样（见 SettingsActivity）。 */
+/** 引导最后一页的「识别聊天记录」：和实验室页上的同一个开关，写法也一样（见 SettingsActivity）。 */
 internal suspend fun SettingsStore.setTourChat(on: Boolean) {
     val config = recognitionConfig.first()
     setRecognitionConfig(config.copy(chatState = if (on) RuleState.MASKED else RuleState.OFF))
+}
+
+/** 首次引导「识别引擎」那一页选的：和「AI › 识别引擎」里选是同一项。没变就不写。 */
+internal suspend fun SettingsStore.setTourEngine(engine: TextEngineOption) {
+    val config = recognitionConfig.first()
+    if (config.textEngine != engine) setRecognitionConfig(config.copy(textEngine = engine))
 }

@@ -66,7 +66,7 @@ internal object TourSample {
         RectF(934.9536f, 1586.782f, 1022.54645f, 1638.6868f),      // 发送
     ).map { Quad.fromRect(it) }
 
-    /** 第二步让用户点的那一段：网盘链接，出厂不打码，又是该遮的。 */
+    /** 「点文字打码」让用户点的那一段：网盘链接，出厂不打码，又是该遮的。 */
     const val LINK_INDEX = 12
     val LINK: Quad get() = LINES[LINK_INDEX]
     val LINK_CENTER: PointF get() = LINK.bounds().let { PointF(it.centerX(), it.centerY()) }
