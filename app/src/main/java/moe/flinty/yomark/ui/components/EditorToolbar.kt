@@ -5,6 +5,7 @@ import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
@@ -1098,8 +1099,11 @@ private const val COLLAPSE_MS = 300
 private val COLLAPSE_EASING = SpringEasing(response = 0.27f, seconds = COLLAPSE_MS / 1000f)
 
 /** 展开、收回各走各的：工具那一行的宽。面板的高见 [panelFoldSpec]，胶囊上的东西淡进淡出见 [contentFoldSpec]。 */
-internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
-    if (opening) tween(EXPAND_MS, easing = EXPAND_EASING) else tween(COLLAPSE_MS, easing = COLLAPSE_EASING)
+internal fun foldSpec(opening: Boolean): AnimationSpec<Float> = foldTween(opening)
+
+/** 同 [foldSpec]，给淡入淡出、尺寸、颜色这些要有限时长、不是 Float 的动画用（首次引导）。 */
+internal fun <T> foldTween(opening: Boolean, delayMillis: Int = 0): TweenSpec<T> =
+    if (opening) tween(EXPAND_MS, delayMillis, EXPAND_EASING) else tween(COLLAPSE_MS, delayMillis, COLLAPSE_EASING)
 
 /**
  * 调节面板（胶囊往上长出来的那一截，见 EditorBottomBar）的高。展开和这一行的宽一起长；
@@ -1117,8 +1121,11 @@ private val PANEL_COLLAPSE_EASING = SpringEasing(response = 0.2f, seconds = COLL
  * 原先它们跟着胶囊的进度慢慢淡，半透明时就被往回收的胶囊边裁掉一截（「Medium」剩「Med」），又和淡回来的两组叠成一片（2026-10-16）。
  * 展开时和胶囊一条曲线。
  */
-internal fun contentFoldSpec(opening: Boolean): AnimationSpec<Float> =
-    if (opening) foldSpec(true) else tween(CONTENT_OUT_MS, easing = CONTENT_OUT_EASING)
+internal fun contentFoldSpec(opening: Boolean): AnimationSpec<Float> = contentFoldTween(opening)
+
+/** 同 [contentFoldSpec]，给不是 Float 的动画用。 */
+internal fun <T> contentFoldTween(opening: Boolean): TweenSpec<T> =
+    if (opening) foldTween(true) else tween(CONTENT_OUT_MS, easing = CONTENT_OUT_EASING)
 
 private const val CONTENT_OUT_MS = 150
 private val CONTENT_OUT_EASING = SpringEasing(response = 0.14f, seconds = CONTENT_OUT_MS / 1000f)

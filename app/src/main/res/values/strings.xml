@@ -15,10 +15,20 @@
     <string name="list_separator">", "</string>
 
     <!-- onboarding / home -->
-    <string name="onboarding_tagline">Finds phone numbers, addresses and faces in screenshots and masks them.</string>
-    <string name="onboarding_no_permissions">No permissions needed</string>
-    <string name="onboarding_offline">Offline by default, images never leave the phone</string>
-    <string name="onboarding_metadata">Location and device info stripped on export</string>
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_open_settings">Open Settings</string>
+    <string name="onboarding_auto_title">Masked automatically</string>
+    <string name="onboarding_auto_body">Opening an image masks addresses, phone numbers and other private info</string>
+    <string name="onboarding_tap_title">Tap text to mask</string>
+    <string name="onboarding_tap_body">Tap text it missed to mask it, tap again to unmask</string>
+    <string name="onboarding_tap_try">Try tapping the outlined link</string>
+    <string name="onboarding_more_title">More in Settings</string>
+    <string name="onboarding_more_body">Choose what gets masked in Settings, from the gear on the home screen</string>
+    <string name="onboarding_step">Step %1$d of %2$d: %3$s</string>
+    <string name="onboarding_sample">Sample chat screenshot</string>
+    <string name="onboarding_sample_masked">%1$d masked</string>
+    <string name="onboarding_mask_link">Mask the link</string>
     <string name="pick_image">Choose image</string>
     <string name="home_share_hint">You can also share images here from your gallery, several at once</string>
     <string name="free_edition">Free edition</string>

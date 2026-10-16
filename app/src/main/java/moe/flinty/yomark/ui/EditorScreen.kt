@@ -609,9 +609,10 @@ private fun OriginalPill(visible: Boolean) {
  *
  * 用 Box 画底色而不是 Surface：Material3 的 Surface 会吃掉触摸，
  * 识别期间画布仍可交互（spec §7.1），提示条底下那一块也不该点不动。
+ * 首次引导的样图上也是它（见 ui/onboarding）。
  */
 @Composable
-private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
+internal fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         val sheen = rememberInfiniteTransition(label = "analyzingSheen").animateFloat(
             initialValue = 0f,
