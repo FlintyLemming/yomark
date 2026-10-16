@@ -213,7 +213,7 @@ fun EditorScreen(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
                     // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角。
-                    // 大爆炸开着时这两个收起来：面板的位置归它，水印面板开出来看不见；选着的字还没打码，这时导出就漏出去了
+                    // 大爆炸开着时水印收起来：面板的位置归它，水印面板开出来看不见
                     onPurpose = if (phone || state.bigBang != null) null else vm::togglePurposeSheet,
                     purposeOn = state.purposeText != null,
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
@@ -224,7 +224,7 @@ fun EditorScreen(
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
                     compare = if (phone) null else compare,
                     canCompare = canCompare,
-                    onExport = if (phone && state.bigBang == null) onExport else null,
+                    onExport = if (phone) onExport else null,
                     exportLabel = exportLabel,
                     exporting = state.exporting,
                 )
@@ -484,8 +484,6 @@ private class ViewModelBigBangActions(private val vm: EditorViewModel) : BigBang
     override fun onToggle(id: Int) = vm.toggleBigBangGlyph(id)
     override fun onSweepStart(id: Int) = vm.startBigBangSweep(id)
     override fun onSweep(ids: List<Int>) = vm.sweepBigBang(ids)
-    override fun onSelectAll(all: Boolean) = vm.selectAllBigBang(all)
-    override fun onMask() = vm.maskBigBang()
     override fun onClose() = vm.closeBigBang()
 }
 

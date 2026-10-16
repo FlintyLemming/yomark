@@ -7,9 +7,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -64,14 +63,10 @@ class BigBangPanelTest {
         val toggled = mutableListOf<Int>()
         val starts = mutableListOf<Int>()
         val swept = mutableListOf<Int>()
-        var masked = 0
         var closed = 0
-        val selectAll = mutableListOf<Boolean>()
         override fun onToggle(id: Int) { toggled += id }
         override fun onSweepStart(id: Int) { starts += id }
         override fun onSweep(ids: List<Int>) { swept += ids }
-        override fun onSelectAll(all: Boolean) { selectAll += all }
-        override fun onMask() { masked++ }
         override fun onClose() { closed++ }
     }
 
@@ -159,26 +154,21 @@ class BigBangPanelTest {
         assertThat(r.toggled).isEmpty()
     }
 
-    @Test fun `mask is disabled until something is selected`() {
+    /** 点字就是打码，没有「打码」「全选」：顶上一行是名字、选了几个字，右边「完成」收起。 */
+    @Test fun `done closes, and there is no mask or select-all button`() {
         val r = Recorder()
         show(sample, r)
-        compose.onNodeWithText("打码").assertIsNotEnabled()
         compose.onNodeWithText("已选 0 字").assertExists()
         bang = bang.copy(selected = setOf(3, 4))
         compose.onNodeWithText("已选 2 字").assertExists()
-        compose.onNodeWithText("打码").assertIsEnabled().performClick()
-        assertThat(r.masked).isEqualTo(1)
-        compose.onNodeWithText("取消").performClick()
+        compose.onNodeWithText("打码").assertDoesNotExist()
+        compose.onNodeWithText("全选").assertDoesNotExist()
+        compose.onNodeWithText("取消").assertDoesNotExist()
+        val done = compose.onNodeWithText("完成").getUnclippedBoundsInRoot()
+        val title = compose.onNodeWithText("大爆炸").getUnclippedBoundsInRoot()
+        assertThat(done.left).isGreaterThan(title.right)                       // 在右边
+        assertThat(done.top).isLessThan(title.bottom)                          // 和名字同一行
+        compose.onNodeWithText("完成").performClick()
         assertThat(r.closed).isEqualTo(1)
-    }
-
-    @Test fun `select all flips to select none once everything is selected`() {
-        val r = Recorder()
-        show(sample, r)
-        compose.onNodeWithText("全选").performClick()
-        assertThat(r.selectAll).containsExactly(true)
-        bang = bang.copy(selected = (0..4).toSet())
-        compose.onNodeWithText("全不选").performClick()
-        assertThat(r.selectAll).containsExactly(true, false).inOrder()
     }
 }

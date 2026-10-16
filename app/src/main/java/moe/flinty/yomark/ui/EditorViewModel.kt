@@ -262,10 +262,11 @@ class EditorViewModel(
      * 把旧的取消往新候选上贴没有正确答案。手动框、点一行字打上的码留着——那是用户自己加的。
      */
     private fun reanalyze(image: SourceImage) {
-        // 打到一半的字先收尾，算它自己一步：不然它起手前的那一份压在重跑这一步上面，撤销的先后就乱了
+        // 打到一半的字先收尾，算它自己一步：不然它起手前的那一份压在重跑这一步上面，撤销的先后就乱了。
+        // 大爆炸也是：它摆的是这一遍之前识别出的字，重跑完就对不上了，收起来，打上的码留着
         finishLookEdit()
+        endBigBang()
         undoStack.push(_state.value.plan)
-        // 大爆炸摆的是这一遍之前识别出的字，重跑完就对不上了
         uiState = _state.value.copy(analyzing = true, aiReview = AiReview.Hidden, bigBang = null).withHistoryFlags()
         val index = _state.value.batch?.index
         if (index != null) scanBatchItem(index, image, keepOnlyManual = true)
@@ -345,6 +346,7 @@ class EditorViewModel(
 
     fun onImageChosen(uri: Uri) {
         endBatch()
+        endBigBang()
         aiReviewJob?.cancel()                             // 上一张图的增强识别作废，按钮随之收起
         uiState = _state.value.copy(loading = true, message = null, aiReview = AiReview.Hidden, bigBang = null)
         viewModelScope.launch {
@@ -434,9 +436,10 @@ class EditorViewModel(
         if (index !in before.items.indices) return
         // 就是眼前这张：开着、或者正在载入，就没什么要做的；上次没打开成，就再试一次
         if (index == before.index && (_state.value.image != null || _state.value.loading)) return
-        // 还没收尾的拖框、滑条先收尾，算进要离开的这张自己的撤销栈
+        // 还没收尾的拖框、滑条、大爆炸先收尾，算进要离开的这张自己的撤销栈
         commitDrag()
         finishLookEdit()
+        endBigBang()
         aiReviewJob?.cancel()
         val s = _state.value
         val batch = s.batch ?: return
@@ -778,6 +781,8 @@ class EditorViewModel(
                 aiReviewsFinished = now.aiReviewsFinished + 1,
                 plan = now.plan.copy(items = now.plan.items + added),
             ).withHistoryFlags()
+            // 大爆炸开着时结果到了：这一批自己是一步，大爆炸接着打的码从这一刻算起（见 commitBigBang）
+            if (added.isNotEmpty() && bigBangOrigin != null) bigBangOrigin = _state.value.plan
         }
     }
 
@@ -887,8 +892,20 @@ class EditorViewModel(
     private var bigBangSweepSelects = true
 
     /**
-     * 长按（spec §7.3，2026-10-16 增补）：按在识别出的字上（离一个字 [reach] 以内也算），打开大爆炸，按着的那个字先选上，
-     * 手指不抬接着划是接着选（[sweepBigBang]）。返回打开了没有：没按在字上、还没识别完、识别结果是从重建里恢复的
+     * 这一次大爆炸开始前（或上一回压进撤销栈后）的 plan。开着时点字就打码，一下一下都不进撤销栈，
+     * 收起时整次压一步（[commitBigBang]）：撤销一下，这一次大爆炸打的码全拿掉。不开着是 null。
+     */
+    private var bigBangOrigin: MaskPlan? = null
+
+    /**
+     * 这一次大爆炸打在图上的码：每一块盖着哪几个字（Glyph.id 的区间）、是哪一块码。块变长、变短还是同一块码（id 不变），
+     * 划字时画布上不会每多一个字就把整块重新抹一遍（MaskToggles 按 id 认码）。
+     */
+    private var bigBangRuns: List<Pair<IntRange, String>> = emptyList()
+
+    /**
+     * 长按（spec §7.3，2026-10-16 增补）：按在识别出的字上（离一个字 [reach] 以内也算），打开大爆炸，按着的那个字马上打上码，
+     * 手指不抬接着划是接着打（[sweepBigBang]）。返回打开了没有：没按在字上、还没识别完、识别结果是从重建里恢复的
      * （只留下了每一段的框，没有字），都不打开，这一下照旧——松手是点一下，拖开是画框。
      *
      * 打开时收起别的：选中的框、写到一半的字、吸管、样式和用途水印的面板，面板的位置这时归大爆炸。
@@ -901,14 +918,17 @@ class EditorViewModel(
         commitDrag()
         finishLookEdit()
         bigBangSweepSelects = true
+        bigBangOrigin = _state.value.plan
+        bigBangRuns = emptyList()
         uiState = _state.value.copy(
-            bigBang = BigBangState(page, selected = setOf(glyph.id), focusLine = glyph.line, holding = true),
+            bigBang = BigBangState(page, focusLine = glyph.line, holding = true),
             selectedManualId = null,
             textPlacement = null,
             textFocus = false,
             stylePanelOpen = false,
             purposeSheetVisible = false,
         )
+        selectBigBang(setOf(glyph.id))
         return true
     }
 
@@ -924,14 +944,14 @@ class EditorViewModel(
         return BigBangPage.of(lines).also { bigBangPage = lines to it }
     }
 
-    /** 点了一个字（面板上的字块，或画布上的字）：没选中的选上，选中的取消。 */
+    /** 点了一个字（面板上的字块，或画布上的字）：没打码的打上，这一次打上的拿掉。 */
     fun toggleBigBangGlyph(id: Int) {
         val bang = _state.value.bigBang ?: return
         if (id !in bang.page.glyphs.indices) return
-        uiState = _state.value.copy(bigBang = bang.copy(selected = BigBangSelection.toggle(bang.selected, id)))
+        selectBigBang(BigBangSelection.toggle(bang.selected, id))
     }
 
-    /** 一划从字 [id] 起手：它没选中，这一划就是选字，选中了就是取消；它自己先照这个改。 */
+    /** 一划从字 [id] 起手：它没选中，这一划就是打码，选中了就是拿掉；它自己先照这个改。 */
     fun startBigBangSweep(id: Int) {
         val bang = _state.value.bigBang ?: return
         if (id !in bang.page.glyphs.indices) return
@@ -939,57 +959,77 @@ class EditorViewModel(
         sweepBigBang(listOf(id))
     }
 
-    /** 这一划又经过了 [ids] 这几个字：照起手时定下的（[startBigBangSweep]、长按）选上或取消。 */
+    /** 这一划又经过了 [ids] 这几个字：照起手时定下的（[startBigBangSweep]、长按）打上或拿掉。 */
     fun sweepBigBang(ids: List<Int>) {
         val bang = _state.value.bigBang ?: return
-        val next = BigBangSelection.sweep(bang.selected, ids.filter { it in bang.page.glyphs.indices }, bigBangSweepSelects)
-        if (next != bang.selected) uiState = _state.value.copy(bigBang = bang.copy(selected = next))
+        selectBigBang(BigBangSelection.sweep(bang.selected, ids, bigBangSweepSelects))
     }
 
     /**
      * 画布上一指划着字、第二根手指落下来变成了缩放平移：这一划作罢，选中的字回到它起手前的样子（[ids]），
      * 和画到一半的框、线一样。
      */
-    fun restoreBigBangSelection(ids: Set<Int>) {
-        val bang = _state.value.bigBang ?: return
-        val next = ids.filterTo(HashSet()) { it in bang.page.glyphs.indices }
-        if (next != bang.selected) uiState = _state.value.copy(bigBang = bang.copy(selected = next))
-    }
+    fun restoreBigBangSelection(ids: Set<Int>) = selectBigBang(ids)
 
-    /** 一下子全选上，或全取消（面板上的「全选」）。 */
-    fun selectAllBigBang(all: Boolean) {
-        val bang = _state.value.bigBang ?: return
-        uiState = _state.value.copy(bigBang = bang.copy(selected = if (all) bang.page.glyphs.indices.toSet() else emptySet()))
+    /**
+     * 选中的字换成 [selected]，图上这一次大爆炸打的码跟着换：选中的、连着的字一块码（BigBangPage.runs），
+     * 用「打码」里眼下的样式，和点字打码一样是 [DetectorSource.LINE]、`kind = MANUAL`：点一下拿掉，换方案重跑时留着。
+     * 已经被一块别的码整个盖住的那一块不再打一遍。不进撤销栈，见 [bigBangOrigin]。
+     */
+    private fun selectBigBang(selected: Set<Int>) {
+        val s = _state.value
+        val bang = s.bigBang ?: return
+        val ids = selected.filterTo(HashSet()) { it in bang.page.glyphs.indices }
+        if (ids == bang.selected) return
+        val mine = bigBangRuns.mapTo(HashSet()) { it.second }
+        val previous = s.plan.items.filter { it.candidateId in mine }.associateBy { it.candidateId }
+        val others = s.plan.items.filterNot { it.candidateId in mine }
+        val masks = others.filter { it.look.style.redacts }.map { it.quad }
+        val runs = ArrayList<Pair<IntRange, String>>()
+        val items = ArrayList<MaskItem>()
+        for (run in bang.page.runs(ids)) {
+            val quad = BigBangPage.runQuad(run)
+            if (masks.any { mask -> quad.points().all(mask::contains) }) continue
+            val range = run.first().id..run.last().id
+            // 和上一回的哪一块盖着同一个字，就还是那一块码
+            val id = bigBangRuns.firstOrNull { (r, id) -> runs.none { it.second == id } && r.first <= range.last && range.first <= r.last }
+                ?.second ?: "line-${UUID.randomUUID()}"
+            runs += range to id
+            items += previous[id]?.copy(quad = quad) ?: MaskItem(
+                candidateId = id,
+                quad = quad,
+                kind = SensitiveKind.MANUAL,
+                source = DetectorSource.LINE,
+                look = s.maskLook,
+            )
+        }
+        bigBangRuns = runs
+        uiState = s.copy(bigBang = bang.copy(selected = ids), plan = s.plan.copy(items = others + items))
     }
 
     /**
-     * 面板上的「打码」：选中的字打上码，挨着的连成一块（BigBangPage.runQuads），用「打码」里眼下的样式，和点字打码一样是
-     * [DetectorSource.LINE]：点一下拿掉，换方案重跑时留着。整批是一步，撤销一下全拿掉。
-     * 已经被一块码整个盖住的那几块不再打一遍。打完收起大爆炸。
+     * 这一次大爆炸打的码压进撤销栈，整次一步（和拖框一样，开始前的那一份压进去）。大爆炸还开着的话接着打，再压就从这一刻算起：
+     * 开着时有别的改动起手（AI 增强识别的结果到了、收尾一段面板调节），各算各的一步，撤销的先后不乱。
      */
-    fun maskBigBang() {
-        val s = _state.value
-        val bang = s.bigBang ?: return
-        val masks = s.plan.items.filter { it.look.style.redacts }.map { it.quad }
-        val look = s.maskLook
-        val items = bang.page.runQuads(bang.selected)
-            .filterNot { run -> masks.any { mask -> run.points().all(mask::contains) } }
-            .map { quad ->
-                MaskItem(
-                    candidateId = "line-${UUID.randomUUID()}",
-                    quad = quad,
-                    kind = SensitiveKind.MANUAL,
-                    source = DetectorSource.LINE,
-                    look = look,
-                )
-            }
-        if (items.isNotEmpty()) mutate { plan -> plan.copy(items = plan.items + items) }
-        uiState = _state.value.copy(bigBang = null, selectedManualId = null)
+    private fun commitBigBang() {
+        val origin = bigBangOrigin ?: return
+        val plan = _state.value.plan
+        bigBangOrigin = if (_state.value.bigBang != null) plan else null
+        if (origin != plan) undoStack.push(origin)
     }
 
-    /** 收起大爆炸，什么也不打。 */
+    /** 大爆炸收起：打上的码留着，整次是一步撤销。 */
+    private fun endBigBang() {
+        commitBigBang()
+        bigBangOrigin = null
+        bigBangRuns = emptyList()
+    }
+
+    /** 面板右上角的「完成」、返回：收起大爆炸，这一次打上的码都留着。想全拿掉，撤销一下。 */
     fun closeBigBang() {
-        if (_state.value.bigBang != null) uiState = _state.value.copy(bigBang = null)
+        if (_state.value.bigBang == null) return
+        endBigBang()
+        uiState = _state.value.copy(bigBang = null).withHistoryFlags()
     }
 
     /**
@@ -1200,6 +1240,8 @@ class EditorViewModel(
     fun finishLookEdit() {
         typing = false
         textAnchor = null
+        // 大爆炸开着时有别的改动起手：这一次大爆炸到此为止打的码先算一步（见 commitBigBang）
+        commitBigBang()
         val origin = lookEditOrigin ?: return
         lookEditOrigin = null
         if (origin == _state.value.plan) return
@@ -1267,12 +1309,15 @@ class EditorViewModel(
     }
 
     fun undo() {
+        // 大爆炸开着时撤销：先收起它（这一次打的码压成一步），撤销的就是这一次打的码
+        closeBigBang()
         finishLookEdit()
         val restored = undoStack.undo(_state.value.plan) ?: return
         uiState = _state.value.copy(plan = restored, textPlacement = null).withHistoryFlags()
     }
 
     fun redo() {
+        closeBigBang()
         finishLookEdit()
         val restored = undoStack.redo(_state.value.plan) ?: return
         uiState = _state.value.copy(plan = restored, textPlacement = null).withHistoryFlags()

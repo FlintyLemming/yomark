@@ -43,7 +43,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
 /**
- * 大爆炸（spec §7.3，2026-10-16 增补）：长按字打开，点、划选字，打码时挨着的字打成一块，整批是一步撤销。
+ * 大爆炸（spec §7.3，2026-10-16 增补）：长按字打开，点字、划字当场打码、拿掉，挨着的字打成一块，
+ * 收起时整次是一步撤销。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -108,7 +109,9 @@ class EditorViewModelBigBangTest {
 
     private fun EditorViewModel.bang() = state.value.bigBang
 
-    @Test fun `a long press on a character opens big bang with that character selected`() = runTest(dispatcher) {
+    private fun EditorViewModel.boxes() = state.value.plan.items.map { it.quad.bounds() }
+
+    @Test fun `a long press on a character opens big bang and masks that character right away`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
@@ -117,7 +120,7 @@ class EditorViewModelBigBangTest {
         assertThat(bang.selected).containsExactly(3)                          // 「张」
         assertThat(bang.focusLine).isEqualTo(0)
         assertThat(bang.page.glyphs).hasSize(18)
-        assertThat(vm.state.value.plan.items).isEmpty()                         // 长按本身不打码
+        assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 120f, 120f))  // 点字就是打码
     }
 
     /** 面板等长按的手指抬起来再出来：一出来画布就变矮，手指底下就不是刚才那几个字了。 */
@@ -137,9 +140,10 @@ class EditorViewModelBigBangTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         assertThat(vm.onLongPress(PointF(300f, 350f), 4f)).isFalse()
         assertThat(vm.bang()).isNull()
+        assertThat(vm.state.value.plan.items).isEmpty()
     }
 
-    @Test fun `masking merges consecutive characters into one box per run, as one undo step`() = runTest(dispatcher) {
+    @Test fun `consecutive characters are one mask per run, and the whole session is one undo step`() = runTest(dispatcher) {
         val vm = vm()
         vm.setStyle(MaskStyle.PIXELATE)
         vm.setStyle(MaskStyle.PEN)                                              // 手里拿着画笔
@@ -147,25 +151,40 @@ class EditorViewModelBigBangTest {
 
         vm.onLongPress(PointF(110f, 110f), 4f)                                  // 「张」
         vm.sweepBigBang(listOf(4))                                              // 接着划到「三」
-        // 号码中间四位：「1381234 5678」里的 1234，是第 2+3..2+6 个字
+        vm.releaseBigBang()
+        // 号码中间四位：「13812345678」里的 1234，是这一行第 2+3..2+6 个字
         vm.toggleBigBangGlyph(5 + 2 + 3)
         vm.startBigBangSweep(5 + 2 + 4)
         vm.sweepBigBang(listOf(5 + 2 + 5, 5 + 2 + 6))
-        vm.maskBigBang()
 
         val items = vm.state.value.plan.items
-        assertThat(items.map { it.quad.bounds() })
-            .containsExactly(RectF(100f, 100f, 140f, 120f), RectF(140f, 150f, 220f, 170f)).inOrder()
+        assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 140f, 120f), RectF(140f, 150f, 220f, 170f)).inOrder()
         assertThat(items.map { it.source }.toSet()).containsExactly(DetectorSource.LINE)
         assertThat(items.map { it.kind }.toSet()).containsExactly(SensitiveKind.MANUAL)
         assertThat(items.map { it.look.style }.toSet()).containsExactly(MaskStyle.PIXELATE)   // 「打码」里的样式，不是画笔
-        assertThat(vm.bang()).isNull()
+        assertThat(vm.state.value.canUndo).isFalse()                            // 开着时一下一下都不进撤销栈
 
+        vm.closeBigBang()
+        assertThat(vm.bang()).isNull()
+        assertThat(vm.boxes()).hasSize(2)                                       // 收起来，码留着
+        assertThat(vm.state.value.canUndo).isTrue()
         vm.undo()
-        assertThat(vm.state.value.plan.items).isEmpty()                          // 一下撤销整批
+        assertThat(vm.state.value.plan.items).isEmpty()                          // 一下撤销整次
     }
 
-    @Test fun `a sweep that starts on a selected character deselects`() = runTest(dispatcher) {
+    /** 块往后长、往前长还是同一块码（id 不变）：划字时画布上不会每多一个字就重新抹一遍。 */
+    @Test fun `a growing run keeps its mask`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onLongPress(PointF(110f, 110f), 4f)                                  // 「张」
+        val id = vm.state.value.plan.items.single().candidateId
+        vm.sweepBigBang(listOf(4))                                              // 往后
+        vm.startBigBangSweep(2)                                                 // 往前
+        assertThat(vm.state.value.plan.items.single().candidateId).isEqualTo(id)
+        assertThat(vm.boxes()).containsExactly(RectF(80f, 100f, 140f, 120f))
+    }
+
+    @Test fun `a sweep that starts on a selected character takes the masks off`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onLongPress(PointF(50f, 110f), 4f)                                   // 「收」
@@ -175,20 +194,22 @@ class EditorViewModelBigBangTest {
         vm.startBigBangSweep(2)
         vm.sweepBigBang(listOf(3))
         assertThat(vm.bang()!!.selected).containsExactly(0, 1)
+        assertThat(vm.boxes()).containsExactly(RectF(40f, 100f, 80f, 120f))
     }
 
-    @Test fun `taps on the canvas toggle characters while big bang is open, and never mask`() = runTest(dispatcher) {
+    @Test fun `taps on the canvas mask and unmask characters while big bang is open`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onLongPress(PointF(110f, 110f), 4f)
 
-        vm.onTap(PointF(130f, 110f), 4f)                                         // 「三」选上
+        vm.onTap(PointF(130f, 110f), 4f)                                         // 「三」打上
         assertThat(vm.bang()!!.selected).containsExactly(3, 4)
-        vm.onTap(PointF(110f, 110f), 4f)                                         // 「张」取消
+        assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 140f, 120f))
+        vm.onTap(PointF(110f, 110f), 4f)                                         // 「张」拿掉
         assertThat(vm.bang()!!.selected).containsExactly(4)
+        assertThat(vm.boxes()).containsExactly(RectF(120f, 100f, 140f, 120f))
         vm.onTap(PointF(300f, 350f), 4f)                                         // 空白：什么也不做
         assertThat(vm.bang()!!.selected).containsExactly(4)
-        assertThat(vm.state.value.plan.items).isEmpty()
     }
 
     /** 一指划着字、第二根手指落下来变成了缩放平移：这一划作罢，回到起手前。 */
@@ -198,10 +219,12 @@ class EditorViewModelBigBangTest {
         vm.onLongPress(PointF(110f, 110f), 4f)
         vm.releaseBigBang()
         val before = vm.bang()!!.selected
+        val boxes = vm.boxes()
         vm.startBigBangSweep(0)
         vm.sweepBigBang(listOf(1, 2))
         vm.restoreBigBangSelection(before)
         assertThat(vm.bang()!!.selected).isEqualTo(before)
+        assertThat(vm.boxes()).isEqualTo(boxes)
     }
 
     /** 开着时用途水印的面板开不出来：面板的位置归大爆炸，开出来也看不见。 */
@@ -214,24 +237,29 @@ class EditorViewModelBigBangTest {
         assertThat(vm.bang()).isNotNull()
     }
 
-    @Test fun `closing adds nothing`() = runTest(dispatcher) {
+    /** 开着时按撤销：先收起，撤销的就是这一次打的码。 */
+    @Test fun `undo while open closes big bang and takes back the session`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.onManualBox(rect(200f, 300f, 300f, 380f))                            // 之前的一步
         vm.onLongPress(PointF(110f, 110f), 4f)
-        vm.closeBigBang()
+        vm.sweepBigBang(listOf(4))
+        vm.undo()
         assertThat(vm.bang()).isNull()
-        assertThat(vm.state.value.plan.items).isEmpty()
-        assertThat(vm.state.value.canUndo).isFalse()
+        assertThat(vm.boxes()).containsExactly(RectF(200f, 300f, 300f, 380f))   // 手动框还在
+        vm.redo()
+        assertThat(vm.boxes()).hasSize(2)
     }
 
-    @Test fun `select all then mask gives one box per line`() = runTest(dispatcher) {
+    /** 收起来什么也没打（长按的那个字又点掉了）：不留一步空的撤销。 */
+    @Test fun `a session that ends with nothing masked leaves no undo step`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onLongPress(PointF(110f, 110f), 4f)
-        vm.selectAllBigBang(true)
-        vm.maskBigBang()
-        assertThat(vm.state.value.plan.items.map { it.quad.bounds() })
-            .containsExactly(RectF(40f, 100f, 140f, 120f), RectF(40f, 150f, 300f, 170f)).inOrder()
+        vm.toggleBigBangGlyph(3)
+        vm.closeBigBang()
+        assertThat(vm.state.value.plan.items).isEmpty()
+        assertThat(vm.state.value.canUndo).isFalse()
     }
 
     @Test fun `a run already covered by a mask is not masked twice`() = runTest(dispatcher) {
@@ -242,8 +270,8 @@ class EditorViewModelBigBangTest {
 
         vm.onLongPress(PointF(110f, 110f), 4f)
         vm.sweepBigBang(listOf(4))
-        vm.maskBigBang()
         assertThat(vm.state.value.plan.items).hasSize(1)
+        vm.closeBigBang()
         assertThat(vm.state.value.canUndo).isFalse()
     }
 
@@ -260,17 +288,20 @@ class EditorViewModelBigBangTest {
         assertThat(vm.state.value.stylePanelOpen).isFalse()
         // 开着时一指拉的框不算数（画布上一指划的是字）
         vm.onManualBox(rect(10f, 300f, 100f, 380f))
-        assertThat(vm.state.value.plan.items).hasSize(1)
+        assertThat(vm.state.value.plan.items).hasSize(2)                        // 手动框和「张」那一块
     }
 
-    @Test fun `a re-run of recognition closes big bang`() = runTest(dispatcher) {
+    /** 重跑识别：大爆炸收起（摆的字对不上了），打上的码和点字打的一样留着。 */
+    @Test fun `a re-run of recognition closes big bang and keeps its masks`() = runTest(dispatcher) {
         val vm = vm()
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         vm.onLongPress(PointF(110f, 110f), 4f)
+        vm.sweepBigBang(listOf(4))
         vm.rerunRecognition()
         assertThat(vm.bang()).isNull()
         advanceUntilIdle()
         assertThat(vm.bang()).isNull()
+        assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 140f, 120f))
     }
 
     /** 重建之后只恢复了每一段的框，没有字：长按照旧，不打开。 */

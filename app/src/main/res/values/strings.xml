@@ -57,9 +57,6 @@
     <!-- big bang -->
     <string name="big_bang_title">Big Bang</string>
     <string name="big_bang_count">%1$d selected</string>
-    <string name="big_bang_select_all">Select all</string>
-    <string name="big_bang_select_none">Select none</string>
-    <string name="big_bang_mask">Mask</string>
 
     <!-- box list -->
     <string name="list_title">Boxes</string>

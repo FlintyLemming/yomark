@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,15 +67,13 @@ interface BigBangActions {
     fun onToggle(id: Int) {}
     fun onSweepStart(id: Int) {}
     fun onSweep(ids: List<Int>) {}
-    fun onSelectAll(all: Boolean) {}
-    fun onMask() {}
     fun onClose() {}
 }
 
 /**
- * 大爆炸（2026-10-16，见 ui/bigbang）：这张图上识别出的字一个个摆成字块，点一下选上或取消，横着划过去一串都选上
- * （从选中的字划起是一串都取消），竖着划是滚动。选中的连着的字连成一整条，和画布上、打出来的码一个样。
- * 已经打了码的字是一块灰。
+ * 大爆炸（2026-10-16，见 ui/bigbang）：这张图上识别出的字一个个摆成字块，点一下就打码（图上马上盖上），再点一下拿掉；
+ * 横着划过去一串都打上（从打了码的字划起是一串都拿掉），竖着划是滚动。选中的连着的字连成一整条，和图上的码一个样。
+ * 别的码盖着的字是一块灰。右上角「完成」收起，打上的码留着。
  *
  * 顶替底栏（手机）或样式、列表那一块（宽屏）：画布让到它上面（左边），选字时看得到图上选中的是哪几块。
  *
@@ -121,9 +118,10 @@ fun BigBangPanel(
 }
 
 /**
- * 面板里的东西：顶上一行是名字、选了几个字和「全选」，中间是字块（放不下在里面滚动），底下是「取消」「打码」。
+ * 面板里的东西：顶上一行是名字、选了几个字和右边的「完成」，底下是字块（放不下在里面滚动）。
+ * 不另设「打码」：点字就是打码。
  *
- * @param fillHeight 字块那一块撑满剩下的高度，「取消」「打码」贴着底边（宽屏右边那一栏）；否则面板只有字块那么高
+ * @param fillHeight 字块那一块撑满剩下的高度（宽屏右边那一栏）；否则面板只有字块那么高
  */
 @Composable
 internal fun BigBangContent(
@@ -133,8 +131,7 @@ internal fun BigBangContent(
     modifier: Modifier = Modifier,
     fillHeight: Boolean = false,
 ) {
-    val all = bang.page.glyphs.isNotEmpty() && bang.selected.size == bang.page.glyphs.size
-    Column(modifier.padding(vertical = 4.dp)) {
+    Column(modifier.padding(top = 4.dp, bottom = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.big_bang_title), style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.width(8.dp))
@@ -144,9 +141,7 @@ internal fun BigBangContent(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = { actions.onSelectAll(!all) }) {
-                Text(stringResource(if (all) R.string.big_bang_select_none else R.string.big_bang_select_all))
-            }
+            TextButton(onClick = actions::onClose) { Text(stringResource(R.string.done)) }
         }
         val scroll = rememberScrollState()
         Box(
@@ -156,13 +151,6 @@ internal fun BigBangContent(
                 .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
             GlyphField(bang.page, bang.selected, covered, actions, bang.focusLine, scroll)
-        }
-        Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextButton(onClick = actions::onClose) { Text(stringResource(R.string.cancel)) }
-            Spacer(Modifier.weight(1f))
-            Button(onClick = actions::onMask, enabled = bang.selected.isNotEmpty()) {
-                Text(stringResource(R.string.big_bang_mask))
-            }
         }
     }
 }

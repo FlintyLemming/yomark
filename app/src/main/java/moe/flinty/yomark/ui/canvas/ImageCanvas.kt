@@ -268,7 +268,7 @@ fun ImageCanvas(
     // 草稿框每一帧都在变；工具条只关心「是不是正在画」，不跟着每帧重组
     val drafting by remember { derivedStateOf { draftQuad != null || inkTick > 0 } }
 
-    // 大爆炸里选中的字连成的块：打码时打的就是这几块
+    // 大爆炸里选中的字连成的块：码已经打上了，这里描出哪几块是这一次打的
     val bigBangRuns = remember(state.bigBang) { state.bigBang?.let { it.page.runQuads(it.selected) }.orEmpty() }
 
     // 选中框、草稿框与手柄用主题色，与应用其余部分一致
@@ -774,22 +774,14 @@ private const val TEXT_BOX_COLOR = 0xFFFF00FF.toInt()
 private const val TEXT_BOX_LINE_DP = 1f
 
 /**
- * 大爆炸里选中的一块字：铺一层主题色，描一圈实线。打码打的就是这一块，连着的字是一整块，不是一个字一个框。
- * 比草稿框的底色浓一些：字常常只有十几 dp 高，太淡了看不出选到了哪个字。
+ * 大爆炸里选中的一块字：码已经打在图上了（点字就是打码），这里只描一圈主题色的实线，
+ * 看得出哪几块是这一次大爆炸打的、连着的字是一整块。
  */
 private fun drawBigBangRun(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
     val path = quad.toPath()
-    val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.FILL
-        color = (colors.primary and 0x00FFFFFF) or (BIG_BANG_FILL_ALPHA shl 24)
-    }
-    canvas.drawPath(path, fill)
     canvas.drawPath(path, haloPaint(colors, dp))
     canvas.drawPath(path, linePaint(colors, dp))
 }
-
-/** 大爆炸选中的块里那层主题色的不透明度，约 30%。 */
-private const val BIG_BANG_FILL_ALPHA = 0x4D
 
 /** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
 private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {
