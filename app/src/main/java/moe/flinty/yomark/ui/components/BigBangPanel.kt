@@ -59,8 +59,14 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** 大爆炸的面板放在哪儿：手机上底栏的位置，宽屏上右边那一栏、下面那一块（见 EditorLayouts）。 */
-enum class BigBangPlacement { PHONE, SIDE, BOTTOM }
+/**
+ * 宽屏上大爆炸的面板放在哪儿：右边那一栏、下面那一块（见 EditorLayouts）。
+ * 手机上它不是单独一块，是底栏的胶囊长出来的（见 EditorBottomBar、[phoneBigBangHeight]）。
+ */
+enum class BigBangPlacement { SIDE, BOTTOM }
+
+/** 手机底栏要长出来的大爆炸面板：开着的大爆炸，和它的字里已经被别的码盖住的（BigBangPage.covered）。 */
+class BigBangPanelModel(val bang: BigBangState, val covered: Set<Int>)
 
 /** 面板上的动作，都交给 ViewModel（见 EditorScreen）。 */
 interface BigBangActions {
@@ -75,7 +81,8 @@ interface BigBangActions {
  * 横着划过去一串都打上（从打了码的字划起是一串都拿掉），竖着划是滚动。选中的连着的字连成一整条，和图上的码一个样。
  * 别的码盖着的字是一块灰。右上角「完成」收起，打上的码留着。
  *
- * 顶替底栏（手机）或样式、列表那一块（宽屏）：画布让到它上面（左边），选字时看得到图上选中的是哪几块。
+ * 宽屏上顶替样式、列表那一块：画布让到它上面（左边），选字时看得到图上选中的是哪几块。
+ * 手机上没有这一块，里面的东西（[BigBangContent]）从底栏的胶囊长出来（见 EditorBottomBar）。
  *
  * @param covered 已经被打码的样式盖住的字（BigBangPage.covered）
  */
@@ -88,10 +95,6 @@ fun BigBangPanel(
     modifier: Modifier = Modifier,
 ) {
     val outer = when (placement) {
-        BigBangPlacement.PHONE -> modifier
-            .fillMaxWidth()
-            .capHeight(PHONE_FRACTION)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
         BigBangPlacement.SIDE -> modifier
             .wideSidePanelWidth()
             .fillMaxHeight()
@@ -101,13 +104,7 @@ fun BigBangPanel(
             .capHeight(BOTTOM_FRACTION)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     }
-    val scheme = MaterialTheme.colorScheme
-    val surface = if (placement == BigBangPlacement.PHONE) {
-        // 和底栏的胶囊、长出来的面板同一种浮着的底
-        Modifier.floatingSurface(scheme.surfaceContainer, scheme.outlineVariant.copy(alpha = EDGE_ALPHA), PHONE_RADIUS)
-    } else {
-        Modifier.background(scheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
-    }
+    val surface = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
     Box(outer) {
         BigBangContent(
             bang, covered, actions,
@@ -433,7 +430,12 @@ private fun Modifier.capHeight(fraction: Float): Modifier = layout { measurable,
     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
 }
 
-/** 手机上面板最多占画布和它那一块的一半：上面那一半留给图，看得到选中的是哪几块。 */
+/**
+ * 手机上从底栏的胶囊长出来的大爆炸面板多高（见 EditorBottomBar）：最多占工具那一行上面的一半，上面那一半留给图，
+ * 看得到选中的是哪几块。
+ */
+internal fun Modifier.phoneBigBangHeight(): Modifier = capHeight(PHONE_FRACTION)
+
 private const val PHONE_FRACTION = 0.5f
 
 /** 面板至少这么高：名字那一行、两排字块、按钮那一行（见 [capHeight]）。 */
@@ -444,6 +446,3 @@ private const val COVERED_ALPHA = 0.38f
 
 /** 宽屏竖着拿时下面那一块的上限，和样式面板开着时差不多（见 WideEditorPanel）。 */
 private const val BOTTOM_FRACTION = 0.48f
-
-/** 手机上面板的圆角：和底栏胶囊长出来的面板一样圆。 */
-private val PHONE_RADIUS = TOOL_ROW_HEIGHT / 2

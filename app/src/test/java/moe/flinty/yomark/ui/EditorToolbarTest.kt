@@ -41,7 +41,10 @@ import com.google.common.truth.Truth.assertWithMessage
 import kotlin.math.abs
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
+import androidx.compose.ui.layout.Layout
 import moe.flinty.yomark.ui.components.EditorToolbar
+import moe.flinty.yomark.ui.components.PillLeft
+import moe.flinty.yomark.ui.components.PillRight
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
@@ -53,7 +56,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 手机底栏的工具那一行：收着时胶囊里「打码」「编辑」两组，旁边 AI、按住对比两颗圆钮；点一组胶囊撑满这一行，
+ * 手机底栏的工具那一行：收着时胶囊里「打码」「编辑」两组，旁边工具、按住对比两颗圆钮；点一组胶囊撑满这一行，
  * 那一组变成返回，圆钮让开。圆钮上没有字，按读屏念的那一句找。
  * 换样式、弹面板由 ViewModel 管（见 EditorViewModelTest），这里只看这一行发出什么。
  */
@@ -81,6 +84,13 @@ class EditorToolbarTest {
     private var purposeClicks = 0
     private var aiClicks = 0
     private var rowWidth by mutableStateOf<Dp?>(null)
+    private var bigBangReady by mutableStateOf(true)
+    private var bigBangOpen by mutableStateOf(false)
+    private var bigBangClicks = 0
+
+    /** 胶囊眼下的左右沿，像素（见 PillLeft）。 */
+    private var pillLeft = 0
+    private var pillRight = 0
 
     private fun show(
         actions: StyleBarActions = Recorder(),
@@ -91,7 +101,8 @@ class EditorToolbarTest {
         compose.setContent {
             MaterialTheme {
                 Surface {
-                    EditorToolbar(
+                    // 包一层，量胶囊眼下的左右沿（这一行交给底栏画胶囊的两条线，见 PillLeft）
+                    Layout(content = { EditorToolbar(
                         open = open,
                         onOpen = { opened += it; open = it },
                         styleBar = StyleBarModel(look),
@@ -101,10 +112,18 @@ class EditorToolbarTest {
                         onPurpose = { purposeClicks++ },
                         aiReview = ai,
                         onAiReview = { aiClicks++ },
+                        bigBangReady = bigBangReady,
+                        onBigBang = { bigBangClicks++ },
+                        bigBangOpen = bigBangOpen,
                         compare = compare,
                         canCompare = canCompare,
                         modifier = rowWidth?.let { Modifier.width(it) } ?: Modifier,
-                    )
+                    ) }) { measurables, constraints ->
+                        val row = measurables.single().measure(constraints)
+                        pillLeft = row[PillLeft]
+                        pillRight = row[PillRight]
+                        layout(row.width, row.height) { row.place(0, 0) }
+                    }
                     LaunchedEffect(compare) { compare.interactions.collect { compareEvents += it } }
                 }
             }
@@ -114,6 +133,7 @@ class EditorToolbarTest {
     @Test fun collapsedItShowsTheTwoGroupsAndCompare() {
         show()
         listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
+        bigBangButton.assertIsDisplayed()                                         // 用不了 AI：没有「工具」
         compareButton.assertIsDisplayed()
         listOf("色块", "马克笔", "水印").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
     }
@@ -125,10 +145,10 @@ class EditorToolbarTest {
         val width = compose.onRoot().getUnclippedBoundsInRoot().right
         val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
         val edit = compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()
-        val sparkle = compose.onNodeWithContentDescription("AI 增强识别").getUnclippedBoundsInRoot()
+        val tools = toolboxButton.getUnclippedBoundsInRoot()
         val cmp = compareButton.getUnclippedBoundsInRoot()
-        assertThat(sparkle.left).isGreaterThan(edit.right)
-        assertThat(cmp.left).isGreaterThan(sparkle.right)
+        assertThat(tools.left).isGreaterThan(edit.right)
+        assertThat(cmp.left).isGreaterThan(tools.right)
         // 胶囊两头里面各留 8 dp
         assertThat((redact.left - 8.dp - (width - cmp.right)).value).isWithin(1f).of(0f)
 
@@ -329,40 +349,193 @@ class EditorToolbarTest {
         assertThat(purposeClicks).isEqualTo(1)
     }
 
-    // ---------- AI 增强识别：胶囊旁边一颗圆钮 ----------
+    // ---------- 工具：用得了 AI 时一颗圆钮，点开是 AI 增强识别、大爆炸；用不了时圆钮就是大爆炸 ----------
 
-    @Test fun aiReviewSitsBesideTheGroupsAndRunsOnClick() {
+    private val toolboxButton get() = compose.onNodeWithContentDescription("工具")
+    private val bigBangButton get() = compose.onNodeWithContentDescription("大爆炸")
+
+    /** 和两组一样：胶囊撑满这一行，最左边是返回箭头，圆钮都让开。 */
+    @Test fun theToolboxUnfoldsLikeTheGroups() {
         ai = AiReview.Ready
         show()
-        compose.onNodeWithContentDescription("AI 增强识别").assertIsEnabled().performClick()
-        assertThat(aiClicks).isEqualTo(1)
+        listOf("AI 增强识别", "大爆炸").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        toolboxButton.assert(clickLabelIs("展开")).performClick()
+        assertThat(opened).containsExactly(ToolGroup.TOOLS)
+        val back = backButton.assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(back.left.value).isWithin(1f).of(20f)
+        listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        toolboxButton.assertDoesNotExist()
+        compareButton.assertDoesNotExist()
+        listOf("AI 增强识别", "大爆炸").forEach {
+            compose.onNodeWithText(it).assertIsDisplayed().assertIsEnabled().assert(!isSelectable())
+            assertThat(compose.onNodeWithText(it).getUnclippedBoundsInRoot().left).isGreaterThan(back.right)
+        }
+
+        backButton.performClick()
+        assertThat(opened).containsExactly(ToolGroup.TOOLS, null).inOrder()
+        toolboxButton.assertIsDisplayed()
     }
 
-    @Test fun aiReviewIsNotOfferedWhereItCannotRun() {
+    /**
+     * 「工具」的胶囊从它那颗圆钮长出来，收回时缩回那颗圆钮，不是从两组的胶囊撑开、缩回两组的胶囊。
+     * 停稳了两组的胶囊还是原来那样。
+     */
+    @Test fun theToolsCapsuleGrowsOutOfItsCircleAndShrinksBackIntoIt() {
+        ai = AiReview.Ready
         show()
-        compose.onNodeWithContentDescription("AI 增强识别").assertDoesNotExist()
-        compareButton.assertIsDisplayed()
+        val restingPill = pillLeft to pillRight
+        val circle = toolboxButton.getUnclippedBoundsInRoot()
+        val circleLeft = px(circle.left)
+        val circleRight = px(circle.right)
+        // 离圆钮比离两组的胶囊近：左沿过了两者的正中，右沿出了两组的胶囊
+        fun nearTheCircle() {
+            assertThat(pillLeft).isGreaterThan((restingPill.first + circleLeft) / 2)
+            assertThat(pillRight).isGreaterThan(restingPill.second)
+            assertThat(pillRight).isAtMost(circleRight + px(40.dp))
+        }
+
+        compose.mainClock.autoAdvance = false
+        toolboxButton.performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(16)
+        nearTheCircle()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillLeft).isEqualTo(px(12.dp))
+
+        compose.mainClock.autoAdvance = false
+        backButton.performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(260)
+        nearTheCircle()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillLeft to pillRight).isEqualTo(restingPill)
     }
 
-    /** 跑着、跑完了都点不动；圆钮上写不下字，读屏念的是结果，对勾上不挂数量角标。没跑成是另一句话，还能点。 */
+    /**
+     * 用不了 AI 时圆钮是大爆炸：打开大爆炸时胶囊从这颗圆钮长出来（展开它的是外面，见 EditorScreen），
+     * 收起时缩回这颗圆钮。
+     */
+    @Test fun withoutAiTheBigBangCapsuleGrowsOutOfItsCircle() {
+        show()
+        val restingLeft = pillLeft
+        val circleLeft = px(bigBangButton.getUnclippedBoundsInRoot().left)
+        compose.mainClock.autoAdvance = false
+        open = ToolGroup.BIG_BANG
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(16)
+        assertThat(pillLeft).isGreaterThan((restingLeft + circleLeft) / 2)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+
+        compose.mainClock.autoAdvance = false
+        open = null
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(260)
+        assertThat(pillLeft).isGreaterThan((restingLeft + circleLeft) / 2)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillLeft).isEqualTo(restingLeft)
+    }
+
+    /**
+     * 大爆炸占住这一行（用不了 AI 时，见 ToolGroup.BIG_BANG）：胶囊撑满，里面什么也不摆，没有返回箭头、没有只剩一项的「工具」，
+     * 地方都给从它长出来的面板。收起靠面板右上角的「完成」。
+     */
+    @Test fun bigBangTakingTheRowLeavesItEmpty() {
+        show(initial = ToolGroup.BIG_BANG)
+        assertThat(pillLeft).isEqualTo(px(12.dp))
+        backButton.assertDoesNotExist()
+        compose.onNodeWithText("大爆炸").assertDoesNotExist()
+        listOf("打码", "编辑").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        bigBangButton.assertDoesNotExist()
+        compareButton.assertDoesNotExist()
+    }
+
+    private fun px(dp: Dp) = with(compose.density) { dp.roundToPx() }
+
+    /** 点了不收回去：AI 跑的样子就在这儿看。收不收大爆炸由外面管（见 EditorScreen）。 */
+    @Test fun theToolsRunOnClick() {
+        ai = AiReview.Ready
+        show(initial = ToolGroup.TOOLS)
+        compose.onNodeWithText("AI 增强识别").performClick()
+        compose.onNodeWithText("大爆炸").performClick()
+        assertThat(aiClicks).isEqualTo(1)
+        assertThat(bigBangClicks).isEqualTo(1)
+        assertThat(opened).isEmpty()
+    }
+
+    /** 用不了 AI：没有「工具」，圆钮直接是大爆炸，点了就打开。 */
+    @Test fun withoutAiTheCircleIsBigBang() {
+        show()
+        toolboxButton.assertDoesNotExist()
+        compose.onNodeWithText("大爆炸").assertDoesNotExist()                     // 圆钮上没有字
+        bigBangButton.assertIsDisplayed().assertIsEnabled().performClick()
+        assertThat(bigBangClicks).isEqualTo(1)
+        assertThat(opened).isEmpty()
+        // 能用了，换成「工具」
+        ai = AiReview.Ready
+        bigBangButton.assertDoesNotExist()
+        toolboxButton.assertIsDisplayed()
+    }
+
+    /** 还没识别完、没认出字：大爆炸灰掉，点不动。圆钮上、「工具」里都是。 */
+    @Test fun bigBangWaitsForText() {
+        bigBangReady = false
+        show()
+        bigBangButton.assertIsNotEnabled()
+        ai = AiReview.Ready
+        toolboxButton.performClick()
+        compose.onNodeWithText("大爆炸").assertIsNotEnabled().performClick()
+        assertThat(bigBangClicks).isEqualTo(0)
+        bigBangReady = true
+        compose.onNodeWithText("大爆炸").assertIsEnabled()
+    }
+
+    /** 跑着、跑完了都点不动，名字换成眼下的样子，对勾上不挂数量角标。没跑成是另一句话，还能点。 */
     @Test fun aiReviewShowsItsProgressAndResultInPlace() {
         ai = AiReview.Running
-        show()
-        compose.onNodeWithContentDescription("增强识别中…").assertIsNotEnabled()
+        show(initial = ToolGroup.TOOLS)
+        compose.onNodeWithText("增强识别中…").assertIsNotEnabled()
         ai = AiReview.Done(found = 3)
-        compose.onNodeWithContentDescription("新发现 3 处").assertIsDisplayed().assertIsNotEnabled().assert(!hasText("3"))
+        compose.onNodeWithText("新发现 3 处").assertIsDisplayed().assertIsNotEnabled()
         ai = AiReview.Done(found = 0)
-        compose.onNodeWithContentDescription("没有新发现").assertIsDisplayed().assert(!hasText("0"))
+        compose.onNodeWithText("没有新发现").assertIsDisplayed()
         ai = AiReview.Failed
-        compose.onNodeWithContentDescription("识别失败，重试").assertIsEnabled().performClick()
+        compose.onNodeWithText("识别失败，重试").assertIsEnabled().performClick()
         assertThat(aiClicks).isEqualTo(1)
     }
 
-    @Test fun aiReviewStepsAsideWhileAGroupIsOpen() {
+    /** 和水印一样：面板开着时选中的是大爆炸（名字加粗），再点一下是收起，点得动。 */
+    @Test fun bigBangIsPickedWhileItsPanelIsOpen() {
+        ai = AiReview.Ready
+        show(initial = ToolGroup.TOOLS)
+        assertThat(weight("大爆炸")).isNotEqualTo(FontWeight.Bold)
+        bigBangOpen = true
+        bigBangReady = false                                                      // 开着时一定点得动，好收起
+        assertThat(weight("大爆炸")).isEqualTo(FontWeight.Bold)
+        assertThat(weight("AI 增强识别")).isNotEqualTo(FontWeight.Bold)
+        compose.onNodeWithText("大爆炸").assertIsEnabled().performClick()
+        assertThat(bigBangClicks).isEqualTo(1)
+    }
+
+    /** 「工具」收着时 AI 还在跑：圆钮说它在干活。 */
+    @Test fun theToolboxSaysWhenAiReviewIsRunning() {
+        ai = AiReview.Running
+        show()
+        toolboxButton.assert(stateIs("增强识别中…"))
+        ai = AiReview.Done(found = 1)
+        toolboxButton.assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
+    }
+
+    @Test fun theToolboxStepsAsideWhileAGroupIsOpen() {
         ai = AiReview.Ready
         show(initial = ToolGroup.EDIT)
-        compose.onNodeWithContentDescription("AI 增强识别").assertDoesNotExist()
+        toolboxButton.assertDoesNotExist()
     }
+
+    private fun isSelectable() = SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected)
 
     private fun stateIs(text: String) = SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, text)
 

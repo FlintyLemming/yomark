@@ -304,7 +304,7 @@ class EditorViewModelBigBangTest {
         assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 140f, 120f))
     }
 
-    /** 重建之后只恢复了每一段的框，没有字：长按照旧，不打开。 */
+    /** 重建之后只恢复了每一段的框，没有字：长按照旧，不打开；底栏的大爆炸灰着。 */
     @Test fun `after a restore there is no text to explode`() = runTest(dispatcher) {
         val saved = SavedStateHandle()
         vm(saved = saved).apply { onImageChosen(sampleUri()) }
@@ -313,5 +313,38 @@ class EditorViewModelBigBangTest {
         advanceUntilIdle()
         assertThat(restored.state.value.image).isNotNull()
         assertThat(restored.onLongPress(PointF(110f, 110f), 4f)).isFalse()
+        assertThat(restored.hasText.value).isFalse()
+        restored.openBigBang()
+        assertThat(restored.bang()).isNull()
+    }
+
+    /** 底栏「工具」里点开（2026-10-16）：面板马上出来，从第一行摆起，一个字也没打；打的码照样整次一步撤销。 */
+    @Test fun `the toolbar opens big bang with nothing picked`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri())
+        assertThat(vm.hasText.value).isFalse()                                  // 还没识别完
+        advanceUntilIdle()
+        assertThat(vm.hasText.value).isTrue()
+
+        vm.openBigBang()
+        val bang = vm.bang()!!
+        assertThat(bang.holding).isFalse()
+        assertThat(bang.selected).isEmpty()
+        assertThat(bang.focusLine).isEqualTo(0)
+        assertThat(vm.state.value.plan.items).isEmpty()
+
+        vm.toggleBigBangGlyph(3)                                                // 「张」
+        vm.closeBigBang()
+        assertThat(vm.boxes()).containsExactly(RectF(100f, 100f, 120f, 120f))
+        vm.undo()
+        assertThat(vm.state.value.plan.items).isEmpty()
+    }
+
+    @Test fun `the toolbar does not open big bang on a page without text`() = runTest(dispatcher) {
+        val vm = vm(lines = emptyList())
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        assertThat(vm.hasText.value).isFalse()
+        vm.openBigBang()
+        assertThat(vm.bang()).isNull()
     }
 }
