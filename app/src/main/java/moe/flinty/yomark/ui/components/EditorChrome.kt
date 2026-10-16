@@ -2,16 +2,13 @@ package moe.flinty.yomark.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,14 +16,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
@@ -34,7 +29,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +37,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
@@ -83,27 +76,19 @@ fun EditorTopBar(
     canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    /** 用途水印。手机竖着拿时它在底栏的「编辑」里，传 null，这里就不出现。 */
-    onPurpose: (() -> Unit)?,
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
+    /**
+     * 导出，在最右上角：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，展开着一组工具时也一直在。
+     * 宽屏也在这儿（2026-10-16），原先在功能方块那一块最底下，和 AI 增强识别一行。
+     */
+    onExport: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 已设用途水印时按钮着主题色，一眼看出它开着。 */
-    purposeOn: Boolean = false,
     /** 去水印的购买入口（开源版是免费版说明与打赏）。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
-    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现：手机竖着拿时它在底栏。 */
-    compare: MutableInteractionSource? = null,
-    /** 有前后可比：打了码，或者设了用途水印。没有时「对比」灰掉。 */
-    canCompare: Boolean = false,
-    /**
-     * 导出，在最右上角。手机竖着拿时在这儿：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，
-     * 展开着一组工具时也一直在。传 null 时不出现：宽屏的导出在样式列表那一块的最底下（见 [EditorActionRow]）。
-     */
-    onExport: (() -> Unit)? = null,
-    /** 导出按钮上的字（见 [EditorActionRow]）。 */
+    /** 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去。 */
     @StringRes exportLabel: Int = R.string.export,
     exporting: Boolean = false,
 ) {
@@ -118,40 +103,23 @@ fun EditorTopBar(
                     Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark))
                 }
             }
-            if (onPurpose != null) {
-                IconButton(onClick = onPurpose, Modifier.layoutId(TopBarItem.PURPOSE)) {
-                    Icon(
-                        PurposeWatermarkIcon,
-                        stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
-                        tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                }
-            }
-            if (compare != null) {
-                // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
-                IconButton(onClick = {}, Modifier.layoutId(TopBarItem.COMPARE), enabled = canCompare, interactionSource = compare) {
-                    Icon(Icons.Filled.Compare, stringResource(R.string.compare_original))
-                }
-            }
             if (onDebug != null) {
                 IconButton(onClick = onDebug, Modifier.layoutId(TopBarItem.DEBUG)) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
             }
             IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-            if (onExport != null) {
-                val label = stringResource(if (exporting) R.string.exporting else exportLabel)
-                Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
-                    Text(label, maxLines = 1, softWrap = false)
-                }
-                // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
-                FilledIconButton(
-                    onClick = onExport,
-                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
-                    enabled = !exporting,
-                ) {
-                    if (exporting) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
-                    // 别的应用来要图时是「完成」：交回去
-                    else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
-                }
+            val label = stringResource(if (exporting) R.string.exporting else exportLabel)
+            Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
+                Text(label, maxLines = 1, softWrap = false)
+            }
+            // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
+            FilledIconButton(
+                onClick = onExport,
+                modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+                enabled = !exporting,
+            ) {
+                if (exporting) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                // 别的应用来要图时是「完成」：交回去
+                else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
             }
         },
         modifier = modifier.fillMaxWidth().padding(8.dp),
@@ -161,14 +129,14 @@ fun EditorTopBar(
         val back = part(TopBarItem.BACK)!!.measure(loose)
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
-        val gap = if (part(TopBarItem.EXPORT) != null) EXPORT_GAP.roundToPx() else 0
-        val label = part(TopBarItem.EXPORT)?.maxIntrinsicWidth(Constraints.Infinity) ?: 0
+        val gap = EXPORT_GAP.roundToPx()
+        val label = part(TopBarItem.EXPORT)!!.maxIntrinsicWidth(Constraints.Infinity)
         val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + gap + label
         // 别的按钮都摆上，导出的字还整个放得下才写字
         val withLabel = back.width + allIcons + gap + label <= width
-        val button = if (withLabel) part(TopBarItem.EXPORT)?.measure(loose.copy(maxWidth = width - back.width - allIcons - gap))
-        else part(TopBarItem.EXPORT_ICON)?.measure(loose)
-        var room = width - back.width - gap - (button?.width ?: 0)
+        val button = if (withLabel) part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - gap))
+        else part(TopBarItem.EXPORT_ICON)!!.measure(loose)
+        var room = width - back.width - gap - button.width
         val kept = mutableSetOf<TopBarItem>()
         for ((item, icon) in icons.sortedBy { it.first }) {
             if (icon.width > room) break
@@ -177,15 +145,15 @@ fun EditorTopBar(
         }
         val shown = icons.filter { it.first in kept }.map { it.second }
         val iconsWidth = shown.sumOf { it.width }
-        val barHeight = (listOf(back) + shown + listOfNotNull(button)).maxOf { it.height }
+        val barHeight = (listOf(back) + shown + button).maxOf { it.height }
             .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, barHeight) {
             val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
             centered(back, 0)
             // 中间这几个靠在导出左边，和返回之间空着
-            var x = width - (button?.width ?: 0) - gap - iconsWidth
+            var x = width - button.width - gap - iconsWidth
             shown.forEach { centered(it, x); x += it.width }
-            button?.let { centered(it, width - it.width) }
+            centered(button, width - button.width)
         }
     }
 }
@@ -193,11 +161,11 @@ fun EditorTopBar(
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
  * 还放不下（再开着调试信息）时，中间那几个照要紧的先后从最后一个起不摆出来，返回和导出一直在。
- * 去水印、设置在首页也有；用途水印、对比只在宽屏的顶栏上，那儿放得下。
+ * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
 private enum class TopBarItem {
-    BACK, EXPORT, EXPORT_ICON, UNDO, REDO, PURPOSE, COMPARE, SETTINGS, DEBUG, REMOVE_WATERMARK;
+    BACK, EXPORT, EXPORT_ICON, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
 
     companion object {
         /** 两头的，不参与让出来。 */
@@ -328,7 +296,8 @@ fun EditorBottomBar(
                 onOpen = onToolGroup,
                 styleBar = styleBar,
                 styleActions = styleActions,
-                purposeOn = purpose.text != null,
+                // 图上真有水印才算开着（同 EditorUiState.purposeText）：开了「应用」、写了字
+                purposeOn = purpose.on && purpose.text.isNotBlank(),
                 purposeOpen = purpose.open,
                 onPurpose = purposeActions::onToggle,
                 aiReview = aiReview,
@@ -450,7 +419,7 @@ internal fun FoldOnTouch(onFold: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /** 接住落在这儿的手指，落下时 [onDown]，别的什么也不做。 */
-private suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
+internal suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
     awaitFirstDown().consume()
     onDown()
     do {
@@ -471,7 +440,7 @@ private val FILM_GAP = 6.dp
 private val PANEL_RADIUS = TOOL_ROW_HEIGHT / 2
 
 /** 面板上的名字、参数从这儿起淡入：面板先长出一截再显出来，不和它一起挤在一条缝里。 */
-private const val CONTENT_IN_START = 0.35f
+internal const val CONTENT_IN_START = 0.35f
 
 /**
  * 手机竖着拿时，AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：它在底栏的「工具」里（见 [EditorToolbar]），
@@ -515,77 +484,3 @@ internal fun AiReviewResultPill(review: AiReview, finished: Int, modifier: Modif
 
 /** 跑完的结果在画布顶上停多久。 */
 private const val AI_RESULT_MS = 3_000L
-
-/**
- * 宽屏的样式列表那一块（WideEditorPanel）最底下那一行。手机上这两样都在工具那一行里（见 [EditorBottomBar]）。
- *
- * 单张时左边「AI 增强识别」，右边「导出」。批量时左边是胶片条，占掉导出左边剩下的地方，
- * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。
- *
- * @param filmstrip 批量时的胶片条，传进来的 Modifier 定好了它的宽。单张时为 null
- * @param exportLabel 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去
- */
-@Composable
-fun EditorActionRow(
-    onExport: () -> Unit,
-    exporting: Boolean,
-    modifier: Modifier = Modifier,
-    @StringRes exportLabel: Int = R.string.export,
-    aiReview: AiReview = AiReview.Hidden,
-    onAiReview: () -> Unit = {},
-    filmstrip: (@Composable (Modifier) -> Unit)? = null,
-) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (filmstrip != null) {
-            filmstrip(Modifier.weight(1f))
-            Box(Modifier.animateContentSize()) { AiReviewButton(aiReview, onAiReview) }
-            Spacer(Modifier.width(8.dp))
-        } else {
-            AiReviewButton(aiReview, onAiReview)
-            Spacer(Modifier.weight(1f))
-        }
-        Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
-    }
-}
-
-/**
- * 「AI 增强识别」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持（也没配外部模型）时整个不出现。
- * 跑的时候三颗星绕着一个圈转，代替转圈的进度条。
- * 结果就写在按钮上，不另弹提示：新发现几处、没有新发现，或者没跑成（还能点，再试一次）。
- * 跑成了就停住不可点——同一页再跑一遍结果一样，不该让人以为多点几次能多找出点什么。
- */
-@Composable
-internal fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
-    when (state) {
-        AiReview.Hidden -> Unit
-        AiReview.Ready -> TextButton(onClick = onClick) {
-            SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_review))
-        }
-        AiReview.Running -> TextButton(onClick = {}, enabled = false) {
-            // 按钮灰掉了，星星仍着主题色，看得出它在干活
-            SparkleIcon(animating = true, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_reviewing))
-        }
-        is AiReview.Done -> TextButton(
-            onClick = {},
-            enabled = false,
-            // 这是结果，要看得清，不能像别的不可点按钮那样灰下去
-            colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        ) {
-            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (state.found == 0) stringResource(R.string.ai_review_none) else stringResource(R.string.ai_review_found, state.found))
-        }
-        AiReview.Failed -> TextButton(
-            onClick = onClick,
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        ) {
-            SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_review_failed))
-        }
-    }
-}

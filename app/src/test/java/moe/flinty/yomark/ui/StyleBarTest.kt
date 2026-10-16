@@ -41,8 +41,8 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
-import moe.flinty.yomark.ui.components.StylePanel
 import moe.flinty.yomark.ui.components.StylePanelContent
+import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.MinSliderWidth
 import moe.flinty.yomark.ui.components.ToolGroup
@@ -54,7 +54,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 样式的调节面板（spec §7.5 修订）：手机上弹出来的那个、宽屏上占列表位置的那个。面板只发出新的样子，
+ * 样式的调节面板（spec §7.5 修订）：手机上从底栏长出来的那个、宽屏上从方块长出来占列表位置的那个。面板只发出新的样子，
  * 写进画笔、改选中的框由 ViewModel 管，那一段见 EditorViewModelTest。底栏上挑样式的那一行见 EditorToolbarTest。
  * 原先在 androidTest 里的样式栏测试挪到了这里：放在 androidTest 里 CI 不跑。
  *
@@ -165,15 +165,17 @@ class StyleBarTest {
         assertThat(actions.collapsed).isEqualTo(0)
     }
 
-    /** 宽屏的面板不盖画布，取色时还在：再点一下吸管就收起它。 */
+    /** 宽屏的面板（从方块长出来的，见 WideEditorPanel）不盖画布，取色时还在：再点一下吸管就收起吸管，面板一直开着。 */
     @Test fun theEyedropperStartsAndStopsPickingInTheWidePanel() {
         val actions = Recorder()
         var model by mutableStateOf(open(MaskStyle.SOLID))
-        compose.setContent { MaterialTheme { Surface { StylePanel(model, actions) } } }
+        compose.setContent { MaterialTheme { Surface { WideEditorPanel(atSide = true, styleBar = model, styleActions = actions, list = null) } } }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         model = model.copy(colorPick = ColorTarget.SOLID)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
         compose.onNodeWithContentDescription("从图上取色").performClick()
         assertThat(actions.picks).containsExactly(ColorTarget.SOLID, null).inOrder()
+        assertThat(actions.collapsed).isEqualTo(0)
     }
 
     // ---------- 近似色 ----------

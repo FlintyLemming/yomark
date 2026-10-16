@@ -596,6 +596,7 @@ class EditorViewModel(
         takeLines(result?.lines)
         rebaseOpenEdits { it.copy(items = detected + keep(it.items)) }
         uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged, bigBang = null)
+            .let { if (ranOn.canRefine) it else it.copy(aiOffered = false) }
         if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
     }
 
@@ -650,6 +651,8 @@ class EditorViewModel(
             aiReview = AiReview.Hidden,
             plan = current.plan.copy(items = detected + keep(current.plan.items)),
             bigBang = null,
+            // 换成了用不了 AI 的方案（实验室里关了外部模型）：宽屏不再给它留那一块
+            aiOffered = current.aiOffered && ranOn.canRefine,
         )
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn, trace)
     }
@@ -722,11 +725,15 @@ class EditorViewModel(
     ) {
         aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
             // 头一回探测要建 Nano 的客户端、连 AICore，放在主线程上画布会卡住，正赶上开始落码
-            if (!withContext(ioDispatcher) { ranOn.refineReady() }) return@launch
+            val ready = withContext(ioDispatcher) { ranOn.refineReady() }
+            if (!ready) {
+                if (_state.value.aiOffered) uiState = _state.value.copy(aiOffered = false)
+                return@launch
+            }
             val current = _state.value
             if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
             if (current.aiReview != AiReview.Hidden) return@launch
-            uiState = current.copy(aiReview = AiReview.Ready)
+            uiState = current.copy(aiReview = AiReview.Ready, aiOffered = true)
         }
     }
 
@@ -748,7 +755,7 @@ class EditorViewModel(
             val now = _state.value
             if (now.image !== image || analyzedWith != ranWith || now.analyzing || now.aiReview == AiReview.Running) return@launch
             val next = if (ready) AiReview.Ready else AiReview.Hidden
-            if (now.aiReview != next) uiState = now.copy(aiReview = next)
+            if (now.aiReview != next || now.aiOffered != ready) uiState = now.copy(aiReview = next, aiOffered = ready)
         }
     }
 
@@ -865,8 +872,12 @@ class EditorViewModel(
     /**
      * 宽屏的列表上点了一行：和在画布上点那一块一样，识别出的、点上的拿掉，手动框选中。
      * 吸管在等着取色时点的是列表不是图，先收起吸管，这一下照常算数。
+     *
+     * 大爆炸开着时不算数，和点画布一样（见 [onTap]）。宽屏上它的面板盖满列表那一块，列表点不着（见 WideEditorPanel），
+     * 这里再挡一道：从列表上拿掉大爆炸刚打的码，面板上那几个字还是选中的，再点一个字那一块又盖回去。
      */
     fun onListItemClick(id: String) {
+        if (_state.value.bigBang != null) return
         val item = _state.value.plan.find(id) ?: return
         cancelColorPick()
         tapItem(item)
@@ -1223,6 +1234,7 @@ class EditorViewModel(
     /**
      * 放下「编辑」里的马克笔、画笔、文本：画笔换回「打码」里上次用的样式，各样式调好的参数照旧（2026-10-16）。
      * 手机上它们只在「编辑」展开着时拿在手里，收起「编辑」就放下（见 EditorScreen）：收着的底栏点图、拖框总是打码。
+     * 宽屏上所有功能平铺着，没有收起这一说，拿着就一直拿着。
      * 原先收起后还拿着文本，点图哪儿都是写字，要回去打码得展开「打码」重新挑一种样式。
      * 只换画笔，不像 [setStyle] 那样连选中的框、已经打好的码一起换；还没写字的那一处作罢。
      */
@@ -1553,10 +1565,10 @@ class EditorViewModel(
 
     /**
      * 打开调节面板，水印不跟着加上：文字框是空的就先填上上次的文字或默认措辞，加不加由面板上的「应用」开关定。
-     * 它和样式的调节面板是同一块地方（手机上都是底栏的胶囊长出来的），一次只开一个：样式面板开着就换成它。
+     * 它和样式的调节面板是同一块地方（手机上是底栏的胶囊长出来的，宽屏上是从方块长出来的），一次只开一个：样式面板开着就换成它。
      */
     fun showPurposeSheet() {
-        // 大爆炸开着时面板的位置归它，开出来也看不见（顶栏的按钮这时也收起来了）
+        // 大爆炸开着时面板的位置归它，开出来也看不见（手机上底栏那一行归它，宽屏上它盖住了水印那一块）
         if (_state.value.bigBang != null) return
         finishLookEdit()
         val s = _state.value
@@ -1570,7 +1582,7 @@ class EditorViewModel(
         )
     }
 
-    /** 点了水印（手机底栏「编辑」里的那一项，宽屏顶栏上的按钮）：收着就打开，开着就收起，和再点一下当前的样式一样。 */
+    /** 点了水印（手机底栏「编辑」里的那一项，宽屏的水印那一块）：收着就打开，开着就收起，和再点一下当前的样式一样。 */
     fun togglePurposeSheet() {
         if (_state.value.purposeSheetVisible) dismissPurposeSheet() else showPurposeSheet()
     }

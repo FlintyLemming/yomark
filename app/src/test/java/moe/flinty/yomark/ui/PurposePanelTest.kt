@@ -40,13 +40,13 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.PanelColumn
-import moe.flinty.yomark.ui.components.PurposePanel
 import moe.flinty.yomark.ui.components.PurposePanelActions
 import moe.flinty.yomark.ui.components.PurposePanelContent
 import moe.flinty.yomark.ui.components.PurposePanelModel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
+import moe.flinty.yomark.ui.components.WideEditorPanel
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -314,15 +314,28 @@ class PurposePanelTest {
 
     // ---------- 宽屏 ----------
 
-    /** 宽屏的面板不盖画布，东西和手机上的一样；取色时还在，再点一下吸管就收起它。 */
+    /** 宽屏的面板（从水印那一块方块长出来，见 WideEditorPanel）不盖画布，东西和手机上的一样；取色时还在，再点一下吸管就收起吸管。 */
     @Test fun theWidePanelHasTheSameControlsAndKeepsItsEyedropper() {
         val actions = Recorder()
         var model by mutableStateOf(opened)
-        compose.setContent { MaterialTheme { Surface { PurposePanel(model, actions) } } }
+        var bar by mutableStateOf(StyleBarModel(MaskLook()))
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    WideEditorPanel(
+                        atSide = true, styleBar = bar, styleActions = object : StyleBarActions {}, list = null,
+                        purpose = model, purposeActions = actions,
+                    )
+                }
+            }
+        }
         listOf("用途水印", "文字", "颜色", "恢复默认", "应用").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         model = model.copy(picking = true)
+        bar = bar.copy(colorPick = ColorTarget.PURPOSE)
+        compose.onNodeWithText("用途水印").assertIsDisplayed()
         compose.onNodeWithContentDescription("从图上取色").performClick()
         assertThat(actions.picks).containsExactly(true, false).inOrder()
+        assertThat(actions.collapsed).isEqualTo(0)
     }
 }

@@ -81,11 +81,8 @@ import moe.flinty.yomark.ui.canvas.ScanEffect
 import moe.flinty.yomark.ui.components.AiReviewResultPill
 import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.BigBangActions
-import moe.flinty.yomark.ui.components.BigBangPanel
 import moe.flinty.yomark.ui.components.BigBangPanelModel
-import moe.flinty.yomark.ui.components.BigBangPlacement
 import moe.flinty.yomark.ui.components.DebugTraceSheet
-import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
 import moe.flinty.yomark.ui.components.FoldOnTouch
@@ -131,7 +128,7 @@ fun EditorScreen(
     val context = LocalContext.current
     val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
     val thumbnails = remember(context, thumbnailPx) { BatchThumbnails(context.contentResolver, thumbnailPx) }
-    // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
+    // 「按住对比」（手机在底栏、宽屏在功能方块里）按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
     // 手机底栏展开着的那一组（打码、编辑、工具）。只是界面上的事，不进 ViewModel
@@ -227,19 +224,14 @@ fun EditorScreen(
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
-                    // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角。
-                    // 大爆炸开着时水印收起来：面板的位置归它，水印面板开出来看不见
-                    onPurpose = if (phone || state.bigBang != null) null else vm::togglePurposeSheet,
-                    purposeOn = state.purposeText != null,
+                    // 导出在右上角，手机、宽屏都是（2026-10-16）。用途水印、对比手机上在底栏，宽屏上在功能方块里
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                     onSettings = onSettings,
                     // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
                     onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                     onNavigateUp = onNavigateUp,
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
-                    compare = if (phone) null else compare,
-                    canCompare = canCompare,
-                    onExport = if (phone) onExport else null,
+                    onExport = onExport,
                     exportLabel = exportLabel,
                     exporting = state.exporting,
                 )
@@ -343,7 +335,7 @@ fun EditorScreen(
                         ) {
                             OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
-                            // 宽屏的 AI 按钮上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
+                            // 宽屏的 AI 那一块上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
                             if (phone) AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
@@ -393,20 +385,15 @@ fun EditorScreen(
                             filmstrip = filmstrip,
                             pushCanvas = writingText(state),
                         )
-                        // 宽屏上大爆炸开着时顶替样式、列表那一块，画布让到它上面（左边）
-                        bang != null -> BigBangPanel(
-                            bang = bang,
-                            covered = covered,
-                            actions = bigBangActions,
-                            placement = if (atSide) BigBangPlacement.SIDE else BigBangPlacement.BOTTOM,
-                        )
+                        // 宽屏上所有功能平铺成方块（2026-10-16），面板从点的那一块长出来；大爆炸的面板盖满这一块，
+                        // 画布让到它上面（左边）
                         else -> WideEditorPanel(
                             atSide = atSide,
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             purpose = purpose,
                             purposeActions = purposeActions,
-                            // 手机横着拿没有列表，右边那一栏只放样式和导出
+                            // 手机横着拿没有列表，右边那一栏只放功能方块
                             list = if (layout.listed) ({ modifier ->
                                 MaskItemList(
                                     image = state.image,
@@ -418,17 +405,18 @@ fun EditorScreen(
                                     modifier = modifier,
                                 )
                             }) else null,
-                            actionRow = { modifier ->
-                                EditorActionRow(
-                                    onExport = onExport,
-                                    exportLabel = exportLabel,
-                                    exporting = state.exporting,
-                                    aiReview = state.aiReview,
-                                    onAiReview = vm::runAiReview,
-                                    filmstrip = filmstrip,
-                                    modifier = modifier,
-                                )
-                            },
+                            aiReview = state.aiReview,
+                            aiOffered = state.aiOffered,
+                            onAiReview = vm::runAiReview,
+                            // 宽屏上吸管等着取色时面板不收、方块都还点得着；大爆炸这时打不开（见 EditorViewModel.openBigBang），灰着
+                            bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing && state.colorPick == null,
+                            // 和水印一样，再点一下收起
+                            onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
+                            bigBang = bang?.let { BigBangPanelModel(it, covered) },
+                            bigBangActions = bigBangActions,
+                            compare = compare,
+                            canCompare = canCompare,
+                            filmstrip = filmstrip,
                         )
                     }
                 },

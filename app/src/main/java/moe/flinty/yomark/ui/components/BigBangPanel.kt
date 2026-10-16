@@ -2,7 +2,6 @@ package moe.flinty.yomark.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
@@ -10,13 +9,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -59,13 +56,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/**
- * 宽屏上大爆炸的面板放在哪儿：右边那一栏、下面那一块（见 EditorLayouts）。
- * 手机上它不是单独一块，是底栏的胶囊长出来的（见 EditorBottomBar、[phoneBigBangHeight]）。
- */
-enum class BigBangPlacement { SIDE, BOTTOM }
-
-/** 手机底栏要长出来的大爆炸面板：开着的大爆炸，和它的字里已经被别的码盖住的（BigBangPage.covered）。 */
+/** 要长出来的大爆炸面板：开着的大爆炸，和它的字里已经被别的码盖住的（BigBangPage.covered）。 */
 class BigBangPanelModel(val bang: BigBangState, val covered: Set<Int>)
 
 /** 面板上的动作，都交给 ViewModel（见 EditorScreen）。 */
@@ -77,48 +68,14 @@ interface BigBangActions {
 }
 
 /**
- * 大爆炸（2026-10-16，见 ui/bigbang）：这张图上识别出的字一个个摆成字块，点一下就打码（图上马上盖上），再点一下拿掉；
+ * 大爆炸（2026-10-16，见 ui/bigbang）的面板里的东西：这张图上识别出的字一个个摆成字块，点一下就打码（图上马上盖上），再点一下拿掉；
  * 横着划过去一串都打上（从打了码的字划起是一串都拿掉），竖着划是滚动。选中的连着的字连成一整条，和图上的码一个样。
  * 别的码盖着的字是一块灰。右上角「完成」收起，打上的码留着。
  *
- * 宽屏上顶替样式、列表那一块：画布让到它上面（左边），选字时看得到图上选中的是哪几块。
- * 手机上没有这一块，里面的东西（[BigBangContent]）从底栏的胶囊长出来（见 EditorBottomBar）。
- *
- * @param covered 已经被打码的样式盖住的字（BigBangPage.covered）
- */
-@Composable
-fun BigBangPanel(
-    bang: BigBangState,
-    covered: Set<Int>,
-    actions: BigBangActions,
-    placement: BigBangPlacement,
-    modifier: Modifier = Modifier,
-) {
-    val outer = when (placement) {
-        BigBangPlacement.SIDE -> modifier
-            .wideSidePanelWidth()
-            .fillMaxHeight()
-            .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)
-        BigBangPlacement.BOTTOM -> modifier
-            .fillMaxWidth()
-            .capHeight(BOTTOM_FRACTION)
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-    }
-    val surface = Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(20.dp))
-    Box(outer) {
-        BigBangContent(
-            bang, covered, actions,
-            fillHeight = placement == BigBangPlacement.SIDE,
-            modifier = surface.then(if (placement == BigBangPlacement.SIDE) Modifier.fillMaxHeight() else Modifier),
-        )
-    }
-}
-
-/**
- * 面板里的东西：顶上一行是名字、选了几个字和右边的「完成」，底下是字块（放不下在里面滚动）。
+ * 手机上面板是底栏的胶囊从「工具」长出来的那一块（见 EditorBottomBar）；宽屏上从大爆炸那一块方块长出来，盖满方块和列表
+ * （见 WideEditorPanel）。图跟着让开，选字时看得到图上选中的是哪几块。
+ * 顶上一行是名字、选了几个字和右边的「完成」，底下是字块（放不下在里面滚动），面板只有字块那么高。
  * 不另设「打码」：点字就是打码。
- *
- * @param fillHeight 字块那一块撑满剩下的高度（宽屏右边那一栏）；否则面板只有字块那么高
  */
 @Composable
 internal fun BigBangContent(
@@ -126,7 +83,6 @@ internal fun BigBangContent(
     covered: Set<Int>,
     actions: BigBangActions,
     modifier: Modifier = Modifier,
-    fillHeight: Boolean = false,
 ) {
     Column(modifier.padding(top = 4.dp, bottom = 12.dp)) {
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -143,7 +99,7 @@ internal fun BigBangContent(
         val scroll = rememberScrollState()
         Box(
             Modifier
-                .weight(1f, fill = fillHeight)
+                .weight(1f, fill = false)
                 .verticalScroll(scroll)
                 .padding(horizontal = 16.dp, vertical = 4.dp),
         ) {
@@ -443,6 +399,3 @@ private val MIN_PANEL = 220.dp
 
 /** 已经打了码的字块的底：正文颜色的这么多，比主题色的选中浅、比没选的深。 */
 private const val COVERED_ALPHA = 0.38f
-
-/** 宽屏竖着拿时下面那一块的上限，和样式面板开着时差不多（见 WideEditorPanel）。 */
-private const val BOTTOM_FRACTION = 0.48f

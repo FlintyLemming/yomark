@@ -124,7 +124,7 @@ interface StyleBarActions {
 // ---------- 小样子 ----------
 
 /**
- * 每种样式的小样子：手机底栏展开后的工具（EditorToolbar）、宽屏的样式方块（StyleGrid）都用它，方块大时按 [scale] 放大。
+ * 每种样式的小样子：手机底栏展开后的工具（EditorToolbar）、宽屏的功能方块（WideEditorPanel）都用它，方块大时按 [scale] 放大。
  * 跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
  *
  * @param nearColors 色块开着近似色时，小样子画的是图上取到的这几种颜色（见 [NearSolidGlyph]）
@@ -226,8 +226,9 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 // ---------- 调节面板 ----------
 
 /**
- * 手机上的调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
- * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶；
+ * 调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
+ * 手机上面板是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶；
+ * 宽屏上是从这种样式那一块方块长出来的，占列表的位置（见 WideEditorPanel）。
  * 外面那一列（[PanelColumn]）由底栏摆，用途水印的面板也在那一列里，换着开时面板一点点变高变矮。
  * 样式和参数管的是下一笔；选中了手动框时那个框照样当场跟着变。
  * 吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
@@ -265,30 +266,6 @@ internal fun DarkSystemBarIcons() {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
         }
-    }
-}
-
-/**
- * 宽屏上的调节面板：占框列表的位置（见 WideEditorPanel），画布留在旁边不被盖住。
- * 每动一下，选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
- *
- * @param standalone 顶替了样式方块（手机横着拿，右边那一栏放不下两样）：方块看不见了，和弹出的面板一样
- *   顶上写出当前样式的名字，方块下面的说明也再说一遍
- */
-@Composable
-internal fun StylePanel(
-    model: StyleBarModel,
-    actions: StyleBarActions,
-    modifier: Modifier = Modifier,
-    standalone: Boolean = false,
-) {
-    WidePanel(modifier) {
-        PanelHeader(
-            title = if (standalone) stringResource(MaskStyleInfo.label(model.look.style)) else null,
-            onCollapse = actions::onCollapse,
-            collapseLabel = stringResource(R.string.collapse_style_panel),
-        )
-        StylePanelBody(model, actions)
     }
 }
 

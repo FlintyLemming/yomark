@@ -577,7 +577,7 @@ private fun editTools(
  * 工具：点了就干活的两样，都不是样式。
  * - AI 增强识别：用不了时没有这一项（这时也没有「工具」，见 ToolboxCircle）。没有选中态。点了不收回去，跑的样子就在这儿看：
  *   星星转着、名字是「增强识别中…」；跑完名字换成结果、星星换成对勾。这两样时点不动，也不灰掉，结果要看得清
- *   （和宽屏的按钮一样，见 AiReviewButton）。没跑成星星是红的，还能点。
+ *   （和宽屏的那一块一样，见 WideEditorPanel）。没跑成星星是红的，还能点。
  * - 大爆炸：和「编辑」里的水印一样，点一下胶囊长出它的面板（见 EditorBottomBar），面板从第一行字摆起
  *   （见 EditorViewModel.openBigBang）；开着时选中的是它，名字后面的小箭头朝下，再点一下收起。
  *   长按图上的字照旧也能打开。还没识别完、没认出字时灰掉。
@@ -836,8 +836,12 @@ private fun Density.chevronRoom(open: Float) = (CHEVRON_ROOM.toPx() * open).roun
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
  */
-internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) = drawWithCache {
-    val radius = min(size.minDimension / 2, maxRadius.toPx())
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) =
+    floatingSurface(fill, edge) { min(it.minDimension / 2, maxRadius.toPx()) }
+
+/** 同上，圆角由 [cornerOf] 按眼下的大小定，可以跟着动画变（宽屏从一块长成面板，见 WideEditorPanel）。 */
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, cornerOf: Density.(Size) -> Float) = drawWithCache {
+    val radius = cornerOf(size)
     val shadows = SHADOWS.map { (blur, dy, alpha) ->
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = fill.toArgb()
@@ -919,7 +923,7 @@ private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit,
     }
 }
 
-/** AI 增强识别眼下的状态，宽屏按钮上、手机「工具」里的那一句。 */
+/** AI 增强识别眼下的状态，宽屏的那一块上、手机「工具」里的那一句。 */
 @Composable
 internal fun aiReviewLabel(state: AiReview): String = when (state) {
     AiReview.Ready, AiReview.Hidden -> stringResource(R.string.ai_review)
@@ -976,7 +980,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
 
 /** 提示在圆钮正上方，靠着屏幕边时往里收，不出屏。 */
 @Composable
-private fun rememberHintPosition(): PopupPositionProvider {
+internal fun rememberHintPosition(): PopupPositionProvider {
     val density = LocalDensity.current
     val space = with(density) { HINT_SPACING.roundToPx() }
     val edge = with(density) { MARGIN.roundToPx() }
@@ -1192,10 +1196,10 @@ private val TOOL_PAD_QUIET = 6.dp
 private val TOOL_GLYPH_GAP = 8.dp
 
 /** 选中的小胶囊是主题色叠这么浓。 */
-private const val SELECTED_TINT = 0.2f
+internal const val SELECTED_TINT = 0.2f
 
 /** 换选中的那一项走多久：Bettbox 1.19.4 给 GNav 设的 250 ms（见 ToolItem）。 */
-private const val PICK_MS = 250
+internal const val PICK_MS = 250
 
 /** 小箭头长出来时从右边多出这么远滑回来：GNav 的名字滑 8。 */
 private val CHEVRON_DRIFT = 8.dp
@@ -1205,11 +1209,11 @@ private val CHEVRON_DRIFT = 8.dp
  * Compose 里同名的 easeInCubic、easeOutSine、easeOutCirc、easeInExpo 控制点和 Flutter 的不一样，照 Flutter 的抄。
  */
 private val FLUTTER_EASE_IN = CubicBezierEasing(0.42f, 0f, 1f, 1f)
-private val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+internal val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private val FLUTTER_EASE_IN_CUBIC = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f)
 private val FLUTTER_EASE_OUT_SINE = CubicBezierEasing(0.39f, 0.575f, 0.565f, 1f)
-private val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
-private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
+internal val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
+internal val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
 
 /** Flutter 的 Curve.flipped：把曲线倒过来走。 */
 private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
@@ -1244,4 +1248,4 @@ private val HINT_SPACING = 8.dp
 /** 组名后面的小箭头，和它前面那一点空：地方不够时先去掉这一截。 */
 private val CHEVRON = 16.dp
 private val CHEVRON_ROOM = 18.dp
-private const val DISABLED_ALPHA = 0.38f
+internal const val DISABLED_ALPHA = 0.38f

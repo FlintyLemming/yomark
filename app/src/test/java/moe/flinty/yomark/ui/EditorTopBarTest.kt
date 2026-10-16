@@ -55,7 +55,7 @@ class EditorTopBarTest {
                 Surface {
                     EditorTopBar(
                         canUndo = true, canRedo = true, onUndo = {}, onRedo = {},
-                        onPurpose = null, onSettings = {}, onNavigateUp = {},
+                        onSettings = {}, onNavigateUp = {},
                         onRemoveWatermark = {},
                         onDebug = if (debug) ({}) else null,
                         onExport = {},
