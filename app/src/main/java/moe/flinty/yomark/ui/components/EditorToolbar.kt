@@ -364,21 +364,21 @@ private fun Density.toolSpace(width: Int) = (
  * 展开后各项工具的小胶囊停稳时多宽：[natural] 是各项本来要多宽（选中的连小箭头），[room] 是分隔线右边一共有多宽，
  * [picked] 是选中的那一项（没有是 -1）。放得下时各按本来的宽，多出来的再平分到格子里（见 [spread]）。
  *
- * 放不下时（窄屏、字调大了、英文的长名字）选中的名字最要紧，一定写全；其次是没选中的名字，从短的起能写几个写几个，
- * 写不下的只留小样子（[bare] 宽，见 [NameAndChevron]），不截断成「Water…」；最后还有地方，选中的名字后面才画小箭头（[chevron]）。
- * 都只剩小样子还放不下，才截断选中的名字。
+ * 放不下时（窄屏、字调大了、英文的长名字）选中的那一项最要紧，名字连小箭头一定画全：小箭头说明再点一下有调节面板，
+ * 没有它看不出这一项还能点。原先地方不够时先去掉的是它，中文在 427 dp 宽的手机上就差 8 dp，选中的一直没有小箭头（2026-10-16）。
+ * 其次是没选中的名字，从短的起能写几个写几个，写不下的只留小样子（[bare] 宽，见 [NameAndChevron]），不截断成「Water…」。
+ * 都只剩小样子还放不下，才截断选中的名字，小箭头照样留着。
  *
  * 只按停稳时的宽分。原先换选中的半路上每一帧按两项眼下的宽重新分：一个撑开一个收窄，谁写得下谁写不下一会儿一个样，
  * 名字藏了又露，整排跟着来回抽（2026-10-16）。现在换选中时各项从原先分到的宽一路走到新分到的宽（见 ToolItem）。
  */
-internal fun toolRooms(natural: List<Int>, room: Int, picked: Int, chevron: Int, bare: Int): List<Int> {
+internal fun toolRooms(natural: List<Int>, room: Int, picked: Int, bare: Int): List<Int> {
     if (natural.sum() <= room) return natural
-    val want = natural.indices.mapTo(ArrayList()) { if (it == picked) natural[it] - chevron else bare }
+    val want = natural.indices.mapTo(ArrayList()) { if (it == picked) natural[it] else bare }
     for (i in natural.indices.filter { it != picked }.sortedBy { natural[it] }) {
         if (want.sum() - bare + natural[i] > room) break
         want[i] = natural[i]
     }
-    if (picked in want.indices && want.sum() + chevron <= room) want[picked] += chevron
     val over = want.sum() - room
     if (over > 0 && picked in want.indices) want[picked] = (want[picked] - over).coerceAtLeast(bare)
     return want
@@ -419,7 +419,6 @@ private fun toolRooms(tools: List<Tool>, space: Int): List<Int> {
             natural = natural.mapIndexed { i, (quiet, chosen) -> if (i == picked) chosen else quiet },
             room = space,
             picked = picked,
-            chevron = CHEVRON_ROOM.roundToPx(),
             bare = TOOL_PAD_QUIET.roundToPx() * 2 + GLYPH_BOX.roundToPx(),
         )
     }
@@ -615,11 +614,13 @@ private fun LabelAndChevron(modifier: Modifier = Modifier, content: @Composable 
  * 小箭头贴着这一截的右沿，跟着它从名字后面推出来，名字盖着的那一段不露；[drift] 是它还差几成滑到位
  * （GNav 的名字在自己那一截里往左滑 8，这里停稳时贴着右沿，所以是从右边多出 8 dp 滑回来），[fade] 是它的浓淡。
  *
- * 给的地方（小胶囊分到的宽，见 [toolRooms]）不够时先少画小箭头，有多少地方长出来多少。
- * 名字也写不全时只露出给它的那一截，露得越少越淡，一点不给就只剩小样子：截成「Water…」难认，
- * 只有小样子的倒和作者给的悬浮底栏截图一个样子。换选中的半路上名字就是这样跟着分到的宽一点点露出来、收进去的。
+ * 选中的（[keep]）停稳了，小箭头一定画全：没有它看不出再点一下有调节面板（见 [toolRooms]）。
+ * 名字用剩下的地方，写不下才截断——选中的名字非写不可。
+ *
+ * 别的时候按给的地方（小胶囊分到的宽）画：小箭头有多少地方长出来多少；名字写不全时只露出给它的那一截，
+ * 露得越少越淡，一点不给就只剩小样子：截成「Water…」难认，只有小样子的倒和作者给的悬浮底栏截图一个样子。
+ * 换选中的半路上名字就是这样跟着分到的宽一点点露出来、收进去的。
  * 不露时名字照样摆着、只是透明：读屏还念得到，点的还是整格。
- * 只有选中的（[keep]）停稳了还写不下才截断名字——选中的名字非写不可。
  */
 @Composable
 private fun NameAndChevron(
@@ -642,16 +643,23 @@ private data class NameAndChevronPolicy(val keep: Boolean, val open: Float, val 
         val natural = gap + label.maxIntrinsicWidth(constraints.maxHeight)
         // 量本来多宽时（宽度不限）都写得下
         val room = if (constraints.hasBoundedWidth) constraints.maxWidth else Int.MAX_VALUE
-        val whole = natural <= room
-        val cut = keep && !whole && open == 1f
-        val text = label.measure(if (cut) Constraints(maxWidth = (room - gap).coerceAtLeast(0)) else Constraints())
+        val grown = if (chevron != null) chevronRoom(open) else 0
+        val settled = keep && open == 1f
+        val whole = settled || natural <= room
+        val arrow = when {
+            settled -> min(grown, (room - gap).coerceAtLeast(0))
+            whole -> min(grown, room - natural)
+            else -> 0
+        }
+        val text = label.measure(
+            if (settled && constraints.hasBoundedWidth) Constraints(maxWidth = (room - gap - arrow).coerceAtLeast(0)) else Constraints(),
+        )
         val end = gap + text.width
-        val arrow = if (whole && chevron != null) min(chevronRoom(open), room - end) else 0
-        val width = if (whole || cut) end + arrow else room.coerceAtLeast(0)
+        val width = if (whole) end + arrow else room.coerceAtLeast(0)
         val height = max(text.height, chevron?.height ?: 0)
         return layout(width, height) {
             val y = (height - text.height) / 2
-            if (whole || cut) {
+            if (whole) {
                 text.place(gap, y)
             } else {
                 text.placeWithLayer(gap, y) {

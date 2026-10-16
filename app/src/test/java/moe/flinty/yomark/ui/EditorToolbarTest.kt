@@ -238,11 +238,11 @@ class EditorToolbarTest {
     }
 
     /**
-     * 窄屏、英文的长名字：哪个名字都不截断。选中的 Marker 写全，短的 Pen 也写全，
-     * 写不下的 Watermark 只剩小样子（名字是透明的，伸出格子外，读屏还念得到）。
+     * 窄屏、英文的长名字：哪个名字都不截断。选中的 Marker 名字连小箭头画全（没有小箭头看不出再点一下有面板），
+     * 别的写不下就只剩小样子（名字是透明的，伸出格子外，读屏还念得到）。
      */
     @Config(qualifiers = "en-rUS-w360dp-h740dp-xxhdpi")
-    @Test fun onANarrowScreenTheChosenToolKeepsItsNameAndLongNamesStepAside() {
+    @Test fun onANarrowScreenTheChosenToolKeepsItsNameAndChevronAndOthersStepAside() {
         look = MaskLook(MaskStyle.MARKER)
         show(initial = ToolGroup.EDIT)
         listOf("Marker", "Pen", "Watermark").forEach { name ->
@@ -252,9 +252,9 @@ class EditorToolbarTest {
         }
         fun overhang(name: String) = compose.onNodeWithText(name, useUnmergedTree = true).getUnclippedBoundsInRoot().right -
             compose.onNodeWithText(name).getUnclippedBoundsInRoot().right
-        assertThat(overhang("Marker").value).isLessThan(0f)
-        assertThat(overhang("Pen").value).isLessThan(0f)
-        assertThat(overhang("Watermark").value).isGreaterThan(0f)
+        // 名字后面还有小箭头那一截和小胶囊右边的空，各 18 dp；没有小箭头只剩 18
+        assertThat(overhang("Marker").value).isLessThan(-30f)
+        listOf("Pen", "Text", "Watermark").forEach { assertThat(overhang(it).value).isGreaterThan(0f) }
     }
 
     /**
