@@ -23,11 +23,13 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.click
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
 import androidx.compose.ui.unit.width
 import androidx.core.net.toUri
 import androidx.lifecycle.SavedStateHandle
@@ -162,6 +164,19 @@ class EditorScreenLayoutTest {
         compose.onNodeWithContentDescription("按住对比原图").assertDoesNotExist()   // 顶栏上那一个挪下来了
         compose.onNodeWithText("色块").assertDoesNotExist()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+    }
+
+    /** 320 dp 宽的手机（或者调大了显示大小）：「导出」两个字放不下，换成只有图标的按钮，顶栏上别的按钮都在（见 EditorTopBarTest）。 */
+    @Config(qualifiers = "en-rUS-w320dp-h640dp-xhdpi")
+    @Test fun `on a 320dp phone export turns into an icon`() {
+        open()
+        compose.onNodeWithText("Export").assertIsNotDisplayed()
+        val export = compose.onNodeWithContentDescription("Export").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(export.height).isAtMost(48.dp)
+        assertThat(export.right).isAtMost(screenBounds().right)
+        for (button in listOf("Back", "Undo", "Redo", "Settings")) {
+            assertThat(compose.onNodeWithContentDescription(button).assertIsDisplayed().getUnclippedBoundsInRoot().right).isAtMost(export.left)
+        }
     }
 
     /** 点一组，胶囊撑满、最左边只留返回箭头，工具就地展开，对比让开；系统返回先把它收回去，不退出编辑器。 */

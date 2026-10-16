@@ -20,12 +20,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Compare
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -57,7 +60,10 @@ import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.util.lerp
 import kotlin.math.max
@@ -98,40 +104,106 @@ fun EditorTopBar(
     @StringRes exportLabel: Int = R.string.export,
     exporting: Boolean = false,
 ) {
-    Row(modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        // 向上回到首页，放在 Android 约定的左上角
-        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
-        Row(Modifier.weight(1f)) {}
-        IconButton(onClick = onUndo, enabled = canUndo) { Icon(Icons.Filled.Undo, stringResource(R.string.undo)) }
-        IconButton(onClick = onRedo, enabled = canRedo) { Icon(Icons.Filled.Redo, stringResource(R.string.redo)) }
-        if (onRemoveWatermark != null) {
-            IconButton(onClick = onRemoveWatermark) { Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark)) }
-        }
-        if (onPurpose != null) {
-            IconButton(onClick = onPurpose) {
-                Icon(
-                    PurposeWatermarkIcon,
-                    stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
-                    tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                )
+    Layout(
+        content = {
+            // 向上回到首页，放在 Android 约定的左上角
+            IconButton(onClick = onNavigateUp, Modifier.layoutId(TopBarItem.BACK)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+            IconButton(onClick = onUndo, Modifier.layoutId(TopBarItem.UNDO), enabled = canUndo) { Icon(Icons.Filled.Undo, stringResource(R.string.undo)) }
+            IconButton(onClick = onRedo, Modifier.layoutId(TopBarItem.REDO), enabled = canRedo) { Icon(Icons.Filled.Redo, stringResource(R.string.redo)) }
+            if (onRemoveWatermark != null) {
+                IconButton(onClick = onRemoveWatermark, Modifier.layoutId(TopBarItem.REMOVE_WATERMARK)) {
+                    Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark))
+                }
             }
-        }
-        if (compare != null) {
-            // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
-            IconButton(onClick = {}, enabled = canCompare, interactionSource = compare) {
-                Icon(Icons.Filled.Compare, stringResource(R.string.compare_original))
+            if (onPurpose != null) {
+                IconButton(onClick = onPurpose, Modifier.layoutId(TopBarItem.PURPOSE)) {
+                    Icon(
+                        PurposeWatermarkIcon,
+                        stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
+                        tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                    )
+                }
             }
+            if (compare != null) {
+                // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
+                IconButton(onClick = {}, Modifier.layoutId(TopBarItem.COMPARE), enabled = canCompare, interactionSource = compare) {
+                    Icon(Icons.Filled.Compare, stringResource(R.string.compare_original))
+                }
+            }
+            if (onDebug != null) {
+                IconButton(onClick = onDebug, Modifier.layoutId(TopBarItem.DEBUG)) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
+            }
+            IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
+            if (onExport != null) {
+                val label = stringResource(if (exporting) R.string.exporting else exportLabel)
+                Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
+                    Text(label, maxLines = 1, softWrap = false)
+                }
+                // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
+                FilledIconButton(
+                    onClick = onExport,
+                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+                    enabled = !exporting,
+                ) {
+                    if (exporting) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                    // 别的应用来要图时是「完成」：交回去
+                    else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
+                }
+            }
+        },
+        modifier = modifier.fillMaxWidth().padding(8.dp),
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val part = { item: TopBarItem -> measurables.firstOrNull { it.layoutId == item } }
+        val back = part(TopBarItem.BACK)!!.measure(loose)
+        val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
+        val allIcons = icons.sumOf { it.second.width }
+        val gap = if (part(TopBarItem.EXPORT) != null) EXPORT_GAP.roundToPx() else 0
+        val label = part(TopBarItem.EXPORT)?.maxIntrinsicWidth(Constraints.Infinity) ?: 0
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + gap + label
+        // 别的按钮都摆上，导出的字还整个放得下才写字
+        val withLabel = back.width + allIcons + gap + label <= width
+        val button = if (withLabel) part(TopBarItem.EXPORT)?.measure(loose.copy(maxWidth = width - back.width - allIcons - gap))
+        else part(TopBarItem.EXPORT_ICON)?.measure(loose)
+        var room = width - back.width - gap - (button?.width ?: 0)
+        val kept = mutableSetOf<TopBarItem>()
+        for ((item, icon) in icons.sortedBy { it.first }) {
+            if (icon.width > room) break
+            kept += item
+            room -= icon.width
         }
-        if (onDebug != null) {
-            IconButton(onClick = onDebug) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
-        }
-        IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-        if (onExport != null) {
-            Spacer(Modifier.width(4.dp))
-            Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
+        val shown = icons.filter { it.first in kept }.map { it.second }
+        val iconsWidth = shown.sumOf { it.width }
+        val barHeight = (listOf(back) + shown + listOfNotNull(button)).maxOf { it.height }
+            .coerceIn(constraints.minHeight, constraints.maxHeight)
+        layout(width, barHeight) {
+            val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
+            centered(back, 0)
+            // 中间这几个靠在导出左边，和返回之间空着
+            var x = width - (button?.width ?: 0) - gap - iconsWidth
+            shown.forEach { centered(it, x); x += it.width }
+            button?.let { centered(it, width - it.width) }
         }
     }
 }
+
+/**
+ * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
+ * 还放不下（再开着调试信息）时，中间那几个照要紧的先后从最后一个起不摆出来，返回和导出一直在。
+ * 去水印、设置在首页也有；用途水印、对比只在宽屏的顶栏上，那儿放得下。
+ * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
+ */
+private enum class TopBarItem {
+    BACK, EXPORT, EXPORT_ICON, UNDO, REDO, PURPOSE, COMPARE, SETTINGS, DEBUG, REMOVE_WATERMARK;
+
+    companion object {
+        /** 两头的，不参与让出来。 */
+        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON)
+    }
+}
+
+/** 导出和它左边的按钮之间多空一点。 */
+private val EXPORT_GAP = 4.dp
 
 /**
  * 手机的底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。
