@@ -50,9 +50,17 @@
 
 ## Claude Code 云端会话
 
-云端容器里没有模拟器，上面那节在云端做不了，也不要用 `claim.ps1`。`.claude/hooks/session-start.sh` 会在开会话时装好 Android SDK（`/opt/android-sdk`）并把 Maven Central 换成 Google 的镜像（云端直连常被限流成 429），所以可以直接跑：
+`.claude/hooks/session-start.sh` 会在开会话时装好 Android SDK（`/opt/android-sdk`）并把 Maven Central 换成 Google 的镜像（云端直连常被限流成 429），所以可以直接跑：
 
 - `./gradlew --no-daemon :app:assembleDebug :app:assertDebugNoRuntimePermissions`
 - `./gradlew --no-daemon :app:testDebugUnitTest`（含真 OCR 的端到端单测）
 
-模拟器上的验证留给本机，在回复里说明这一步没做。
+模拟器验证在云端也照做，只是 `.ps1` 脚本用不了，换成 `tools/emu/` 下的 `cloud-*.sh`。云端容器没有 KVM，模拟器是纯软件模拟，比本机慢几十倍：看界面、截图够用，别拿它量速度。
+
+- **领模拟器：** 一开始就在后台跑 `tools/emu/cloud-claim.sh`，跟写代码、编译同时进行。每个会话第一次领要装模拟器和系统镜像、冷启动，约 20 分钟；开好以后再跑几秒就输出 serial `emulator-5560`。
+- **安装：** `adb -s emulator-5560 install -r app/build/outputs/apk/debug/app-x86_64-debug.apk`，要三到五分钟。
+- **打开测试图：** `tools/emu/cloud-open-image.sh <图片路径>`，一两分钟。
+- **识别要等很久：** 一张 540×1170 的聊天截图要半小时以上，识别结果对不对用单测查快得多。要在界面上看结果，等的时候 `adb -s emulator-5560 shell input keyevent KEYCODE_SLEEP` 关屏，不然扫描动效抢走大半 CPU；截图前 `KEYCODE_WAKEUP`。
+- **截图：** `adb -s emulator-5560 exec-out screencap -p > <scratchpad>/x.png`。`screencap -p /sdcard/...` 每次都要起一个 `am broadcast`，软件模拟下慢得多。
+- adb 命令都套上 `timeout`：模拟器卡住时 adb 会一直等。
+- 收尾跑 `tools/emu/cloud-release.sh` 关掉。
