@@ -42,6 +42,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import moe.flinty.yomark.R
+import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.render.RendererRegistry
 import moe.flinty.yomark.ui.AnalyzingPill
@@ -124,7 +125,7 @@ internal fun TourStage(
                 onDeleteSelected = {},
                 scanStyle = scanStyle,
             )
-            LinkRing(sample, showRing, animate)
+            LinkRing(sample, state.sample.link, showRing, animate)
             TapCatcher(state, sample, linkAction = page >= 1)
             // 读屏从图上就念得到「识别中…」（见 TapCatcher），提示条不再念一遍
             AnalyzingPill(visible = analyzing, Modifier.align(Alignment.TopCenter).padding(top = 12.dp).clearAndSetSemantics {})
@@ -178,7 +179,7 @@ private fun BoxScope.TapCatcher(state: TourState, sample: SourceImage, linkActio
  * 等落码停稳一会儿再淡进来，之后慢慢一明一暗；点过字就淡掉。系统关了动画时不闪。
  */
 @Composable
-private fun BoxScope.LinkRing(sample: SourceImage, show: Boolean, animate: Boolean) {
+private fun BoxScope.LinkRing(sample: SourceImage, link: Quad, show: Boolean, animate: Boolean) {
     val shown by animateFloatAsState(
         targetValue = if (show) 1f else 0f,
         animationSpec = if (show) foldTween(true, delayMillis = RING_DELAY_MS) else contentFoldTween(false),
@@ -201,7 +202,7 @@ private fun BoxScope.LinkRing(sample: SourceImage, show: Boolean, animate: Boole
         val alpha = shown * (breath?.value ?: 1f)
         if (alpha <= 0f) return@Canvas
         val vp = Viewport.fit(sample.width, sample.height, size.width.toInt(), size.height.toInt())
-        val r = vp.imageToScreen(TourSample.LINK.bounds())
+        val r = vp.imageToScreen(link.bounds())
         val pad = RING_PAD.toPx()
         val topLeft = Offset(r.left - pad, r.top - pad)
         val box = Size(r.width() + 2 * pad, r.height() + 2 * pad)

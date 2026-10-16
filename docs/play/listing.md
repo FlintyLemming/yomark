@@ -120,3 +120,4 @@ python3 docs/play/src/finalize.py
 
 截图的标题、副标题和替代文字在 [`src/screenshots.json`](src/screenshots.json)；聊天记录样图的源文件是 [`src/chat-page.html`](src/chat-page.html)
 （`render.cjs chat-page` 渲染到 `app/src/test/resources/play/chat-page.png`），快递详情样图沿用 README 的 `order-page.png`。样图里的人名、地址、号码都是编的。
+首次引导在非中文环境下用的英文样图是 [`src/chat-page-en.html`](src/chat-page-en.html)（`render.cjs chat-page-en`），商店截图不用它。

@@ -30,6 +30,7 @@ import moe.flinty.yomark.ui.canvas.ScanStyle
  * @param revealed 识别动效演完了没有（或者没等它演完就按了「下一步」）。演完了的，回来时码直接在图上，不再演一遍
  * @param toggled 点过、和出厂不一样的码，按点的先后：识别出的是点掉了，「line-」开头的是点上了
  * @param tapped 点字打上过码：第二步的提示就不用再框了
+ * @param sample [toggled] 是在哪一张样图上点的（TourSample.key）。中途换了语言、样图跟着换了，点过的就不算数
  */
 @Parcelize
 internal data class TourProgress(
@@ -37,6 +38,7 @@ internal data class TourProgress(
     val revealed: Boolean = false,
     val toggled: List<String> = emptyList(),
     val tapped: Boolean = false,
+    val sample: String = "",
 ) : Parcelable
 
 /**
@@ -44,19 +46,23 @@ internal data class TourProgress(
  * 点码拿掉，原地再点一下打回来，点没打码的一段字就把这一段遮住；没有撤销、没有手动框。
  */
 @Stable
-internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
+internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean, val sample: TourSample) {
 
     var progress by saved
+
+    init {
+        if (progress.sample != sample.key) progress = progress.copy(toggled = emptyList(), sample = sample.key)
+    }
 
     /** 落码那一遍演完了，图上点得动了。编辑器识别中也点不了字（还没有字）。不存：回来时演完了的直接就是 true。 */
     var settled by mutableStateOf(progress.revealed)
 
-    /** 聊天的码露出了几处（TourSample.CHAT 的前几个）。实验室一打开，一处一处抹上去。 */
-    var chatShown by mutableIntStateOf(if (chatOn) TourSample.CHAT.size else 0)
+    /** 聊天的码露出了几处（[TourSample.chat] 的前几个）。实验室一打开，一处一处抹上去。 */
+    var chatShown by mutableIntStateOf(if (chatOn) sample.chat.size else 0)
 
-    val plan: MaskPlan by derivedStateOf { TourSample.plan(chatShown, progress.toggled) }
+    val plan: MaskPlan by derivedStateOf { sample.plan(chatShown, progress.toggled) }
 
-    val linkMasked: Boolean by derivedStateOf { TourSample.lineId(TourSample.LINK_INDEX) in progress.toggled }
+    val linkMasked: Boolean by derivedStateOf { TourSample.lineId(sample.linkIndex) in progress.toggled }
 
     /** 识别动效到点了：码落下来。 */
     fun reveal() {
@@ -77,9 +83,9 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
     fun onTap(p: PointF, reach: Float) {
         if (!settled) return
         val toggled = progress.toggled
-        val defaults = TourSample.defaults(chatShown)
+        val defaults = sample.defaults(chatShown)
         val dismissed = toggled.mapNotNull { id -> defaults.firstOrNull { it.candidateId == id } }
-        progress = when (val target = GestureRules.tapTarget(plan.items, TourSample.LINES, p, reach, dismissed)) {
+        progress = when (val target = GestureRules.tapTarget(plan.items, sample.lines, p, reach, dismissed)) {
             // 点上的一段再点一下拿掉；识别出的点掉了记着，原地再点一下打回来
             is GestureRules.TapTarget.Item -> {
                 val id = target.item.candidateId
@@ -87,7 +93,7 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
             }
             is GestureRules.TapTarget.Dismissed -> progress.copy(toggled = toggled - target.item.candidateId)
             is GestureRules.TapTarget.Line -> {
-                val id = TourSample.lineId(TourSample.LINES.indexOf(target.quad))
+                val id = TourSample.lineId(sample.lines.indexOf(target.quad))
                 // 点在已经遮上的一段旁边、又在手指的余量里：这一段只有一块码
                 if (id in toggled) return
                 progress.copy(toggled = toggled + id, tapped = true)
@@ -97,7 +103,7 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
     }
 
     /** 读屏用：在链接上点一下，和手指点它一样。 */
-    fun toggleLink() = onTap(TourSample.LINK_CENTER, 0f)
+    fun toggleLink() = onTap(sample.linkCenter, 0f)
 
     /**
      * 实验室里的「识别聊天记录」开关变了。打开：等翻页停稳（[ready]），标题和头像隔 [CHAT_STAGGER_MS] 一处一处抹上；
@@ -105,20 +111,20 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
      */
     suspend fun syncChat(on: Boolean, animate: Boolean, ready: () -> Boolean) {
         if (!on) {
-            val chatIds = TourSample.CHAT.map { it.candidateId }.toSet()
+            val chatIds = sample.chat.map { it.candidateId }.toSet()
             Snapshot.withMutableSnapshot {
                 chatShown = 0
                 progress = progress.copy(toggled = progress.toggled.filterNot { it in chatIds })
             }
             return
         }
-        if (chatShown >= TourSample.CHAT.size) return
+        if (chatShown >= sample.chat.size) return
         if (!animate) {
-            chatShown = TourSample.CHAT.size
+            chatShown = sample.chat.size
             return
         }
         snapshotFlow { settled && ready() }.first { it }
-        while (chatShown < TourSample.CHAT.size) {
+        while (chatShown < sample.chat.size) {
             chatShown++
             awaitMillis(CHAT_STAGGER_MS)
         }
@@ -132,9 +138,9 @@ internal class TourState(saved: MutableState<TourProgress>, chatOn: Boolean) {
 
 /** 记住引导的进度（转屏、进程被杀后接着来）。[animate] 为 false 时一开始就是演完了的样子。 */
 @Composable
-internal fun rememberTourState(chatOn: Boolean, animate: Boolean): TourState {
-    val saved = rememberSaveable { mutableStateOf(TourProgress(revealed = !animate)) }
-    return remember { TourState(saved, chatOn) }
+internal fun rememberTourState(sample: TourSample, chatOn: Boolean, animate: Boolean): TourState {
+    val saved = rememberSaveable { mutableStateOf(TourProgress(revealed = !animate, sample = sample.key)) }
+    return remember { TourState(saved, chatOn, sample) }
 }
 
 /** 识别动效（磨砂）演多久再落码。扫光那种别取 2 秒整：结果正好卡在一遍光扫完时，收尾要多扫一遍（见 ScanEffect.settleMs）。 */

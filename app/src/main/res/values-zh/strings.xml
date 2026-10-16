@@ -29,6 +29,8 @@
     <string name="onboarding_sample">示例聊天截图</string>
     <string name="onboarding_sample_masked">遮住了 %1$d 处</string>
     <string name="onboarding_mask_link">遮住链接</string>
+    <!-- 不给人看：引导的样图 tour_chat.webp 是哪一张，和图跟着同一个语言限定符换（见 TourSample.of） -->
+    <string name="tour_sample">zh</string>
     <string name="pick_image">选择图片</string>
     <string name="home_share_hint">也可以在相册里分享图片到「有码」，支持多张</string>
     <string name="free_edition">全功能免费版</string>
