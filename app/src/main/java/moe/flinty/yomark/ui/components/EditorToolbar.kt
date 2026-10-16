@@ -106,10 +106,15 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /** 手机底栏上点开的几组工具，和大爆炸占住这一行的那一种（[BIG_BANG]）。 */
 enum class ToolGroup(@StringRes val label: Int) {
@@ -188,6 +193,13 @@ fun EditorToolbar(
     canCompare: Boolean = false,
 ) {
     val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
+    // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走，比胶囊快，
+    // 胶囊缩回去的后半程上已经没有它们，不和淡回来的两组叠成一片（照 FlClash 收起弹出菜单、底栏换按钮）
+    val toolsIn = animateFloatAsState(
+        if (open != null) 1f else 0f,
+        if (open != null) foldSpec(true) else tween(TOOLS_OUT_MS, easing = TOOLS_OUT_EASING),
+        label = "toolGroupTools",
+    )
     // 收回去的半路上 open 已经是 null，那一组的工具还要接着画完
     val last = remember { LastOpen() }
     if (open != null) last.group = open
@@ -380,12 +392,13 @@ fun EditorToolbar(
                 }
                 val shift = backAt - backX
                 divider?.let { it.placeWithLayer(backAt + backWidth + dividerGap, it.centerY()) { alpha = span(p, 0.45f, 0.8f) } }
-                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走。
+                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走，比胶囊快（见 toolsIn）。
                 // 胶囊还没撑到的地方不露出来：最右边那几个跟着胶囊的右沿一点点现出来
                 val stagger = if (tools.size > 1) (1f - TOOL_IN_START - TOOL_IN) / (tools.size - 1) else 0f
+                val shownTools = toolsIn.value
                 tools.forEachIndexed { i, tool ->
                     val start = TOOL_IN_START + i * stagger
-                    val t = span(p, start, start + TOOL_IN)
+                    val t = span(shownTools, start, start + TOOL_IN)
                     val x = toolX[i] + shift - ((1f - t) * slide).roundToInt()
                     tool.placeWithLayer(x, tool.centerY()) {
                         alpha = t
@@ -1078,11 +1091,19 @@ private const val EXPAND_MS = 350
 private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /**
- * 收回去比展开快一点，曲线是 ease-out cubic：起步快，尾巴不像标准曲线那样拖。
- * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）。
+ * 收回去是一根不回弹的弹簧（见 [SpringEasing]，照 FlClash 收起弹出菜单）：从静止起步，中段最快，落地缓，300 ms 停稳。
+ * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）；
+ * 300 ms 的 ease-out cubic 一下就是最快，头一帧就走掉一成半，还是生硬（2026-10-16）。
  */
 private const val COLLAPSE_MS = 300
-private val COLLAPSE_EASING = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
+private val COLLAPSE_EASING = SpringEasing(response = 0.27f, seconds = COLLAPSE_MS / 1000f)
+
+/**
+ * 收回去时展开的工具走得比胶囊快（见 EditorToolbar 的 toolsIn）：右边的先走，九十来 ms 都淡没了，两组差不多这时才淡回来。
+ * 原先它们和胶囊一条进度，「打码」「编辑」淡进来时工具的名字还在原处，叠成一片（2026-10-16）。
+ */
+private const val TOOLS_OUT_MS = 200
+private val TOOLS_OUT_EASING = SpringEasing(response = 0.2f, seconds = TOOLS_OUT_MS / 1000f)
 
 /** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
 internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
@@ -1171,6 +1192,27 @@ private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035
 
 /** Flutter 的 Curve.flipped：把曲线倒过来走。 */
 private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
+
+/**
+ * 一根弹簧从 0 弹到 1 走成的曲线，照 FlClash 的 SpringCurve（Flutter 的 SpringDescription.withDurationAndBounce）：
+ * [response] 是弹簧的感知时长（秒），[bounce] 是回弹多少（0 不回弹）。整条在 [seconds] 里放完：
+ * 到点时弹簧还差的那一点从头匀着补上，正好停在 1，时长是定的。
+ * 和 ease-out 不一样，弹簧从静止起步，头几帧走得少，中段最快，再慢慢落地。
+ */
+internal class SpringEasing(response: Float, bounce: Float = 0f, private val seconds: Float) : Easing {
+    private val omega = 2 * PI / response
+    private val zeta = 1.0 - bounce
+    private val residual = 1 - at(seconds.toDouble())
+
+    /** 弹簧放了 [t] 秒走到哪儿。 */
+    private fun at(t: Double): Double {
+        if (zeta >= 1) return 1 - (1 + omega * t) * exp(-omega * t)
+        val damped = omega * sqrt(1 - zeta * zeta)
+        return 1 - exp(-zeta * omega * t) * (cos(damped * t) + zeta * omega / damped * sin(damped * t))
+    }
+
+    override fun transform(fraction: Float) = (at(fraction.toDouble() * seconds) + residual * fraction).toFloat()
+}
 
 /** 小胶囊撑开、收窄，和分到的宽一起走的那一条（见 ToolItem）。 */
 private val GROW_EASING = FLUTTER_EASE_IN_CUBIC.flipped()
