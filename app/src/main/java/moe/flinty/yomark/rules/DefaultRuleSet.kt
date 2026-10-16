@@ -544,22 +544,48 @@ object DefaultRuleSet {
             """(?:add )?(?:delivery )?instructions|edit|change|copy)\b|(?:home|work|personal|office|other|main|primary|default)$)"""
     )
 
+    /** 取件码的样子：至多三个字母打头，有数字，可用连字符分段（「1-58908」「A12-3-4567」「B3-1107」「36920471」）。 */
+    private const val PICKUP_VALUE = """[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""
+
+    /**
+     * 短信里不写字段名的取件码：「请凭8-5-2001于21:00前取件」「请凭3-2-1234到东门驿站领取」。码紧跟在「凭」后面，
+     * 接着说怎么取（「于」「到」「及时」「取件」……），这一句里要说到取、领、提货，码至少四位数字（[collectWithCode]）：
+     * 「凭2024年发票领取」「凭1000积分领取」「凭8888到店享八折」都不是。
+     */
+    private val COLLECT_WITH_CODE = Regex(
+        """凭 ?($PICKUP_VALUE)(?![A-Za-z0-9])(?= ?(?:于|到|至|在|前往|前来|及时|尽快|尽早|速|来|去|开|取|领|提货))""" +
+            """(?=[^。；;！!？?\n]*?(?:取(?!消)|领|提货))"""
+    )
+
+    /** [COLLECT_WITH_CODE] 里的码，逐字切开的行也认。 */
+    private fun collectWithCode(confidence: Float) = Finder { text ->
+        val view = HanView.of(text)
+        COLLECT_WITH_CODE.findAll(view.text).map { it.groups[1]!! }
+            .filter { code -> code.value.count(Char::isDigit) >= 4 }
+            .map { RuleMatch(view.toSource(it.range), confidence) }.toList()
+    }
+
     /**
      * 取件码（真机漏检补的）。驿站、快递柜凭它取件，截图里露出来，
      * 看到的人就能去把包裹拿走——危害比快递单号直接得多。
      *
-     * 只认字段名后面的值，误报率低，所以默认打码。值至少含一位数字，
+     * 认字段名后面的值和短信里「凭」后面的码，误报率低，所以默认打码。值至少含一位数字，
      * 「请凭取货码及时领取」这种说明文字不会被当成值。
+     *
+     * 短信、聊天里字段名写在句子中间（测评页上漏的）：「凭取件码36920471取件」「柜子取餐码 5-0318」前面紧挨着汉字，
+     * 「您的取件码为 6-2-3001」隔着「为」，照认（LabeledField 的 inSentence）。
      */
     private val PICKUP_CODE = CompositeRule(
         id = "pickup",
         kind = SensitiveKind.PICKUP_CODE,
         enabledByDefault = true,
         LabeledField(
-            labels = listOf("取件码", "取货码", "提货码", "取件号", "自提码"),
-            value = Regex("""[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""),
+            labels = listOf("取件码", "取货码", "提货码", "取件号", "自提码", "取餐码"),
+            value = Regex(PICKUP_VALUE),
             confidence = 0.8f,
+            inSentence = true,
         ),
+        collectWithCode(confidence = 0.7f),
     )
 
     private val BIRTH_DATE_LABELS = listOf(
