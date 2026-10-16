@@ -1,8 +1,11 @@
 package moe.flinty.yomark.ui.settings
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.BugReport
+import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Policy
 import androidx.compose.material.icons.outlined.SettingsBackupRestore
@@ -45,7 +48,12 @@ internal const val TAPS_TO_DEBUG = 7
  * 隐私权政策那一行把网址写在摘要里：手机上没有浏览器能接时（[openUrl] 抛异常），用户照着抄也能打开。
  * 写全 https://，末尾不带斜杠（2026-10-15 起）；打开的还是带斜杠的那个，GitHub Pages 不用再跳一次。
  *
+ * 「反馈」一组（2026-10-16）：发邮件、GitHub Issues，两条路各管什么见 Feedback.kt。都带上版本和机型；
+ * 邮件那一行也把地址写在摘要里，没有邮件应用时地址进剪贴板。
+ *
  * @param play 上架 Play 的内购版（见 Edition）：版本号后面写一句「Play 版」，和 GitHub 上发的开源版分得开。
+ * @param device 机型和系统版本，写进反馈里。
+ * @param sendEmail 交给邮件应用。没有能接的应用时抛异常。
  * @param notify 弹一句提示（连点版本号时的「还差几下」）。默认是系统的 Toast，单测里换掉。
  */
 @Composable
@@ -57,12 +65,15 @@ fun AboutSettingsScreen(
     modifier: Modifier = Modifier,
     version: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
     play: Boolean = !Edition.isFree,
+    device: String = deviceSummary(),
     openUrl: (String) -> Unit = LocalUriHandler.current::openUri,
+    sendEmail: (Intent) -> Unit = LocalContext.current::startActivity,
     notify: (String) -> Unit = rememberToast(),
 ) {
     val context = LocalContext.current
     var taps by remember { mutableIntStateOf(0) }
     var confirmReset by rememberSaveable { mutableStateOf(false) }
+    val edition = if (play) "$version · ${stringResource(R.string.play_edition)}" else version
 
     SettingsScaffold(title = stringResource(R.string.settings_about), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -70,7 +81,7 @@ fun AboutSettingsScreen(
             SettingsGroup {
                 SettingsRow(
                     title = stringResource(R.string.version),
-                    summary = if (play) "$version · ${stringResource(R.string.play_edition)}" else version,
+                    summary = edition,
                     interaction = Modifier.clickable {
                         if (debugTrace) {
                             notify(context.getString(R.string.debug_already_on))
@@ -94,6 +105,32 @@ fun AboutSettingsScreen(
                     summary = PRIVACY_POLICY_URL.removeSuffix("/"),
                     icon = Icons.Outlined.Policy,
                     onClick = { runCatching { openUrl(PRIVACY_POLICY_URL) } },
+                )
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.feedback))
+            SettingsGroup {
+                LinkRow(
+                    title = stringResource(R.string.feedback_email),
+                    summary = FEEDBACK_EMAIL,
+                    icon = Icons.Outlined.Email,
+                    onClick = {
+                        val mail = feedbackEmail(
+                            subject = context.getString(R.string.feedback_email_subject),
+                            version = "${context.getString(R.string.app_name)} $edition",
+                            device = device,
+                        )
+                        runCatching { sendEmail(mail) }.onFailure {
+                            if (copyFeedbackEmail(context)) notify(context.getString(R.string.no_email_app))
+                        }
+                    },
+                )
+                LinkRow(
+                    title = stringResource(R.string.github_issues),
+                    summary = stringResource(R.string.github_issues_summary),
+                    icon = Icons.Outlined.BugReport,
+                    onClick = { runCatching { openUrl(issueUrl(edition, device)) } },
                 )
             }
         }

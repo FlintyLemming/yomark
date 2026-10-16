@@ -208,7 +208,7 @@
     <string name="settings_appearance_summary">Theme color, scan effect</string>
     <string name="settings_labs_summary">Detect chat screenshots, external model</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
-    <string name="settings_about_summary">Version %1$s · Privacy policy · Reset</string>
+    <string name="settings_about_summary">Version %1$s · Privacy policy · Feedback · Reset</string>
     <string name="count_kinds">%1$d %2$s</string>
     <string name="summary_masked">masked</string>
     <string name="summary_off">off</string>
@@ -347,6 +347,12 @@
     <string name="version">Version</string>
     <string name="play_edition">Play edition</string>
     <string name="privacy_policy">Privacy policy</string>
+    <string name="feedback">Feedback</string>
+    <string name="feedback_email">Email</string>
+    <string name="feedback_email_subject">Yomark feedback</string>
+    <string name="no_email_app">No email app; address copied</string>
+    <string name="github_issues">GitHub Issues</string>
+    <string name="github_issues_summary">Public; needs a GitHub account</string>
     <string name="reset_settings">Reset settings</string>
     <string name="reset_settings_summary">Everything except appearance</string>
     <string name="reset_confirm_title">Reset settings?</string>

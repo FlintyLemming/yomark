@@ -1,0 +1,40 @@
+# 应用里「关于 → 反馈 → GitHub Issues」打开时，按 id 预填 version、device 两栏（见 app 里的 Feedback.kt），改 id 要两边一起改。
+name: 问题 / Bug
+description: 闪退、界面不对、功能不好用 / Crashes, broken screens, things that don't work
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        这里所有人都看得到。识别不准、要附截图或调试记录的，请发邮件到 [yomark@flinty.moe](mailto:yomark@flinty.moe)：调试记录里有截图上的原文。
+
+        Everything here is public. For missed or wrong masks that need a screenshot or debug log, email [yomark@flinty.moe](mailto:yomark@flinty.moe) instead: the debug log contains the text from your screenshot.
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么 / What happened
+      description: 附截图前先用有码打码 / Mask screenshots with Yomark before attaching them
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 怎么重现 / Steps to reproduce
+      placeholder: |
+        1.
+        2.
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: 设置 → 关于 / Settings → About
+      placeholder: 0.18.0 (26)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 机型和系统 / Device and Android version
+      placeholder: Google Pixel 10 Pro · Android 17 (API 37)
+    validations:
+      required: true
