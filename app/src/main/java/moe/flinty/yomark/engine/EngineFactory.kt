@@ -47,17 +47,17 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
  * 「AI 增强识别」的两个后端：实验室里的外部模型开着、配好了就用它，Nano 让开；不然照旧是本机的 Nano。
  * 外部模型的设置每次用时现读（[external]），不进 config：改了接口不用重建引擎、编辑器也不用重跑识别。
  * 什么都没开就不摆「AI 增强识别」：没有可问的，点了也只会说「没有新发现」。
+ *
+ * 原先「文字」页上有个开关能把它整个关掉，2026-10-15 去掉了：它本来就是点了才跑，不想用不点就是。
+ * 老安装存着的「关」不再读。
  */
 internal fun refinersFor(config: RecognitionConfig, external: suspend () -> ExternalModelSettings): List<SensitivityClassifier> =
-    when (config.semantic) {
-        SemanticOption.GEMINI_NANO -> aiKinds(config).takeIf { it.isNotEmpty() }?.let { kinds ->
-            listOf(
-                ExternalModelClassifier(kinds, aiOffRules(config), RuleCatalog.rulesFor(config), external).traced(),
-                GeminiNanoClassifier(kinds, aiOffRules(config), yieldTo = { external().active }).traced(),
-            )
-        }.orEmpty()
-        SemanticOption.OFF -> emptyList()
-    }
+    aiKinds(config).takeIf { it.isNotEmpty() }?.let { kinds ->
+        listOf(
+            ExternalModelClassifier(kinds, aiOffRules(config), RuleCatalog.rulesFor(config), external).traced(),
+            GeminiNanoClassifier(kinds, aiOffRules(config), yieldTo = { external().active }).traced(),
+        )
+    }.orEmpty()
 
 /**
  * AI 增强识别找哪几类：「文字」里开着的那些，聊天记录开着时再加上昵称和聊天标题（头像是图，读文字的模型看不到）。

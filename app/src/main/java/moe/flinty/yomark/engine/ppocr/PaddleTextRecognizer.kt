@@ -36,7 +36,7 @@ internal fun OcrLine.toTextLine(): TextLine? {
         charBoxes[i]?.let { TextElement(it.toQuad(), text[i].toString(), i..i) }
     }
     if (elements.isEmpty()) return null
-    return TextLine(box.toQuad(), text, confidence, elements)
+    return TextLine(box.toQuad(), text, confidence, elements, segments.map { it.toQuad() })
 }
 
 private fun Box.toQuad() = Quad(tl.toPointF(), tr.toPointF(), br.toPointF(), bl.toPointF())

@@ -6,7 +6,6 @@ import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
-import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.theme.ThemeColor
@@ -35,7 +34,6 @@ class RecognitionConfigStoreTest {
             face = FaceOption.ACCURATE,
             faceState = RuleState.OFF,
             chatState = RuleState.MASKED,
-            semantic = SemanticOption.OFF,
             maskUnanchoredNames = true,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )

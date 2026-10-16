@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
@@ -107,6 +108,18 @@ class EditorViewModel(
     val debugTrace: StateFlow<Boolean> = settings.debugTrace
         .onEach { on -> if (!on) traceLog.clear() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /**
+     * 开发者里的「显示识别框」：画布上叠出 [textBoxes]。调试信息关着时一律不画。
+     * 不进 EditorUiState，理由同 [scanStyle]。
+     */
+    val showTextBoxes: StateFlow<Boolean> = combine(debugTrace, settings.showTextBoxes) { debug, on -> debug && on }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    private val _textBoxes = MutableStateFlow<List<Quad>>(emptyList())
+
+    /** 画布上这张图识别出的每一段字的框，就是 [lines]（init 里恢复时就要写它，所以放在前面）。开发者里打开「显示识别框」时画出来。 */
+    val textBoxes: StateFlow<List<Quad>> = _textBoxes.asStateFlow()
 
     /**
      * 唯一的状态写入口。每次写都把 plan 镜像进 SavedStateHandle——
@@ -644,14 +657,17 @@ class EditorViewModel(
     private var reviewLines: List<TextLine>? = null
 
     /**
-     * 画布上这张图识别出的每一行字的框（TextLine.quad）：点在没打码的字上，打码的就是它所在的那一行。
-     * 和 [reviewLines] 不同，它跟着 plan 进 SavedStateHandle（一行八个数），重建之后照样点得上。
+     * 画布上这张图识别出的每一段字的框（TextLine.segments）：点在没打码的字上，打码的就是它所在的那一段。
+     * 不是拼好的整行：PP-OCR 把同一排上隔开的几段拼成一行给规则看（RowGrouper），并排的三个按钮、
+     * 缩略图上的字和它右边的标签都在一行里，按行打码一下盖住一整排。
+     * 和 [reviewLines] 不同，它跟着 plan 进 SavedStateHandle（一段八个数），重建之后照样点得上。
      * 还没识别完、识别失败时是空的。
      */
     private var lines: List<Quad> = emptyList()
         set(value) {
             field = value
             savedState[KEY_LINES] = packQuads(value)
+            _textBoxes.value = value
         }
 
     /**
@@ -662,10 +678,10 @@ class EditorViewModel(
      */
     private var dismissed: List<MaskItem> = emptyList()
 
-    /** 换上画布上这张图识别出的文字（没有就是 null）：增强识别要送的整页文字，点字打码要的每一行的框。 */
+    /** 换上画布上这张图识别出的文字（没有就是 null）：增强识别要送的整页文字，点字打码要的每一段的框。 */
     private fun takeLines(found: List<TextLine>?) {
         reviewLines = found
-        lines = found.orEmpty().map { it.quad }
+        lines = found.orEmpty().flatMap { it.segments }
     }
 
     private var aiReviewJob: Job? = null
@@ -763,9 +779,9 @@ class EditorViewModel(
     // ---------- 编辑 ----------
 
     /**
-     * 点一下（spec §7.3，2026-10-14 修订；点中了什么见 GestureRules.tapTarget）：
+     * 点一下（spec §7.3，2026-10-14、2026-10-15 修订；点中了什么见 GestureRules.tapTarget）：
      * - 识别出的码、点一行字打上的码：拿掉。撤销能回来，识别出的原地再点一下也原样回来；
-     * - 没打码的字：它所在的那一整行打上码，框是文字识别给的这一行，用「打码」里眼下的样式（[EditorUiState.maskLook]）。
+     * - 没打码的字：它所在的那一段打上码（见 [lines]），用「打码」里眼下的样式（[EditorUiState.maskLook]）。
      *   手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码；
      * - 手动框：不拿掉，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
      *   点它要是把码去掉了，「点一下再调一调」就成了「点一下码没了」。
@@ -773,10 +789,10 @@ class EditorViewModel(
      * 吸管在等着取色时，这一下只取颜色。
      *
      * 文本（2026-10-15）：选中的文本再点一下是改它的字（[editSelectedText]）。手里拿着文本时，点的不是哪一块码——
-     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码那一行：拿起文本就是要往图上写字。
+     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字。
      * 这时选中着什么的话，这一下只是取消选中，和别的时候点空白一样：写完一块点一下别处，不会又开始写一块。
      *
-     * @param reach 点没落在任何一行字里时，离一行多近也算点中它（图像像素）
+     * @param reach 点没落在任何一段字里时，离一段多近也算点中它（图像像素）
      */
     fun onTap(imagePoint: PointF, reach: Float = 0f) {
         if (_state.value.colorPick != null) {
@@ -838,7 +854,7 @@ class EditorViewModel(
         uiState = _state.value.copy(selectedManualId = null)
     }
 
-    /** 点了没打码的一行字：整行打上码，用「打码」里眼下的样式。和点识别出的码一样，不进选中态。 */
+    /** 点了没打码的字：它所在的那一段打上码，用「打码」里眼下的样式。和点识别出的码一样，不进选中态。 */
     private fun maskLine(quad: Quad) {
         val item = MaskItem(
             candidateId = "line-${UUID.randomUUID()}",

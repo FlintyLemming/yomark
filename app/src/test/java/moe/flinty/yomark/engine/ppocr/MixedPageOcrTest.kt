@@ -1,6 +1,7 @@
 package moe.flinty.yomark.engine.ppocr
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -70,6 +71,26 @@ class MixedPageOcrTest {
                 SensitiveKind.PERSON_NAME to "林知夏",
                 SensitiveKind.BIRTH_DATE to "1993年7月18日",
             )
+        }
+    }
+
+    /**
+     * 点字打码按段打（TextLine.segments）：转正了读的、压着水印重读的行，段的框和字的框一起映射回原图，
+     * 每个字都落在它那一行的某一段里，点哪个字都点得中。
+     */
+    @Test fun `every character falls inside a segment of its line`() {
+        listOf(
+            "form90" to { TestPages.formWithCard(90) },
+            "form270" to { TestPages.formWithCard(270) },
+            "watermark" to { TestPages.res("/ppocr/id-card-watermark.jpg") },
+        ).forEach { (key, image) ->
+            read(key, image).forEach { line ->
+                line.elements.forEach { e ->
+                    val c = e.quad.bounds()
+                    assertWithMessage("$key「${line.text}」的「${e.text}」")
+                        .that(line.segments.any { it.contains(PointF(c.centerX(), c.centerY())) }).isTrue()
+                }
+            }
         }
     }
 

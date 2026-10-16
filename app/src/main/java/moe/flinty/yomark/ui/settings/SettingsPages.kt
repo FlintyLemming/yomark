@@ -62,7 +62,6 @@ import moe.flinty.yomark.engine.BarcodeOption
 import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
-import moe.flinty.yomark.engine.SemanticOption
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.engine.genai.NanoStatus
@@ -76,23 +75,26 @@ import moe.flinty.yomark.ui.theme.colorScheme
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、导出、外观、实验室。
+ * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、通用、外观、实验室。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 外观和导出两页不影响识别，换它们不重跑。AI 页显示本机的 Gemini Nano 和随包的 PP-OCR；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
+ * 通用和外观两页不影响识别，换它们不重跑。AI 页显示本机的 Gemini Nano 和随包的 PP-OCR；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
+ *
+ * 行下的小字、页尾说明都不带句号（2026-10-15 起），几句话并成一句，中间用逗号、分号隔开。
  */
 
 /**
- * 文字：上面一组是「怎么认字」（识别引擎、AI 增强识别），下面一组是认出来的各类敏感信息，
+ * 文字：上面一组是「怎么认字」（识别引擎），下面一组是认出来的各类敏感信息，
  * 每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
  *
  * 各类原先在行尾直接摆一排「关 / 圈出 / 打码」；人名多了一个只属于它的开关之后，行尾放不下，
  * 一类一页又和人脸、条码的页是同一个样子：先是「识别到时怎么办」，再是这一类自己的选项和认法。
  * 原先单独一页的「文字识别」并进来：认字和认出来怎么处理都是「文字」的事，分在两处找不到。
+ * 「文字识别」一组里原先还有 AI 增强识别的开关，2026-10-15 去掉了，它总是开着（见 refinersFor）。
  *
- * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、AI 增强识别、各类的处理方式和人名的开关。
+ * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、各类的处理方式和人名的开关。
  */
 @Composable
 fun TextSettingsScreen(
@@ -120,14 +122,6 @@ fun TextSettingsScreen(
                     summary = stringResource(textEngineLabel(config.textEngine)),
                     icon = Icons.Outlined.DocumentScanner,
                     onClick = onOpenEngine,
-                )
-                SwitchRow(
-                    title = stringResource(R.string.ai_review),
-                    icon = Icons.Outlined.AutoAwesome,
-                    checked = config.semantic != SemanticOption.OFF,
-                    onCheckedChange = { on ->
-                        onChange(config.copy(semantic = if (on) SemanticOption.GEMINI_NANO else SemanticOption.OFF))
-                    },
                 )
             }
             SectionHeader(stringResource(R.string.sensitive_info))
@@ -290,8 +284,9 @@ fun BarcodeSettingsScreen(
 /**
  * 实验室：还不够稳、出厂关着的功能，一项一个开关，说明写在各自的页脚。
  *
- * 聊天记录（2026-10-15 从一级页挪进来）：认出是聊天截图之后，遮住头像、昵称、聊天标题。
+ * 识别聊天记录（2026-10-15 从一级页挪进来，原先叫「聊天记录」）：认出是聊天截图之后，遮住头像、昵称、聊天标题。
  * 三类共用一个开关：用户要遮的是「这段对话是谁和谁」，分开设没有意义。开着就是打码。
+ * 页脚只说遮什么和一句局限（认不全、可能认错），怎么认的、适用哪些应用不写。
  *
  * 外部模型（2026-10-15）：AI 增强识别改用用户自己配置的大模型。接口在「AI」页上填，这里只是开关。
  * 它不在识别方案里（见 SettingsStore.externalModel），所以单独传。
@@ -337,7 +332,9 @@ fun LabsSettingsScreen(
 /**
  * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
  * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。这几样只显示，没有可设的项。
- * AI 增强识别的开关和识别引擎的选择都在「文字」页的「文字识别」一组里。
+ * 识别引擎在「文字」页里选；AI 增强识别没有开关，总是开着。
+ *
+ * Gemini Nano 卡片下面是一段话：先说它是什么，再接着说本机这边要知道的（[nanoNote]），不换行。
  *
  * 实验室里打开了外部模型时，最上面多一组「外部模型」：接口地址、API Key、模型，点一行弹框改；再加一行测试连接。
  *
@@ -370,7 +367,7 @@ fun AiSettingsScreen(
             FooterText(
                 buildAnnotatedString {
                     append(stringResource(R.string.nano_footer))
-                    nanoNote(nano)?.let { append("\n\n"); append(it) }
+                    nanoNote(nano)?.let { append(stringResource(R.string.clause_separator)); append(it) }
                 },
             )
         }
@@ -406,41 +403,20 @@ fun AiSettingsScreen(
 }
 
 /**
- * 编辑：编辑器里的操作习惯。眼下只有一项「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
- * 不在识别方案里：改它编辑器不重跑识别。
+ * 通用（2026-10-15 起）：原先的「编辑」「导出」两页各只有一项，并成这一页，一项一组。
+ * 导出那一组的标题是「水印样式」不是「导出」：几个选项只写了「图标 + 有码」，不说是水印就看不懂。
+ * 都不在识别方案里：改它们编辑器不重跑识别。
+ *
+ * 编辑：「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
+ *
+ * 导出：品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
+ * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
+ * 原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
  */
 @Composable
-fun EditSettingsScreen(
+fun GeneralSettingsScreen(
     restyleAll: Boolean,
     onRestyleAllChange: (Boolean) -> Unit,
-    onNavigateUp: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SettingsScaffold(title = stringResource(R.string.settings_edit), onNavigateUp = onNavigateUp, modifier = modifier) {
-        item {
-            PageTopSpacer()
-            SettingsGroup {
-                SwitchRow(
-                    title = stringResource(R.string.restyle_all),
-                    summary = stringResource(R.string.restyle_all_summary),
-                    icon = Icons.Outlined.DoneAll,
-                    checked = restyleAll,
-                    onCheckedChange = onRestyleAllChange,
-                )
-            }
-        }
-    }
-}
-
-/**
- * 导出：品牌水印的样式。原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
- *
- * 水印样式是导出时角落那个品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
- * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
- * 不在识别方案里：改它编辑器不重跑识别。
- */
-@Composable
-fun ExportSettingsScreen(
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     /** 能不能去水印。false 时没有「无水印」这一项。 */
@@ -452,9 +428,21 @@ fun ExportSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val none = watermarkUnlocked && watermarkOff
-    SettingsScaffold(title = stringResource(R.string.settings_export), onNavigateUp = onNavigateUp, modifier = modifier) {
+    SettingsScaffold(title = stringResource(R.string.settings_general), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader(stringResource(R.string.watermark_style), first = true)
+            SectionHeader(stringResource(R.string.settings_edit), first = true)
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.restyle_all),
+                    summary = stringResource(R.string.restyle_all_summary),
+                    icon = Icons.Outlined.DoneAll,
+                    checked = restyleAll,
+                    onCheckedChange = onRestyleAllChange,
+                )
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.watermark_style))
             SettingsGroup(Modifier.selectableGroup()) {
                 BrandWatermarkStyle.entries.forEach { style ->
                     RadioRow(
@@ -605,7 +593,6 @@ internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
     val factory = RecognitionConfig()
     return copy(
         textEngine = factory.textEngine,
-        semantic = factory.semantic,
         maskUnanchoredNames = factory.maskUnanchoredNames,
         ruleOverrides = emptyMap(),
     )
@@ -620,11 +607,11 @@ internal fun handlingLabel(state: RuleState): String = stringResource(
     },
 )
 
-/** 「nano-v3 · 已就绪」：先回答是哪一版，再说模型在不在本机。本机没有就只写「本机没有」。 */
+/** 「nano-v3 · 已就绪」：先回答是哪一版，再说模型在不在本机。用不了就只写「不可用」。 */
 @Composable
 internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
     null -> stringResource(R.string.nano_checking)
-    is NanoStatus.Unavailable -> stringResource(R.string.nano_absent)
+    is NanoStatus.Unavailable -> stringResource(R.string.nano_unavailable)
     is NanoStatus.Present -> "${nano.version ?: stringResource(R.string.nano_version_unknown)} · " + stringResource(
         when (nano.model) {
             NanoStatus.Model.READY -> R.string.nano_ready
@@ -637,26 +624,28 @@ internal fun nanoSummary(nano: NanoStatus?): String = when (nano) {
 /** 哪些机型有 Gemini Nano：Google 的文档。页尾「支持设备列表参考官方文档」那一句指向它。 */
 internal const val GENAI_DOCS_URL = "https://developers.google.cn/ml-kit/genai"
 
-/** 「支持设备列表参考官方文档。」，「官方文档」是个链接。 */
+/** 「支持设备列表参考官方文档」，「官方文档」是个链接，放在最后。 */
 @Composable
-private fun supportedDevicesSentence(): AnnotatedString = buildAnnotatedString {
+private fun supportedDevicesClause(): AnnotatedString = buildAnnotatedString {
     append(stringResource(R.string.supported_devices_prefix))
     append(footerLink(stringResource(R.string.official_docs), GENAI_DOCS_URL))
-    append(stringResource(R.string.sentence_end))
 }
 
 /**
- * 卡片下面那句：本机没有就指去看哪些机型有，模型还没下载就说怎么让系统去下。
- * 已就绪、下载中的小字已经说清了，不再重复；还没问完时不写。
+ * 卡片下面那段话里，接在「Google 的端侧大模型」后面的半句：用不了就指去看哪些机型有（AICore 报了错再带上错误码），
+ * 模型还没下载就说系统什么时候下。已就绪、下载中的小字已经说清了，不再重复；还没问完时不写。
  *
- * 未下载时不在这里摆下载按钮：开着 AI 增强识别打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
+ * 未下载时不在这里摆下载按钮：打开一张图，编辑页探测时就会请 AICore 去下（见 NanoClient.ready）。
  */
 @Composable
 internal fun nanoNote(nano: NanoStatus?): AnnotatedString? = when (nano) {
     null -> null
     is NanoStatus.Unavailable -> buildAnnotatedString {
-        append(supportedDevicesSentence())
-        nano.errorCode?.let { append(stringResource(R.string.aicore_error, it)) }
+        append(supportedDevicesClause())
+        nano.errorCode?.let {
+            append(stringResource(R.string.clause_separator))
+            append(stringResource(R.string.aicore_error, it))
+        }
     }
     is NanoStatus.Present -> when (nano.model) {
         NanoStatus.Model.NOT_DOWNLOADED -> AnnotatedString(stringResource(R.string.nano_download_hint))

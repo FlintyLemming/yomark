@@ -45,11 +45,9 @@ class SettingsActivity : YomarkActivity() {
         setSettingsContent(store) {
             val config by store.recognitionConfig.collectAsStateWithLifecycle(initialValue = null)
             val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
-            val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
             val current = config
             val developer = debugTrace
-            val restyle = restyleAll
-            if (current != null && developer != null && restyle != null) {
+            if (current != null && developer != null) {
                 SettingsScreen(
                     config = current,
                     onOpen = { page -> startActivity(SettingsPageActivity.intent(this, page)) },
@@ -57,7 +55,6 @@ class SettingsActivity : YomarkActivity() {
                     developer = developer,
                     // 改了语言 Activity 会重建，这里读一次就够
                     language = remember { AppLocale.current(this) },
-                    restyleAll = restyle,
                 )
             }
         }
@@ -124,18 +121,9 @@ class SettingsPageActivity : YomarkActivity() {
                     )
                 }
             }
-            SettingsPage.EDIT -> {
+            SettingsPage.GENERAL -> {
                 val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
-                restyleAll?.let { on ->
-                    EditSettingsScreen(
-                        restyleAll = on,
-                        onRestyleAllChange = { next -> lifecycleScope.launch { store.setRestyleAllMasks(next) } },
-                        onNavigateUp = ::finish,
-                    )
-                }
-            }
-            SettingsPage.EXPORT -> {
-                // 三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
+                // 水印的三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
                 val watermark by remember {
                     combine(
                         store.brandWatermarkStyle,
@@ -143,8 +131,12 @@ class SettingsPageActivity : YomarkActivity() {
                         PurchaseStore(applicationContext).unlocked(Edition.isFree),
                     ) { style, off, unlocked -> BrandWatermarkSetting(style, unlocked, !brandWatermarkApplies(unlocked, off)) }
                 }.collectAsStateWithLifecycle(initialValue = null)
-                watermark?.let { mark ->
-                    ExportSettingsScreen(
+                val restyle = restyleAll
+                val mark = watermark
+                if (restyle != null && mark != null) {
+                    GeneralSettingsScreen(
+                        restyleAll = restyle,
+                        onRestyleAllChange = { next -> lifecycleScope.launch { store.setRestyleAllMasks(next) } },
                         watermarkStyle = mark.style,
                         onWatermarkStyleChange = { next ->
                             lifecycleScope.launch { store.setBrandWatermarkStyle(next, mark.unlocked) }
@@ -190,9 +182,11 @@ class SettingsPageActivity : YomarkActivity() {
             SettingsPage.DEVELOPER -> {
                 val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)
                 val capacity by store.debugTraceCapacity.collectAsStateWithLifecycle(initialValue = null)
+                val textBoxes by store.showTextBoxes.collectAsStateWithLifecycle(initialValue = null)
                 val on = debugTrace
                 val keep = capacity
-                if (on != null && keep != null) {
+                val boxes = textBoxes
+                if (on != null && keep != null && boxes != null) {
                     DeveloperSettingsScreen(
                         debugTrace = on,
                         onDebugTraceChange = { next -> lifecycleScope.launch { store.setDebugTrace(next) } },
@@ -200,6 +194,8 @@ class SettingsPageActivity : YomarkActivity() {
                         traceCapacity = keep,
                         onTraceCapacityChange = { next -> lifecycleScope.launch { store.setDebugTraceCapacity(next) } },
                         onOpenTraceHistory = { startActivity(intent(this, SettingsPage.DEBUG_TRACE)) },
+                        showTextBoxes = boxes,
+                        onShowTextBoxesChange = { next -> lifecycleScope.launch { store.setShowTextBoxes(next) } },
                     )
                 }
             }
@@ -266,5 +262,5 @@ private fun ComponentActivity.setSettingsContent(store: SettingsStore, screen: @
     }
 }
 
-/** 导出页的品牌水印：选的字样、能不能去水印、现在是不是无水印。 */
+/** 通用页上的品牌水印：选的字样、能不能去水印、现在是不是无水印。 */
 private data class BrandWatermarkSetting(val style: BrandWatermarkStyle, val unlocked: Boolean, val off: Boolean)

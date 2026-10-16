@@ -115,7 +115,9 @@ class PpOcrEngine(
     private fun upright(view: Turned, box: Box): Box = DbPostProcess.order(box.corners().map(view::fromSource))
 
     /** 画布上读出的一行，行和字的框映射回原图。 */
-    private fun OcrLine.toSource(view: Turned) = copy(box = box.map(view::toSource), charBoxes = charBoxes.map { it?.map(view::toSource) })
+    private fun OcrLine.toSource(view: Turned) = copy(
+        box = box.map(view::toSource), charBoxes = charBoxes.map { it?.map(view::toSource) }, segments = segments.map { it.map(view::toSource) },
+    )
 
     /** 倒着的一组字（见 [upsideDownGroup]）：转了半圈的画布，和组里每个框在画布上读出的结果（键是框的下标）。 */
     private class Flipped(val view: Turned, val reads: Map<Int, Read?>)
@@ -671,6 +673,9 @@ class PpOcrEngine(
  * 标签和值分在两行，标签锚定就接不上——ML Kit 中文识别器同样会把一整行合成一条，
  * 规则层一直按这个前提写。
  *
+ * 拼之前每一段的框留在 OcrLine.segments 里：规则看整行，点字打码只打手指下的那一段。
+ * 同一排上拼起来的不一定是一回事：并排的三个按钮、商品缩略图上印的字和它右边的一排标签，都拼成了一行。
+ *
  * 两段算同一行：竖直方向重叠超过较矮那段高度的一半，且水平间距不超过行高的 3 倍
  * （再远多半是左右两栏，拼起来会让「名字在电话前面」这类判断串栏）。两段都斜着同一个角度的（截图里一张拍歪了的证件照，
  * 整页照常读），「竖直」「水平」按它们自己的走向量：歪了六度的驾驶证上，左边一栏的字段名和右边一栏差着大半行，
@@ -778,6 +783,6 @@ object RowGrouper {
             Pt(sorted.maxOf { it.box.maxX }, sorted.maxOf { it.box.maxY }),
             Pt(sorted.minOf { it.box.minX }, sorted.maxOf { it.box.maxY }),
         )
-        return OcrLine(text, conf.toFloat(), box, boxes)
+        return OcrLine(text, conf.toFloat(), box, boxes, sorted.flatMap { it.segments })
     }
 }

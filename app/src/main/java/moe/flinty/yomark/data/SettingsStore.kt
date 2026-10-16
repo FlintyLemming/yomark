@@ -237,6 +237,16 @@ class SettingsStore internal constructor(
     }
 
     /**
+     * 开发者里的「显示识别框」：编辑页画布上叠出文字识别认出的每一行的框，看漏认、框歪在哪儿。出厂关着。
+     * 只在调试信息也开着时才画；调试信息关掉再打开，它还是原来的样子。
+     */
+    val showTextBoxes: Flow<Boolean> = store.data.map { it[KEY_SHOW_TEXT_BOXES] ?: false }
+
+    suspend fun setShowTextBoxes(on: Boolean) {
+        store.edit { it[KEY_SHOW_TEXT_BOXES] = on }
+    }
+
+    /**
      * 实验室里的外部模型：开关，和 AI 页上填的接口地址、API Key、模型（见 ExternalModelSettings）。
      * 不进 [recognitionConfig]：改一个字编辑器不用重跑识别，它每次用时现读。
      * 只在这几项变了时才发出新值：编辑器收到要重新探测一次「AI 增强识别」能不能用。
@@ -287,7 +297,6 @@ class SettingsStore internal constructor(
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
             chatState = prefs[KEY_CHAT_STATE].toRuleState(fallback.chatState),
-            semantic = prefs[KEY_SEMANTIC].toEnum(fallback.semantic),
             maskUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.maskUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
@@ -301,7 +310,6 @@ class SettingsStore internal constructor(
             it[KEY_FACE] = config.face.name
             it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_CHAT_STATE] = config.chatState.name
-            it[KEY_SEMANTIC] = config.semantic.name
             it[KEY_UNANCHORED_NAMES] = config.maskUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
         }
@@ -324,7 +332,6 @@ class SettingsStore internal constructor(
             it.remove(KEY_FACE)
             it.remove(KEY_FACE_STATE)
             it.remove(KEY_CHAT_STATE)
-            it.remove(KEY_SEMANTIC)
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
@@ -423,6 +430,7 @@ class SettingsStore internal constructor(
         val KEY_THEME_COLOR = stringPreferencesKey("theme_color")
         val KEY_DEBUG_TRACE = booleanPreferencesKey("debug_trace")
         val KEY_DEBUG_TRACE_CAPACITY = intPreferencesKey("debug_trace_capacity")
+        val KEY_SHOW_TEXT_BOXES = booleanPreferencesKey("debug_show_text_boxes")
         /**
          * v2：出厂 OCR 从 ML Kit 换成了 PP-OCR。setRecognitionConfig 每次都整份写入，
          * 动过任何一项设置的老安装里都存着一个 BOTH，沿用旧键就会永远停在 ML Kit 上。
@@ -437,7 +445,6 @@ class SettingsStore internal constructor(
         /** v2：出厂从打码改成关着（挪进实验室），换键的理由同 KEY_TEXT_ENGINE。 */
         val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state_v2")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
-        val KEY_SEMANTIC = stringPreferencesKey("recognition_semantic")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
         val KEY_EXTERNAL_ON = booleanPreferencesKey("external_model_enabled")
         val KEY_EXTERNAL_URL = stringPreferencesKey("external_model_base_url")

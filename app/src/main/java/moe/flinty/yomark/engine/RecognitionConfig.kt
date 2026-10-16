@@ -22,14 +22,6 @@ enum class BarcodeOption { STRICT, LOOSE }
 enum class FaceOption { FAST, ACCURATE }
 
 /**
- * 语义判定（设置页上叫「AI 增强识别」）：让端侧大模型把整页文字再看一遍（spec §14 的 Gemini Nano 接口位）。
- *
- * GEMINI_NANO 不是「每张图都自动跑」，而是「编辑器里给一个 AI 增强识别按钮」——用户点了才跑。
- * 只在支持 AICore 的机型上出现；找到的直接打码。枚举名是持久化格式，语义变了名字不改。
- */
-enum class SemanticOption { GEMINI_NANO, OFF }
-
-/**
  * 一类识别结果怎么处理：打码，或者关掉（不认）。OFF 的规则根本不进引擎。
  * 人脸、条码、聊天记录用的也是它（[RecognitionConfig.faceState]、[RecognitionConfig.barcodeState]、[RecognitionConfig.chatState]）。
  *
@@ -72,7 +64,6 @@ data class RecognitionConfig(
      * 出厂关着（2026-10-15 起）：开关挪进了设置里的「实验室」。
      */
     val chatState: RuleState = RuleState.OFF,
-    val semantic: SemanticOption = SemanticOption.GEMINI_NANO,
     /**
      * 没有旁证、只凭字面猜出的人名要不要也打码。出厂不打：HanLP 会把药名、品牌名、规格词都猜成人名，
      * 附近没有电话、证件号、地址、「收货人」这类字段的，十有八九不是人（见 RuleClassifier）。
