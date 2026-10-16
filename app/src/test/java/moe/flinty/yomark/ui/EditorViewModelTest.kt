@@ -540,7 +540,7 @@ class EditorViewModelTest {
         assertThat(vm.state.value.stylePanelOpen).isFalse()
     }
 
-    /** 面板开着时底栏那一行的样式还点得到：换样式不把面板收起来，面板换成新样式的参数。 */
+    /** 宽屏上面板开着时样式方块还点得到：换样式不把面板收起来，面板换成新样式的参数。 */
     @Test
     fun `switching style while the panel is open keeps it open`() = runTest(dispatcher) {
         val vm = vm()

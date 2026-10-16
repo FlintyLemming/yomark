@@ -80,7 +80,7 @@ fun EditorTopBar(
     onNavigateUp: () -> Unit,
     /**
      * 导出，在最右上角：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，展开着一组工具时也一直在。
-     * 宽屏也在这儿（2026-10-16），原先在样式列表那一块最底下，和 AI 增强识别一行。
+     * 宽屏也在这儿（2026-10-16），原先在功能方块那一块最底下，和 AI 增强识别一行。
      */
     onExport: () -> Unit,
     modifier: Modifier = Modifier,
@@ -161,7 +161,7 @@ fun EditorTopBar(
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
  * 还放不下（再开着调试信息）时，中间那几个照要紧的先后从最后一个起不摆出来，返回和导出一直在。
- * 去水印、设置在首页也有。用途水印、对比在底栏上（宽屏也是，2026-10-16），顶栏上没有。
+ * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
 private enum class TopBarItem {
@@ -177,16 +177,15 @@ private enum class TopBarItem {
 private val EXPORT_GAP = 4.dp
 
 /**
- * 底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。
+ * 手机的底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。
  *
- * 手机的底栏占满画布那一块的高：调节面板从工具那一行往上长出来，盖在画布上，图不跟着往上顶。
- * 宽屏竖着拿的也占满，只是这条线跟着面板的上沿走，画布让开面板（见 BarPlacement.BOTTOM）。
- * 画布只给这条线以下让地方；没有这条线的照它自己的高让。
+ * 底栏占满画布那一块的高：调节面板从工具那一行往上长出来，盖在画布上，图不跟着往上顶。
+ * 画布只给这条线以下让地方；没有这条线的（宽屏的那一栏）照它自己的高让。
  */
 val PanelTop = HorizontalAlignmentLine(::min)
 
 /**
- * 编辑器的底栏：一行浮着的工具（见 [EditorToolbar]），它自己留两边的空。导出在顶栏右上角（见 [EditorTopBar]）。
+ * 手机的底栏：一行浮着的工具（见 [EditorToolbar]），它自己留两边的空。导出在顶栏右上角（见 [EditorTopBar]）。
  * 批量时胶片条单独一行，在工具上面。
  *
  * 样式的调节面板（展开一组后再点当前的样式）不另外弹一层：胶囊直接往上长成一块大圆角面板，
@@ -207,21 +206,13 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * 面板收着时它就是工具那一行的胶囊。长出来、缩回去的半路上也只有这一圈边、一层投影，看着是整个胶囊在变大变小；
  * 开着面板点返回收起这一组，面板上的东西先淡掉，胶囊一边往下缩一边往回收窄，往下比收窄快一点（见 panelFoldSpec）。
  *
- * 宽屏、手机横着拿（[placement] 不是 PHONE，2026-10-16）也是它，在画布旁边那一块里（见 BarPlacement）：工具那一行在最底下，
- * 每一样各是一块圆角矩形（见 EditorToolbar 的 tiles），上面是框列表（[list]）。面板照样从这一行长上去，盖住列表、不盖图，
- * 胶囊和面板的角是 TILE_RADIUS 的圆角。图在旁边看得见，所以和手机不一样的是：点面板外面不收起，开着面板照样在图上画框、
- * 选中的框跟着面板变；吸管取色时面板不缩回去；打字时面板不收成只剩输入框。竖着拿时面板比这一块高，这一块跟着长高，
- * 画布跟着变矮（见 wideBottomOpen），大爆炸也是。
- *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param bigBangReady 大爆炸点得动（见 [EditorToolbar]）
  * @param bigBang 开着的大爆炸，面板从胶囊长出来；不开着（或者长按的手指还没抬，见 BigBangState.holding）是 null
  * @param compare 「按住对比」的按压状态（见 [EditorToolbar]）
  * @param purpose 用途水印：设了水印时「编辑」里的水印着主题色，面板开着时从胶囊长出来
  * @param pushCanvas 面板不盖在图上，画布让到面板上面为止（见 [PanelTop]）：写文本时字落在点的那一处，
- *   面板盖着的话打的字看不见。用途水印铺满整张图，盖住一截照样看得见，不用让。宽屏上不用给：面板总不盖图
- * @param placement 铺在哪儿：手机竖着拿铺满画布那一块，宽屏、手机横着拿在画布旁边那一块里
- * @param list 宽屏的框列表，在工具那一行上面，传进来的 Modifier 定好了它的位置和大小。手机上没有
+ *   面板盖着的话打的字看不见。用途水印铺满整张图，盖住一截照样看得见，不用让
  */
 @Composable
 fun EditorBottomBar(
@@ -232,8 +223,6 @@ fun EditorBottomBar(
     compare: MutableInteractionSource,
     canCompare: Boolean,
     modifier: Modifier = Modifier,
-    placement: BarPlacement = BarPlacement.PHONE,
-    list: (@Composable (Modifier) -> Unit)? = null,
     aiReview: AiReview = AiReview.Hidden,
     onAiReview: () -> Unit = {},
     bigBangReady: Boolean = false,
@@ -246,13 +235,11 @@ fun EditorBottomBar(
     filmstrip: (@Composable (Modifier) -> Unit)? = null,
     pushCanvas: Boolean = false,
 ) {
-    val phone = placement == BarPlacement.PHONE
     // 大爆炸的面板等这一行换到「工具」（或者大爆炸自己占住这一行）再长：从收着的那一行打开时，
     // 胶囊先得从那颗圆钮长出来（见 PillInset）
     val bigBangRow = toolGroup == ToolGroup.TOOLS || toolGroup == ToolGroup.BIG_BANG
-    // 吸管等着取色时手机上的面板缩回去，要点的是它盖着的图；宽屏上图在旁边，面板不用让
     val wanted = (bigBang != null && bigBangRow) ||
-        ((styleBar.panelOpen || purpose.open) && (styleBar.colorPick == null || !phone) && toolGroup != null)
+        ((styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null)
     val grow = animateFloatAsState(if (wanted) 1f else 0f, panelFoldSpec(wanted), label = "stylePanel")
     // 面板上的东西淡进淡出走这一条：收回去时先淡没，胶囊再往回缩，不被它的边裁着走（见 contentFoldSpec）
     val contentIn = animateFloatAsState(if (wanted) 1f else 0f, contentFoldSpec(wanted), label = "stylePanelContent")
@@ -271,45 +258,37 @@ fun EditorBottomBar(
     // 收回去的半路上面板已经关了，画布还照刚才那样让，跟着胶囊的上沿一点点回来，不一下跳回去；
     // 大爆炸占住这一行的，这一行也已经换回去了，面板照样占到胶囊最底下
     if (wanted) {
-        // 宽屏竖着拿的面板总让开画布，不盖图（横着拿的在画布右边，碰不到图）
-        last.push = pushCanvas || bigBang != null || !phone
+        last.push = pushCanvas || bigBang != null
         last.bare = toolGroup == ToolGroup.BIG_BANG
     }
     val container = MaterialTheme.colorScheme.surfaceContainer
     val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = EDGE_ALPHA)
-    val radius = if (phone) PANEL_RADIUS else TILE_RADIUS
 
     Layout(
         content = {
             // 垫在最底下，铺满底栏这一整块（画布那一块都是它的）：落在胶囊外面的手指都归它。顶栏那一截见 EditorScreen。
-            // 大爆炸开着时不垫：点图上是点字。宽屏上不垫：图在旁边，开着面板接着在图上画
-            if (phone && wanted && bigBang == null) {
+            // 大爆炸开着时不垫：点图上是点字
+            if (wanted && bigBang == null) {
                 FoldOnTouch({ if (purpose.open) purposeActions.onCollapse() else styleActions.onCollapse() }, Modifier.layoutId(BarPart.SCRIM))
             }
-            list?.invoke(Modifier.layoutId(BarPart.LIST))
             filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
-            // 面板上没有控件的地方也接住手指：落不到底下的画布（宽屏是列表）上去。
+            // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框。
             // 面板收着时不接：两组只有 40 dp 高，按在它们上下边外面一点也算按到，胶囊接了就按不着了
             Box(
                 Modifier
                     .layoutId(BarPart.PILL)
-                    .floatingSurface(container, edge, radius)
+                    .floatingSurface(container, edge, PANEL_RADIUS)
                     .then(if (panelShown) Modifier.pointerInput(Unit) { swallowTouches() } else Modifier),
             )
             val bang = last.bang
             if (panelShown && last.kind == PanelKind.BIG_BANG && bang != null) {
-                // 字块自己滚动，名字那一行不跟着滚，不放进 PanelColumn。
-                // 手机上最多占一半，留一半给图；宽屏上图在旁边，给多高长多高（竖着拿的见 wideBottomOpen）
-                BigBangContent(
-                    bang.bang, bang.covered, bigBangActions,
-                    Modifier.layoutId(BarPart.CONTENT).then(if (phone) Modifier.phoneBigBangHeight() else Modifier),
-                )
+                // 字块自己滚动，名字那一行不跟着滚，不放进 PanelColumn
+                BigBangContent(bang.bang, bang.covered, bigBangActions, Modifier.layoutId(BarPart.CONTENT).phoneBigBangHeight())
             } else if (panelShown) {
-                // 两种面板换着开时外面这一列不换，跟着里面的东西一点点变高变矮。
-                // 打字时只留输入框是手机上的事：面板盖在图上，输入法又占掉下半截
+                // 两种面板换着开时外面这一列不换，跟着里面的东西一点点变高变矮
                 PanelColumn(Modifier.layoutId(BarPart.CONTENT)) {
-                    if (last.kind == PanelKind.PURPOSE) PurposePanelContent(purpose, purposeActions, compactWhileTyping = phone)
-                    else StylePanelContent(styleBar, styleActions, compactWhileTyping = phone)
+                    if (last.kind == PanelKind.PURPOSE) PurposePanelContent(purpose, purposeActions, compactWhileTyping = true)
+                    else StylePanelContent(styleBar, styleActions, compactWhileTyping = true)
                 }
             }
             EditorToolbar(
@@ -328,7 +307,6 @@ fun EditorBottomBar(
                 bigBangOpen = bigBang != null,
                 compare = compare,
                 canCompare = canCompare,
-                tiles = placement.tiles,
                 modifier = Modifier.layoutId(BarPart.ROW),
             )
         },
@@ -338,83 +316,60 @@ fun EditorBottomBar(
         val pad = BAR_PAD.roundToPx()
         val margin = PANEL_MARGIN.roundToPx()
         val part = { id: BarPart -> measurables.firstOrNull { it.layoutId == id } }
-        // 宽屏竖着拿时这一块（列表、胶片条、工具那一行和从它长出来的面板）不铺满整个宽，在正中（见 BAR_MAX_WIDTH）
-        val rowWidth = if (placement == BarPlacement.BOTTOM) min(width, BAR_MAX_WIDTH.roundToPx()) else width
-        val rowX = (width - rowWidth) / 2
-        val row = part(BarPart.ROW)!!.measure(Constraints.fixedWidth(rowWidth))
-        val film = part(BarPart.FILM)?.measure(Constraints.fixedWidth((rowWidth - FILM_MARGIN.roundToPx() * 2).coerceAtLeast(0)))
+        val row = part(BarPart.ROW)!!.measure(Constraints.fixedWidth(width))
+        val film = part(BarPart.FILM)?.measure(Constraints.fixedWidth((width - FILM_MARGIN.roundToPx() * 2).coerceAtLeast(0)))
         val filmGap = if (film != null) FILM_GAP.roundToPx() else 0
-        val bar = pad + (film?.height ?: 0) + filmGap + row.height + pad
-        // 闲着时这一块多高：手机上只有工具那一行（和胶片条），上面是图；宽屏上面还有列表，
-        // 横着拿占满这一栏，竖着拿见 wideBottomRest
-        val available = if (constraints.hasBoundedHeight) constraints.maxHeight else bar
-        val resting = when (placement) {
-            BarPlacement.PHONE -> bar
-            BarPlacement.SIDE -> max(available, bar)
-            BarPlacement.BOTTOM -> max(wideBottomRest(available), bar)
-        }
+        val resting = pad + (film?.height ?: 0) + filmGap + row.height + pad
         // 有多高就占多高：面板往上长的那一截在画布上面，画布只让到 PanelTop 为止
         val height = if (constraints.hasBoundedHeight) max(constraints.maxHeight, resting) else resting
         val rowY = height - pad - row.height
-        val restTop = height - resting
-        val panelWidth = (rowWidth - margin * 2).coerceAtLeast(0)
+        val panelWidth = (width - margin * 2).coerceAtLeast(0)
         // 面板的底：平常在工具那一行上面；大爆炸占住这一行时就是胶囊的底（见 ToolGroup.BIG_BANG）
         val contentBottom = if (last.bare) height - pad else rowY
-        // 面板最高长到这一块的顶上，再高就在面板里面滚动；竖着拿的宽屏长到 wideBottomOpen 为止，画布留着
-        val ceiling = if (placement == BarPlacement.BOTTOM) height - max(wideBottomOpen(available), resting) else 0
-        val roomAbove = (contentBottom - ceiling - pad).coerceAtLeast(0)
+        // 面板最高长到画布那一块的顶上，再高就在面板里面滚动
+        val roomAbove = (contentBottom - pad).coerceAtLeast(0)
         val content = part(BarPart.CONTENT)?.measure(Constraints(minWidth = panelWidth, maxWidth = panelWidth, maxHeight = roomAbove))
         val p = grow.value
         val openTop = contentBottom - (content?.height ?: 0)
         val pillTop = lerp(rowY, openTop, p)
         // 左右听工具那一行的：收着、展开、半路上都不一样宽。面板开着时它撑满这一行，和面板一样宽。
         // 上下平常就是这一行，从「工具」那颗矮一点的圆钮长出来时上下各缩进去一点（见 PillInset）
-        val pillLeft = rowX + row[PillLeft]
-        val pillRight = rowX + row[PillRight]
+        val pillLeft = row[PillLeft]
+        val pillRight = row[PillRight]
         val pillInset = row[PillInset].takeIf { it != AlignmentLine.Unspecified } ?: 0
         val pillBottom = height - pad - pillInset
         val pill = part(BarPart.PILL)!!.measure(
             Constraints.fixed((pillRight - pillLeft).coerceAtLeast(0), (pillBottom - pillTop - pillInset).coerceAtLeast(0)),
         )
         val scrim = part(BarPart.SCRIM)?.measure(Constraints.fixed(width, height))
-        // 框列表在工具那一行（和胶片条）上面，铺到这一块的顶上。面板长上来时列表只到面板的上沿：
-        // 盖住的那几行不留在列表里，读屏、键盘走不到看不见的行上去点掉一块码。面板是实心的，看着一个样
-        val listTop = restTop + pad
-        val listBottom = (if (film != null) rowY - filmGap - film.height else rowY) - LIST_GAP.roundToPx()
-        val listEnd = if (panelShown) min(listBottom, pillTop) else listBottom
-        val listed = part(BarPart.LIST)?.measure(
-            Constraints.fixed(panelWidth, (listEnd - listTop).coerceAtLeast(0)),
-        )
 
         // 画布让到哪儿：平常只让工具那一行（和胶片条），面板往上长时盖在图上；要让开面板时跟着胶囊的上沿一点点让
-        val canvasEnd = if (last.push) min(pillTop, restTop) else restTop
+        val canvasEnd = if (last.push) min(pillTop, height - resting) else height - resting
         layout(width, height, mapOf(PanelTop to canvasEnd)) {
             scrim?.place(0, 0)
-            listed?.place(rowX + margin, listTop)
-            film?.place(rowX + FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
+            film?.place(FILM_MARGIN.roundToPx(), rowY - filmGap - film.height)
             pill.place(pillLeft, pillTop + pillInset)
             // 名字、参数跟着胶囊的上沿往上走，胶囊没盖到的地方不露出来，后半程显出来
             // （圆角和胶囊一样，见 floatingSurface：不超过它窄的那一边的一半）
-            val corner = min(radius.toPx(), min(pill.width, pill.height) / 2f)
-            val contentX = rowX + margin
-            content?.placeWithLayer(contentX, pillTop) {
+            val radius = min(PANEL_RADIUS.toPx(), min(pill.width, pill.height) / 2f)
+            content?.placeWithLayer(margin, pillTop) {
                 alpha = span(contentIn.value, CONTENT_IN_START, 1f)
                 clip = true
                 shape = AbovePill(
-                    left = (pillLeft - contentX).toFloat(),
+                    left = (pillLeft - margin).toFloat(),
                     top = pillInset.toFloat(),
-                    right = (pillRight - contentX).toFloat(),
+                    right = (pillRight - margin).toFloat(),
                     bottom = ((if (last.bare) pillBottom else rowY) - pillTop).toFloat(),
-                    radius = corner,
+                    radius = radius,
                     roundBottom = last.bare,
                 )
             }
-            row.place(rowX, rowY)
+            row.place(0, rowY)
         }
     }
 }
 
-private enum class BarPart { SCRIM, LIST, FILM, PILL, CONTENT, ROW }
+private enum class BarPart { SCRIM, FILM, PILL, CONTENT, ROW }
 
 /**
  * 胶囊上一次长出来的是哪一种面板（大爆炸的连着它那时的样子）、画布让没让开它、它是不是占住了工具那一行（[bare]，见 ToolGroup.BIG_BANG）。
@@ -464,7 +419,7 @@ internal fun FoldOnTouch(onFold: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /** 接住落在这儿的手指，落下时 [onDown]，别的什么也不做。 */
-private suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
+internal suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
     awaitFirstDown().consume()
     onDown()
     do {
@@ -477,22 +432,19 @@ private suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = 
 private val BAR_PAD = 6.dp
 private val FILM_MARGIN = 12.dp
 
-/** 面板离屏幕两边多远：和展开后的胶囊一样宽（见 EditorToolbar 的 MARGIN）。宽屏的框列表也是。 */
+/** 面板离屏幕两边多远：和展开后的胶囊一样宽（见 EditorToolbar 的 MARGIN）。 */
 private val PANEL_MARGIN = 12.dp
 private val FILM_GAP = 6.dp
-
-/** 宽屏的框列表和它下面的工具那一行（批量时是胶片条）之间空多少。 */
-private val LIST_GAP = 8.dp
 
 /** 胶囊的圆角：收着时就是两头的半圆，长高了四个角还是这么圆，看得出面板是胶囊长出来的。 */
 private val PANEL_RADIUS = TOOL_ROW_HEIGHT / 2
 
 /** 面板上的名字、参数从这儿起淡入：面板先长出一截再显出来，不和它一起挤在一条缝里。 */
-private const val CONTENT_IN_START = 0.35f
+internal const val CONTENT_IN_START = 0.35f
 
 /**
- * AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：它在底栏的「工具」里（见 [EditorToolbar]），
- * 收起了「工具」，圆钮上写不下字。展开着时那一项上也写着结果。宽屏也是（2026-10-16），原先宽屏的按钮上写着结果。
+ * 手机竖着拿时，AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：它在底栏的「工具」里（见 [EditorToolbar]），
+ * 收起了「工具」，圆钮上写不下字。展开着时那一项上也写着结果。
  * 只在 [finished]（跑完的次数，见 EditorUiState.aiReviewsFinished）变了时说：批量里换回跑过的图不再说一遍。
  * 和识别中的提示条一样用 Box 画底色，不吃触摸。
  */

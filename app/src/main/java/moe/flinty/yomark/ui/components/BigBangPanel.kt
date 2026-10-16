@@ -56,7 +56,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
-/** 底栏要长出来的大爆炸面板：开着的大爆炸，和它的字里已经被别的码盖住的（BigBangPage.covered）。 */
+/** 要长出来的大爆炸面板：开着的大爆炸，和它的字里已经被别的码盖住的（BigBangPage.covered）。 */
 class BigBangPanelModel(val bang: BigBangState, val covered: Set<Int>)
 
 /** 面板上的动作，都交给 ViewModel（见 EditorScreen）。 */
@@ -72,7 +72,8 @@ interface BigBangActions {
  * 横着划过去一串都打上（从打了码的字划起是一串都拿掉），竖着划是滚动。选中的连着的字连成一整条，和图上的码一个样。
  * 别的码盖着的字是一块灰。右上角「完成」收起，打上的码留着。
  *
- * 面板是底栏的胶囊从「工具」长出来的那一块（见 EditorBottomBar），手机、宽屏都是；图跟着让开，选字时看得到图上选中的是哪几块。
+ * 手机上面板是底栏的胶囊从「工具」长出来的那一块（见 EditorBottomBar）；宽屏上从大爆炸那一块方块长出来，盖满方块和列表
+ * （见 WideEditorPanel）。图跟着让开，选字时看得到图上选中的是哪几块。
  * 顶上一行是名字、选了几个字和右边的「完成」，底下是字块（放不下在里面滚动），面板只有字块那么高。
  * 不另设「打码」：点字就是打码。
  */

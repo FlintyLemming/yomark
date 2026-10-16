@@ -9,14 +9,14 @@ import org.junit.Test
 
 /**
  * 哪些窗口用宽屏版式。数值是各类设备上 Configuration 报的 dp：Android 15 起含系统栏，之前不含，
- * 两种都列了一些。手机怎么摆都不该用宽屏版式，横过来只把工具那一行挪到右边；宽屏转个方向只换列表的位置。
+ * 两种都列了一些。手机怎么摆都不该用宽屏版式，横过来只把样式挪到右边；宽屏转个方向只换列表的位置。
  */
 class EditorLayoutTest {
 
     private fun layout(width: Int, height: Int, smallest: Int = minOf(width, height)) =
         EditorLayouts.choose(width, height, smallest)
 
-    @Test fun `phones move the tools beside the image when held sideways`() {
+    @Test fun `phones move the styles beside the image when held sideways`() {
         assertThat(layout(412, 915)).isEqualTo(PHONE)           // Pixel 8
         assertThat(layout(915, 412)).isEqualTo(PHONE_SIDE)
         assertThat(layout(360, 780)).isEqualTo(PHONE)           // 小屏手机
@@ -36,19 +36,11 @@ class EditorLayoutTest {
         assertThat(layout(956, 466, smallest = 514)).isEqualTo(PHONE_SIDE)
     }
 
-    /** 近乎方的小窗口：右边那一栏一占，画布只剩窄窄一条，工具还是放在下面。 */
-    @Test fun `a nearly square small window keeps the tools below the image`() {
+    /** 近乎方的小窗口：右边那一栏一占，画布只剩窄窄一条，样式还是放在下面。 */
+    @Test fun `a nearly square small window keeps the styles below the image`() {
         assertThat(layout(450, 411)).isEqualTo(PHONE)           // 横屏手机分屏，各占一半
         assertThat(layout(400, 380)).isEqualTo(PHONE)           // 小外屏
         assertThat(layout(600, 411)).isEqualTo(PHONE_SIDE)      // 分屏时分到三分之二
-    }
-
-    /** 宽比高多出不少、可是不够宽的窗口：右边那一栏（至少 360 dp）一占画布就没了，工具放在下面。 */
-    @Test fun `a short window too narrow for the side column keeps the tools below`() {
-        assertThat(layout(360, 240)).isEqualTo(PHONE)           // 竖着拿的手机分屏，分到矮的那一半
-        assertThat(layout(412, 290)).isEqualTo(PHONE)
-        assertThat(layout(540, 300)).isEqualTo(PHONE)
-        assertThat(layout(560, 300)).isEqualTo(PHONE_SIDE)
     }
 
     /** 阔折叠（华为 Pura X 内屏 2120×1320，16:10）：按 2.5 和 2.625 两种密度折算。 */

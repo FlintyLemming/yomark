@@ -38,7 +38,6 @@ import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
-import moe.flinty.yomark.ui.components.BarPlacement
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.PanelColumn
 import moe.flinty.yomark.ui.components.PurposePanelActions
@@ -47,6 +46,7 @@ import moe.flinty.yomark.ui.components.PurposePanelModel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
+import moe.flinty.yomark.ui.components.WideEditorPanel
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,7 +55,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 用途水印的调节面板，和马克笔、画笔的一个样子：从底栏的胶囊长出来（这里连底栏一起摆出来），手机上盖在图上，宽屏上盖住列表。
+ * 用途水印的调节面板，和马克笔、画笔的一个样子：手机上从底栏的胶囊长出来（这里连底栏一起摆出来），宽屏上占列表的位置。
  * 面板只发出新的文字、样子；写进 ViewModel、和样式面板换着开的规矩见 EditorViewModelWatermarkTest，
  * 在真的编辑器里走一遍见 EditorScreenLayoutTest。
  */
@@ -85,14 +85,9 @@ class PurposePanelTest {
     /** 底栏要收起（null）或展开哪一组。 */
     private val toolGroups = mutableListOf<ToolGroup?>()
 
-    /** 手机的底栏，展开着「编辑」：水印在这一组里，面板就是从它里面长出来的。[placement] 换成宽屏的就是宽屏右边那一栏。 */
+    /** 手机的底栏，展开着「编辑」：水印在这一组里，面板就是从它里面长出来的。 */
     @Composable
-    private fun PhoneBar(
-        model: PurposePanelModel,
-        actions: PurposePanelActions,
-        styleBar: StyleBarModel = StyleBarModel(MaskLook()),
-        placement: BarPlacement = BarPlacement.PHONE,
-    ) {
+    private fun PhoneBar(model: PurposePanelModel, actions: PurposePanelActions, styleBar: StyleBarModel = StyleBarModel(MaskLook())) {
         EditorBottomBar(
             toolGroup = ToolGroup.EDIT,
             onToolGroup = { toolGroups += it },
@@ -100,7 +95,6 @@ class PurposePanelTest {
             styleActions = object : StyleBarActions {},
             compare = remember { MutableInteractionSource() },
             canCompare = false,
-            placement = placement,
             purpose = model,
             purposeActions = actions,
         )
@@ -320,12 +314,21 @@ class PurposePanelTest {
 
     // ---------- 宽屏 ----------
 
-    /** 宽屏（画布右边那一栏）的面板也从底栏长出来，东西和手机上的一样；它不盖画布，取色时还在，再点一下吸管就收起吸管。 */
+    /** 宽屏的面板（从水印那一块方块长出来，见 WideEditorPanel）不盖画布，东西和手机上的一样；取色时还在，再点一下吸管就收起吸管。 */
     @Test fun theWidePanelHasTheSameControlsAndKeepsItsEyedropper() {
         val actions = Recorder()
         var model by mutableStateOf(opened)
         var bar by mutableStateOf(StyleBarModel(MaskLook()))
-        compose.setContent { MaterialTheme { Surface { PhoneBar(model, actions, bar, BarPlacement.SIDE) } } }
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    WideEditorPanel(
+                        atSide = true, styleBar = bar, styleActions = object : StyleBarActions {}, list = null,
+                        purpose = model, purposeActions = actions,
+                    )
+                }
+            }
+        }
         listOf("用途水印", "文字", "颜色", "恢复默认", "应用").forEach { compose.onNodeWithText(it).assertIsDisplayed() }
         compose.onNodeWithContentDescription("从图上取色").performClick()
         model = model.copy(picking = true)

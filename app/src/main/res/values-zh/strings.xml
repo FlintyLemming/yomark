@@ -112,6 +112,7 @@
     <string name="tool_group_expand">展开</string>
     <string name="tool_group_collapse">收起</string>
     <string name="tool_watermark">水印</string>
+    <string name="tool_compare">对比</string>
     <string name="tool_on">已开启</string>
 
     <!-- styles -->

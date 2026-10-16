@@ -43,7 +43,7 @@ import androidx.compose.ui.unit.max
 
 /**
  * 调节面板的那一列：放不下就在里面滚动，里面的东西变多变少（换了样式、点开自定义颜色）时一点点变高变矮。
- * 它是底栏的胶囊长出来的那一块里的东西（见 EditorBottomBar），手机、宽屏都是。
+ * 手机上它是底栏的胶囊长出来的那一块里的东西（见 EditorBottomBar），宽屏上是从方块长出来的那一块里的（见 WideEditorPanel）。
  */
 @Composable
 internal fun PanelColumn(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {

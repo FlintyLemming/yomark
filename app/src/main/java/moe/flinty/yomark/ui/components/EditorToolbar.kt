@@ -27,7 +27,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -118,7 +117,7 @@ import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-/** 底栏上点开的几组工具（手机、宽屏一样），和大爆炸占住这一行的那一种（[BIG_BANG]）。 */
+/** 手机底栏上点开的几组工具，和大爆炸占住这一行的那一种（[BIG_BANG]）。 */
 enum class ToolGroup(@StringRes val label: Int) {
     /** 盖住：色块、马赛克、模糊。 */
     REDACT(R.string.tool_group_redact),
@@ -168,10 +167,6 @@ enum class ToolGroup(@StringRes val label: Int) {
  *
  * 圆钮上没有字。AI 跑完那一下画布顶上说一声结果（见 AiReviewResultPill）；对比点一下没有比上，弹个提示说要按住。
  *
- * 宽屏和手机横着拿（[tiles]，2026-10-16）也是这一行，只是不共用一条胶囊：「打码」「编辑」「工具」「对比」各是一块圆角矩形，
- * 块和块之间空开，一样的细边、一样的投影。点一组，工具栏从这一块撑开，别的块和手机上的圆钮一样缩小、淡掉；
- * 收回去缩回这一块。展开后和手机一个样子，只是角是 [TILE_RADIUS] 的圆角，不是两头的半圆。
- *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
  * @param purposeOn 设了用途水印：读屏念「已开启」
@@ -181,7 +176,6 @@ enum class ToolGroup(@StringRes val label: Int) {
  * @param bigBangOpen 大爆炸的面板开着（从胶囊长出来，见 EditorBottomBar）：「工具」里选中的是大爆炸
  * @param compare 「按住对比」的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。null 时没有这一颗
  * @param canCompare 有前后可比：打了码，或者设了用途水印。没有时「按住对比」灰掉
- * @param tiles 宽屏的样子：每一样各是一块圆角矩形，工具栏从点开的那一块长出来
  */
 @Composable
 fun EditorToolbar(
@@ -200,7 +194,6 @@ fun EditorToolbar(
     bigBangOpen: Boolean = false,
     compare: MutableInteractionSource? = null,
     canCompare: Boolean = false,
-    tiles: Boolean = false,
 ) {
     val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
     // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走（见 contentFoldSpec），
@@ -219,20 +212,16 @@ fun EditorToolbar(
     val circles = listOfNotNull(Slot.TOOLS, Slot.COMPARE.takeIf { compare != null })
     val container = MaterialTheme.colorScheme.surfaceContainer
     val edge = MaterialTheme.colorScheme.outlineVariant.copy(alpha = EDGE_ALPHA)
-    // 展开、收回的半路上胶囊从哪一样长出来、缩回哪一样（它自己的底子这时就是胶囊）：
-    // 「工具」（用不了 AI 时是大爆炸）是那颗圆钮（见 [PillInset]），两组的胶囊这时另画一块，在前半程淡掉，和点开一组时圆钮让开一样；
-    // 宽屏上每一组都是从自己那一块长出来的。手机上点开两组时是两组共用的那条胶囊撑开，没有这一样（null）
-    val origin = shown?.takeIf { expandedRow && (tiles || it == ToolGroup.TOOLS || it == ToolGroup.BIG_BANG) }
-    val fromCircle = origin == ToolGroup.TOOLS || origin == ToolGroup.BIG_BANG
-    val buttonShape = if (tiles) RoundedCornerShape(TILE_RADIUS) else CircleShape
-    val radius = if (tiles) TILE_RADIUS else Dp.Infinity
+    // 「工具」（用不了 AI 时是大爆炸）展开、收回的半路上：胶囊从那颗圆钮长出来、缩回那颗圆钮（见 [PillInset]），圆钮的底子就是它；
+    // 两组的胶囊这时另画一块，在前半程淡掉，和点开一组时圆钮让开一样
+    val fromCircle = (shown == ToolGroup.TOOLS || shown == ToolGroup.BIG_BANG) && expandedRow
 
     // 展开后各项工具分多宽在组合时就定（见 toolRooms），要先知道这一行多宽
     BoxWithConstraints(modifier.fillMaxWidth()) {
         val space = LocalDensity.current.toolSpace(constraints.maxWidth)
         Layout(
             content = {
-                if (fromCircle && !tiles) Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge))
+                if (fromCircle) Box(Modifier.layoutId(Slot.PILL).floatingSurface(container, edge))
                 ToolGroup.PILL.forEach { group ->
                     // 两组一直都在组合里：胶囊收着时多宽要按两组一起量。展开停稳后不摆出来、读屏也读不到
                     GroupButton(
@@ -243,10 +232,7 @@ fun EditorToolbar(
                         enabled = open == null && settledShut,
                         away = !collapsedRow,
                         onClick = { onOpen(group) },
-                        tile = tiles,
-                        // 宽屏上每一组自己一块底子，工具栏从它长出来的时候让给底栏画的胶囊
-                        modifier = Modifier.layoutId(group)
-                            .then(if (tiles && origin != group) Modifier.floatingSurface(container, edge, TILE_RADIUS) else Modifier),
+                        modifier = Modifier.layoutId(group),
                     )
                 }
                 // 大爆炸占住这一行时这里什么也不摆（见 ToolGroup.BIG_BANG）
@@ -268,7 +254,7 @@ fun EditorToolbar(
                     }
                 }
                 if (collapsedRow) {
-                    val toolsModifier = Modifier.layoutId(Slot.TOOLS).then(if (fromCircle) Modifier else Modifier.floatingSurface(container, edge, radius))
+                    val toolsModifier = Modifier.layoutId(Slot.TOOLS).then(if (fromCircle) Modifier else Modifier.floatingSurface(container, edge))
                     // 和两组一样，半路上不接着点
                     val settled = open == null && settledShut
                     if (aiReview != AiReview.Hidden) {
@@ -276,15 +262,12 @@ fun EditorToolbar(
                             running = aiReview == AiReview.Running,
                             enabled = settled,
                             onClick = { onOpen(ToolGroup.TOOLS) },
-                            shape = buttonShape,
                             modifier = toolsModifier,
                         )
                     } else {
-                        BigBangCircle(bigBangReady, settled, onBigBang, buttonShape, toolsModifier)
+                        BigBangCircle(bigBangReady, settled, onBigBang, toolsModifier)
                     }
-                    if (compare != null) {
-                        CompareCircle(compare, canCompare, buttonShape, Modifier.layoutId(Slot.COMPARE).floatingSurface(container, edge, radius))
-                    }
+                    if (compare != null) CompareCircle(compare, canCompare, Modifier.layoutId(Slot.COMPARE).floatingSurface(container, edge))
                 }
             },
             modifier = Modifier.fillMaxWidth(),
@@ -309,33 +292,27 @@ fun EditorToolbar(
                 Slot.TOOLS, Slot.COMPARE -> circleParts[id as Slot] = m
             }
 
-            // 收着：两组各按本来的宽度，加上两头的边就是胶囊；圆钮和胶囊一样高。宽屏上两组各是一块，中间空开（[groupsExtra]）。
-            // 放不下时一步步让：先把圆钮缩小，再去掉名字后面的小箭头（见 GroupButton），最后两组按比例缩、名字截断。
-            // 宽屏先去掉小箭头再缩方块：方块和两组的块并排，矮一截看着高低不齐
+            // 收着：两组各按本来的宽度，加上两头的边就是胶囊；圆钮和胶囊一样高。
+            // 放不下时一步步让：先把圆钮缩小，再去掉名字后面的小箭头（见 GroupButton），最后两组按比例缩、名字截断
             val chevronRoom = CHEVRON_ROOM.roundToPx()
             val natural = ToolGroup.PILL.associateWith { groupParts.getValue(it).maxIntrinsicWidth(rowMin) }
             val room = width - margin * 2
             val sizes = CIRCLE_SIZES.map { it.roundToPx() }
-            val groupsExtra = if (tiles) gap * (ToolGroup.PILL.size - 1) else inset * 2
-            fun fits(groupsWidth: Int, circle: Int) = groupsWidth + groupsExtra + circles.size * (gap + circle) <= room
+            fun fits(groupsWidth: Int, circle: Int) = groupsWidth + inset * 2 + circles.size * (gap + circle) <= room
             val full = natural.values.sum()
             val bare = full - chevronRoom * natural.size
-            val circle = sizes.firstOrNull { fits(if (tiles) bare else full, it) } ?: sizes.last()
+            val circle = sizes.firstOrNull { fits(full, it) } ?: sizes.last()
             val chevrons = fits(full, circle)
-            val squeeze = if (chevrons) 1f else ((room - circles.size * (gap + circle) - groupsExtra).toFloat() / bare).coerceAtMost(1f)
+            val squeeze = if (chevrons) 1f else ((room - circles.size * (gap + circle) - inset * 2).toFloat() / bare).coerceAtMost(1f)
             val groups = ToolGroup.PILL.associateWith {
-                val w = (if (chevrons) natural.getValue(it) else ((natural.getValue(it) - chevronRoom) * squeeze).toInt()).coerceAtLeast(0)
-                // 宽屏上一组就是一整块，和这一行一样高；手机上一组在胶囊里，自己多高就多高
-                groupParts.getValue(it).measure(if (tiles) Constraints(minWidth = w, maxWidth = w, minHeight = rowMin) else Constraints.fixedWidth(w))
+                val w = if (chevrons) natural.getValue(it) else ((natural.getValue(it) - chevronRoom) * squeeze).toInt()
+                groupParts.getValue(it).measure(Constraints.fixedWidth(w.coerceAtLeast(0)))
             }
-            val pillWidth = groups.values.sumOf { it.width } + groupsExtra
+            val pillWidth = groups.values.sumOf { it.width } + inset * 2
             val shutLeft = (width - pillWidth - circles.size * (gap + circle)) / 2
             val shutRight = shutLeft + pillWidth
             val shutX = HashMap<ToolGroup, Int>()
-            ToolGroup.PILL.fold(shutLeft + if (tiles) 0 else inset) { x, group ->
-                shutX[group] = x
-                x + groups.getValue(group).width + if (tiles) gap else 0
-            }
+            ToolGroup.PILL.fold(shutLeft + inset) { x, group -> shutX[group] = x; x + groups.getValue(group).width }
             val circleX = HashMap<Slot, Int>()
             circles.fold(shutRight + gap) { x, slot -> circleX[slot] = x; x + circle + gap }
             val circlePlaceables = circleParts.mapValues { (_, m) -> m.measure(Constraints.fixed(circle, circle)) }
@@ -364,16 +341,10 @@ fun EditorToolbar(
             // 胶囊有多宽跟着动画走：每一帧重新算，交给底栏画（见 PillLeft）。
             // 孩子们约束不变，不会跟着重新量；动画也不重组
             val p = progress.value
-            // 收着的那一头：「工具」是它那颗圆钮，上下也和它一样（圆钮放不下时比这一行矮）；宽屏上是点开的那一块。
-            // 宽屏收着、停稳了没有胶囊（每一块画自己的底子），交给底栏的是一条没有宽的线
+            // 「工具」从它那颗圆钮长出来、缩回去：收着的那一头是圆钮，上下也和它一样（圆钮放不下时比这一行矮）
             val toolsX = circleX.getValue(Slot.TOOLS)
-            val (fromLeft, fromRight) = when (origin) {
-                null -> if (tiles) shutLeft to shutLeft else shutLeft to shutRight
-                ToolGroup.TOOLS, ToolGroup.BIG_BANG -> toolsX to toolsX + circle
-                else -> shutX.getValue(origin).let { it to it + groups.getValue(origin).width }
-            }
-            val left = lerp(fromLeft, openLeft, p)
-            val right = lerp(fromRight, openRight, p)
+            val left = lerp(if (fromCircle) toolsX else shutLeft, openLeft, p)
+            val right = lerp(if (fromCircle) toolsX + circle else shutRight, openRight, p)
             val pillInset = if (fromCircle) lerp((height - circle) / 2, 0, p) else 0
             val slide = SLIDE.roundToPx()
             fun Placeable.centerY() = (height - this.height) / 2
@@ -387,17 +358,9 @@ fun EditorToolbar(
                         compositingStrategy = CompositingStrategy.ModulateAlpha
                     }
                 }
-                // 两组在前半程淡掉；展开停稳后不摆出来。宽屏上它们是各自的一块，和下面的圆钮一样缩小着淡掉，
-                // 工具栏从它长出来的那一块没有自己的底子，上面的东西原地淡掉
+                // 两组在前半程淡掉；展开停稳后不摆出来
                 if (collapsedRow) groups.forEach { (group, placeable) ->
-                    placeable.placeWithLayer(shutX.getValue(group), placeable.centerY()) {
-                        alpha = 1f - fadeOut
-                        if (tiles) {
-                            scaleX = if (group == origin) 1f else 1f - CIRCLE_SHRINK * fadeOut
-                            scaleY = scaleX
-                            compositingStrategy = CompositingStrategy.ModulateAlpha
-                        }
-                    }
+                    placeable.placeWithLayer(shutX.getValue(group), placeable.centerY()) { alpha = 1f - fadeOut }
                 }
                 // 返回箭头从点开的那一组的图标那儿（「工具」是那颗圆钮的正中）滑到胶囊最左边，一边滑一边显出来
                 val backFromX = when (shown) {
@@ -613,8 +576,8 @@ private fun editTools(
 /**
  * 工具：点了就干活的两样，都不是样式。
  * - AI 增强识别：用不了时没有这一项（这时也没有「工具」，见 ToolboxCircle）。没有选中态。点了不收回去，跑的样子就在这儿看：
- *   星星转着、名字是「增强识别中…」；跑完名字换成结果、星星换成对勾。这两样时点不动，也不灰掉，结果要看得清。
- *   同一页再跑一遍结果一样，跑成了就不让再点，不该让人以为多点几次能多找出点什么。没跑成星星是红的，还能点。
+ *   星星转着、名字是「增强识别中…」；跑完名字换成结果、星星换成对勾。这两样时点不动，也不灰掉，结果要看得清
+ *   （和宽屏的那一块一样，见 WideEditorPanel）。没跑成星星是红的，还能点。
  * - 大爆炸：和「编辑」里的水印一样，点一下胶囊长出它的面板（见 EditorBottomBar），面板从第一行字摆起
  *   （见 EditorViewModel.openBigBang）；开着时选中的是它，名字后面的小箭头朝下，再点一下收起。
  *   长按图上的字照旧也能打开。还没识别完、没认出字时灰掉。
@@ -689,7 +652,6 @@ private fun styleTool(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
  *
  * @param inUse 画笔在这一组时它的样子；不在时为 null，画这一组自己的图标
  * @param away 展开停稳了：这一组不摆出来，读屏也不该读到它
- * @param tile 宽屏上这一组自己是一块（见 EditorToolbar）：整块都能点，按下去的水波铺满这一块的圆角矩形
  */
 @Composable
 private fun GroupButton(
@@ -700,14 +662,13 @@ private fun GroupButton(
     away: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tile: Boolean = false,
 ) {
     val colors = MaterialTheme.colorScheme
     val inUseName = inUse?.let { stringResource(MaskStyleInfo.label(it.style)) }
     Row(
         modifier
-            .then(if (tile) Modifier else Modifier.height(GROUP_HEIGHT))
-            .clip(if (tile) RoundedCornerShape(TILE_RADIUS) else CircleShape)
+            .height(GROUP_HEIGHT)
+            .clip(CircleShape)
             .then(
                 if (away) Modifier.clearAndSetSemantics {}
                 else Modifier.semantics { if (inUseName != null) stateDescription = inUseName },
@@ -874,10 +835,13 @@ private fun Density.chevronRoom(open: Float) = (CHEVRON_ROOM.toPx() * open).roun
  * 照 Bettbox 1.19.4 的悬浮底栏：一层铺得开（模糊 30、往下 10、8% 的黑），一层贴着边（模糊 10、往下 2、4% 的黑）。
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
- * 没有宽或高时什么也不画：宽屏的这一行收着时底栏的胶囊就是一条没有宽的线（见 EditorToolbar 的 tiles）。
  */
-internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) = drawWithCache {
-    val radius = min(size.minDimension / 2, maxRadius.toPx())
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) =
+    floatingSurface(fill, edge) { min(it.minDimension / 2, maxRadius.toPx()) }
+
+/** 同上，圆角由 [cornerOf] 按眼下的大小定，可以跟着动画变（宽屏从一块长成面板，见 WideEditorPanel）。 */
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, cornerOf: Density.(Size) -> Float) = drawWithCache {
+    val radius = cornerOf(size)
     val shadows = SHADOWS.map { (blur, dy, alpha) ->
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = fill.toArgb()
@@ -886,7 +850,6 @@ internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = 
     }
     val line = EDGE_WIDTH.toPx()
     onDrawBehind {
-        if (size.width <= line || size.height <= line) return@onDrawBehind
         drawIntoCanvas { canvas ->
             shadows.forEach { canvas.nativeCanvas.drawRoundRect(0f, 0f, size.width, size.height, radius, radius, it) }
         }
@@ -911,14 +874,14 @@ private val SHADOWS = listOf(Triple(30.dp, 10.dp, 0.08f), Triple(10.dp, 2.dp, 0.
  * AI 跑着时圆钮上是转着的星星，读屏念「增强识别中…」。
  */
 @Composable
-private fun ToolboxCircle(running: Boolean, enabled: Boolean, onClick: () -> Unit, shape: Shape, modifier: Modifier = Modifier) {
+private fun ToolboxCircle(running: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val colors = MaterialTheme.colorScheme
     val label = stringResource(R.string.toolbox)
     val runningText = stringResource(R.string.ai_reviewing)
     Box(
         modifier
             .fillMaxSize()
-            .clip(shape)
+            .clip(CircleShape)
             .semantics {
                 contentDescription = label
                 if (running) stateDescription = runningText
@@ -941,12 +904,12 @@ private fun ToolboxCircle(running: Boolean, enabled: Boolean, onClick: () -> Uni
  * @param enabled 这一行停稳了，点得动（灰不灰只看 [ready]）
  */
 @Composable
-private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit, shape: Shape, modifier: Modifier = Modifier) {
+private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     val label = stringResource(R.string.big_bang_title)
     Box(
         modifier
             .fillMaxSize()
-            .clip(shape)
+            .clip(CircleShape)
             .semantics { contentDescription = label }
             .clickable(enabled = ready && enabled, role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
@@ -960,7 +923,7 @@ private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit,
     }
 }
 
-/** AI 增强识别眼下的状态，「工具」里那一项上的那一句。 */
+/** AI 增强识别眼下的状态，宽屏的那一块上、手机「工具」里的那一句。 */
 @Composable
 internal fun aiReviewLabel(state: AiReview): String = when (state) {
     AiReview.Ready, AiReview.Hidden -> stringResource(R.string.ai_review)
@@ -975,7 +938,7 @@ internal fun aiReviewLabel(state: AiReview): String = when (state) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolean, shape: Shape, modifier: Modifier = Modifier) {
+private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolean, modifier: Modifier = Modifier) {
     val hint = rememberTooltipState()
     val scope = rememberCoroutineScope()
     val label = stringResource(R.string.compare_hold)
@@ -991,7 +954,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
             Box(
                 Modifier
                     .fillMaxSize()
-                    .clip(shape)
+                    .clip(CircleShape)
                     .semantics { contentDescription = label }
                     .combinedClickable(
                         interactionSource = interaction,
@@ -1017,7 +980,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
 
 /** 提示在圆钮正上方，靠着屏幕边时往里收，不出屏。 */
 @Composable
-private fun rememberHintPosition(): PopupPositionProvider {
+internal fun rememberHintPosition(): PopupPositionProvider {
     val density = LocalDensity.current
     val space = with(density) { HINT_SPACING.roundToPx() }
     val edge = with(density) { MARGIN.roundToPx() }
@@ -1201,12 +1164,6 @@ internal val TOOL_ROW_HEIGHT = 56.dp
 /** 圆钮和胶囊一样高；放不下就一档档缩小。 */
 private val CIRCLE_SIZES = listOf(56.dp, 52.dp, 48.dp)
 
-/**
- * 宽屏上一块的圆角（见 EditorToolbar 的 tiles）：不到这一行高的一半，看得出是圆角矩形，不是胶囊。
- * 撑开的工具栏、从它长出来的面板也是这么圆（见 EditorBottomBar）。
- */
-internal val TILE_RADIUS = 16.dp
-
 /** 圆钮缩进胶囊时缩到多小（按原来的比例少掉这么多）。 */
 private const val CIRCLE_SHRINK = 0.4f
 
@@ -1239,10 +1196,10 @@ private val TOOL_PAD_QUIET = 6.dp
 private val TOOL_GLYPH_GAP = 8.dp
 
 /** 选中的小胶囊是主题色叠这么浓。 */
-private const val SELECTED_TINT = 0.2f
+internal const val SELECTED_TINT = 0.2f
 
 /** 换选中的那一项走多久：Bettbox 1.19.4 给 GNav 设的 250 ms（见 ToolItem）。 */
-private const val PICK_MS = 250
+internal const val PICK_MS = 250
 
 /** 小箭头长出来时从右边多出这么远滑回来：GNav 的名字滑 8。 */
 private val CHEVRON_DRIFT = 8.dp
@@ -1252,11 +1209,11 @@ private val CHEVRON_DRIFT = 8.dp
  * Compose 里同名的 easeInCubic、easeOutSine、easeOutCirc、easeInExpo 控制点和 Flutter 的不一样，照 Flutter 的抄。
  */
 private val FLUTTER_EASE_IN = CubicBezierEasing(0.42f, 0f, 1f, 1f)
-private val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+internal val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private val FLUTTER_EASE_IN_CUBIC = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f)
 private val FLUTTER_EASE_OUT_SINE = CubicBezierEasing(0.39f, 0.575f, 0.565f, 1f)
-private val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
-private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
+internal val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
+internal val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
 
 /** Flutter 的 Curve.flipped：把曲线倒过来走。 */
 private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
@@ -1291,4 +1248,4 @@ private val HINT_SPACING = 8.dp
 /** 组名后面的小箭头，和它前面那一点空：地方不够时先去掉这一截。 */
 private val CHEVRON = 16.dp
 private val CHEVRON_ROOM = 18.dp
-private const val DISABLED_ALPHA = 0.38f
+internal const val DISABLED_ALPHA = 0.38f

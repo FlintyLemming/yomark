@@ -79,7 +79,6 @@ import moe.flinty.yomark.ui.batch.BatchThumbnails
 import moe.flinty.yomark.ui.canvas.ImageCanvas
 import moe.flinty.yomark.ui.canvas.ScanEffect
 import moe.flinty.yomark.ui.components.AiReviewResultPill
-import moe.flinty.yomark.ui.components.BarPlacement
 import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.BigBangActions
 import moe.flinty.yomark.ui.components.BigBangPanelModel
@@ -97,8 +96,8 @@ import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
 import moe.flinty.yomark.ui.components.UnopenedExportDialog
+import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.nearColorsOf
-import moe.flinty.yomark.ui.components.wideSidePanelWidth
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
@@ -129,17 +128,17 @@ fun EditorScreen(
     val context = LocalContext.current
     val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
     val thumbnails = remember(context, thumbnailPx) { BatchThumbnails(context.contentResolver, thumbnailPx) }
-    // 底栏的「按住对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
+    // 「按住对比」（手机在底栏、宽屏在功能方块里）按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
-    // 底栏展开着的那一组（打码、编辑、工具）。只是界面上的事，不进 ViewModel；转屏换了版式也还是这一组
+    // 手机底栏展开着的那一组（打码、编辑、工具）。只是界面上的事，不进 ViewModel
     var toolGroup by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
-    // 大爆炸开着、长按的手指也抬起来了：它的面板从「工具」长出来，那时展开着「工具」是因为它（见下面的 LaunchedEffect），
+    // 大爆炸开着、长按的手指也抬起来了：手机上它的面板从「工具」长出来，那时展开着「工具」是因为它（见下面的 LaunchedEffect），
     // 收起时回到打开前展开着的那一组
     val bigBangUp = state.bigBang?.holding == false
     var bigBangHoldsRow by rememberSaveable { mutableStateOf(false) }
     var rowBeforeBigBang by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
-    // 调节面板（样式的、用途水印的）开着：它从所在的那一组长出来，收起时底栏回到打开它之前那样（见下面的 LaunchedEffect）
+    // 调节面板（样式的、用途水印的）开着：手机上它从所在的那一组长出来，收起时底栏回到打开它之前那样（见下面的 LaunchedEffect）
     var panelHoldsRow by rememberSaveable { mutableStateOf(false) }
     var rowBeforePanel by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
@@ -225,7 +224,7 @@ fun EditorScreen(
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
-                    // 用途水印在底栏的「编辑」里，对比在底栏，导出在右上角：手机、宽屏都是（2026-10-16）
+                    // 导出在右上角，手机、宽屏都是（2026-10-16）。用途水印、对比手机上在底栏，宽屏上在功能方块里
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                     onSettings = onSettings,
                     // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
@@ -238,12 +237,13 @@ fun EditorScreen(
                 )
                 if (panelUp) FoldOnTouch(foldPanel, Modifier.matchParentSize())
             }
-            // 调节面板是从展开的那一组长出来的（宽屏也是，2026-10-16）。面板不是点这一组里的工具打开的时候，展开它所在的那一组接着显示它：
+            // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
             // 用途水印在「编辑」里，样式在它自己那一组。展开着另一组时也换过去：
             // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来。
-            // 收起面板（箭头、返回键、手机上点它外面）时底栏回到打开它之前那样（2026-10-16）：展开着「编辑」写完一处字点一下图，
+            // 收起面板（箭头、返回键、点它外面）时底栏回到打开它之前那样（2026-10-16）：展开着「编辑」写完一处字点一下图，
             // 还在「编辑」里；从收着的底栏点两下图上的字打开的，这一组跟着收回去。开着面板换了一样工具，这一组就是自己挑的，留着
-            LaunchedEffect(state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
+            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
+                if (!phone) return@LaunchedEffect
                 val own = when {
                     state.purposeSheetVisible -> ToolGroup.EDIT
                     state.stylePanelOpen -> ToolGroup.of(state.barLook.style)
@@ -260,18 +260,16 @@ fun EditorScreen(
                 if (toolGroup != own) toolGroup = own
             }
             // 「编辑」里的马克笔、画笔、文本只在「编辑」展开着时拿在手里（2026-10-16）：收起「编辑」（或者展开着别的组）就放下，
-            // 换回「打码」里上次用的样式（见 EditorViewModel.backToRedact），收着的底栏点图、拖框总是打码。大爆炸借走这一行时不算。
-            // 开着面板选中了另一组样式的框也不算：宽屏上面板开着照样点得着图和列表，面板跟着选中的框，这一组跟着换过去（见上面），
-            // 拿着马克笔点一下色块框就放下的话，取消选中回到「编辑」时马克笔已经没了。手机上面板开着时点不着图（见 FoldOnTouch）
-            LaunchedEffect(toolGroup, bigBangHoldsRow, state.brush.style, panelHoldsRow, state.selectedManualId) {
-                val followingSelection = panelHoldsRow && state.selectedItem != null
-                if (toolGroup != ToolGroup.EDIT && !bigBangHoldsRow && !followingSelection) vm.backToRedact()
+            // 换回「打码」里上次用的样式（见 EditorViewModel.backToRedact），收着的底栏点图、拖框总是打码。大爆炸借走这一行时不算
+            LaunchedEffect(phone, toolGroup, bigBangHoldsRow, state.brush.style) {
+                if (phone && toolGroup != ToolGroup.EDIT && !bigBangHoldsRow) vm.backToRedact()
             }
             // 大爆炸的面板也是从胶囊长出来的（见 EditorBottomBar）。用得了 AI 时从「工具」那一行长出来：开着时展开「工具」，
             // 从收着的那一行打开的（长按图上的字）胶囊从「工具」那颗圆钮撑开。用不了 AI 时「工具」里只有它，
             // 面板直接从大爆炸那颗圆钮长出来，不带工具那一行（ToolGroup.BIG_BANG）。打开时定下用哪一种，开着时不换。
             // 收起时回到打开前那样，原先展开着哪一组还是哪一组
-            LaunchedEffect(bigBangUp) {
+            LaunchedEffect(phone, bigBangUp) {
+                if (!phone) return@LaunchedEffect
                 if (bigBangUp && !bigBangHoldsRow) {
                     rowBeforeBigBang = toolGroup
                     bigBangHoldsRow = true
@@ -291,7 +289,7 @@ fun EditorScreen(
             BackHandler(enabled = state.colorPick == null && state.purposeSheetVisible, onBack = vm::dismissPurposeSheet)
             // 底栏展开着一组时，返回先收回去。上面几样开着时先收它们
             BackHandler(
-                enabled = toolGroup != null && state.colorPick == null && !panelOpen,
+                enabled = phone && toolGroup != null && state.colorPick == null && !panelOpen,
                 onBack = { toolGroup = null },
             )
             // 大爆炸开着时返回先收起它，什么也不打。放在最后：后登记的先拦，底栏展开着一组时也先收它
@@ -337,8 +335,8 @@ fun EditorScreen(
                         ) {
                             OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
-                            // AI 增强识别收在底栏的「工具」里，跑完在这儿说一声
-                            AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
+                            // 宽屏的 AI 那一块上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
+                            if (phone) AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
                     }
@@ -366,46 +364,61 @@ fun EditorScreen(
                     // 长按的手指抬起来面板才出来
                     val bang = state.bigBang?.takeIf { !it.holding }
                     val covered = remember(bang?.page, state.plan.items) { bang?.page?.covered(state.plan.items).orEmpty() }
-                    // 手机竖着拿铺满画布那一块，面板盖在图上；宽屏、手机横着拿在画布右边那一栏或下面那一块里，
-                    // 上面是框列表，面板盖住列表、不盖图（见 BarPlacement）。大爆炸的面板也从这一行长出来，画布跟着让开
-                    val placement = when {
-                        layout == EditorLayout.PHONE -> BarPlacement.PHONE
-                        atSide -> BarPlacement.SIDE
-                        else -> BarPlacement.BOTTOM
+                    when {
+                        // 手机上大爆炸的面板从底栏的胶囊长出来，画布跟着让到它上面
+                        layout == EditorLayout.PHONE -> EditorBottomBar(
+                            toolGroup = toolGroup,
+                            onToolGroup = onToolGroup,
+                            styleBar = styleBarModel(state),
+                            styleActions = styleActions,
+                            compare = compare,
+                            canCompare = canCompare,
+                            aiReview = state.aiReview,
+                            onAiReview = vm::runAiReview,
+                            bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing,
+                            // 和「编辑」里的水印一样，再点一下收起
+                            onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
+                            bigBang = bang?.let { BigBangPanelModel(it, covered) },
+                            bigBangActions = bigBangActions,
+                            purpose = purpose,
+                            purposeActions = purposeActions,
+                            filmstrip = filmstrip,
+                            pushCanvas = writingText(state),
+                        )
+                        // 宽屏上所有功能平铺成方块（2026-10-16），面板从点的那一块长出来；大爆炸的面板盖满这一块，
+                        // 画布让到它上面（左边）
+                        else -> WideEditorPanel(
+                            atSide = atSide,
+                            styleBar = styleBarModel(state),
+                            styleActions = styleActions,
+                            purpose = purpose,
+                            purposeActions = purposeActions,
+                            // 手机横着拿没有列表，右边那一栏只放功能方块
+                            list = if (layout.listed) ({ modifier ->
+                                MaskItemList(
+                                    image = state.image,
+                                    plan = state.plan,
+                                    // 换图时先载入、再识别：载入的那一下也算还没出结果，不该说「没有识别到」
+                                    analyzing = state.analyzing || state.loading,
+                                    selectedId = state.selectedManualId,
+                                    onItemClick = vm::onListItemClick,
+                                    modifier = modifier,
+                                )
+                            }) else null,
+                            aiReview = state.aiReview,
+                            aiOffered = state.aiOffered,
+                            onAiReview = vm::runAiReview,
+                            // 宽屏上吸管等着取色时面板不收、方块都还点得着；大爆炸这时打不开（见 EditorViewModel.openBigBang），灰着
+                            bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing && state.colorPick == null,
+                            // 和水印一样，再点一下收起
+                            onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
+                            bigBang = bang?.let { BigBangPanelModel(it, covered) },
+                            bigBangActions = bigBangActions,
+                            compare = compare,
+                            canCompare = canCompare,
+                            filmstrip = filmstrip,
+                        )
                     }
-                    EditorBottomBar(
-                        toolGroup = toolGroup,
-                        onToolGroup = onToolGroup,
-                        styleBar = styleBarModel(state),
-                        styleActions = styleActions,
-                        compare = compare,
-                        canCompare = canCompare,
-                        modifier = if (atSide) Modifier.wideSidePanelWidth() else Modifier,
-                        placement = placement,
-                        // 手机横着拿没有列表，右边那一栏只有工具那一行
-                        list = if (layout.listed) ({ modifier ->
-                            MaskItemList(
-                                image = state.image,
-                                plan = state.plan,
-                                // 换图时先载入、再识别：载入的那一下也算还没出结果，不该说「没有识别到」
-                                analyzing = state.analyzing || state.loading,
-                                selectedId = state.selectedManualId,
-                                onItemClick = vm::onListItemClick,
-                                modifier = modifier,
-                            )
-                        }) else null,
-                        aiReview = state.aiReview,
-                        onAiReview = vm::runAiReview,
-                        bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing,
-                        // 和「编辑」里的水印一样，再点一下收起
-                        onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
-                        bigBang = bang?.let { BigBangPanelModel(it, covered) },
-                        bigBangActions = bigBangActions,
-                        purpose = purpose,
-                        purposeActions = purposeActions,
-                        filmstrip = filmstrip,
-                        pushCanvas = writingText(state),
-                    )
                 },
             )
         }
@@ -413,11 +426,10 @@ fun EditorScreen(
 }
 
 /**
- * 画布和它旁边的那一块（底栏：手机竖着拿在下面，宽屏连同框列表在下面或右边，见 BarPlacement）。
+ * 画布和它旁边的那一块（手机的底栏或右边那一栏，宽屏的样式与列表）。
  *
  * 旁边那一块先量：在下面时高度由它自己定，在右边（[panelAtSide]）时宽度由它自己定，画布占剩下的。
- * 在下面的底栏占满整块，画布让到它给的 [PanelTop] 为止：手机上面那一截是往上长的调节面板，盖在图上；
- * 宽屏竖着拿时这条线跟着面板的上沿走，面板比列表那一块高时画布跟着变矮。
+ * 手机的底栏例外：它占满整块，画布让到它给的 [PanelTop] 为止，上面那一截是往上长的调节面板，盖在图上。
  * 画布永远是第一个孩子：转个方向，那一块从下面挪到右边，画布还是原来那一个，放大到哪儿、识别动效走到哪儿都接着来。
  * 分开写成 Column 和 Row 的话，一转就换成了一块新画布。
  */

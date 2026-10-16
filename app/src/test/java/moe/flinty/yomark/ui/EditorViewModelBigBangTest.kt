@@ -341,7 +341,7 @@ class EditorViewModelBigBangTest {
     }
 
     /**
-     * 宽屏的列表上点一行在大爆炸开着时不算数，和点图一样（2026-10-16）：面板从底栏长出来，字少时矮，上面还露着几行列表。
+     * 宽屏的列表上点一行在大爆炸开着时不算数，和点图一样（2026-10-16）：面板盖住列表、列表点不着（见 WideEditorPanel），这里再挡一道。
      * 从列表上拿掉大爆炸刚打的那一块，面板上那几个字还是选中的，再点一个字那一块又盖回去。
      */
     @Test fun `the list does nothing while big bang is open`() = runTest(dispatcher) {

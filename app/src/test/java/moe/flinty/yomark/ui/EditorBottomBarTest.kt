@@ -33,16 +33,9 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.ui.bigbang.BigBangPage
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.unit.width
-import moe.flinty.yomark.ui.components.BarPlacement
 import moe.flinty.yomark.ui.components.BigBangPanelModel
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.PanelTop
-import moe.flinty.yomark.ui.components.PurposePanelModel
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.ToolGroup
@@ -57,7 +50,6 @@ import org.robolectric.annotation.GraphicsMode
  * 手机底栏的胶囊和从它长出来的调节面板，看画出来的样子：长出来、缩回去的半路上是同一块胶囊在变大变小，
  * 工具那一行的上沿没有一道自己的边，面板里也没有它多出来的一层投影；开着面板收起这一组，面板跟着胶囊收窄。
  * 读屏看不出这些，真的画一遍取像素。面板里的东西怎么用见 StyleBarTest，工具那一行见 EditorToolbarTest。
- * 宽屏上收着时一样一块、面板是圆角矩形、竖着拿时面板把画布顶上去，也在这里。
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -259,116 +251,6 @@ class EditorBottomBarTest {
         compose.onAllNodesWithText("大爆炸").assertCountEquals(1)
         compose.onNodeWithText("完成").assertIsDisplayed()
         assertThat(canvasEnd - withRow).isAtLeast(px(48.dp))
-    }
-
-    // ---------- 宽屏：每一样各是一块，面板盖住列表、不盖图 ----------
-
-    /** 宽屏的底栏，[group] 展开着（null 是收着），量出画布让到哪儿（PanelTop）。 */
-    private fun showWide(
-        placement: BarPlacement,
-        purpose: () -> PurposePanelModel = { PurposePanelModel() },
-        batch: Boolean = false,
-        onCanvasEnd: (Int) -> Unit = {},
-    ) {
-        compose.setContent {
-            MaterialTheme {
-                Surface {
-                    view = LocalView.current
-                    fill = MaterialTheme.colorScheme.surfaceContainer.toArgb()
-                    Layout(content = {
-                        EditorBottomBar(
-                            toolGroup = group,
-                            onToolGroup = {},
-                            styleBar = model,
-                            styleActions = object : StyleBarActions {},
-                            compare = remember { MutableInteractionSource() },
-                            canCompare = false,
-                            placement = placement,
-                            list = { Box(it.testTag("list")) },
-                            purpose = purpose(),
-                            filmstrip = if (batch) ({ Box(it.height(40.dp).testTag("film")) }) else null,
-                        )
-                    }) { measurables, constraints ->
-                        val bar = measurables.single().measure(constraints)
-                        onCanvasEnd(bar[PanelTop])
-                        layout(bar.width, bar.height) { bar.place(0, 0) }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun draw(): Bitmap = compose.runOnUiThread {
-        Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888).also { view.draw(Canvas(it)) }
-    }
-
-    /** 宽屏收着时没有一条连着的胶囊：「打码」「编辑」两块之间露着底下的颜色，块里面是胶囊的底色。 */
-    @Test fun onAWideScreenTheFoldedTilesStandApart() {
-        group = null
-        showWide(BarPlacement.SIDE)
-        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
-        val edit = compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()
-        val shot = draw()
-        val y = px((redact.top + redact.bottom) / 2)
-        assertThat(hex(shot.getPixel(px(redact.left) + px(4.dp), y))).isEqualTo(hex(fill))
-        assertThat(hex(shot.getPixel(px((redact.right + edit.left) / 2), y))).isNotEqualTo(hex(fill))
-    }
-
-    /** 宽屏的面板是圆角矩形，不是胶囊那样大的圆角：左上角往里 6 dp 已经是面板的底色，手机上那儿还在圆角外面。 */
-    @Test fun onAWideScreenThePanelIsARoundedRectangle() {
-        model = StyleBarModel(MaskLook(), panelOpen = true)
-        showWide(BarPlacement.SIDE)
-        compose.waitForIdle()
-        val shot = draw()
-        // 面板的上沿：正中那一列从上往下第一个是底色的（边那一道细线在它上面）
-        val top = (0 until shot.height).first { hex(shot.getPixel(shot.width / 2, it)) == hex(fill) }
-        assertThat(hex(shot.getPixel(px(12.dp) + px(6.dp), top + px(6.dp)))).isEqualTo(hex(fill))
-    }
-
-    /** 宽屏竖着拿：列表在工具那一行上面，和工具那一行、面板一样宽，在正中。 */
-    @Config(qualifiers = "zh-rCN-w800dp-h1280dp-xhdpi")
-    @Test fun onAnUprightTabletTheListSitsAboveTheBarInOneColumn() {
-        group = null
-        showWide(BarPlacement.BOTTOM)
-        val list = compose.onNodeWithTag("list").getUnclippedBoundsInRoot()
-        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
-        assertThat(list.bottom).isLessThan(redact.top)
-        assertThat(list.width.value).isWithin(1f).of(560f - 24f)
-        assertThat(((list.left + list.right) / 2).value).isWithin(1f).of(400f)
-    }
-
-    /** 批量时胶片条在列表和工具那一行之间，也在那一列里，和手机上一样在工具那一行上面。 */
-    @Config(qualifiers = "zh-rCN-w800dp-h1280dp-xhdpi")
-    @Test fun onAnUprightTabletTheFilmstripSitsBetweenTheListAndTheBar() {
-        group = null
-        showWide(BarPlacement.BOTTOM, batch = true)
-        val list = compose.onNodeWithTag("list").getUnclippedBoundsInRoot()
-        val film = compose.onNodeWithTag("film").getUnclippedBoundsInRoot()
-        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
-        assertThat(film.top).isGreaterThan(list.bottom)
-        assertThat(film.bottom).isLessThan(redact.top)
-        assertThat(((film.left + film.right) / 2).value).isWithin(1f).of(400f)
-        assertThat(film.width).isAtMost(560.dp)
-    }
-
-    /** 宽屏竖着拿：面板比列表那一块高时画布让到面板上面，不盖图；收起后画布回原处。 */
-    @Config(qualifiers = "zh-rCN-w800dp-h1280dp-xhdpi")
-    @Test fun onAnUprightTabletATallPanelPushesTheCanvas() {
-        var canvasEnd = 0
-        var purpose by mutableStateOf(PurposePanelModel(text = "仅供办理签证使用"))
-        group = ToolGroup.EDIT
-        showWide(BarPlacement.BOTTOM, { purpose }) { canvasEnd = it }
-        val resting = canvasEnd
-        assertThat(px(compose.onNodeWithTag("list").getUnclippedBoundsInRoot().top)).isAtLeast(resting)
-
-        purpose = purpose.copy(open = true)
-        compose.waitForIdle()
-        assertThat(canvasEnd).isLessThan(resting)
-        assertThat(px(compose.onNodeWithText("用途水印").getUnclippedBoundsInRoot().top)).isAtLeast(canvasEnd)
-
-        purpose = purpose.copy(open = false)
-        compose.waitForIdle()
-        assertThat(canvasEnd).isEqualTo(resting)
     }
 
     private fun px(dp: Dp) = with(compose.density) { dp.roundToPx() }
