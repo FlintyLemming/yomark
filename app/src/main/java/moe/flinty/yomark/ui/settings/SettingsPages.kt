@@ -409,7 +409,7 @@ fun AiSettingsScreen(
  *
  * 编辑：「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
  *
- * 识别：「按原分辨率识别」，出厂按机器快不快定（见 SettingsStore.fullResolutionOcr）。不在识别页：它管的是快慢，不是认什么。
+ * 识别：「按原分辨率识别」，出厂关着（见 SettingsStore.fullResolutionOcr）。不在识别页：它管的是快慢，不是认什么。
  *
  * 导出：品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
  * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。

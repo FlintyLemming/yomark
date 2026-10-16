@@ -19,12 +19,10 @@ import java.util.UUID
  */
 internal fun isolatedSettingsStore(
     context: Context,
-    fastDevice: () -> Boolean = { true },
     locale: () -> Locale = Locale::getDefault,
 ): SettingsStore = SettingsStore(
     PreferenceDataStoreFactory.create(
         scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
     ) { File(context.filesDir, "settings-test-${UUID.randomUUID()}.preferences_pb") },
-    locale = locale,
-    fastDevice = fastDevice,
+    locale,
 )

@@ -151,16 +151,15 @@ class SettingsStoreTest {
         assertThat(store.maskOptions.first().pixelBlockDivisor).isEqualTo(4)
     }
 
-    /** 没选过按机器定，选过就记住；恢复默认设置后又按机器定。 */
+    /** 出厂关着，打开了就记住；恢复默认设置后又关上。 */
     @Test
-    fun `full resolution follows the device until chosen`() = runTest {
-        assertThat(isolatedSettingsStore(context, fastDevice = { true }).fullResolutionOcr.first()).isTrue()
-        val slow = isolatedSettingsStore(context, fastDevice = { false })
-        assertThat(slow.fullResolutionOcr.first()).isFalse()
-        slow.setFullResolutionOcr(true)
-        assertThat(slow.fullResolutionOcr.first()).isTrue()
-        slow.resetSettings()
-        assertThat(slow.fullResolutionOcr.first()).isFalse()
+    fun `full resolution is off until turned on`() = runTest {
+        val store = store()
+        assertThat(store.fullResolutionOcr.first()).isFalse()
+        store.setFullResolutionOcr(true)
+        assertThat(store.fullResolutionOcr.first()).isTrue()
+        store.resetSettings()
+        assertThat(store.fullResolutionOcr.first()).isFalse()
     }
 
     @Test

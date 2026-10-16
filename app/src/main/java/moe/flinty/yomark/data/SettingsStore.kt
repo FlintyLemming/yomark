@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import moe.flinty.yomark.core.DevicePerformance
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
@@ -43,14 +42,9 @@ class SettingsStore internal constructor(
     private val store: DataStore<Preferences>,
     /** 系统语言，品牌水印字样没选过时按它定。测试换成固定值。 */
     private val locale: () -> Locale = Locale::getDefault,
-    /** 机器够不够快，「按原分辨率识别」没选过时按它定。测试换成固定值。 */
-    private val fastDevice: () -> Boolean = { true },
 ) {
 
-    constructor(context: Context) : this(
-        context.applicationContext.settingsDataStore,
-        fastDevice = { DevicePerformance.fast(context.applicationContext) },
-    )
+    constructor(context: Context) : this(context.applicationContext.settingsDataStore)
 
     /**
      * 「打码」里上次选的样式：识别出来直接打码的用它，下次打开编辑器时画笔也是它。
@@ -173,11 +167,11 @@ class SettingsStore internal constructor(
 
     /**
      * 截图按原分辨率识别（见 SourceImageLoader.sampleSizeForAnalysis）：小字认得全，识别慢一倍多。
-     * 关掉就和照片一样缩到长边 2048 再认。没选过按机器快不快定（见 DevicePerformance），同样不在第一次读时写下。
+     * 关掉就和照片一样缩到长边 2048 再认。出厂关着，快的机器也一样：原先没选过时按机器快不快定，2026-10-16 改成一律关。
      *
      * 不放进 RecognitionConfig：它管的是怎么解码识别图，改了从下一张图起生效，不让编辑器重跑。
      */
-    val fullResolutionOcr: Flow<Boolean> = store.data.map { it[KEY_FULL_RESOLUTION] ?: fastDevice() }
+    val fullResolutionOcr: Flow<Boolean> = store.data.map { it[KEY_FULL_RESOLUTION] ?: false }
 
     suspend fun setFullResolutionOcr(on: Boolean) {
         store.edit { it[KEY_FULL_RESOLUTION] = on }
@@ -334,7 +328,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值，「按原分辨率识别」重新按机器定。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。实验室里的外部模型关掉，填过的接口地址、key、模型留着，再打开不用重填。
