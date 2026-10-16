@@ -63,15 +63,18 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 
 /**
- * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表，横过来样式和导出挪到画布右边；
+ * 编辑器在哪些屏幕上换成宽屏版式（宽屏增补设计）：手机没有框列表，横过来工具那一行挪到画布右边；
  * 平板、阔折叠在画布下面或右边多出列表，点列表的一行就切换那一块。
  * 哪些尺寸算宽屏的细账在 EditorLayoutTest，列表本身在 MaskItemListTest。
  *
- * 手机的底栏是一行工具：点「打码」「编辑」就地展开，返回收起；用途水印在「编辑」里，对比在这一行，导出在右上角。
+ * 底栏是一行工具（宽屏也是，2026-10-16）：点「打码」「编辑」就地展开，返回收起；用途水印在「编辑」里，对比在这一行，导出在右上角。
+ * 宽屏上每一样各是一块，面板从这一行长上去盖住列表、不盖图，点面板外面不收起。
  * 手机上样式的调节面板是从底栏往上长出来盖在图上的：底栏不动，吸管取色时缩回去再长出来，箭头、返回都收起。
  * 用途水印的面板也是这样长出来的，和样式面板换着开。
  * 这几条用真的 ViewModel 走一遍，这一行自己的细节在 EditorToolbarTest，面板自己的控件在 StyleBarTest、PurposePanelTest。
@@ -491,76 +494,103 @@ class EditorScreenLayoutTest {
         assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.SOLID)
     }
 
-    /** 手机横过来：样式和导出挪到画布右边，和平板横着拿一样，只是没有列表。 */
+    // ---------- 宽屏、手机横着拿：也是底栏那一行，每一样各是一块（2026-10-16） ----------
+
+    /** 「点了是收起」的那一颗：底栏上展开着一组时最左边的返回。 */
+    private val foldBack get() = compose.onNode(SemanticsMatcher("点了是收起") { it.config.getOrNull(SemanticsActions.OnClick)?.label == "收起" })
+
+    /** 宽屏的顶栏和手机的一样：导出在右上角，用途水印、对比都不在顶栏上，在底栏。 */
+    private fun assertTheTopBarIsThePhones() {
+        assertThat(compose.onNodeWithText("导出").getUnclippedBoundsInRoot().bottom).isLessThan(screenBounds().bottom * 0.2f)
+        compose.onNodeWithContentDescription("用途水印").assertDoesNotExist()
+        compose.onNodeWithContentDescription("按住对比原图").assertDoesNotExist()
+        compose.onNodeWithContentDescription("按住对比").assertIsDisplayed()
+    }
+
+    /** 手机横过来：工具那一行挪到画布右边那一栏的最底下，和平板横着拿一样，只是没有列表；各组收着，样式不平铺。 */
     @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
-    @Test fun `a phone on its side moves the styles and export right of the image, without the list`() {
+    @Test fun `a phone on its side moves the tools right of the image, without the list`() {
         open()
         compose.onNodeWithText("框出 2 处").assertDoesNotExist()
         val screen = screenBounds()
-        for (label in listOf("色块", "马克笔", "导出")) {
-            assertThat(compose.onNodeWithText(label).getUnclippedBoundsInRoot().left).isGreaterThan(screen.right * 0.6f)
+        for (label in listOf("打码", "编辑")) {
+            val tile = compose.onNodeWithText(label).getUnclippedBoundsInRoot()
+            assertThat(tile.left).isGreaterThan(screen.right * 0.55f)
+            assertThat(tile.bottom).isGreaterThan(screen.bottom * 0.75f)
         }
-    }
-
-    /** 手机横着拿，右边那一栏矮：调节面板弹出来时顶替样式方块，不盖在图上；导出还在底下，收起后方块回来。 */
-    @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
-    @Test fun `on a phone held sideways the style panel takes the styles' place`() {
-        val vm = open()
-        compose.runOnUiThread { vm.onStyleChipClick(MaskStyle.SOLID) }   // 点当前这一种，弹出面板
-        frames(SETTLE_FRAMES)
-        val reset = compose.onNode(hasText("恢复默认") and !hasAnyAncestor(isDialog()))
-        reset.assertIsDisplayed()
-        assertThat(reset.getUnclippedBoundsInRoot().left).isGreaterThan(screenBounds().right * 0.6f)
+        compose.onNodeWithText("色块").assertDoesNotExist()
         compose.onNodeWithText("马克笔").assertDoesNotExist()
-        compose.onNodeWithText("导出").assertIsDisplayed()
-        compose.runOnUiThread { vm.dismissStylePanel() }
-        frames(SETTLE_FRAMES)
-        compose.onNodeWithText("恢复默认").assertDoesNotExist()
-        compose.onNodeWithText("马克笔").assertIsDisplayed()
+        assertTheTopBarIsThePhones()
     }
 
-    /** 手机横着拿：水印的面板和样式面板一样顶替样式方块（顶栏上的水印按钮点开），不盖在图上。 */
+    /**
+     * 手机横着拿：点一组，工具栏就地撑开；再点当前的样式，面板从这一行往上长，在右边那一栏里，不盖图。
+     * 返回先收面板，再收这一组。
+     */
     @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
-    @Test fun `on a phone held sideways the watermark panel takes the styles' place`() {
+    @Test fun `on a phone held sideways the style panel grows from the bar beside the image`() {
         val vm = open()
-        compose.onNodeWithContentDescription("用途水印").performClick()
+        compose.onNodeWithText("打码").performClick()
         frames(SETTLE_FRAMES)
+        val tool = compose.onNodeWithText("马赛克").assertIsDisplayed().getUnclippedBoundsInRoot()
+        compose.runOnUiThread { vm.onStyleChipClick(vm.state.value.barLook.style) }   // 点当前这一种，长出面板
+        frames(SETTLE_FRAMES)
+        // 这一栏矮，面板里面可能要滚动：看顶上的收起
+        val header = compose.onNodeWithContentDescription("收起样式面板").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(header.left).isGreaterThan(screenBounds().right * 0.55f)
+        assertThat(header.bottom).isAtMost(tool.top)
+        assertThat(compose.onNodeWithText("马赛克").getUnclippedBoundsInRoot()).isEqualTo(tool)
+
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithContentDescription("收起样式面板").assertDoesNotExist()
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
+        compose.runOnUiThread { compose.activity.onBackPressedDispatcher.onBackPressed() }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        compose.onNodeWithText("打码").assertIsDisplayed()
+        assertThat(compose.activity.isFinishing).isFalse()
+    }
+
+    /** 手机横着拿：用途水印和手机竖着拿一样在「编辑」里，面板从这一行长出来，在右边那一栏里。 */
+    @Config(qualifiers = "zh-rCN-sw412dp-w860dp-h412dp-land-xxhdpi")
+    @Test fun `on a phone held sideways the watermark is under edit`() {
+        val vm = open()
+        openWatermarkPanel()
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
-        val title = compose.onNode(hasText("用途水印") and !hasAnyAncestor(isDialog()))
-        title.assertIsDisplayed()
-        assertThat(title.getUnclippedBoundsInRoot().left).isGreaterThan(screenBounds().right * 0.6f)
-        compose.onNodeWithText("马克笔").assertDoesNotExist()
+        val title = compose.onNode(hasText("用途水印") and !hasAnyAncestor(isDialog())).assertIsDisplayed()
+        assertThat(title.getUnclippedBoundsInRoot().left).isGreaterThan(screenBounds().right * 0.55f)
         compose.onNodeWithText("导出").assertIsDisplayed()
     }
 
+    /** 平板竖着拿：画布下面是列表，最底下是工具那一行（每一样一块），列表、工具那一行都在正中。 */
     @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
-    @Test fun `an upright tablet lists the boxes below the image`() {
+    @Test fun `an upright tablet lists the boxes below the image, above the tools`() {
         open()
-        compose.onNodeWithText("导出").assertExists()
-        compose.onNodeWithText("框出 2 处").assertExists()
         val list = listBounds()
         val screen = screenBounds()
         assertThat(list.top).isGreaterThan(screen.bottom * 0.6f)
-        // 样式方块铺满左半边，列表占右半边
-        val solid = compose.onNodeWithText("色块").getUnclippedBoundsInRoot()
-        // 五种样式两行三列，第一行最右边是模糊
-        val blur = compose.onNodeWithText("模糊").getUnclippedBoundsInRoot()
-        assertThat(blur.right).isLessThan(list.left)
-        assertThat(blur.right).isGreaterThan(screen.right * 0.45f)
-        assertThat(solid.width).isGreaterThan(100.dp)
+        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
+        val cmp = compose.onNodeWithContentDescription("按住对比").getUnclippedBoundsInRoot()
+        assertThat(redact.top).isGreaterThan(list.bottom)
+        // 收着时整组在正中
+        assertThat(((redact.left + cmp.right) / 2 - screen.width / 2).value).isWithin(2f).of(0f)
+        compose.onNodeWithText("色块").assertDoesNotExist()
+        assertTheTopBarIsThePhones()
     }
 
+    /** 平板横着拿：列表在画布右边那一栏的上面，工具那一行在它下面、这一栏的最底下。 */
     @Config(qualifiers = "zh-rCN-sw800dp-w1280dp-h800dp-land-xhdpi")
-    @Test fun `a tablet on its side lists the boxes right of the image, below the styles`() {
+    @Test fun `a tablet on its side lists the boxes right of the image, above the tools`() {
         open()
         val list = listBounds()
         val screen = screenBounds()
         assertThat(list.left).isGreaterThan(screen.right * 0.6f)
-        // 样式方块铺满这一栏的宽，在列表上面
-        val solid = compose.onNodeWithText("色块").getUnclippedBoundsInRoot()
-        val blur = compose.onNodeWithText("模糊").getUnclippedBoundsInRoot()
-        assertThat(solid.bottom).isLessThan(list.top)
-        assertThat(blur.right - solid.left).isGreaterThan(screen.width * 0.25f)
+        val edit = compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()
+        assertThat(edit.left).isGreaterThan(screen.right * 0.6f)
+        assertThat(edit.top).isGreaterThan(list.top)
+        assertThat(edit.bottom).isGreaterThan(screen.bottom * 0.85f)
+        assertTheTopBarIsThePhones()
     }
 
     @Config(qualifiers = "zh-rCN-sw528dp-w528dp-h848dp-port-xhdpi")
@@ -579,48 +609,135 @@ class EditorScreenLayoutTest {
         assertThat(vm.state.value.canUndo).isTrue()
     }
 
-    /** 样式的调节面板弹出来时占列表的位置，收起后列表回来。 */
+    /**
+     * 平板上和手机一样：点一组就地撑开，从这一组自己那一块撑开；再点当前的样式，面板从这一行往上长，盖住列表。
+     * 收起面板列表露出来，这一组还展开着；返回收起这一组。
+     */
     @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
-    @Test fun `the style panel takes the list's place while it is open`() {
+    @Test fun `on a tablet the style panel grows from the bar over the list`() {
         val vm = open()
+        val list = listBounds()
+        compose.onNodeWithText("打码").performClick()
+        frames(SETTLE_FRAMES)
+        val tool = compose.onNodeWithText("马赛克").assertIsDisplayed().getUnclippedBoundsInRoot()
         compose.runOnUiThread {
             vm.onStyleChipClick(MaskStyle.PIXELATE)   // 换成马赛克
-            vm.onStyleChipClick(MaskStyle.PIXELATE)   // 再点一下才弹出面板
+            vm.onStyleChipClick(MaskStyle.PIXELATE)   // 再点一下才长出面板
         }
         frames(SETTLE_FRAMES)
-        compose.onNodeWithText("恢复默认").assertExists()
-        compose.onNodeWithText("框出 2 处").assertDoesNotExist()
+        // 马赛克的面板矮，只盖住列表的下半截：在列表顶上那一行（「框出 2 处」）下面、工具那一行上面
+        val reset = compose.onNodeWithText("恢复默认").assertIsDisplayed().getUnclippedBoundsInRoot()
+        assertThat(reset.bottom).isAtMost(tool.top)
+        assertThat(reset.top).isGreaterThan(list.bottom)
+        assertThat(reset.left).isAtLeast(list.left)
+
         compose.runOnUiThread { vm.dismissStylePanel() }
         frames(SETTLE_FRAMES)
-        compose.onNodeWithText("框出 2 处").assertExists()
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
+        foldBack.performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马赛克").assertDoesNotExist()
+        compose.onNodeWithText("打码").assertIsDisplayed()
     }
 
-    /** 宽屏上点顶栏的水印按钮：水印的面板也占列表的位置，和样式面板一次只开一个；再点一下收起，列表回来。 */
+    /**
+     * 平板上点面板外面不收起（和手机不一样）：图在旁边，开着面板接着在图上点、画，选中的框跟着面板变。
+     * 吸管取色时面板也不缩回去。
+     */
     @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
-    @Test fun `the watermark panel takes the list's place too`() {
+    @Test fun `on a tablet the panel stays open while the image is used`() {
         val vm = open()
-        compose.onNodeWithContentDescription("用途水印").performClick()
+        compose.onNodeWithText("打码").performClick()
         frames(SETTLE_FRAMES)
+        compose.runOnUiThread { vm.onStyleChipClick(vm.state.value.barLook.style) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+        compose.onRoot().performTouchInput { click(Offset(centerX, height * 0.25f)) }
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+        compose.onNodeWithText("恢复默认").assertIsDisplayed()
+    }
+
+    /**
+     * 平板上用途水印也在「编辑」里：点它长出水印的面板，和样式面板一次只开一个；再点一下收起，「编辑」还展开着。
+     * 「编辑」里的水印设了就念「已开启」。
+     */
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Test fun `on a tablet the watermark is under edit too`() {
+        val vm = open()
+        openWatermarkPanel()
         assertThat(vm.state.value.purposeSheetVisible).isTrue()
         compose.onNodeWithText("用途水印").assertIsDisplayed()
-        compose.onNodeWithText("框出 2 处").assertDoesNotExist()
-        // 打开面板还没加上，按钮不说「已开启」
-        compose.onNodeWithContentDescription("用途水印").assertExists()
+        // 面板里填好了字，「应用」还没开：图上没有水印，不念「已开启」
+        compose.onNodeWithText("水印").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
         compose.onNodeWithText("应用").performClick()
+        assertThat(vm.state.value.purposeText).isNotNull()
 
-        compose.runOnUiThread { vm.onStyleChipClick(vm.state.value.barLook.style) }
+        compose.onNodeWithText("马克笔").performClick()
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("用途水印").assertDoesNotExist()
         compose.onNodeWithContentDescription("收起样式面板").assertIsDisplayed()
 
-        // 设了水印，顶栏上的按钮说的是「已开启」
-        compose.onNodeWithContentDescription("用途水印（已开启）").performClick()
+        compose.onNodeWithText("水印").assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, "已开启")).performClick()
         frames(SETTLE_FRAMES)
         compose.onNodeWithText("用途水印").assertIsDisplayed()
-        compose.onNodeWithContentDescription("用途水印（已开启）").performClick()
+        compose.onNodeWithText("水印").performClick()
         frames(SETTLE_FRAMES)
         assertThat(vm.state.value.purposeSheetVisible).isFalse()
-        compose.onNodeWithText("框出 2 处").assertExists()
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+    }
+
+    /**
+     * 平板上开着马克笔的面板，在图上点了一个色块框：面板跟着它换成色块的，这一组跟着换到「打码」，可马克笔不放下；
+     * 取消选中回到「编辑」，手里还是马克笔（手机上面板开着时点不着图，碰不到这一步）。
+     */
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Test fun `on a tablet selecting a box under an open panel keeps the marker in hand`() {
+        val vm = open()
+        val box = MaskItem(
+            candidateId = "manual-box",
+            quad = Quad.fromRect(RectF(40f, 250f, 200f, 290f)),
+            kind = SensitiveKind.MANUAL,
+            source = DetectorSource.MANUAL,
+            look = MaskLook(MaskStyle.SOLID),
+        )
+        compose.runOnUiThread { vm.replacePlanForTest(MaskPlan(listOf(phone, url, box))) }
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("编辑").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马克笔").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马克笔").performClick()   // 再点一下长出面板
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.stylePanelOpen).isTrue()
+
+        compose.runOnUiThread { vm.onTap(PointF(120f, 270f)) }   // 选中色块框
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.SOLID)
+        compose.onNodeWithText("马赛克").assertIsDisplayed()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.MARKER)
+
+        compose.runOnUiThread { vm.onTap(PointF(380f, 380f)) }   // 点空白，取消选中
+        frames(SETTLE_FRAMES)
+        // 回到「编辑」（水印只在它里面），面板又是马克笔的
+        compose.onNodeWithText("水印").assertIsDisplayed()
+        compose.onNodeWithContentDescription("收起样式面板").assertIsDisplayed()
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.MARKER)
+    }
+
+    /** 平板上收起「编辑」也放下马克笔、画笔、文本，回到打码的样式，和手机一样。 */
+    @Config(qualifiers = "zh-rCN-sw800dp-w800dp-h1280dp-port-xhdpi")
+    @Test fun `on a tablet folding edit puts the marker down`() {
+        val vm = open()
+        compose.onNodeWithText("编辑").performClick()
+        frames(SETTLE_FRAMES)
+        compose.onNodeWithText("马克笔").performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.style).isEqualTo(MaskStyle.MARKER)
+        foldBack.performClick()
+        frames(SETTLE_FRAMES)
+        assertThat(vm.state.value.brush.style.redacts).isTrue()
     }
 
     private companion object {

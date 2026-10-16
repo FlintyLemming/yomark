@@ -38,7 +38,6 @@
     <string name="undo">撤销</string>
     <string name="redo">重做</string>
     <string name="purpose_watermark">用途水印</string>
-    <string name="purpose_watermark_on">用途水印（已开启）</string>
     <string name="compare_original">按住对比原图</string>
     <string name="compare_hold">按住对比</string>
     <string name="debug_info">调试信息</string>

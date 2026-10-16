@@ -88,6 +88,9 @@ class EditorToolbarTest {
     private var bigBangOpen by mutableStateOf(false)
     private var bigBangClicks = 0
 
+    /** 宽屏的样子：每一样各是一块（见 EditorToolbar 的 tiles）。 */
+    private var tiles by mutableStateOf(false)
+
     /** 胶囊眼下的左右沿，像素（见 PillLeft）。 */
     private var pillLeft = 0
     private var pillRight = 0
@@ -117,6 +120,7 @@ class EditorToolbarTest {
                         bigBangOpen = bigBangOpen,
                         compare = compare,
                         canCompare = canCompare,
+                        tiles = tiles,
                         modifier = rowWidth?.let { Modifier.width(it) } ?: Modifier,
                     ) }) { measurables, constraints ->
                         val row = measurables.single().measure(constraints)
@@ -454,6 +458,136 @@ class EditorToolbarTest {
     }
 
     private fun px(dp: Dp) = with(compose.density) { dp.roundToPx() }
+
+    // ---------- 宽屏：每一样各是一块 ----------
+
+    /**
+     * 宽屏上不共用一条胶囊：「打码」「编辑」「工具」「对比」各是一块，块和块之间空开 8 dp，一样高（和这一行一样，56 dp）。
+     * 收着停稳了底栏没有胶囊要画：交给它的是一条没有宽的线。
+     */
+    @Test fun onAWideScreenEachOneIsItsOwnTile() {
+        tiles = true
+        ai = AiReview.Ready
+        show()
+        val blocks = listOf(compose.onNodeWithText("打码"), compose.onNodeWithText("编辑"), toolboxButton, compareButton)
+            .map { it.getUnclippedBoundsInRoot() }
+        blocks.zipWithNext().forEach { (a, b) -> assertThat((b.left - a.right).value).isWithin(1f).of(8f) }
+        blocks.forEach { assertThat(it.height.value).isWithin(1f).of(56f) }
+        assertThat(pillRight).isEqualTo(pillLeft)
+    }
+
+    /** 点开一组，工具栏从这一组自己那一块撑开（不是从两组一起的那条胶囊）；收回去缩回这一块，停稳了又是各画各的。 */
+    @Test fun onAWideScreenTheBarGrowsOutOfTheTappedTileAndShrinksBackIntoIt() {
+        tiles = true
+        show()
+        val edit = compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()
+        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
+        // 离「编辑」那一块近：左沿过了「打码」那一块的右边，右沿没出「编辑」多远
+        fun nearTheTile() {
+            assertThat(pillLeft).isGreaterThan(px(redact.right))
+            assertThat(pillRight).isAtMost(px(edit.right) + px(40.dp))
+            assertThat(pillRight).isGreaterThan(pillLeft)
+        }
+
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithText("编辑").performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(16)
+        nearTheTile()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillLeft).isEqualTo(px(12.dp))
+        compose.onNodeWithText("马克笔").assertIsDisplayed()
+
+        compose.mainClock.autoAdvance = false
+        backButton.performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(260)
+        nearTheTile()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillRight).isEqualTo(pillLeft)
+        assertThat(compose.onNodeWithText("编辑").getUnclippedBoundsInRoot()).isEqualTo(edit)
+    }
+
+    /** 「工具」那一块也一样：工具栏从它长出来，和手机上从那颗圆钮长出来一样。 */
+    @Test fun onAWideScreenTheToolsBarGrowsOutOfItsTile() {
+        tiles = true
+        ai = AiReview.Ready
+        show()
+        val box = toolboxButton.getUnclippedBoundsInRoot()
+        compose.mainClock.autoAdvance = false
+        toolboxButton.performClick()
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(16)
+        assertThat(pillLeft).isGreaterThan(px(compose.onNodeWithText("编辑").getUnclippedBoundsInRoot().right))
+        assertThat(pillRight).isAtMost(px(box.right) + px(40.dp))
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertThat(pillLeft).isEqualTo(px(12.dp))
+    }
+
+    /**
+     * 宽屏右边那一栏最窄 360 dp（见 wideSidePanelWidth）：中文收着时四块连小箭头都摆得下，方块不缩；
+     * 展开「编辑」，选中的马克笔名字写得全。
+     */
+    @Test fun aThreeHundredSixtyDpColumnHoldsEverythingWhole() {
+        tiles = true
+        ai = AiReview.Ready
+        rowWidth = 360.dp
+        show()
+        assertThat(compareButton.getUnclippedBoundsInRoot().height.value).isWithin(1f).of(56f)
+        // 名字后面有小箭头：一组比「小样子 + 名字」宽出小箭头那一截
+        val redact = compose.onNodeWithText("打码").getUnclippedBoundsInRoot()
+        val name = compose.onNodeWithText("打码", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertThat((redact.right - name.right).value).isAtLeast(18f)
+
+        look = MaskLook(MaskStyle.MARKER)
+        compose.onNodeWithText("编辑").performClick()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("马克笔", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+    }
+
+    /**
+     * 英文的名字长，360 dp 的一栏里收着时先去掉小箭头，名字都写得全，方块不缩；展开「编辑」，选中的马克笔名字也写得全，
+     * 和 360 dp 宽的手机竖着拿一样。
+     */
+    @Config(qualifiers = "en-rUS-w360dp-h740dp-xxhdpi")
+    @Test fun inEnglishAThreeHundredSixtyDpColumnKeepsTheNamesWhole() {
+        tiles = true
+        ai = AiReview.Ready
+        rowWidth = 360.dp
+        show()
+        assertThat(compose.onNodeWithContentDescription("Hold to compare").getUnclippedBoundsInRoot().height.value).isWithin(1f).of(56f)
+        listOf("Redact", "Edit").forEach { label ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+        }
+
+        look = MaskLook(MaskStyle.MARKER)
+        compose.onNodeWithText("Edit").performClick()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Marker", useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+    }
+
+    /** 再窄（调大了显示大小的分屏）：先去掉名字后面的小箭头，方块和两组还是一样高，不先缩方块。 */
+    @Test fun onANarrowerColumnTheChevronsGoBeforeTheTilesShrink() {
+        tiles = true
+        ai = AiReview.Ready
+        rowWidth = 320.dp
+        show()
+        assertThat(compareButton.getUnclippedBoundsInRoot().height.value).isWithin(1f).of(56f)
+        assertThat(toolboxButton.getUnclippedBoundsInRoot().height.value).isWithin(1f).of(56f)
+        listOf("打码", "编辑").forEach { label ->
+            val layouts = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(label, useUnmergedTree = true).performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+            assertThat(layouts.single().isLineEllipsized(0)).isFalse()
+        }
+        assertThat(compareButton.getUnclippedBoundsInRoot().right).isAtMost(320.dp - 12.dp + 1.dp)
+    }
 
     /** 点了不收回去：AI 跑的样子就在这儿看。收不收大爆炸由外面管（见 EditorScreen）。 */
     @Test fun theToolsRunOnClick() {

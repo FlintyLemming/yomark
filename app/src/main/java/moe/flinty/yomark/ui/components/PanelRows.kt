@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -19,7 +18,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -39,13 +37,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 
 /*
- * 编辑器里两种调节面板（打码样式、用途水印）共用的架子和行：外面那一列、宽屏上垫的底、顶上的名字和收起、
+ * 编辑器里两种调节面板（打码样式、用途水印）共用的架子和行：外面那一列、顶上的名字和收起、
  * 一样东西上面的小标题、左边一列名字右边一条滑条的一行。两种面板长得一个样子，换着开时看着是同一块面板换了内容。
  */
 
 /**
  * 调节面板的那一列：放不下就在里面滚动，里面的东西变多变少（换了样式、点开自定义颜色）时一点点变高变矮。
- * 手机上它是底栏的胶囊长出来的那一块里的东西（见 EditorBottomBar），宽屏上外面再垫一块底（见 [WidePanel]）。
+ * 它是底栏的胶囊长出来的那一块里的东西（见 EditorBottomBar），手机、宽屏都是。
  */
 @Composable
 internal fun PanelColumn(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
@@ -58,29 +56,15 @@ internal fun PanelColumn(modifier: Modifier = Modifier, content: @Composable Col
     )
 }
 
-/** 宽屏上的调节面板：占框列表的位置（见 WideEditorPanel），一块圆角的底，里面是 [PanelColumn]。 */
-@Composable
-internal fun WidePanel(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        PanelColumn(content = content)
-    }
-}
-
 /**
- * 面板顶上：左边是面板的名字，右边是收起。宽屏上样式方块里写着当前样式的名字，那时样式面板不再写一遍（[title] 为 null）。
+ * 面板顶上：左边是面板的名字，右边是收起。
  *
  * @param collapseLabel 读屏念的收起按钮
  */
 @Composable
-internal fun PanelHeader(title: String?, onCollapse: () -> Unit, collapseLabel: String) {
+internal fun PanelHeader(title: String, onCollapse: () -> Unit, collapseLabel: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            if (title != null) Text(title, style = MaterialTheme.typography.titleMedium)
-        }
+        Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
         IconButton(onClick = onCollapse) {
             Icon(Icons.Filled.KeyboardArrowDown, contentDescription = collapseLabel)
         }

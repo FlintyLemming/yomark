@@ -124,7 +124,7 @@ interface StyleBarActions {
 // ---------- 小样子 ----------
 
 /**
- * 每种样式的小样子：手机底栏展开后的工具（EditorToolbar）、宽屏的样式方块（StyleGrid）都用它，方块大时按 [scale] 放大。
+ * 每种样式的小样子：底栏展开后的工具、收着时一组的样子（EditorToolbar）都用它。
  * 跟着参数走：色块是当前的颜色（近似色是图上取到的颜色）、马克笔是当前的颜色——不点开面板也看得出下一笔是什么样。
  *
  * @param nearColors 色块开着近似色时，小样子画的是图上取到的这几种颜色（见 [NearSolidGlyph]）
@@ -135,47 +135,46 @@ internal fun StyleGlyph(
     style: MaskStyle,
     options: MaskOptions,
     nearColors: List<Int> = emptyList(),
-    scale: Float = 1f,
     ink: Color = Color.Unspecified,
 ) {
     val outline = MaterialTheme.colorScheme.outlineVariant
     val tone = ink.takeOrElse { MaterialTheme.colorScheme.onSurfaceVariant }
     when (style) {
-        MaskStyle.SOLID -> if (options.solidNear) NearSolidGlyph(nearColors, scale) else Box(
+        MaskStyle.SOLID -> if (options.solidNear) NearSolidGlyph(nearColors) else Box(
             Modifier
-                .size(width = 22.dp * scale, height = 16.dp * scale)
-                .background(Color(options.solidColor), RoundedCornerShape(4.dp * scale))
-                .border(1.dp, outline, RoundedCornerShape(4.dp * scale)),
+                .size(width = 22.dp, height = 16.dp)
+                .background(Color(options.solidColor), RoundedCornerShape(4.dp))
+                .border(1.dp, outline, RoundedCornerShape(4.dp)),
         )
-        MaskStyle.PIXELATE -> MosaicGlyph(tone, 18.dp * scale)
-        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = tone)
+        MaskStyle.PIXELATE -> MosaicGlyph(tone, 18.dp)
+        MaskStyle.BLUR -> Icon(Icons.Filled.BlurOn, contentDescription = null, modifier = Modifier.size(20.dp), tint = tone)
         MaskStyle.MARKER -> if (options.markerShape == StrokeShape.FREEHAND) {
-            Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.markerColor))
+            Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(options.markerColor))
         } else Box(
             Modifier
-                .size(width = 22.dp * scale, height = 12.dp * scale)
-                .background(Color(options.markerColor), RoundedCornerShape(3.dp * scale)),
+                .size(width = 22.dp, height = 12.dp)
+                .background(Color(options.markerColor), RoundedCornerShape(3.dp)),
         )
         // 画笔：手画是一道弯线，拉框是一个空心框，箭头是一支斜着的箭头，都是画笔的颜色
         MaskStyle.PEN -> when (options.penShape) {
-            StrokeShape.FREEHAND -> Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
-            StrokeShape.ARROW -> Icon(Icons.Outlined.NorthEast, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.penColor))
+            StrokeShape.FREEHAND -> Icon(Icons.Outlined.Gesture, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(options.penColor))
+            StrokeShape.ARROW -> Icon(Icons.Outlined.NorthEast, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(options.penColor))
             StrokeShape.BOX -> Box(
                 Modifier
-                    .size(width = 20.dp * scale, height = 14.dp * scale)
-                    .border(2.dp * scale, Color(options.penColor), RoundedCornerShape(2.dp * scale)),
+                    .size(width = 20.dp, height = 14.dp)
+                    .border(2.dp, Color(options.penColor), RoundedCornerShape(2.dp)),
             )
         }
         // 文本：一个 T，是文本的颜色；垫着底色时是那个颜色的一块底，上面的 T 和图上的字一样取黑或白
         MaskStyle.TEXT -> if (options.textBackground) Box(
             Modifier
-                .size(width = 22.dp * scale, height = 16.dp * scale)
-                .background(Color(options.textColor), RoundedCornerShape(4.dp * scale)),
+                .size(width = 22.dp, height = 16.dp)
+                .background(Color(options.textColor), RoundedCornerShape(4.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(14.dp * scale), tint = Color(TextStamp.onColor(options.textColor)))
+            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(TextStamp.onColor(options.textColor)))
         } else {
-            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(20.dp * scale), tint = Color(options.textColor))
+            Icon(Icons.Filled.Title, contentDescription = null, modifier = Modifier.size(20.dp), tint = Color(options.textColor))
         }
     }
 }
@@ -186,14 +185,14 @@ internal fun StyleGlyph(
  * 不像面板上那颗圆那样轮着换颜色：样式栏一直在眼前，一直在动会分心。
  */
 @Composable
-private fun NearSolidGlyph(nearColors: List<Int>, scale: Float) {
+private fun NearSolidGlyph(nearColors: List<Int>) {
     val dash = MaterialTheme.colorScheme.outline
     val fill = nearColors.firstOrNull()?.let(::Color) ?: NEAR_PLACEHOLDER
-    Canvas(Modifier.size(width = 22.dp * scale, height = 16.dp * scale)) {
-        val corner = CornerRadius(4.dp.toPx() * scale)
+    Canvas(Modifier.size(width = 22.dp, height = 16.dp)) {
+        val corner = CornerRadius(4.dp.toPx())
         drawRoundRect(fill, cornerRadius = corner)
         val stroke = 1.dp.toPx()
-        val on = 2.dp.toPx() * scale
+        val on = 2.dp.toPx()
         drawRoundRect(
             dash,
             topLeft = Offset(stroke / 2f, stroke / 2f),
@@ -226,14 +225,14 @@ private val MOSAIC_SHADES = listOf(0.9f, 0.35f, 0.6f)
 // ---------- 调节面板 ----------
 
 /**
- * 手机上的调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
- * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在画布上，不把图往上顶；
+ * 调节面板里的东西：顶上是当前样式的名字和收起，下面是能调的。
+ * 面板本身是底栏的胶囊往上长出来的那一块（见 EditorBottomBar）：手机上盖在画布上，不把图往上顶；宽屏上盖住框列表。
  * 外面那一列（[PanelColumn]）由底栏摆，用途水印的面板也在那一列里，换着开时面板一点点变高变矮。
  * 样式和参数管的是下一笔；选中了手动框时那个框照样当场跟着变。
- * 吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
+ * 手机上吸管在等取色时面板先缩回去——要点的是底下的图，取完色（或取消了）再长出来，看得到取到的颜色。
  *
  * @param compactWhileTyping 文本打字时（输入框有焦点、输入法弹着）只留输入框那一格，收起输入法再摊开，和用途水印一样：
- *   面板盖在图上，输入法又占掉下半截，整个摊开的话看不到字落在图上是什么样
+ *   手机上面板盖在图上，输入法又占掉下半截，整个摊开的话看不到字落在图上是什么样
  * @param imeVisible 输入法弹着。测试里没有输入法，由测试给
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -265,30 +264,6 @@ internal fun DarkSystemBarIcons() {
             isAppearanceLightStatusBars = true
             isAppearanceLightNavigationBars = true
         }
-    }
-}
-
-/**
- * 宽屏上的调节面板：占框列表的位置（见 WideEditorPanel），画布留在旁边不被盖住。
- * 每动一下，选中的框（刚画完的框就是选中的）当场跟着变；没有选中的框时，改的是下一笔。
- *
- * @param standalone 顶替了样式方块（手机横着拿，右边那一栏放不下两样）：方块看不见了，和弹出的面板一样
- *   顶上写出当前样式的名字，方块下面的说明也再说一遍
- */
-@Composable
-internal fun StylePanel(
-    model: StyleBarModel,
-    actions: StyleBarActions,
-    modifier: Modifier = Modifier,
-    standalone: Boolean = false,
-) {
-    WidePanel(modifier) {
-        PanelHeader(
-            title = if (standalone) stringResource(MaskStyleInfo.label(model.look.style)) else null,
-            onCollapse = actions::onCollapse,
-            collapseLabel = stringResource(R.string.collapse_style_panel),
-        )
-        StylePanelBody(model, actions)
     }
 }
 

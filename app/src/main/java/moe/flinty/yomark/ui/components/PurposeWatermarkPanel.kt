@@ -57,7 +57,7 @@ data class PurposePanelModel(
 
 /** 用途水印面板上的动作。都有空实现，测试只接自己关心的。 */
 interface PurposePanelActions {
-    /** 点了水印（手机底栏「编辑」里的那一项、宽屏顶栏上的按钮）：收着就打开，开着就收起。 */
+    /** 点了水印（底栏「编辑」里的那一项）：收着就打开，开着就收起。 */
     fun onToggle() {}
     fun onTextChange(text: String) {}
     fun onStyleChange(style: PurposeWatermarkStyle) {}
@@ -74,8 +74,8 @@ interface PurposePanelActions {
 /**
  * 用途水印的调节面板里的东西：顶上是名字和收起，下面是文字、颜色、角度、不透明度、密度，最底下是「恢复默认」和「应用」开关。
  *
- * 和马克笔、画笔的面板一个样子、一个地方：手机上是底栏的胶囊往上长出来的那一块（见 EditorBottomBar），盖在图上，
- * 外面那一列（[PanelColumn]）由底栏摆；宽屏上占框列表的位置（见 [PurposePanel]）。原先它顶替整个底栏，样子也是另一套。
+ * 和马克笔、画笔的面板一个样子、一个地方：底栏的胶囊往上长出来的那一块（见 EditorBottomBar），手机上盖在图上，
+ * 宽屏上盖住框列表；外面那一列（[PanelColumn]）由底栏摆。原先它顶替整个底栏，样子也是另一套。
  * 每动一下，图上的水印就跟着变，所见即导出。颜色和马克笔一样有自定义和吸管，吸管等着取色时手机上的面板先缩回去。
  *
  * @param compactWhileTyping 打字时（输入框有焦点、输入法弹着）只留文字那一格，收起输入法再摊开。
@@ -191,15 +191,6 @@ internal fun PurposePanelContent(
             )
         }
     }
-}
-
-/**
- * 宽屏上的用途水印面板：和样式面板一样占框列表的位置（见 WideEditorPanel），画布留在旁边不被盖住。
- * 样式方块里没有水印，顶上总写着名字。
- */
-@Composable
-internal fun PurposePanel(model: PurposePanelModel, actions: PurposePanelActions, modifier: Modifier = Modifier) {
-    WidePanel(modifier) { PurposePanelContent(model, actions) }
 }
 
 /** 密度的三档：滑条不分档，右边写它落在哪一档。 */

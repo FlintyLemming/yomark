@@ -340,6 +340,21 @@ class EditorViewModelBigBangTest {
         assertThat(vm.state.value.plan.items).isEmpty()
     }
 
+    /**
+     * 宽屏的列表上点一行在大爆炸开着时不算数，和点图一样（2026-10-16）：面板从底栏长出来，字少时矮，上面还露着几行列表。
+     * 从列表上拿掉大爆炸刚打的那一块，面板上那几个字还是选中的，再点一个字那一块又盖回去。
+     */
+    @Test fun `the list does nothing while big bang is open`() = runTest(dispatcher) {
+        val vm = vm()
+        vm.onImageChosen(sampleUri()); advanceUntilIdle()
+        vm.openBigBang()
+        vm.toggleBigBangGlyph(3)                                                // 「张」
+        val masked = vm.state.value.plan.items.single()
+        vm.onListItemClick(masked.candidateId)
+        assertThat(vm.state.value.plan.items).containsExactly(masked)
+        assertThat(vm.bang()!!.selected).containsExactly(3)
+    }
+
     @Test fun `the toolbar does not open big bang on a page without text`() = runTest(dispatcher) {
         val vm = vm(lines = emptyList())
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
