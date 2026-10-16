@@ -1,6 +1,7 @@
 // 把 docs/play/src 里的 HTML 渲染成 Google Play 商品详情的素材。
 //
 //   node docs/play/src/render.cjs chat-page        → app/src/test/resources/play/chat-page.png（截图用的样图，1 倍）
+//   node docs/play/src/render.cjs chat-page-en     → app/src/test/resources/play/chat-page-en.png（它的英文版，首次引导用）
 //   node docs/play/src/render.cjs icon             → docs/play/icon.png（512×512）
 //   node docs/play/src/render.cjs iap-icon         → docs/play/iap-remove-watermark.png（512×512，一次性商品「去除水印」的图标）
 //   node docs/play/src/render.cjs feature-graphic  → docs/play/feature-graphic.png（1024×500）
@@ -20,6 +21,7 @@ const SHOTS = require('./screenshots.json');
 
 const TARGETS = {
   'chat-page': { html: 'chat-page.html', size: [1080, 1680], out: 'app/src/test/resources/play/chat-page.png' },
+  'chat-page-en': { html: 'chat-page-en.html', size: [1080, 1680], out: 'app/src/test/resources/play/chat-page-en.png' },
   // Play 要的图标是带 alpha 的 32 位 PNG，其余素材都不能带 alpha（见 finalize.py）
   icon: { html: 'icon.html', size: [512, 512], out: 'docs/play/icon.png', transparent: true },
   'iap-icon': { html: 'iap-icon.html', size: [512, 512], out: 'docs/play/iap-remove-watermark.png', transparent: true },
