@@ -53,9 +53,8 @@ object SemanticPrompt {
         Category("MAC", SensitiveKind.MAC_ADDR, "MAC 地址（如 3c:22:fb:01:9a:7e）"),
         Category("IP", SensitiveKind.IP_ADDR, "IP 地址"),
         Category("网址", SensitiveKind.URL, "带个人信息或口令的链接"),
-        Category("快递单号", SensitiveKind.TRACKING_NO, "快递运单号"),
         Category("日期", SensitiveKind.DATETIME, "日期、时间"),
-        Category("长数字串", SensitiveKind.LONG_NUMBER, "其他能对应到个人的长串编号"),
+        Category("长数字串", SensitiveKind.LONG_NUMBER, "快递单号、订单号，和其他能对应到个人的长串编号"),
     )
 
     /** 提示词能问的全部类型。 */
@@ -336,7 +335,7 @@ object SemanticPrompt {
 
     private val NUMBERS = setOf(
         SensitiveKind.ID_NUMBER, SensitiveKind.PAYMENT_CARD, SensitiveKind.PICKUP_CODE, SensitiveKind.PASSPORT,
-        SensitiveKind.SSN, SensitiveKind.IBAN, SensitiveKind.VIN, SensitiveKind.LICENSE_PLATE, SensitiveKind.TRACKING_NO,
+        SensitiveKind.SSN, SensitiveKind.IBAN, SensitiveKind.VIN, SensitiveKind.LICENSE_PLATE,
         SensitiveKind.IP_ADDR, SensitiveKind.MAC_ADDR, SensitiveKind.LONG_NUMBER,
     )
 

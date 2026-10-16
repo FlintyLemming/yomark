@@ -134,12 +134,6 @@ class ChecksumsTest {
         assertThat(Checksums.shannonEntropy("aB3xQ9zL2mR7tK1v")).isGreaterThan(3.5)
     }
 
-    // ---------- UPS ----------
-    @Test fun `ups check digit validates a real-format tracking number`() {
-        assertThat(Checksums.upsCheckDigit("1Z9999W99999999999".let { it })).isFalse()  // 随手编的必然不过
-        assertThat(Checksums.upsCheckDigit("1Z12345E0205271688")).isTrue()
-    }
-
     // ---------- MAC ----------
     @Test fun `mac separator consistency`() {
         assertThat(Checksums.macSeparatorConsistent("00:1A:2B:3C:4D:5E")).isTrue()

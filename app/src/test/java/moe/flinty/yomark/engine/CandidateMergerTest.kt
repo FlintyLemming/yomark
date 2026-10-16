@@ -139,7 +139,7 @@ class CandidateMergerTest {
         // 两条链路互不去重，否则条码候选会被静默吃掉——漏检是事故。
         val out = merger.merge(listOf(
             c("barcode", 0f, 0f, 100f, 40f, kind = SensitiveKind.BARCODE, source = DetectorSource.BARCODE),
-            c("tracking", 1f, 0f, 100f, 40f, kind = SensitiveKind.TRACKING_NO, source = DetectorSource.RULE),
+            c("tracking", 1f, 0f, 100f, 40f, kind = SensitiveKind.LONG_NUMBER, source = DetectorSource.RULE),
         ))
         assertThat(out.map { it.id }).containsExactly("barcode", "tracking")
     }

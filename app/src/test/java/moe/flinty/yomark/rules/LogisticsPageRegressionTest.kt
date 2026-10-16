@@ -4,11 +4,11 @@ import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKind.DATETIME
+import moe.flinty.yomark.core.model.SensitiveKind.LONG_NUMBER
 import moe.flinty.yomark.core.model.SensitiveKind.PERSON_NAME
 import moe.flinty.yomark.core.model.SensitiveKind.PHONE
 import moe.flinty.yomark.core.model.SensitiveKind.PICKUP_CODE
 import moe.flinty.yomark.core.model.SensitiveKind.POSTAL_ADDRESS
-import moe.flinty.yomark.core.model.SensitiveKind.TRACKING_NO
 import moe.flinty.yomark.core.model.TextElement
 import moe.flinty.yomark.core.model.TextLine
 import com.google.common.truth.Truth.assertThat
@@ -55,7 +55,7 @@ class LogisticsPageRegressionTest {
 
     private val expected = listOf(
         DATETIME to "16:08",
-        TRACKING_NO to "773443899958908",
+        LONG_NUMBER to "773443899958908",                // 快递单号
         DATETIME to "09-29 12:30",
         POSTAL_ADDRESS to "合肥四方新村10栋101室",       // 通知里的驿站地址
         POSTAL_ADDRESS to "合肥四方新村10栋101室",       // 驿站名

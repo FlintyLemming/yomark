@@ -7,7 +7,7 @@ import moe.flinty.yomark.R
 import java.time.LocalDate
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。20 条：15 条出厂打码、5 条出厂关着（误报率高，原先只圈出，2026-10-14 起没有这一档）。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。19 条：15 条出厂打码、4 条出厂关着（误报率高，原先只圈出，2026-10-14 起没有这一档）。
  * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
@@ -738,74 +738,56 @@ object DefaultRuleSet {
         return true
     }
 
-    private val TRACKING = object : Rule {
-        override val id = "tracking"
-        override val kind = SensitiveKind.TRACKING_NO
-        override val enabledByDefault = false
-        // 15 位的一代身份证号、字段名后面 12 位的档案编号也是这个长度
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
-
-        private val ups = Regex("""(?<![A-Za-z0-9])1Z[0-9A-Za-z]{16}(?![A-Za-z0-9])""")
-        // FedEx 12/15 位、USPS 20/22 位：无校验位，置信度调低
-        private val plainDigits = Regex("""(?<![\d-])(?:\d{12}|\d{15}|\d{20}|\d{22})(?![\d-])""")
-
-        override fun findIn(text: String): List<RuleMatch> {
-            val out = ArrayList<RuleMatch>()
-            ups.findAll(text)
-                .filter { Checksums.upsCheckDigit(it.value) }
-                .forEach { out += RuleMatch(it.range, 0.85f) }
-            plainDigits.findAll(text)
-                .filter { d -> out.none { it.range.first <= d.range.last && d.range.first <= it.range.last } }
-                .forEach { out += RuleMatch(it.range, 0.5f) }   // 无校验位 → 低置信度
-            return out
-        }
-    }
+    /** 长数字串拿它认出日期，所以单独拎出来、与规则表共用同一个实例（同 PHONE）。 */
+    private val DATE_TIME = DateTimeRule()
 
     /**
-     * 长数字串兜底（spec §15 第 5 条的实测漏检）。
+     * 长数字串兜底：至少 8 位数字连成的一串，中间可以夹着连字符和大写字母。快递单号（「SF1234567890123」
+     * 「1Z12345E0205271688」）、订单号（「231016-091234567890123」「123-4567890-1234567」）、交易号都归这一类。
      *
-     * 实测：真实淘宝订单页上的 28 位支付宝交易号不被任何规则命中——
-     * CARD 限 13–19 位、TRACKING 限 12/15/20/22 位，28 位落在所有窗口之外。
-     * 漏检是事故，所以补一条不看语义、只看长度的兜底。
+     * 起初（spec §15 第 5 条的实测漏检：淘宝订单页上 28 位的支付宝交易号没有一条规则认）只认 16 位以上的纯数字，
+     * 快递单号另成一类，只认 UPS 和几种固定长度。2026-10-16 起快递单号并进来，下限降到 8 位：
+     * 单号、订单号的写法太多，按快递公司、按长度认总有漏的。
      *
-     * 三条边界，都是为了不跟已有规则抢同一串数字（合并只在同 kind 之间做，
-     * 抢起来会在同一处叠出两个候选）：
-     * - 下限 16 位：E.164 电话最长 15 位，兜底与 PhoneRule 完全不重叠；
-     * - 排除 20/22 位：那是 TRACKING 的 USPS 窗口；
-     * - 排除 13–19 位里 Luhn 通过的：那是 CARD 的地盘。
-     *   只在 CARD 的窗口内让位——别处 Luhn 碰巧通过（约十分之一）不该让兜底失灵。
+     * 它是兜底，同一处别的类型认出了东西就让开（yieldsTo 是其余各类）：电话、证件号码、银行卡号……
+     * 让开只在那一类开着时做得到（引擎里只有开着的规则），所以有两样不管那一类开没开都不算：
+     * - 日期时间：「2026-10-16」也是 8 位数字夹着连字符，日期时间出厂关着，不能从这里遮上；
+     * - 13–19 位、过得了 Luhn 的：那是银行卡号的地盘。只在卡号的长度里让——别处碰巧过得了 Luhn（约十分之一）不该让兜底失灵。
      *
-     * 没有任何校验位，误报天然多（时间戳拼接、纯序号都会撞上），
+     * 没有任何校验位，误报天然多（时间戳、序号、金额都会撞上），
      * 因此按 §6「默认按误报率划线」出厂关着。
      */
     private val LONG_NUMBER = object : Rule {
         override val id = "longnum"
         override val kind = SensitiveKind.LONG_NUMBER
         override val enabledByDefault = false
-        // 18 位的身份证号原先就落在这里，那时只圈不遮
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
+        override val yieldsTo = SensitiveKind.entries.toSet() - SensitiveKind.LONG_NUMBER
 
-        private val run = Regex("""(?<![A-Za-z0-9])\d{16,}(?![A-Za-z0-9])""")
-        private val trackingLengths = setOf(20, 22)
+        /**
+         * 数字、大写字母、连字符连成的一段：头尾不是连字符，前后不挨着字母数字和下划线
+         * （「abc2026…」是哈希、变量名，「IMG_20260312_100512.jpg」是文件名）。
+         */
+        private val run = Regex("""(?<![A-Za-z0-9_])[0-9A-Z](?:[0-9A-Z－-]*[0-9A-Z])?(?![A-Za-z0-9_])""")
+        private val minDigits = 8
 
-        override fun findIn(text: String): List<RuleMatch> =
-            run.findAll(text)
-                .filter { m ->
-                    val v = m.value
-                    when {
-                        v.length in trackingLengths -> false
-                        v.length in 13..19 && Checksums.luhn(v) -> false
-                        else -> true
-                    }
+        override fun findIn(text: String): List<RuleMatch> {
+            val runs = run.findAll(text).filter { m -> m.value.count(Char::isDigit) >= minDigits }.toList()
+            if (runs.isEmpty()) return emptyList()
+            val dates = DATE_TIME.findIn(text).map { it.range }
+            return runs
+                .filterNot { m -> dates.any { m.range.first >= it.first && m.range.last <= it.last } }
+                .filterNot { m ->
+                    val digits = m.value.filter(Char::isDigit)
+                    m.value.none(Char::isLetter) && digits.length in 13..19 && Checksums.luhn(digits)
                 }
                 .map { RuleMatch(it.range, 0.4f) }      // 无校验位 → 低置信度
-                .toList()
+        }
     }
 
     val rules: List<Rule> = listOf(
         CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, ID_NUMBER, VIN, API_KEY,
         NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE, PLATE,
-        URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
+        URL, IP, LONG_NUMBER, DATE_TIME,
     )
 
     // ---------- 人名的旁证 ----------

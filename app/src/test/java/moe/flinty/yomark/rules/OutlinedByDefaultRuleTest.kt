@@ -49,27 +49,10 @@ class OutlinedByDefaultRuleTest {
         assertThat(rule("ip").enabledByDefault).isFalse()
     }
 
-    // ---------- 快递单号 ----------
-    @Test fun `ups tracking with a valid check digit is matched`() {
-        assertThat(masked("tracking", "ships 1Z12345E0205271688 today")).containsExactly("1Z12345E0205271688")
-    }
-
-    @Test fun `ups tracking with a broken check digit is rejected`() {
-        assertThat(masked("tracking", "1Z12345E0205271689")).isEmpty()
-    }
-
-    @Test fun `checksumless carrier formats are matched with lower confidence`() {
-        val fedex = rule("tracking").findIn("track 123456789012 now")
-        assertThat(fedex).hasSize(1)
-        assertThat(fedex.single().confidence).isLessThan(0.7f)
-    }
-
-    @Test fun `tracking is outlined by default`() {
-        assertThat(rule("tracking").enabledByDefault).isFalse()
-    }
+    // 快递单号原先单独一条（tracking），2026-10-16 并进了 longnum，见 LongNumberRuleTest
 
     // ---------- 规则表完整性 ----------
-    // spec §6 的 11 条
+    // spec §6 的 11 条，其中 tracking 并进了 longnum
     //   + 计划 04 按 §15 第 5 条的实测漏检补的 longnum 兜底
     //   + 2026-09-04 增补 §3 按真机漏检补的 datetime
     //   + 标签锚定的 name / address（见 LabeledField）——原先它们标着
@@ -79,10 +62,10 @@ class OutlinedByDefaultRuleTest {
     //   + 护照样张实测漏检补的 birthdate（出生日期）
     //   + 身份证照片实测漏检补的 idnumber（证件号码），和同一批加的 vin（车架号）
     //   + 车的照片实测漏检补的 plate（车牌）
-    @Test fun `the rule set has the eleven spec rules plus the nine field-added ones`() {
+    @Test fun `the rule set has the ten remaining spec rules plus the nine field-added ones`() {
         assertThat(DefaultRuleSet.rules.map { it.id }).containsExactly(
             "card", "iban", "ssn", "mac", "email", "phone", "passport", "idnumber", "vin", "apikey",
-            "name", "address", "pickup", "birthdate", "plate", "url", "ip", "tracking", "longnum", "datetime",
+            "name", "address", "pickup", "birthdate", "plate", "url", "ip", "longnum", "datetime",
         )
     }
 
@@ -93,11 +76,11 @@ class OutlinedByDefaultRuleTest {
      * idnumber / vin 也在这一侧：没有字段名的只认有校验位、形状够特别的，见 IdNumberRuleTest、VinRuleTest。
      * plate 同理：字段名后面的、写法独特的打码，写法不够独特的单独成行时只圈出，见 LicensePlateRuleTest。
      */
-    @Test fun `exactly fifteen rules are masked by default and five are outlined`() {
+    @Test fun `exactly fifteen rules are masked by default and four are outlined`() {
         val (masked, outlined) = DefaultRuleSet.rules.partition { it.enabledByDefault }
         assertThat(masked).hasSize(15)
         assertThat(outlined.map { it.id })
-            .containsExactly("url", "ip", "tracking", "longnum", "datetime")
+            .containsExactly("url", "ip", "longnum", "datetime")
     }
 
     /**
