@@ -226,11 +226,16 @@ fun EditorScreen(
                 if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
             }
             // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
-            // 用途水印在「编辑」里，样式在它自己那一组
-            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible) {
-                if (!phone || toolGroup != null) return@LaunchedEffect
-                if (state.purposeSheetVisible) toolGroup = ToolGroup.EDIT
-                else if (state.stylePanelOpen) toolGroup = ToolGroup.of(state.barLook.style)
+            // 用途水印在「编辑」里，样式在它自己那一组。展开着另一组时也换过去：
+            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来
+            LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
+                if (!phone) return@LaunchedEffect
+                val own = when {
+                    state.purposeSheetVisible -> ToolGroup.EDIT
+                    state.stylePanelOpen -> ToolGroup.of(state.barLook.style)
+                    else -> return@LaunchedEffect
+                }
+                if (toolGroup != own) toolGroup = own
             }
             // 吸管在等取色时，返回先收吸管；样式面板、用途水印面板开着时，返回先收面板，不直接退出编辑器。
             // 都不拦的时候不常驻 BackHandler（见 EditorActivity）
@@ -248,10 +253,10 @@ fun EditorScreen(
             CanvasAndPanel(
                 panelAtSide = atSide,
                 // 用途水印面板开着时输入法弹起来，整块让开：画布也缩到键盘上面，打字时看得到整张图上的水印
-                // （手机上面板盖在图上，打字时它只留文字那一格，见 PurposePanelContent）
+                // （手机上面板盖在图上，打字时它只留文字那一格，见 PurposePanelContent）。写文本也一样
                 modifier = Modifier
                     .weight(1f)
-                    .then(if (state.purposeSheetVisible) Modifier.imePadding() else Modifier),
+                    .then(if (state.purposeSheetVisible || writingText(state)) Modifier.imePadding() else Modifier),
                 canvas = {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         // 批量里切图的那一下，画布上先垫着这一张的缩略图，载入完换成原图
@@ -268,6 +273,8 @@ fun EditorScreen(
                             onResize = vm::previewSelectedQuad,
                             onCommitDrag = vm::commitDrag,
                             onDeleteSelected = vm::deleteSelected,
+                            onEditSelected = vm::editSelectedText,
+                            plainSelection = panelUp && writingText(state),
                             scanStyle = scanStyle,
                             showOriginal = comparing,
                             textBoxes = if (showTextBoxes) textBoxes else emptyList(),
@@ -318,6 +325,7 @@ fun EditorScreen(
                             purpose = purpose,
                             purposeActions = purposeActions,
                             filmstrip = filmstrip,
+                            pushCanvas = writingText(state),
                         )
                         else -> WideEditorPanel(
                             atSide = atSide,
@@ -418,13 +426,20 @@ private fun styleBarModel(state: EditorUiState): StyleBarModel {
     val nearColors = remember(state.image, state.plan, selected?.candidateId, wantNear) {
         if (wantNear) nearColorsOf(state.image, state.plan, selected) else emptyList()
     }
+    val text = state.selectedText
     return StyleBarModel(
         look = look,
         panelOpen = state.stylePanelOpen,
         colorPick = state.colorPick,
         nearColors = nearColors,
+        text = text?.text.orEmpty(),
+        textKey = text?.candidateId ?: state.textPlacement?.id,
+        textFocus = state.textFocus,
     )
 }
+
+/** 文本的面板开着：输入框在上面，输入法可能弹着。 */
+private fun writingText(state: EditorUiState) = state.stylePanelOpen && state.barLook.style == MaskStyle.TEXT
 
 /** 用途水印面板的动作都交给 ViewModel。 */
 private class ViewModelPurposeActions(private val vm: EditorViewModel) : PurposePanelActions {
@@ -446,6 +461,8 @@ private class ViewModelStyleActions(private val vm: EditorViewModel) : StyleBarA
     override fun onCollapse() = vm.dismissStylePanel()
     override fun onPickColor(target: ColorTarget?) =
         if (target == null) vm.cancelColorPick() else vm.startColorPick(target)
+    override fun onTextChange(text: String) = vm.setText(text)
+    override fun onTextFocusTaken() = vm.textFocusTaken()
 }
 
 /**

@@ -39,10 +39,10 @@ import kotlin.math.min
 internal class PreparedMasks {
 
     /**
-     * 一块码画出来是什么样：样式与参数、框、手画的那一笔，读像素的码还要看 [under]——它读的地方底下先画了哪几块
+     * 一块码画出来是什么样：样式与参数、框、手画的那一笔、写的字，读像素的码还要看 [under]——它读的地方底下先画了哪几块
      * （各自的编号，按先后）。编号由 [ids] 发，一个样子一个编号，比的时候不用一层层往下比。
      */
-    private data class Node(val look: MaskLook, val quad: Quad, val ink: InkPath?, val under: List<Int>)
+    private data class Node(val look: MaskLook, val quad: Quad, val ink: InkPath?, val text: String?, val under: List<Int>)
 
     private var source: Bitmap? = null
     private var next = 0
@@ -125,7 +125,7 @@ internal class PreparedMasks {
     /** 渲染器里的绝对像素常数按分析图折算（见 MaskOptions.renderScale），与逐块现算时一样。 */
     private fun idOf(image: SourceImage, item: MaskItem, under: List<Int>): Int {
         val look = item.look.copy(options = item.look.options.copy(renderScale = image.scale))
-        val node = Node(look, item.quad, item.ink, under)
+        val node = Node(look, item.quad, item.ink, item.text, under)
         return ids.getOrPut(node) { next++.also { nodes[it] = node } }
     }
 
@@ -157,7 +157,7 @@ internal class PreparedMasks {
         val node = nodes.getValue(id)
         val renderer = registry[node.look.style]
         if (renderer is PixelMaskRenderer) patch(id, image, registry).draw(canvas)
-        else renderer.render(canvas, image.bitmap, node.quad, node.look.options, node.ink)
+        else renderer.render(canvas, image.bitmap, node.quad, node.look.options, node.ink, node.text)
     }
 
     private companion object {

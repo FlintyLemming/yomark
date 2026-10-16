@@ -10,19 +10,26 @@ import kotlin.math.roundToInt
  * 原先还有一种「抹除」，2026-10-11 并进了色块，成了色块的「近似色」（见 [MaskOptions.solidNear]）；
  * 还有一种「表情」，2026-10-12 去掉了。记着这两个名字的旧设置读回来认不出，落回色块。
  * 画笔（[PEN]）2026-10-14 加上：不透明的线，和马克笔一样只做标记，可以拉框也可以手画。
+ * 文本（[TEXT]）2026-10-15 加上：在图上写一行字，也只做标记（见 TextStamp）。
  */
 enum class MaskStyle {
-    SOLID, PIXELATE, BLUR, MARKER, PEN;
+    SOLID, PIXELATE, BLUR, MARKER, PEN, TEXT;
 
     /**
-     * 拿来打码的：色块、马赛克、模糊，底栏的「打码」。马克笔、画笔只在图上做标记（「编辑」），
+     * 拿来打码的：色块、马赛克、模糊，底栏的「打码」。马克笔、画笔、文本只在图上做标记（「编辑」），
      * 识别出来直接打的码、点一下打上的码都不用它们，用「打码」里上次选的（见 EditorUiState.maskLook）。
      */
-    val redacts: Boolean get() = this != MARKER && this != PEN
+    val redacts: Boolean get() = this == SOLID || this == PIXELATE || this == BLUR
+
+    /**
+     * 选中的一块能不能直接换成 [other] 的样子：打码的几种之间换，马克笔、画笔之间换（线和框两种都画得出）。
+     * 文本只和文本换：线换成文本没有字，文本换成线就只剩一个框。
+     */
+    fun restylesTo(other: MaskStyle): Boolean = redacts == other.redacts && (this == TEXT) == (other == TEXT)
 }
 
 /**
- * 各样式的参数。一份里装着全部五种样式的参数，每块码只读它自己那种样式的几项；
+ * 各样式的参数。一份里装着全部样式的参数，每块码只读它自己那种样式的几项；
  * 编辑器里调好的参数记在 SettingsStore，下次打开沿用。
  *
  * 能调的项都有范围（见 [normalized]），范围的边界是安全底线，不是审美：
@@ -62,6 +69,12 @@ data class MaskOptions(
     val penShape: StrokeShape = StrokeShape.FREEHAND,
     /** 画笔的笔宽，按图的短边算的比例（见 [halfWidth]）。 */
     val penWidth: Float = DEFAULT_PEN_WIDTH,
+    /** 文本的颜色，不透明。垫着底色（[textBackground]）时是底的颜色，字取黑白里和它对得开的那个（见 TextStamp）。 */
+    val textColor: Int = DEFAULT_TEXT_COLOR,
+    /** 文本的字号，按图的短边算的比例：预览画在分析图上、导出画在原图上，看上去一样大。 */
+    val textSize: Float = DEFAULT_TEXT_SIZE,
+    /** 文本垫一块底：花的截图上字也看得清。 */
+    val textBackground: Boolean = false,
     /**
      * 当前渲染坐标系相对**原图**的比例。预览画在降采样的分析图上（< 1），导出画在原图上（= 1）。
      *
@@ -89,6 +102,8 @@ data class MaskOptions(
         markerWidth = markerWidth.orIfNaN(DEFAULT_MARKER_WIDTH).coerceIn(MARKER_WIDTH_RANGE),
         penColor = penColor or OPAQUE,
         penWidth = penWidth.orIfNaN(DEFAULT_PEN_WIDTH).coerceIn(PEN_WIDTH_RANGE),
+        textColor = textColor or OPAQUE,
+        textSize = textSize.orIfNaN(DEFAULT_TEXT_SIZE).coerceIn(TEXT_SIZE_RANGE),
     )
 
     /** [style] 下一笔怎么画。只有马克笔、画笔能手画，别的样式一律拉框。 */
@@ -118,6 +133,7 @@ data class MaskOptions(
         MaskStyle.BLUR -> copy(blurRadiusRatio = from.blurRadiusRatio)
         MaskStyle.MARKER -> copy(markerColor = from.markerColor, markerShape = from.markerShape, markerWidth = from.markerWidth)
         MaskStyle.PEN -> copy(penColor = from.penColor, penShape = from.penShape, penWidth = from.penWidth)
+        MaskStyle.TEXT -> copy(textColor = from.textColor, textSize = from.textSize, textBackground = from.textBackground)
     }
 
     /** 只把 [style] 用到的几项放回出厂值，别的样式调好的不动。面板上的「恢复默认」。 */
@@ -164,6 +180,11 @@ data class MaskOptions(
         const val DEFAULT_PEN_WIDTH = 0.008f
         val PEN_WIDTH_RANGE = 0.003f..0.025f
 
+        /** 文本：出厂和画笔一样是红色，字比截图上的正文大一点。 */
+        const val DEFAULT_TEXT_COLOR: Int = DEFAULT_PEN_COLOR
+        const val DEFAULT_TEXT_SIZE = 0.05f
+        val TEXT_SIZE_RANGE = 0.025f..0.15f
+
         private const val OPAQUE = 0xFF000000.toInt()
 
         /** 把 [argb] 的透明度换成 [alpha]（0～1），颜色不变。 */
@@ -206,6 +227,11 @@ data class MaskItem(
      * null 是拉的框。手画的那一笔换成打码的样式时盖住整个外接框，宁可多盖。
      */
     val ink: InkPath? = null,
+    /**
+     * 文本（[MaskStyle.TEXT]）写的字，一行。[quad] 正好包住这行字（见 TextStamp），字号由它定：拖角放大缩小就是改字号。
+     * 别的样式是 null。
+     */
+    val text: String? = null,
 ) : Parcelable {
 
     /**

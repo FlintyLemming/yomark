@@ -42,11 +42,12 @@ object SensitiveKindLabels {
 
     /**
      * 一块码的类型名：模型猜的与规则命中区分开（spec §3），Gemini Nano 的结果标「AI」。
-     * 点一行字打上的码说不上是哪一类，就叫「文字」。
+     * 点一行字打上的码说不上是哪一类，就叫「文字」。文本就写它写的字：缩略图截的是原图，看不到写上去的字。
      */
-    fun display(res: Resources, item: MaskItem): String = when (item.source) {
-        DetectorSource.LINE -> res.getString(R.string.kind_line)
-        DetectorSource.LLM -> display(res, item.kind) + " · AI"
+    fun display(res: Resources, item: MaskItem): String = when {
+        item.text != null -> item.text
+        item.source == DetectorSource.LINE -> res.getString(R.string.kind_line)
+        item.source == DetectorSource.LLM -> display(res, item.kind) + " · AI"
         else -> display(res, item.kind)
     }
 

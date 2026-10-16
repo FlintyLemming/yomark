@@ -11,7 +11,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -35,6 +39,7 @@ import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.ui.components.StyleBarActions
 import moe.flinty.yomark.ui.components.StyleBarModel
 import moe.flinty.yomark.ui.components.StylePanel
+import moe.flinty.yomark.ui.components.StylePanelContent
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.ToolGroup
 import org.junit.Rule
@@ -323,5 +328,87 @@ class StyleBarTest {
         compose.onNodeWithText("恢复默认").assertIsDisplayed()
         model = model.copy(panelOpen = false)
         compose.onNodeWithText("恢复默认").assertDoesNotExist()
+    }
+
+    // ---------- 文本 ----------
+
+    private class TextRecorder : StyleBarActions {
+        val texts = mutableListOf<String>()
+        val looks = mutableListOf<MaskLook>()
+        var focusTaken = 0
+        override fun onTextChange(text: String) { texts += text }
+        override fun onTextFocusTaken() { focusTaken++ }
+        override fun onLookChange(look: MaskLook, inProgress: Boolean) { looks += look }
+    }
+
+    /** 文本的面板：最上面是写的字，下面是颜色、字号、底色。 */
+    @Test fun theTextPanelHoldsTheTextAColorASizeAndABackground() {
+        val actions = TextRecorder()
+        show(open(MaskStyle.TEXT).copy(text = "签收人", textKey = "t1"), actions)
+        compose.onNode(hasSetTextAction()).assertIsDisplayed()
+        compose.onNodeWithText("签收人").assertIsDisplayed()
+        compose.onNodeWithContentDescription("红色").assertIsSelected()
+        compose.onNodeWithContentDescription("字号").assertIsDisplayed()
+        compose.onNodeWithText("底色").performClick()
+        assertThat(actions.looks.single().options.textBackground).isTrue()
+    }
+
+    @Test fun typingInTheTextFieldReportsEveryChange() {
+        val actions = TextRecorder()
+        show(open(MaskStyle.TEXT).copy(textKey = "t1"), actions)
+        compose.onNode(hasSetTextAction()).performTextInput("Hi")
+        assertThat(actions.texts.last()).isEqualTo("Hi")
+    }
+
+    /** 点了图上一处要写字、要改选中的文本：输入框拿焦点，拿到了说一声，收起再打开不会又抢一次。 */
+    @Test fun theTextFieldTakesFocusWhenAsked() {
+        val actions = TextRecorder()
+        show(open(MaskStyle.TEXT).copy(textKey = "t1", textFocus = true), actions)
+        compose.onNode(hasSetTextAction()).assertIsFocused()
+        assertThat(actions.focusTaken).isEqualTo(1)
+    }
+
+    /** 手机上打字时输入法占掉下半截：面板只留输入框，看得到字落在图上。 */
+    @Test fun whileTypingOnlyTheTextFieldShows() {
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    Column { StylePanelContent(open(MaskStyle.TEXT), TextRecorder(), compactWhileTyping = true, imeVisible = true) }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("字号").assertIsDisplayed()
+        compose.onNode(hasSetTextAction()).performClick()
+        compose.onNodeWithContentDescription("字号").assertDoesNotExist()
+        compose.onNodeWithText("恢复默认").assertDoesNotExist()
+        compose.onNode(hasSetTextAction()).assertIsDisplayed()
+    }
+
+    /** 撤销、重做把图上的字改了：打着字的输入框也换成图上的，接着打不会把撤掉的又打回来。 */
+    @Test fun theTextFieldFollowsTheImageEvenWhileTyping() {
+        var model by mutableStateOf(open(MaskStyle.TEXT).copy(text = "hello", textKey = "t1"))
+        val actions = TextRecorder()
+        compose.setContent { MaterialTheme { Surface { PhoneBar(model, actions) } } }
+        compose.onNode(hasSetTextAction()).performClick()
+        compose.onNode(hasSetTextAction()).assertIsFocused()
+        model = model.copy(text = "hi")
+        compose.onNodeWithText("hi").assertIsDisplayed()
+        compose.onNodeWithText("hello").assertDoesNotExist()
+    }
+
+    /** 只写一行：粘贴进来的换行在输入框里就换成空格，和图上的一样。 */
+    @Test fun aPastedLineBreakBecomesASpaceInTheField() {
+        val actions = TextRecorder()
+        show(open(MaskStyle.TEXT).copy(textKey = "t1"), actions)
+        compose.onNode(hasSetTextAction()).performTextInput("a\nb")
+        assertThat(actions.texts.last()).isEqualTo("a b")
+    }
+
+    /** 改已经写好的字：光标在最后，接着打是接在后面，不是插到最前面。 */
+    @Test fun editingATextTypesAfterWhatIsThere() {
+        val actions = TextRecorder()
+        show(open(MaskStyle.TEXT).copy(text = "Hi", textKey = "t1", textFocus = true), actions)
+        compose.onNode(hasSetTextAction()).assertIsFocused().performTextInput("!")
+        assertThat(actions.texts.last()).isEqualTo("Hi!")
     }
 }

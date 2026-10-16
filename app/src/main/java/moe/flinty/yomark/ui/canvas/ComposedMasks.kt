@@ -40,7 +40,7 @@ internal class ComposedMasks(
                 if (renderer is PixelMaskRenderer) {
                     renderer.prepare(into, it.quad, options)?.also { patch -> patch.draw(canvas) }
                 } else {
-                    renderer.render(canvas, into, it.quad, options, it.ink)
+                    renderer.render(canvas, into, it.quad, options, it.ink, it.text)
                     null
                 }
             }

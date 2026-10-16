@@ -21,7 +21,7 @@ class MarkerRenderer : MaskRenderer {
 
     override val style = MaskStyle.MARKER
 
-    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?) {
+    override fun render(canvas: Canvas, source: Bitmap, quad: Quad, options: MaskOptions, ink: InkPath?, text: String?) {
         if (ink != null) {
             val half = InkStroke.halfWidth(style, options, source)
             canvas.drawPath(InkStroke.path(ink, quad, half), InkStroke.paint(options.markerColor, half))

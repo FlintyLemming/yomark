@@ -403,4 +403,84 @@ class EditorViewModelAnalysisTest {
 
         assertThat(vm.state.value.plan.items.map { it.candidateId }).doesNotContain("llm")
     }
+
+    // ---------- 文本和识别、AI 增强识别 ----------
+
+    /** 文本只做标记，底下的字照样看得见：模型在文本底下找到的照样打上码，不当成已经盖住了。 */
+    @Test
+    fun `a text written over what the model finds does not hide it from the review`() = runTest(dispatcher) {
+        val vm = vmWithNano(Nano())
+        vm.onImageChosen(sampleUri("nano-under-text.jpg")); advanceUntilIdle()
+        vm.setStyle(MaskStyle.TEXT)
+        vm.onTap(PointF(130f, 110f))
+        vm.setText("看这里")                                      // 正压在模型要报的那一处（100..160 × 100..120）上
+        vm.dismissStylePanel()
+
+        vm.runAiReview(); advanceUntilIdle()
+
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).contains("llm")
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
+    }
+
+    /** 增强识别跑着的时候写了字：字和它找到的码各是一步，撤销一下只拿掉找到的码，字还在。 */
+    @Test
+    fun `typing while the review runs keeps the text and the findings as separate undo steps`() = runTest(dispatcher) {
+        val nano = Nano()
+        val vm = vmWithNano(nano)
+        vm.onImageChosen(sampleUri("nano-while-typing.jpg")); advanceUntilIdle()
+        nano.gate = CompletableDeferred()
+        vm.runAiReview(); advanceUntilIdle()
+        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Running)
+
+        vm.setStyle(MaskStyle.TEXT)
+        vm.onTap(PointF(300f, 300f))
+        vm.setText("Hi")
+        nano.gate.complete(Unit); advanceUntilIdle()
+        vm.dismissStylePanel()
+        fun ids() = vm.state.value.plan.items.map { it.candidateId }
+        fun texts() = vm.state.value.plan.items.mapNotNull { it.text }
+
+        vm.undo()
+        assertThat(ids()).doesNotContain("llm")
+        assertThat(texts()).contains("Hi")
+        vm.undo()
+        assertThat(texts()).doesNotContain("Hi")
+        assertThat(ids()).contains("rule")
+    }
+
+    /** 识别还没出结果时就写了字：结果到了照样打上，撤销那几个字不会把识别出的码一起撤掉。 */
+    @Test
+    fun `typing before the results land does not let undo drop them`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        val rules = listOf(candidate("rule", true, 10f, 10f, 60f, 30f))
+        val vm = EditorViewModel(
+            intake = ImageIntake(context),
+            exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
+            engineProvider = {
+                RedactionEngine(DeadRecognizer(), emptyList(), listOf(object : SensitivityClassifier {
+                    override val id = "slow"
+                    override suspend fun isAvailable() = true
+                    override suspend fun classify(lines: List<TextLine>): List<Candidate> {
+                        gate.await()
+                        return rules
+                    }
+                }), CandidateMerger())
+            },
+            settings = isolatedSettingsStore(context),
+            savedState = SavedStateHandle(),
+            ioDispatcher = dispatcher,
+        )
+        vm.onImageChosen(sampleUri("slow-rules.jpg")); advanceUntilIdle()
+        assertThat(vm.state.value.analyzing).isTrue()
+
+        vm.setStyle(MaskStyle.TEXT)
+        vm.onTap(PointF(300f, 300f))
+        vm.setText("Hi")
+        gate.complete(Unit); advanceUntilIdle()
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).contains("rule")
+        vm.dismissStylePanel()
+
+        vm.undo()
+        assertThat(vm.state.value.plan.items.map { it.candidateId }).containsExactly("rule")
+    }
 }

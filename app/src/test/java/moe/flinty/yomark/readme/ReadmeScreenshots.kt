@@ -126,7 +126,8 @@ class ReadmeScreenshots {
 
     @Test fun styles() {
         val vm = openSample()
-        MaskStyle.entries.filter { it != MaskStyle.SOLID }.forEach { style ->
+        // 文本不是盖在码上的样子：码换成文本就没了，不拍
+        MaskStyle.entries.filter { it != MaskStyle.SOLID && it != MaskStyle.TEXT }.forEach { style ->
             // 对照图要整张图都换成这种：马克笔、画笔换样式时已有的码不跟着变，直接改 plan
             compose.runOnUiThread {
                 vm.setStyle(style)

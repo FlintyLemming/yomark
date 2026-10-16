@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui
 
+import android.graphics.PointF
 import android.net.Uri
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.MaskItem
@@ -41,6 +42,13 @@ sealed interface AiReview {
     data object Failed : AiReview
 }
 
+/**
+ * 拿着文本点了图上一处，字还没打（见 EditorViewModel.setText）：打下第一个字时，这块文本以 [center]（图像坐标）为中心落下，
+ * id 是 [id]。[look] 是它的样子，null 用画笔：改字时把字删光了，那一块先拿掉、留下它原来的位置、样子和它在 plan 里的第几个
+ * （[index]，-1 是排到最后），接着打还在原处、还在原来那一层。
+ */
+data class TextPlacement(val id: String, val center: PointF, val look: MaskLook? = null, val index: Int = -1)
+
 data class EditorUiState(
     val image: SourceImage? = null,
     val plan: MaskPlan = MaskPlan.empty(),
@@ -75,6 +83,10 @@ data class EditorUiState(
     val maskStyle: MaskStyle = MaskStyle.SOLID,
     /** 样式栏下面的调节面板开着。点样式栏上的一项就弹出来，再点一下当前那项收起。 */
     val stylePanelOpen: Boolean = false,
+    /** 要写的文本还没有字：落在哪儿（见 [TextPlacement]）。只在文本的面板开着时有。 */
+    val textPlacement: TextPlacement? = null,
+    /** 文本面板上的输入框该拿焦点、弹出输入法了：点了图上一处要写字，或者要改选中的文本。输入框拿到就放下（见 EditorViewModel.textFocusTaken）。 */
+    val textFocus: Boolean = false,
     /** 吸管在等用户点图：点到哪儿就取哪儿的颜色，填进这一项。这期间点画布不切换打码。 */
     val colorPick: ColorTarget? = null,
     /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
@@ -107,12 +119,16 @@ data class EditorUiState(
     /** 选中的手动框；没有选中、或选中的框已经不在了（被撤销掉了）时为 null。 */
     val selectedItem: MaskItem? get() = selectedManualId?.let { plan.find(it) }
 
+    /** 选中的文本；选中的不是文本时为 null。 */
+    val selectedText: MaskItem? get() = selectedItem?.takeIf { it.look.style == MaskStyle.TEXT }
+
     /**
      * 样式栏上显示、面板里调的那一份：选中了手动框时是那个框的样子，否则是画笔。
+     * 改字时把字删光了的那一块文本先拿掉了（见 [TextPlacement]），面板上还是它的样子。
      * 在面板上改，选中的框跟着变，画笔也换成改后的样子（见 EditorViewModel.editLook）；
      * 只是选中、什么也没改，画笔不动——取消选中后样式栏回到画笔。
      */
-    val barLook: MaskLook get() = selectedItem?.look ?: brush
+    val barLook: MaskLook get() = selectedItem?.look ?: textPlacement?.look ?: brush
 
     /** 图上（和导出时）的用途水印；null 是不加：开关关着，或者文字是空的。安全功能，与付费去水印无关。 */
     val purposeText: String? get() = purposeDraft.takeIf { purposeOn && it.isNotBlank() }
