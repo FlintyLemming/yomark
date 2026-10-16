@@ -8,7 +8,7 @@ import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 
 /**
- * 画笔：不透明的线。手画的一笔照着手指走过的地方画；拉的框描一圈框线，线整个落在框里面。
+ * 画笔：不透明的线。手画的一笔照着手指走过的地方画；拉的框描一圈框线，线整个落在框里面；箭头是一条直线带一个实心的头。
  *
  * **安全性：不遮蔽，仅标记。** 和马克笔一样是拿来圈出来给人看的，线底下的东西照样看得见。
  */
@@ -20,7 +20,8 @@ class PenRenderer : MaskRenderer {
         val half = InkStroke.halfWidth(style, options, source)
         val paint = InkStroke.paint(options.penColor, half)
         if (ink != null) {
-            canvas.drawPath(InkStroke.path(ink, quad, half), paint)
+            if (ink.arrow) InkStroke.drawArrow(canvas, ink, quad, half, paint)
+            else canvas.drawPath(InkStroke.path(ink, quad, half), paint)
             return
         }
         // 框线往里让半个笔宽：整条线在框里，拖手柄、选中框都对得上

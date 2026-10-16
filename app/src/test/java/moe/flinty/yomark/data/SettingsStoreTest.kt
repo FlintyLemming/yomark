@@ -10,6 +10,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.canvas.ScanStyle
@@ -306,5 +307,13 @@ class SettingsStoreTest {
         val tuned = MaskOptions(textColor = 0xFF1E88E5.toInt(), textSize = 0.09f, textBackground = true)
         store.setMaskOptions(tuned)
         assertThat(store.maskOptions.first()).isEqualTo(tuned)
+    }
+
+    /** 画笔停在箭头上：下次打开还是箭头。 */
+    @Test
+    fun `a pen left on arrow comes back as arrow`() = runTest {
+        val store = store()
+        store.setMaskOptions(MaskOptions(penShape = StrokeShape.ARROW))
+        assertThat(store.maskOptions.first().penShape).isEqualTo(StrokeShape.ARROW)
     }
 }

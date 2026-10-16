@@ -116,6 +116,7 @@
     <string name="stroke_shape">Draw as</string>
     <string name="stroke_shape_box">Box</string>
     <string name="stroke_shape_freehand">Freehand</string>
+    <string name="stroke_shape_arrow">Arrow</string>
     <string name="stroke_width">Thickness</string>
     <string name="text_content">Text</string>
     <string name="text_size">Size</string>

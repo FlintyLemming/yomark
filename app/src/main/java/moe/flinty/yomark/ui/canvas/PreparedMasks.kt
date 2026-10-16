@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.core.model.Ink
 import moe.flinty.yomark.core.model.InkPath
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
@@ -79,7 +80,7 @@ internal class PreparedMasks {
             val id = idOf(image, item, under)
             plannedIds[i] = id
             planned[item] = id
-            drawn += drawBounds(image, item.quad, item.look)
+            drawn += drawBounds(image, item.quad, item.look, item.ink)
         }
         // 揭开的码已经不在 plan 里，照它自己读原图的样子画
         val used = plannedIds.toHashSet()
@@ -190,13 +191,13 @@ internal class PreparedMasks {
 
         /**
          * 一块码画出来会碰到的范围，宁大勿小。打码的几种不出框，抗锯齿多出不到一像素；马克笔拉的框边是抖的，
-         * 抖出框外；线（马克笔、画笔）的框比笔宽还窄时，线探出框外，按半个笔宽放宽。
+         * 抖出框外；线（马克笔、画笔）的框比笔宽还窄时，线探出框外，按半个笔宽放宽；箭头的框被压扁了，头探出框外，按头的半宽放宽。
          */
-        fun drawBounds(image: SourceImage, quad: Quad, look: MaskLook): RectF {
+        fun drawBounds(image: SourceImage, quad: Quad, look: MaskLook, ink: InkPath? = null): RectF {
             val shortSide = min(image.width, image.height).toFloat()
             val out = 1f + when (look.style) {
                 MaskStyle.MARKER -> look.options.halfWidth(look.style, shortSide) + quad.shortEdge() * MarkerRenderer.JITTER_RATIO
-                MaskStyle.PEN -> look.options.halfWidth(look.style, shortSide)
+                MaskStyle.PEN -> Ink.margin(look.options.halfWidth(look.style, shortSide), ink?.arrow == true)
                 else -> 0f
             }
             return RectF(quad.bounds()).apply { inset(-out, -out) }

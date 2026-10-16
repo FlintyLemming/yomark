@@ -59,13 +59,13 @@ data class MaskOptions(
     val blurRadiusRatio: Float = DEFAULT_BLUR_RATIO,
     /** 马克笔的颜色，ARGB。透明度就在 alpha 里，范围见 [MARKER_ALPHA_RANGE]。 */
     val markerColor: Int = DEFAULT_MARKER_COLOR,
-    /** 马克笔下一笔是拉框（照旧涂一块）还是手画（一道半透明的粗线）。 */
+    /** 马克笔下一笔是拉框（照旧涂一块）还是手画（一道半透明的粗线）。没有箭头（见 StrokeShape）。 */
     val markerShape: StrokeShape = StrokeShape.BOX,
     /** 马克笔手画时的笔宽，按图的短边算的比例（见 [halfWidth]）。拉框时用不着。 */
     val markerWidth: Float = DEFAULT_MARKER_WIDTH,
     /** 画笔的颜色，不透明。 */
     val penColor: Int = DEFAULT_PEN_COLOR,
-    /** 画笔下一笔是拉框（描一圈框线）还是手画。出厂是手画：画笔就是拿来随手画的。 */
+    /** 画笔下一笔是拉框（描一圈框线）、手画还是箭头。出厂是手画：画笔就是拿来随手画的。 */
     val penShape: StrokeShape = StrokeShape.FREEHAND,
     /** 画笔的笔宽，按图的短边算的比例（见 [halfWidth]）。 */
     val penWidth: Float = DEFAULT_PEN_WIDTH,
@@ -99,6 +99,7 @@ data class MaskOptions(
         pixelBlockDivisor = pixelBlockDivisor.coerceIn(PIXEL_DIVISOR_RANGE),
         blurRadiusRatio = blurRadiusRatio.orIfNaN(DEFAULT_BLUR_RATIO).coerceIn(BLUR_RATIO_RANGE),
         markerColor = withAlpha(markerColor, markerAlpha.coerceIn(MARKER_ALPHA_RANGE)),
+        markerShape = if (markerShape == StrokeShape.ARROW) StrokeShape.BOX else markerShape,
         markerWidth = markerWidth.orIfNaN(DEFAULT_MARKER_WIDTH).coerceIn(MARKER_WIDTH_RANGE),
         penColor = penColor or OPAQUE,
         penWidth = penWidth.orIfNaN(DEFAULT_PEN_WIDTH).coerceIn(PEN_WIDTH_RANGE),
@@ -106,7 +107,7 @@ data class MaskOptions(
         textSize = textSize.orIfNaN(DEFAULT_TEXT_SIZE).coerceIn(TEXT_SIZE_RANGE),
     )
 
-    /** [style] 下一笔怎么画。只有马克笔、画笔能手画，别的样式一律拉框。 */
+    /** [style] 下一笔怎么画。只有马克笔、画笔能手画，只有画笔能画箭头，别的样式一律拉框。 */
     fun shapeFor(style: MaskStyle): StrokeShape = when (style) {
         MaskStyle.MARKER -> markerShape
         MaskStyle.PEN -> penShape

@@ -109,4 +109,12 @@ class MaskOptionsTest {
         assertThat(took.penColor).isEqualTo(0xFF000000.toInt())
         assertThat(took.resetFor(MaskStyle.TEXT)).isEqualTo(brush)
     }
+
+    /** 马克笔没有箭头：读回来、别处传进来的箭头一律当拉框。画笔的箭头照留。 */
+    @Test fun `only the pen keeps an arrow`() {
+        val o = MaskOptions(markerShape = StrokeShape.ARROW, penShape = StrokeShape.ARROW).normalized()
+        assertThat(o.markerShape).isEqualTo(StrokeShape.BOX)
+        assertThat(o.penShape).isEqualTo(StrokeShape.ARROW)
+        assertThat(o.shapeFor(MaskStyle.PEN)).isEqualTo(StrokeShape.ARROW)
+    }
 }

@@ -86,13 +86,13 @@ import moe.flinty.yomark.R
  * 遮罩用与导出**同一套** MaskRenderer 绘制，保证所见即所得。
  * 手势分工：一指画框、两指缩放平移、点手动框进选中态（框上方浮出「删除」）、
  * 点码拿掉、点没打码的字打码那一行（见 EditorViewModel.onTap）。缩放只用两指，没有双击放大（2026-10-15 去掉）。
- * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）。
+ * 马克笔、画笔选了手画时，一指画的是一道线而不是框（见 [onInk]）；画笔选了箭头时，从按下的地方拉出一支箭头。
  * 拿着文本点图上一处是在那儿写字（见 EditorViewModel.onTap）：字还没打时那儿立着一道光标。
  *
  * @param scanStyle 识别动效的样式（设置里选的）。识别中跟着它走；结果到达那一刻定下来，落码 / 散开那一遍不再变
  * @param showOriginal 按住「对比」时为 true：只画原图，缩放与位置不变，前后比的是同一块
  * @param onTap 点了一下：点在哪儿（图像坐标），点字时手指偏出一段字多远还算点中它（图像像素）
- * @param onInk 手画完一笔：手指走过的点，图像坐标
+ * @param onInk 手画完一笔：手指走过的点，图像坐标。箭头只有起点和松手的那一点
  * @param onEditSelected 选中的是文本时，框上方多一个「编辑」：改它写的字
  * @param plainSelection 选中框只描一圈线，不画手柄、不浮工具条：手机上写文本时面板开着，点画布只是收起面板，
  *   手柄和工具条点不到，倒把缩小了的图上正在打的字盖住了
@@ -289,9 +289,9 @@ fun ImageCanvas(
                             }
                         }
 
-                        // 画笔照手画还是拉框，按下去那一刻定下来
+                        // 画笔照手画、拉框还是拉箭头，按下去那一刻定下来
                         val brush = latest.brush
-                        val freehand = brush.options.shapeFor(brush.style) == StrokeShape.FREEHAND
+                        val shape = brush.options.shapeFor(brush.style)
                         val start = down.position
                         var last = down.position
                         var pointerCount = 1
@@ -348,7 +348,7 @@ fun ImageCanvas(
                                     } else if (selected != null && grabbingBody) {
                                         editingSelection = true
                                         onResize(SelectionHandles.move(selected.quad, now.x - downImage.x, now.y - downImage.y))
-                                    } else if (freehand) {
+                                    } else if (shape == StrokeShape.FREEHAND) {
                                         // 起手那一段 touch slop 也算进去：线从手指按下的地方开始
                                         val points = draftInk.points
                                             ?: arrayListOf(viewport.screenToImage(PointF(start.x, start.y))).also { draftInk.points = it }
@@ -356,6 +356,10 @@ fun ImageCanvas(
                                             points.addIfApart(viewport.screenToImage(PointF(h.position.x, h.position.y)), INK_STEP_PX / viewport.scale)
                                         }
                                         points.addIfApart(now, INK_STEP_PX / viewport.scale)
+                                        inkTick++
+                                    } else if (shape == StrokeShape.ARROW) {
+                                        // 箭头只看头尾：尾在手指按下的地方，箭尖跟着手指走
+                                        draftInk.points = arrayListOf(viewport.screenToImage(PointF(start.x, start.y)), now)
                                         inkTick++
                                     } else {
                                         draftQuad = GestureRules.quadFromDrag(
@@ -542,7 +546,7 @@ private fun ArrayList<PointF>.addIfApart(p: PointF, step: Float) {
 /** 手画时隔多远记一个点（屏幕像素）。 */
 private const val INK_STEP_PX = 3f
 
-/** 正在手画的一笔，按画笔的样子画，和画完落进 plan 的那一笔一个样。 */
+/** 正在手画的一笔（或拉着的箭头），按画笔的样子画，和画完落进 plan 的那一笔一个样。 */
 private fun drawInkDraft(
     canvas: android.graphics.Canvas,
     points: List<PointF>,
@@ -552,7 +556,8 @@ private fun drawInkDraft(
 ) {
     val options = brush.options.copy(renderScale = image.scale)
     val half = options.halfWidth(brush.style, min(image.width, image.height).toFloat())
-    val (quad, ink) = Ink.fit(points, half)
+    val arrow = options.shapeFor(brush.style) == StrokeShape.ARROW
+    val (quad, ink) = Ink.fit(points, Ink.margin(half, arrow), arrow)
     registry[brush.style].render(canvas, image.bitmap, quad, options, ink)
 }
 

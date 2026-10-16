@@ -22,6 +22,7 @@ import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskPlanFactory
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.TraceLog
@@ -895,8 +896,9 @@ class EditorViewModel(
     }
 
     /**
-     * 手画完一笔（马克笔、画笔选了手画）：和画完一个框一样，落笔就打上、画完进选中态，拖得动、删得掉。
-     * [quad] 是这一笔的外接框，四边让出半个笔宽（见 Ink.fit）。
+     * 手画完一笔（马克笔、画笔选了手画，或者画笔选了箭头）：和画完一个框一样，落笔就打上、画完进选中态，拖得动、删得掉。
+     * [quad] 是这一笔的外接框，四边让出半个笔宽、箭头让出头的半宽（见 Ink.fit、Ink.margin）。
+     * 箭头只要头尾两个点：从按下的地方指到松手的地方。
      */
     fun onInk(pointsInImageSpace: List<PointF>) {
         val s = _state.value
@@ -904,7 +906,9 @@ class EditorViewModel(
         if (pointsInImageSpace.isEmpty()) return
         val brush = s.brush
         val half = brush.options.halfWidth(brush.style, min(image.width, image.height).toFloat())
-        val (quad, ink) = Ink.fit(pointsInImageSpace, half)
+        val arrow = brush.options.shapeFor(brush.style) == StrokeShape.ARROW
+        val points = if (arrow) listOf(pointsInImageSpace.first(), pointsInImageSpace.last()) else pointsInImageSpace
+        val (quad, ink) = Ink.fit(points, Ink.margin(half, arrow), arrow)
         val item = MaskItem(
             candidateId = "manual-${UUID.randomUUID()}",
             quad = quad,
@@ -1040,7 +1044,10 @@ class EditorViewModel(
         val next = look.normalized()
         if (_state.value.colorPick != null) _state.value = _state.value.copy(colorPick = null)
         val selected = _state.value.selectedItem
-        if (selected != null && !selected.look.style.restylesTo(next.style)) clearSelection()
+        // 箭头只有画笔画得出：选着一支箭头拿起马克笔，箭头原样留着
+        if (selected != null && (!selected.look.style.restylesTo(next.style) || selected.ink?.arrow == true && next.style != MaskStyle.PEN)) {
+            clearSelection()
+        }
         setBrush(MaskLook(next.style, _state.value.brush.options.withParamsOf(next.style, next.options)))
         // 还没写字的那一处：换成别的工具就作罢；它带着自己的样子（字删光了拿掉的那一块）时，面板上改的是它
         _state.value.textPlacement?.let { at ->
@@ -1059,10 +1066,22 @@ class EditorViewModel(
         if (!inProgress) finishLookEdit()
     }
 
-    /** 选中的那一块换成 [look]。文本换了字号，框跟着变大变小，中心不动（见 [textAnchor]）。 */
+    /**
+     * 选中的那一块换成 [look]。文本换了字号，框跟着变大变小，中心不动（见 [textAnchor]）。
+     * 手画的一笔、箭头换了笔宽，框让出的那一圈跟着变（见 Ink.margin），线还在原处：箭头指的地方不动。
+     */
     private fun restyled(item: MaskItem, look: MaskLook): MaskItem {
-        val text = item.text
+        val ink = item.ink
         val image = _state.value.image
+        if (ink != null && image != null) {
+            val shortSide = min(image.width, image.height).toFloat()
+            val was = Ink.margin(item.look.options.halfWidth(item.look.style, shortSide), ink.arrow)
+            val now = Ink.margin(look.options.halfWidth(look.style, shortSide), ink.arrow)
+            if (was == now) return item.copy(look = look)
+            val (quad, refit) = Ink.fit(Ink.toImage(ink, item.quad, was), now, ink.arrow)
+            return item.copy(look = look, quad = quad, ink = refit)
+        }
+        val text = item.text
         if (look.style != MaskStyle.TEXT || text == null || image == null || look.options.textSize == item.look.options.textSize) {
             return item.copy(look = look)
         }

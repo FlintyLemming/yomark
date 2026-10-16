@@ -68,4 +68,89 @@ class PenRendererTest {
         assertThat(points.last().x).isWithin(0.01f).of(150f)
         assertThat(points.first().y).isWithin(0.01f).of(50f)
     }
+
+    // ---------- 箭头 ----------
+
+    /** 箭头：一条线，箭尖那头一个实心的三角，比线宽得多；尾巴那头只有线，箭尖外面什么也没有。 */
+    @Test fun `an arrow is a line with a solid head at the tip`() {
+        val bmp = white()
+        val half = pen.halfWidth(MaskStyle.PEN, 200f)                // 2 像素
+        val (quad, ink) = Ink.fit(listOf(PointF(20f, 100f), PointF(180f, 100f)), Ink.margin(half, arrow = true), arrow = true)
+        PenRenderer().render(Canvas(bmp), bmp, quad, pen, ink)
+        val color = MaskOptions.DEFAULT_PEN_COLOR
+        assertThat(bmp.getPixel(60, 100)).isEqualTo(color)                  // 线
+        assertThat(bmp.getPixel(176, 100)).isEqualTo(color)                 // 箭尖里面
+        assertThat(bmp.getPixel(168, 105)).isEqualTo(color)                 // 头比线宽：离中线 5 像素还在头里
+        assertThat(bmp.getPixel(60, 105)).isEqualTo(Color.WHITE)           // 线那一段只有线宽
+        assertThat(bmp.getPixel(186, 100)).isEqualTo(Color.WHITE)           // 箭尖外面
+        assertThat(bmp.getPixel(14, 100)).isEqualTo(Color.WHITE)            // 尾巴没有头
+    }
+
+    /** 斜着的箭头：头的两个角也落在外接框里，选中框、导出都不会切掉它。 */
+    @Test fun `a slanted arrow head stays inside its box`() {
+        val bmp = white()
+        val half = pen.halfWidth(MaskStyle.PEN, 200f)
+        val (quad, ink) = Ink.fit(listOf(PointF(40f, 160f), PointF(160f, 40f)), Ink.margin(half, arrow = true), arrow = true)
+        PenRenderer().render(Canvas(bmp), bmp, quad, pen, ink)
+        val box = quad.bounds()
+        for (y in 0 until 200) for (x in 0 until 200) {
+            if (bmp.getPixel(x, y) != Color.WHITE) {
+                assertThat(x + 0.5f).isAtLeast(box.left - 1f)
+                assertThat(x + 0.5f).isAtMost(box.right + 1f)
+                assertThat(y + 0.5f).isAtLeast(box.top - 1f)
+                assertThat(y + 0.5f).isAtMost(box.bottom + 1f)
+            }
+        }
+    }
+
+    /** 箭头的框让出的是头的半宽：放回图上还是原来的头尾，拖大了框跟着拉长。 */
+    @Test fun `an arrow comes back where it was drawn and stretches with its box`() {
+        val half = pen.halfWidth(MaskStyle.PEN, 200f)
+        val margin = Ink.margin(half, arrow = true)
+        assertThat(margin).isGreaterThan(half)
+        val (quad, ink) = Ink.fit(listOf(PointF(30f, 40f), PointF(120f, 90f)), margin, arrow = true)
+        assertThat(ink.arrow).isTrue()
+        val back = Ink.toImage(ink, quad, margin)
+        assertThat(back.first().x).isWithin(0.01f).of(30f)
+        assertThat(back.last().y).isWithin(0.01f).of(90f)
+        // 框拖宽了，头尾按比例跟着走：框宽了几成，离左边就远了几成
+        val b = quad.bounds()
+        val wider = Quad.fromRect(RectF(b.left, b.top, b.right + 90f, b.bottom))
+        val stretch = (b.width() + 90f) / b.width()
+        assertThat(Ink.toImage(ink, wider, margin).last().x).isWithin(0.01f).of(b.left + (120f - b.left) * stretch)
+    }
+
+    /** 很短的箭头：头跟着缩，不比线还长，看着还是一支箭头。 */
+    @Test fun `a short arrow keeps a short head`() {
+        val bmp = white()
+        val thick = MaskOptions(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)   // 5 像素宽，头本该 40 像素长
+        val half = thick.halfWidth(MaskStyle.PEN, 200f)
+        val (quad, ink) = Ink.fit(listOf(PointF(80f, 100f), PointF(110f, 100f)), Ink.margin(half, arrow = true), arrow = true)
+        PenRenderer().render(Canvas(bmp), bmp, quad, thick, ink)
+        assertThat(bmp.getPixel(84, 100)).isEqualTo(MaskOptions.DEFAULT_PEN_COLOR)   // 尾巴那一截还是线
+        assertThat(bmp.getPixel(84, 107)).isEqualTo(Color.WHITE)                     // 头没有伸到尾巴上
+    }
+
+    /** 箭头的框拖小了：头尾按比例跟着收，框还不小的时候箭头不会先缩成一个点。 */
+    @Test fun `shrinking an arrow box shrinks the arrow in proportion`() {
+        val thick = MaskOptions(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)
+        val margin = Ink.margin(thick.halfWidth(MaskStyle.PEN, 200f), arrow = true)
+        val (quad, ink) = Ink.fit(listOf(PointF(40f, 100f), PointF(160f, 100f)), margin, arrow = true)
+        val b = quad.bounds()
+        val half = Quad.fromRect(RectF(b.left, b.top, b.left + b.width() / 2f, b.bottom))
+        val (tail, tip) = Ink.toImage(ink, half, margin).let { it.first() to it.last() }
+        assertThat(tip.x - tail.x).isWithin(0.01f).of(60f)                 // 原来 120，框窄一半就短一半
+    }
+
+    /** 又短又粗的箭头：线跟着头变细，圆头藏在头里，箭尖外面什么也没有。 */
+    @Test fun `a short thick arrow keeps its line inside the head`() {
+        val bmp = white()
+        val thick = MaskOptions(penWidth = MaskOptions.PEN_WIDTH_RANGE.endInclusive)
+        val half = thick.halfWidth(MaskStyle.PEN, 200f)                     // 2.5 像素
+        val (quad, ink) = Ink.fit(listOf(PointF(90f, 100f), PointF(98f, 100f)), Ink.margin(half, arrow = true), arrow = true)
+        PenRenderer().render(Canvas(bmp), bmp, quad, thick, ink)
+        assertThat(bmp.getPixel(92, 100)).isEqualTo(MaskOptions.DEFAULT_PEN_COLOR)
+        assertThat(bmp.getPixel(100, 100)).isEqualTo(Color.WHITE)           // 箭尖外面
+        assertThat(bmp.getPixel(92, 102)).isEqualTo(Color.WHITE)            // 线比原来的笔宽（5 像素）细
+    }
 }
