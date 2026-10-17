@@ -50,7 +50,7 @@ import moe.flinty.yomark.R
 fun DebugTraceHistoryScreen(
     runs: List<TraceRun>,
     onClear: () -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -63,7 +63,9 @@ fun DebugTraceHistoryScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.debug_log)) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (onNavigateUp != null) {
+                        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    }
                 },
                 actions = {
                     IconButton(onClick = { copyToClipboard(context, runs.toText()) }, enabled = runs.isNotEmpty()) {

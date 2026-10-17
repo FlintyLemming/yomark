@@ -23,8 +23,9 @@ import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.AppLanguage
 
 /**
- * 设置一级页以下的各页。每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的。
+ * 设置一级页以下的各页。手机上每一页是同一个 [SettingsPageActivity] 带着不同的参数打开的，宽屏上在一级页的右栏里（见 SettingsHost）。
  * TEXT_ENGINE 从「AI」页点进去（2026-10-16 前在「文字」页）；TEXT_RULE 从「文字」页点进去，另带一个规则 id，说明是哪一类。
+ * 谁从哪一页点进去见 [parent]。
  */
 enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, GENERAL, APPEARANCE, LABS, DEVELOPER, LANGUAGE, ABOUT, DEBUG_TRACE }
 
@@ -45,6 +46,10 @@ enum class SettingsPage { TEXT, TEXT_ENGINE, TEXT_RULE, FACE, BARCODE, AI, GENER
  *
  * AI 那一行的小字是固定的，不写本机 Gemini Nano 眼下的情况：那得去问系统的 AICore 服务，
  * 不值得每次打开设置都问一遍，点进去再看。
+ *
+ * 宽屏上分两栏时（2026-10-17 起，见 SettingsHost）这一页是左栏，[selected] 是右栏开着的那一项，那一行换了底色。
+ * 开发者页开在右栏时，在那一页里关掉调试信息，「开发者」这一项先留着，换到别的项才不见，
+ * 和手机上「回到一级页才不见」一样。
  */
 @Composable
 fun SettingsScreen(
@@ -55,7 +60,10 @@ fun SettingsScreen(
     onReplayTour: () -> Unit = {},
     developer: Boolean = false,
     language: AppLanguage = AppLanguage.SYSTEM,
+    selected: SettingsPage? = null,
 ) {
+    // 不分栏（selected 为 null）时各行只是能点，分栏时才有选中不选中
+    fun selects(page: SettingsPage): Boolean? = selected?.let { it == page }
     SettingsScaffold(title = stringResource(R.string.settings), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
             PageTopSpacer()
@@ -66,6 +74,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.TextFields,
                     iconColors = SettingsIconColors.blue,
                     onClick = { onOpen(SettingsPage.TEXT) },
+                    selected = selects(SettingsPage.TEXT),
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_face),
@@ -73,6 +82,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Face,
                     iconColors = SettingsIconColors.orange,
                     onClick = { onOpen(SettingsPage.FACE) },
+                    selected = selects(SettingsPage.FACE),
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_barcode),
@@ -80,6 +90,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.QrCode2,
                     iconColors = SettingsIconColors.green,
                     onClick = { onOpen(SettingsPage.BARCODE) },
+                    selected = selects(SettingsPage.BARCODE),
                 )
             }
         }
@@ -93,6 +104,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.AutoAwesome,
                     iconColors = SettingsIconColors.yellow,
                     onClick = { onOpen(SettingsPage.AI) },
+                    selected = selects(SettingsPage.AI),
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_general),
@@ -100,6 +112,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Tune,
                     iconColors = SettingsIconColors.purple,
                     onClick = { onOpen(SettingsPage.GENERAL) },
+                    selected = selects(SettingsPage.GENERAL),
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_appearance),
@@ -107,6 +120,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Palette,
                     iconColors = SettingsIconColors.pink,
                     onClick = { onOpen(SettingsPage.APPEARANCE) },
+                    selected = selects(SettingsPage.APPEARANCE),
                 )
             }
         }
@@ -120,14 +134,16 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Science,
                     iconColors = SettingsIconColors.teal,
                     onClick = { onOpen(SettingsPage.LABS) },
+                    selected = selects(SettingsPage.LABS),
                 )
-                if (developer) {
+                if (developer || selected == SettingsPage.DEVELOPER) {
                     NavigationRow(
                         title = stringResource(R.string.settings_developer),
                         summary = stringResource(R.string.settings_developer_summary),
                         icon = Icons.Outlined.Code,
                         iconColors = SettingsIconColors.purple,
                         onClick = { onOpen(SettingsPage.DEVELOPER) },
+                        selected = selects(SettingsPage.DEVELOPER),
                     )
                 }
                 NavigationRow(
@@ -136,6 +152,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Language,
                     iconColors = SettingsIconColors.indigo,
                     onClick = { onOpen(SettingsPage.LANGUAGE) },
+                    selected = selects(SettingsPage.LANGUAGE),
                 )
                 NavigationRow(
                     title = stringResource(R.string.settings_help),
@@ -150,6 +167,7 @@ fun SettingsScreen(
                     icon = Icons.Outlined.Info,
                     iconColors = SettingsIconColors.gray,
                     onClick = { onOpen(SettingsPage.ABOUT) },
+                    selected = selects(SettingsPage.ABOUT),
                 )
             }
         }

@@ -22,7 +22,7 @@ import moe.flinty.yomark.debug.TraceLog
 fun DeveloperSettingsScreen(
     debugTrace: Boolean,
     onDebugTraceChange: (Boolean) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     traceCapacity: Int = TraceLog.DEFAULT_CAPACITY,
     onTraceCapacityChange: (Int) -> Unit = {},
     onOpenTraceHistory: () -> Unit = {},

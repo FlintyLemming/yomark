@@ -100,7 +100,7 @@ fun TextSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
     onOpenRule: (ruleId: String) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
@@ -133,7 +133,7 @@ fun TextSettingsScreen(
 fun TextEngineSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.engine), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -167,7 +167,7 @@ fun TextRuleSettingsScreen(
     ruleId: String,
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val rule = RuleCatalog.all.first { it.id == ruleId }
@@ -206,7 +206,7 @@ fun TextRuleSettingsScreen(
 fun FaceSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_face), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -235,7 +235,7 @@ fun FaceSettingsScreen(
 fun BarcodeSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_barcode), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -280,7 +280,7 @@ fun BarcodeSettingsScreen(
 fun LabsSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
     externalModel: Boolean = false,
     onExternalModelChange: (Boolean) -> Unit = {},
@@ -333,7 +333,7 @@ fun AiSettingsScreen(
     nano: NanoStatus?,
     textEngine: TextEngineOption,
     onOpenEngine: () -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
     external: ExternalModelSettings? = null,
     onExternalChange: ((ExternalModelSettings) -> ExternalModelSettings) -> Unit = {},
@@ -428,7 +428,7 @@ fun GeneralSettingsScreen(
     /** 导出不加品牌水印。只在 [watermarkUnlocked] 时有意义。 */
     watermarkOff: Boolean,
     onWatermarkOff: () -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val none = watermarkUnlocked && watermarkOff
@@ -488,7 +488,7 @@ fun AppearanceSettingsScreen(
     onThemeColorChange: (ThemeColor) -> Unit,
     scanStyle: ScanStyle,
     onScanStyleChange: (ScanStyle) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
