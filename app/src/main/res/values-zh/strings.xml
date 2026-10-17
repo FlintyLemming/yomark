@@ -54,6 +54,7 @@
     <string name="debug_info">调试信息</string>
     <string name="export">导出</string>
     <string name="exporting">导出中…</string>
+    <string name="sharing">分享中…</string>
     <string name="ai_review">AI 增强识别</string>
     <string name="ai_reviewing">增强识别中…</string>
     <string name="ai_review_none">没有新发现</string>
@@ -70,6 +71,7 @@
     <string name="saved_batch">已保存 %1$d 张到相册</string>
     <string name="error_open_image">打不开这张图片</string>
     <string name="error_export">导出失败，请重试</string>
+    <string name="error_share">分享失败，请重试</string>
     <string name="error_batch_partial">%1$d 张已保存，%2$d 张失败</string>
     <string name="purpose_default">仅供办理 XX 使用</string>
     <string name="filmstrip_item">第 %1$d 张，共 %2$d 张</string>
@@ -187,9 +189,10 @@
 
     <!-- dialogs -->
     <string name="unopened_title">还有 %1$d 张没看过</string>
-    <string name="unopened_text">没打开过的图片还没识别，导出时会跳过。</string>
+    <string name="unopened_text">没打开过的图片还没识别，会被跳过。</string>
     <string name="review">去看看</string>
     <string name="export_opened">只导出看过的 %1$d 张</string>
+    <string name="share_opened">只分享看过的 %1$d 张</string>
     <string name="paywall_one_time">一次付费，永久有效，不是订阅。</string>
     <string name="paywall_what">付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。</string>
     <string name="paywall_restore_hint">以前买过？点「恢复购买」，不会再次扣费。</string>

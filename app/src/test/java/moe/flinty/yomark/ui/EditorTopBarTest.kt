@@ -34,8 +34,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * 手机竖着拿时的顶栏：返回、撤销、重做、去水印、设置、导出。一行放不下「导出」两个字时（320 dp 宽，或者调大了显示大小），
- * 导出换成只有图标的按钮，别的都还在；再放不下才从最不要紧的起让出来。
+ * 手机竖着拿时的顶栏：返回、撤销、重做、去水印、设置、分享、导出。一行放不下「导出」两个字时（320 dp 宽，或者调大了显示大小），
+ * 导出换成只有图标的按钮，别的都还在；再放不下才从最不要紧的起让出来，分享和导出一样不让。
  * 用真的 ViewModel 走一遍的见 EditorScreenLayoutTest。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -47,9 +47,13 @@ class EditorTopBarTest {
     @get:Rule val compose = createComposeRule()
 
     private var exporting by mutableStateOf(false)
+    private var sharing by mutableStateOf(false)
 
-    /** EditorScreen 在手机竖着拿时传的那几样；[debug] 是开发者选项里打开了调试信息。 */
-    private fun show(debug: Boolean = false, exportLabel: Int = R.string.export) {
+    /**
+     * EditorScreen 在手机竖着拿时传的那几样；[debug] 是开发者选项里打开了调试信息，
+     * [share] 是有分享（别的应用来要图时没有）。
+     */
+    private fun show(debug: Boolean = false, exportLabel: Int = R.string.export, share: Boolean = false) {
         compose.setContent {
             MaterialTheme {
                 Surface {
@@ -59,8 +63,10 @@ class EditorTopBarTest {
                         onRemoveWatermark = {},
                         onDebug = if (debug) ({}) else null,
                         onExport = {},
+                        onShare = if (share) ({}) else null,
                         exportLabel = exportLabel,
                         exporting = exporting,
+                        sharing = sharing,
                     )
                 }
             }
@@ -108,10 +114,57 @@ class EditorTopBarTest {
         assertThat(button("Settings").assertIsDisplayed().bounds()).isEqualTo(settings)
     }
 
-    /** 别的应用来要图时导出叫「完成」，换成图标后也念「完成」。 */
+    /** 别的应用来要图时导出叫「完成」，换成图标后也念「完成」。没有分享：导出就是把图交回去。 */
     @Test fun forACallerTheIconSaysDone() {
         show(exportLabel = R.string.done)
         button("Done").assertIsDisplayed()
+        button("Share").assertDoesNotExist()
+    }
+
+    /** 有分享时它挨在导出左边，320 dp 上放不下所有的：去水印让出来，分享和导出都在。 */
+    @Test fun onA320dpScreenShareStaysAndThePremiumButtonStepsAside() {
+        show(share = true)
+        premium.assertIsNotDisplayed()
+        assertInARow(listOf("Back", "Undo", "Redo", "Settings", "Share", "Export").map(::button))
+        // 紧挨着：两颗圆钮四周各留 4 dp 的触摸余量，中间再多空 4 dp（EXPORT_GAP）
+        assertThat(button("Export").bounds().left - button("Share").bounds().right).isAtMost(12.dp)
+    }
+
+    @Config(qualifiers = "zh-rCN-w320dp-h640dp-xhdpi")
+    @Test fun shareInChineseToo() {
+        show(share = true)
+        assertInARow(listOf("返回", "撤销", "重做", "设置", "分享", "导出").map(::button))
+    }
+
+    /** 分享中：分享那颗转圈、读屏念「分享中…」，导出也点不动，但不说自己在导出。 */
+    @Test fun whileSharingTheShareIconSpinsAndExportWaits() {
+        show(share = true)
+        exporting = true
+        sharing = true
+        compose.waitForIdle()
+        button("Sharing…").assertIsDisplayed().assertIsNotEnabled()
+        button("Export").assertIsDisplayed().assertIsNotEnabled()
+        button("Exporting…").assertDoesNotExist()
+    }
+
+    /** 导出中：导出那颗转圈，分享点不动。 */
+    @Test fun whileExportingShareWaits() {
+        show(share = true)
+        exporting = true
+        compose.waitForIdle()
+        button("Exporting…").assertIsDisplayed().assertIsNotEnabled()
+        button("Share").assertIsDisplayed().assertIsNotEnabled()
+    }
+
+    /** 放得下时：去水印、设置、分享挨着写字的导出，都在。 */
+    @Config(qualifiers = "en-rUS-w412dp-h915dp-xxhdpi")
+    @Test fun withRoomShareSitsBesideTheExportLabel() {
+        show(share = true)
+        button("Export").assertIsNotDisplayed()
+        assertInARow(
+            listOf("Back", "Undo", "Redo").map(::button) + premium + listOf("Settings", "Share").map(::button) +
+                compose.onNodeWithText("Export"),
+        )
     }
 
     /** 再开着调试信息，换成图标也放不下：去水印最先让出来，别的都在。 */

@@ -17,6 +17,7 @@ import moe.flinty.yomark.engine.CandidateMerger
 import moe.flinty.yomark.engine.RedactionEngine
 import moe.flinty.yomark.engine.ppocr.PaddleTextRecognizer
 import moe.flinty.yomark.export.Exporter
+import moe.flinty.yomark.export.FileProviderSink
 import moe.flinty.yomark.export.ImageSink
 import moe.flinty.yomark.export.WatermarkDrawer
 import moe.flinty.yomark.render.RendererRegistry
@@ -74,6 +75,8 @@ class ReadmeScreenshots {
             },
             settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
+            // 顶栏上和应用里一样有分享
+            shareSink = FileProviderSink(context, FileProviderSink.SHARE),
         )
         compose.setContent {
             MaterialTheme { Surface { EditorScreen(vm = vm, onSettings = {}, onNavigateUp = {}) } }
