@@ -7,7 +7,9 @@ import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import androidx.core.content.FileProvider
 import org.junit.After
+import org.junit.Before
 import org.junit.Assume.assumeTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,6 +26,15 @@ class FileProviderSinkTest {
 
     /** 不经 FileProvider，直接给出文件本身，看写到了哪个文件。 */
     private val sink = FileProviderSink(context) { Uri.fromFile(it) }
+
+    /**
+     * FileProvider 把每个 authority 的根目录缓存在静态的 sCache 里，Robolectric 每个测试的 cacheDir 却是新的，
+     * 不清掉的话第二个走真 provider 的测试拿到的还是上一个测试的目录，getUriForFile 认不出文件。
+     */
+    @Before fun forgetProviderRoots() {
+        val cache = FileProvider::class.java.getDeclaredField("sCache").apply { isAccessible = true }
+        synchronized(cache.get(null)!!) { (cache.get(null) as HashMap<*, *>).clear() }
+    }
 
     @After fun tearDown() = sink.clear()
 
