@@ -278,7 +278,7 @@ class OnboardingTourTest {
         stageSays("遮住了 4 处")
     }
 
-    /** 划开「自动打码」时识别动效还在演：码当场落下，下一页的图上不再从头演一遍。 */
+    /** 划开「自动打码」时识别动效还在演：码当场落下，不再从头演一遍。划的是图：图叠在翻页上面，照样翻得动。 */
     @Test fun `swiping away during the scan lands the masks`() {
         show()
         next()
@@ -460,49 +460,77 @@ class OnboardingTourTest {
         compose.onNodeWithText("选择图片").assertIsDisplayed()
     }
 
-    /** 翻页途中进来的那一页上，图、标题、正文各自的左右边（dp，不按屏幕裁掉）。[incoming] 从两块图里挑进来的那一块。 */
-    private fun turning(incoming: (List<Float>) -> Int): Triple<ClosedFloatingPointRange<Float>, DpRect, DpRect> {
-        val density = compose.activity.resources.displayMetrics.density
-        val stages = compose.onAllNodesWithContentDescription("示例聊天截图").fetchSemanticsNodes()
-        assertThat(stages).hasSize(2)
-        val node = stages[incoming(stages.map { it.positionInRoot.x })]
-        val image = node.positionInRoot.x / density..(node.positionInRoot.x + node.size.width) / density
-        val title = compose.onNodeWithText("点文字打码").getUnclippedBoundsInRoot()
-        val body = compose.onNodeWithText("漏掉的字点一下就遮住，再点一下取消").getUnclippedBoundsInRoot()
-        return Triple(image, title, body)
+    /** 「点文字打码」那一页的标题、正文（dp，不按屏幕裁掉）。 */
+    private fun tapPageText(): Pair<DpRect, DpRect> = Pair(
+        compose.onNodeWithText("点文字打码").getUnclippedBoundsInRoot(),
+        compose.onNodeWithText("漏掉的字点一下就遮住，再点一下取消").getUnclippedBoundsInRoot(),
+    )
+
+    private fun assertSameBounds(actual: DpRect, expected: DpRect) {
+        assertThat(actual.left.value).isWithin(0.5f).of(expected.left.value)
+        assertThat(actual.top.value).isWithin(0.5f).of(expected.top.value)
+        assertThat(actual.right.value).isWithin(0.5f).of(expected.right.value)
+        assertThat(actual.bottom.value).isWithin(0.5f).of(expected.bottom.value)
     }
 
-    /** 翻页途中：两页的图都在屏幕上，进来的那一页从上到下一层比一层落在后面（视差），停下时对齐。 */
-    @Test fun `turning a page slides it with the lower layers further out`() {
+    /** 翻页途中图只有一块、一点不动，只有说明在滑：进来的那一页从上到下一层比一层落在后面（视差），停下时对齐。 */
+    @Test fun `turning a page slides only the text with the lower layers further out`() {
         show()
         next()
         settle()
+        val image = stage.getBoundsInRoot()
         val width = compose.onRoot().getBoundsInRoot().width.value
         compose.onNodeWithText("下一步").performClick()
         advance(PAGE_TURN_MS / 3)
-        // 进来的这一页在右边。停稳时图、标题、正文的左边都缩进 24 dp，对齐
-        val (image, title, body) = turning { xs -> xs.indexOf(xs.max()) }
-        assertThat(image.start).isLessThan(width)
-        assertThat(title.left.value).isGreaterThan(image.start)
+        compose.onAllNodesWithContentDescription("示例聊天截图").assertCountEquals(1)
+        assertSameBounds(stage.getBoundsInRoot(), image)
+        // 进来的这一页在右边。停稳时标题、正文的左边都缩进 24 dp，对齐
+        val (title, body) = tapPageText()
+        assertThat(title.left.value).isLessThan(width)
+        assertThat(title.left.value).isGreaterThan(24.5f)
         assertThat(body.left.value).isGreaterThan(title.left.value)
         settle()
-        compose.onAllNodesWithContentDescription("示例聊天截图").assertCountEquals(1)
-        assertThat(compose.onNodeWithText("漏掉的字点一下就遮住，再点一下取消").getUnclippedBoundsInRoot().left.value)
-            .isWithin(0.5f).of(compose.onNodeWithText("点文字打码").getUnclippedBoundsInRoot().left.value)
+        assertSameBounds(stage.getBoundsInRoot(), image)
+        val (titleAfter, bodyAfter) = tapPageText()
+        assertThat(bodyAfter.left.value).isWithin(0.5f).of(titleAfter.left.value)
     }
 
-    /** 从右往左排的语言里下一页从左边进来：下面几层落在图的更左边（更后面），不往中间挤。 */
+    /** 从右往左排的语言里下一页从左边进来：下面几层落在更左边（更后面），不往中间挤；图照样不动。 */
     @Test fun `in right to left layouts the lower layers trail on the left`() {
         direction = LayoutDirection.Rtl
         show()
         next()
         settle()
+        val image = stage.getBoundsInRoot()
+        val width = compose.onRoot().getBoundsInRoot().width.value
         compose.onNodeWithText("下一步").performClick()
         advance(PAGE_TURN_MS / 3)
-        val (image, title, body) = turning { xs -> xs.indexOf(xs.min()) }
-        assertThat(image.endInclusive).isGreaterThan(0f)
-        assertThat(title.right.value).isLessThan(image.endInclusive)
+        assertSameBounds(stage.getBoundsInRoot(), image)
+        val (title, body) = tapPageText()
+        assertThat(title.right.value).isGreaterThan(0f)
+        assertThat(title.right.value).isLessThan(width - 24.5f)
         assertThat(body.right.value).isLessThan(title.right.value)
+    }
+
+    /** 翻进说明更高的一页：图左右不动，下边翻到哪儿往上让到哪儿；那一页的说明贴着图的下边进来，不钻到图底下。 */
+    @Test fun `a taller page pushes the sample up as it slides in`() {
+        show()
+        next()
+        settle()
+        next()
+        val tapPage = stage.getBoundsInRoot()
+        compose.onNodeWithText("下一步").performClick()
+        // 这一页的图上下还有富余，翻过一半多才开始变小
+        advance(PAGE_TURN_MS / 3)
+        val turning = stage.getBoundsInRoot()
+        val title = compose.onNodeWithText("设置里还有更多").getUnclippedBoundsInRoot()
+        settle()
+        val morePage = stage.getBoundsInRoot()
+        assertThat(morePage.height).isLessThan(tapPage.height)
+        assertThat(turning.height).isLessThan(tapPage.height)
+        assertThat(turning.height).isGreaterThan(morePage.height)
+        assertThat((turning.left + turning.right).value / 2).isWithin(0.5f).of((tapPage.left + tapPage.right).value / 2)
+        assertThat(title.top).isAtLeast(turning.bottom)
     }
 
     /** 英文环境下换成英文的样图和它的框：码的处数是它的，框出的链接点得中。 */
