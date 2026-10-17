@@ -63,6 +63,15 @@
 
 [Releases](https://github.com/FlintyLemming/yomark/releases) 里下载 APK：真机装 `arm64-v8a`，模拟器装 `x86_64`。
 
+## 反馈
+
+欢迎反馈：
+
+- **识别问题**：哪种截图漏遮、遮错、该认的没认出来，发邮件到 [yomark@flinty.moe](mailto:yomark@flinty.moe)。附上截图更好查，邮件不公开。
+- **使用体验**：闪退、不好用、想要什么功能，提 [GitHub Issues](https://github.com/FlintyLemming/yomark/issues/new/choose)。Issues 所有人都看得到，附截图前先用有码打码。
+
+应用里「设置 → 关于 → 反馈」会带上版本和机型。
+
 ## 构建
 
 ```sh
