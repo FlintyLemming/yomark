@@ -59,7 +59,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -71,10 +73,17 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -93,8 +102,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.flow.first
@@ -115,6 +126,7 @@ import moe.flinty.yomark.ui.settings.textEngineLabel
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * 第一次打开时的引导（见 [TourPage]），随时可以跳过：
@@ -125,9 +137,10 @@ import kotlin.math.min
  * 5. 设置里还有更多：实验室里「识别聊天记录」的真开关，打开了图上的标题、头像跟着遮住。
  * 设置里「帮助」重放的没有第 4 页（[engineAdvice] 为 null）。
  *
- * 各页左右排开，点「下一步」、左右划都是整页平移；页里从上到下一层比一层走得快（视差），
- * 图走得最慢、最底下的走得最快，翻页时拉开、停下时对齐。欢迎页以外看的是同一张图上的同一份码：
- * 前一页点上的、点掉的，翻过去还在。返回键回上一页，第一页时交给系统。
+ * 各页左右排开，点「下一步」、左右划都是平移。欢迎页以外共用一张样图，翻页时它不动，只有说明在滑：
+ * 说明从上到下一层比一层走得快（视差），翻页时拉开、停下时对齐。竖排时说明高的那一页把图往上顶，
+ * 翻到哪儿顶到哪儿。图跟着「自动打码」从欢迎页后面滑进来；前一页点上的、点掉的码，翻过去还在。
+ * 返回键回上一页，第一页时交给系统。
  *
  * @param sample 样图（TourSample.load）
  * @param boxes 这张样图上量好的框（TourSample.of），和图出自同一套资源
@@ -259,6 +272,10 @@ internal fun OnboardingTour(
         val pageWidth = constraints.maxWidth.toFloat()
         // 从右往左排的语言里下一页在左边：多走的那一截也要反过来
         val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
+        // 欢迎页以外共用的那块样图停在后面几页时不动，只在欢迎页和「自动打码」之间跟着「自动打码」滑：这一截多远（px）
+        val stageShift = { direction * max(0f, pageOffset(pager, state.autoStep)) * pageWidth }
+        // 竖排时共用样图的那几页，说明量出来各多高（px）：图的下边让到说明的上边（见 panelHeightAt）
+        val panelHeights = remember { mutableStateMapOf<Int, Int>() }
 
         HorizontalPager(
             state = pager,
@@ -267,22 +284,11 @@ internal fun OnboardingTour(
             key = { it },
         ) { index ->
             val page = pages[index]
+            // 欢迎页摆自己的图标；后面几页的图不在页里，是叠在翻页上面共用的那一块，页里只空出它的位置
+            val welcome = page == TourPage.WELCOME
             // 这一层比整页多走多少（见 PARALLAX）：离开时往外多走，进来时落在后面，停下时为 0
             val layer = { depth: Int ->
                 Modifier.graphicsLayer { translationX = direction * pageOffset(pager, index) * pageWidth * PARALLAX[depth] }
-            }
-            val stage = @Composable { m: Modifier ->
-                if (page == TourPage.WELCOME) {
-                    WelcomeMark(enter = { stageIn.value }, modifier = m.then(layer(0)))
-                } else {
-                    TourStage(
-                        state, sample, scanStyle,
-                        page = page,
-                        showRing = page == TourPage.TAP && pager.settledPage == index && state.settled && !state.progress.tapped,
-                        animate = animate,
-                        modifier = m.then(layer(0)),
-                    )
-                }
             }
             val panel = @Composable { m: Modifier ->
                 Box(m.then(if (index == 0) risen else Modifier)) {
@@ -297,7 +303,7 @@ internal fun OnboardingTour(
                             Promise(stringResource(R.string.onboarding_metadata), Modifier.padding(top = 12.dp))
                         }
                         TourPage.AUTO, TourPage.TAP -> {
-                            // 这两页的说明占一样高（垫一份看不见的另一页），图在两页上一样大、一样高，平移时不上下跳
+                            // 这两页的说明占一样高（垫一份看不见的另一页）：在这两页之间翻，图一点不动
                             val other = if (page == TourPage.AUTO) TourPage.TAP else TourPage.AUTO
                             Panel(other.title(), other.body(), { Modifier }, Modifier.graphicsLayer { alpha = 0f }.clearAndSetSemantics {}) {
                                 if (other == TourPage.TAP) TapHint(tapped = false)
@@ -322,10 +328,31 @@ internal fun OnboardingTour(
                 }
             }
             if (geometry != null) {
-                // 横屏、平板横着、折叠屏展开：图在左，说明在右；顶上一行、底下按钮叠在说明那一栏上下，不跟着翻
-                Row(Modifier.fillMaxSize().padding(start = geometry.start)) {
+                // 横屏、平板横着、折叠屏展开：图在左，说明在右；顶上一行、底下按钮叠在说明那一栏上下，不跟着翻。
+                // 说明往图那边滑走是钻到图底下：过了图靠说明的那条边就不画，不从图另一边的空白里露出来
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (welcome) {
+                                Modifier
+                            } else {
+                                Modifier.drawWithContent {
+                                    // 图不动、这一页在滑：那条边换算到这一页上
+                                    val slide = stageShift() - direction * pageOffset(pager, index) * pageWidth
+                                    val stageEnd = (geometry.start + geometry.stage).toPx()
+                                    if (direction > 0) {
+                                        clipRect(left = stageEnd + slide) { this@drawWithContent.drawContent() }
+                                    } else {
+                                        clipRect(right = size.width - stageEnd + slide) { this@drawWithContent.drawContent() }
+                                    }
+                                }
+                            },
+                        )
+                        .padding(start = geometry.start),
+                ) {
                     Box(Modifier.width(geometry.stage).fillMaxHeight().padding(vertical = SIDE_PAD), Alignment.Center) {
-                        stage(Modifier)
+                        if (welcome) WelcomeMark(enter = { stageIn.value })
                     }
                     Spacer(Modifier.width(SIDE_GAP))
                     Column(Modifier.width(geometry.text).fillMaxHeight()) {
@@ -337,25 +364,96 @@ internal fun OnboardingTour(
                     }
                 }
             } else {
-                Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (welcome) {
+                                Modifier
+                            } else {
+                                // 说明跟在图底下压下去的那一截（见下面）不伸进底下按钮那一行
+                                Modifier.drawWithContent {
+                                    clipRect(bottom = size.height - BOTTOM_BAR_HEIGHT.toPx()) { this@drawWithContent.drawContent() }
+                                }
+                            },
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
                     Spacer(Modifier.height(TOP_BAR_HEIGHT))
                     Box(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = STAGE_PAD_H, vertical = STAGE_PAD_V),
                         Alignment.Center,
                     ) {
-                        stage(Modifier)
+                        if (welcome) WelcomeMark(enter = { stageIn.value })
                     }
                     // 字放得很大、屏幕又矮时，图至少留这么高，说明自己滚
                     panel(
                         Modifier
+                            .then(
+                                if (welcome) {
+                                    Modifier
+                                } else {
+                                    Modifier
+                                        .layout { measurable, constraints ->
+                                            val placeable = measurable.measure(constraints)
+                                            if (panelHeights[index] != placeable.height) panelHeights[index] = placeable.height
+                                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                                        }
+                                        .graphicsLayer {
+                                            // 翻进说明更高的一页，图还没让够：这一页的说明贴着图的下边，把图往上顶，图让开了才落到位
+                                            val room = panelHeightAt(panelHeights, pager, state) ?: return@graphicsLayer
+                                            translationY = max(0f, (panelHeights[index] ?: 0) - room)
+                                        }
+                                },
+                            )
                             .widthIn(max = COLUMN_TEXT_MAX)
                             .fillMaxWidth()
-                            .heightIn(max = panelCap(if (page == TourPage.WELCOME) WELCOME_ICON else MIN_STAGE))
+                            .heightIn(max = panelCap(if (welcome) WELCOME_ICON else MIN_STAGE))
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 24.dp, vertical = 8.dp),
                     )
                     Spacer(Modifier.height(BOTTOM_BAR_HEIGHT))
                 }
+            }
+        }
+
+        // 欢迎页以外共用的那块样图：叠在翻页上面，翻页时不动，只有底下的说明在滑。「自动打码」那一页露出来才有，
+        // 跟着它从欢迎页后面滑进来；手指落在图上，底下的翻页也收得到，左右划照样翻页
+        val stageShown by remember(pager, state) { derivedStateOf { pageOffset(pager, state.autoStep) < 1f } }
+        if (stageShown) {
+            val place = if (geometry != null) {
+                Modifier.padding(start = geometry.start).width(geometry.stage).fillMaxHeight().padding(vertical = SIDE_PAD)
+            } else {
+                Modifier
+                    .padding(top = TOP_BAR_HEIGHT)
+                    .fillMaxWidth()
+                    // 竖排：底下给说明让出地方，说明高的那一页把图往上顶
+                    .layout { measurable, constraints ->
+                        val panel = panelHeightAt(panelHeights, pager, state) ?: PANEL_ESTIMATE.toPx()
+                        val height = (constraints.maxHeight - BOTTOM_BAR_HEIGHT.toPx() - panel).roundToInt()
+                            .coerceIn(0, constraints.maxHeight)
+                        val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }
+                    .padding(horizontal = STAGE_PAD_H, vertical = STAGE_PAD_V)
+            }
+            Box(
+                Modifier
+                    .shareTouchesBelow()
+                    // 读屏念完第几步先念图，再念页里的说明：图画在翻页上面，不排的话会落到说明后头
+                    .semantics { isTraversalGroup = true; traversalIndex = -0.5f }
+                    .then(place)
+                    .graphicsLayer { translationX = stageShift() },
+                Alignment.Center,
+            ) {
+                TourStage(
+                    state, sample, scanStyle,
+                    linkAction = pager.currentPage > state.autoStep,
+                    // 一翻就淡掉：图不跟着页走，不淡的话框会留在图上，带到翻去的那一页
+                    showRing = pager.settledPage == pages.indexOf(TourPage.TAP) && !pager.isScrollInProgress &&
+                        state.settled && !state.progress.tapped,
+                    animate = animate,
+                )
             }
         }
 
@@ -385,6 +483,41 @@ internal fun OnboardingTour(
 /** 第 [page] 页离停着的位置几页远：右边为正。正停在这一页时是 0。 */
 private fun pageOffset(pager: PagerState, page: Int): Float =
     (page - pager.currentPage) - pager.currentPageOffsetFraction
+
+/**
+ * 竖排时共用的样图底下要让给说明多高（px）：停着的那一页的说明多高；翻页途中按翻过的那一截在两页之间取，
+ * 说明高的那一页翻进来，图跟着一点点往上让。欢迎页上没有这块图，和「自动打码」之间按「自动打码」的算。
+ * 两页都还没量到时为 null。
+ */
+private fun panelHeightAt(heights: Map<Int, Int>, pager: PagerState, state: TourState): Float? {
+    val position = (pager.currentPage + pager.currentPageOffsetFraction)
+        .coerceIn(state.autoStep.toFloat(), state.lastStep.toFloat())
+    val from = position.toInt()
+    val a = heights[from]?.toFloat()
+    val b = heights[min(from + 1, state.lastStep)]?.toFloat()
+    return when {
+        a == null -> b
+        b == null -> a
+        else -> lerp(a, b, position - from)
+    }
+}
+
+/**
+ * 叠在翻页上面的图让底下的翻页也收到手指：在图上左右划照样翻页，点一下还是图自己接（TourStage 里只认点一下的那层）。
+ * 划开以后点一下就作废，和图在页里时一样。
+ */
+private fun Modifier.shareTouchesBelow(): Modifier = this then ShareTouchesElement
+
+private data object ShareTouchesElement : ModifierNodeElement<ShareTouchesNode>() {
+    override fun create() = ShareTouchesNode()
+    override fun update(node: ShareTouchesNode) = Unit
+}
+
+private class ShareTouchesNode : Modifier.Node(), PointerInputModifierNode {
+    override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) = Unit
+    override fun onCancelPointerInput() = Unit
+    override fun sharePointerInputWithSiblings() = true
+}
 
 @Composable
 private fun TourPage.title(): String = stringResource(
@@ -539,7 +672,7 @@ private fun BottomBar(
 
 /**
  * 一页的说明：标题一行，下面一两句；[extra] 是这一页另外要摆的（提示、承诺、设置里那几行）。
- * 标题、正文、另外那块各是视差里的一层（[layer] 1、2、3）。
+ * 标题、正文、另外那块各是视差里的一层（[layer] 0、1、2）。
  *
  * @param reserve 正文还可能换成的那几句：按最高的占住高度，换的时候淡入淡出、上面的图不跳
  */
@@ -558,16 +691,16 @@ private fun Panel(
             title,
             style = titleStyle,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = layer(1).semantics { heading() },
+            modifier = layer(0).semantics { heading() },
         )
         val bodyStyle = MaterialTheme.typography.bodyLarge
         val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
         if (reserve.isEmpty()) {
-            Text(body, style = bodyStyle, color = bodyColor, modifier = layer(2).padding(top = 8.dp))
+            Text(body, style = bodyStyle, color = bodyColor, modifier = layer(1).padding(top = 8.dp))
         } else {
             // 读屏念的是眼下这一句，换了也念
             Box(
-                layer(2).padding(top = 8.dp).clearAndSetSemantics {
+                layer(1).padding(top = 8.dp).clearAndSetSemantics {
                     text = AnnotatedString(body)
                     liveRegion = LiveRegionMode.Polite
                 },
@@ -576,7 +709,7 @@ private fun Panel(
                 Crossfade(body, label = "panelBody") { Text(it, style = bodyStyle, color = bodyColor) }
             }
         }
-        Column(layer(3)) { extra() }
+        Column(layer(2)) { extra() }
     }
 }
 
@@ -710,10 +843,10 @@ private suspend fun PointerInputScope.swallowTouches() = awaitEachGesture {
 private const val RATIO = TourSample.WIDTH / TourSample.HEIGHT.toFloat()
 
 /**
- * 视差：页里从上到下各层比整页多走几成（图、标题、正文、另外那块）。离开时往外多走、进来时落在后面，
- * 越往下拉得越开，停下时一齐对齐。
+ * 视差：说明里从上到下各层比整页多走几成（标题、正文、另外那块）。离开时往外多走、进来时落在后面，
+ * 越往下拉得越开，停下时一齐对齐。图不在里头：欢迎页的图标和整页一起走，后面几页共用的样图不动。
  */
-private val PARALLAX = floatArrayOf(0f, 0.18f, 0.34f, 0.5f)
+private val PARALLAX = floatArrayOf(0.18f, 0.34f, 0.5f)
 
 /** 点「下一步」、返回键翻一页：整页宽的一段路，比面板展开（350 ms）长一点，同一条 Material 3 标准曲线。 */
 private const val PAGE_MS = 450
@@ -724,7 +857,7 @@ private val TOP_BAR_HEIGHT = 56.dp
 /** 底下按钮那一行（按钮 40 dp，上下各留 16）。每页底下空出这么高给它。 */
 private val BOTTOM_BAR_HEIGHT = 72.dp
 
-/** 「自动打码」「点文字打码」的说明大约多高：挑横竖排时用，真摆的时候按量出来的高。 */
+/** 「自动打码」「点文字打码」的说明大约多高：挑横竖排时用（还没量到时图也先按它让），真摆的时候按量出来的高。 */
 private val PANEL_ESTIMATE = 160.dp
 
 /** 竖排时图至少留这么高。 */

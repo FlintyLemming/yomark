@@ -60,9 +60,9 @@ import moe.flinty.yomark.ui.components.foldTween
  *
  * 画布上面盖一层只认点一下的：两指缩放、拖出框、长按大爆炸在引导里都不要。
  *
- * 欢迎页以外每页各有一块（翻页时两页的图一起在屏幕上），画的是同一份码。
+ * 欢迎页以外几页共用这一块：翻页时它不动，只有说明在滑（见 OnboardingTour）。
  *
- * @param page 哪一页的图：识别动效只在「自动打码」上演；从「点文字打码」起读屏能双击遮住链接
+ * @param linkAction 读屏能双击遮住链接：从「点文字打码」起
  * @param showRing 「点文字打码」框出让人点的那段链接
  */
 @Composable
@@ -70,7 +70,7 @@ internal fun TourStage(
     state: TourState,
     sample: SourceImage,
     scanStyle: ScanStyle,
-    page: TourPage,
+    linkAction: Boolean,
     showRing: Boolean,
     animate: Boolean,
     modifier: Modifier = Modifier,
@@ -88,8 +88,8 @@ internal fun TourStage(
                 .border(1.dp, colors.outlineVariant.copy(alpha = EDGE_ALPHA), shape),
         ) {
             val registry = remember { RendererRegistry.default() }
-            // 识别动效只在「自动打码」的图上演：后面几页的图在这一页一动时才出来，那时码已经落下
-            val analyzing = !state.progress.revealed && page == TourPage.AUTO
+            // 码还没落下就是在识别：图跟着「自动打码」才出来，翻离那一页码就落下，识别动效只在那一页上演
+            val analyzing = !state.progress.revealed
             val plan = state.plan
             val ui = remember(sample, plan, analyzing) { EditorUiState(image = sample, plan = plan, analyzing = analyzing) }
             ImageCanvas(
@@ -103,7 +103,7 @@ internal fun TourStage(
                 scanStyle = scanStyle,
             )
             LinkRing(sample, state.sample.link, showRing, animate)
-            TapCatcher(state, sample, linkAction = page > TourPage.AUTO)
+            TapCatcher(state, sample, linkAction)
             // 读屏从图上就念得到「识别中…」（见 TapCatcher），提示条不再念一遍
             AnalyzingPill(visible = analyzing, Modifier.align(Alignment.TopCenter).padding(top = 12.dp).clearAndSetSemantics {})
         }
