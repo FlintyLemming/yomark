@@ -138,7 +138,7 @@ class MaskItemListTest {
         ),
     )
 
-    /** 每一行都是一块码：识别出的点了就取消打码（读屏念的就是这个动作），手动框写着是手动画的。 */
+    /** 每一行都是一块码：识别出的点了就取消打码（读屏念的就是这个动作）。 */
     @Test fun `every box is listed with its kind`() {
         show(plan)
         compose.onNode(hasText("电话") and hasClickAction()).assert(
@@ -146,7 +146,6 @@ class MaskItemListTest {
         )
         compose.onNodeWithText("网址").assertExists()
         compose.onNodeWithText("手动").assertExists()
-        compose.onNodeWithText("手动画的框").assertExists()
         compose.onNodeWithText("框出 3 处").assertExists()
     }
 
@@ -161,7 +160,6 @@ class MaskItemListTest {
     @Test fun `the selected manual box is marked`() {
         show(plan, selectedId = "manual")
         compose.onNodeWithText("手动").assertIsSelected()
-        compose.onNodeWithText("已选中").assertExists()
     }
 
     @Test fun `results from the model say so`() {

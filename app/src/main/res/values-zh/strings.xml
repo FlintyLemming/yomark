@@ -83,8 +83,6 @@
     <string name="list_count">框出 %1$d 处</string>
     <string name="list_empty">没有识别到敏感信息</string>
     <string name="list_empty_hint">有漏掉的地方，在图上用一根手指拖出一个框</string>
-    <string name="item_selected">已选中</string>
-    <string name="item_manual">手动画的框</string>
     <string name="item_unmask">取消打码</string>
 
     <!-- kinds -->
