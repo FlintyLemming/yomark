@@ -15,7 +15,7 @@ enum class MaskSafety { IRREVERSIBLE, COSMETIC, ANNOTATION_ONLY }
 
 object MaskStyleInfo {
 
-    /** 样式栏上的顺序：不可还原的色块排最前面，外观优先的与只做标记的排后面（前五种与 README 的样式表一致，文本在 README 里单列）。 */
+    /** 样式栏上的顺序：不可还原的色块排最前面，外观优先的与只做标记的排后面（前五种与功能说明 docs/features.md 的样式表一致，文本在那里单列）。 */
     val ORDER: List<MaskStyle> = listOf(
         MaskStyle.SOLID, MaskStyle.PIXELATE, MaskStyle.BLUR, MaskStyle.MARKER, MaskStyle.PEN, MaskStyle.TEXT,
     )
