@@ -61,7 +61,7 @@ fun AboutSettingsScreen(
     debugTrace: Boolean,
     onDebugTraceChange: (Boolean) -> Unit,
     onReset: () -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
     version: String = "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
     play: Boolean = !Edition.isFree,

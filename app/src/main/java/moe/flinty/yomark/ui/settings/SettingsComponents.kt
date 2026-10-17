@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.settings
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +44,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -112,12 +114,15 @@ internal fun RowGapSpacer() {
  * 最后一行下面留出导航条的高度。横屏时左右再让开挖孔与三键导航。
  *
  * 各页都是自己的 Activity，这里不拦系统返回：返回由 Activity 自己 finish，预见式返回的跨 Activity 动画才放得出来。
+ * 宽屏上分两栏时（见 SettingsHost）各栏各让各的：左栏不管右边的系统栏、挖孔，右栏不管左边的。
+ *
+ * [onNavigateUp] 为 null 时标题栏左边不放返回：分栏时右栏最底下那一页，它的上一层就是左栏。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsScaffold(
     title: String,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit,
@@ -131,7 +136,9 @@ internal fun SettingsScaffold(
             LargeTopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (onNavigateUp != null) {
+                        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    }
                 },
                 actions = actions,
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -226,7 +233,7 @@ internal fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable C
  * 这样点哪里都算，读屏也把标题、说明和开关读成一个整体。
  *
  * 放在 [SettingsGroup] 里时不用传 [shape]；懒加载列表里逐行排的组，用 [groupItemShape] 按位置给，
- * 再在 [modifier] 上加 [lazyGroupInset]。
+ * 再在 [modifier] 上加 [lazyGroupInset]。[container] 是卡片的底色，只有分栏时左栏里选中的那一行换（见 [NavigationRow]）。
  */
 @Composable
 internal fun SettingsRow(
@@ -236,6 +243,7 @@ internal fun SettingsRow(
     summary: String? = null,
     shape: Shape = RoundedCornerShape(InnerCorner),
     enabled: Boolean = true,
+    container: Color = MaterialTheme.colorScheme.surfaceBright,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     below: (@Composable () -> Unit)? = null,
@@ -244,7 +252,7 @@ internal fun SettingsRow(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceBright)
+            .background(container)
             .then(interaction)
             .heightIn(min = 64.dp)
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -302,7 +310,12 @@ internal fun RowIcon(icon: ImageVector, modifier: Modifier = Modifier) {
     )
 }
 
-/** 点进下一页（或弹出对话框）的一行。Android 的设置首页不画右箭头，这里也不画。 */
+/**
+ * 点进下一页（或弹出对话框）的一行。Android 的设置首页不画右箭头，这里也不画。
+ *
+ * 分栏时一级页在左栏（见 SettingsHost），[selected] 不为 null：右栏正开着的那一项底色换成 secondaryContainer，
+ * 和编辑器宽屏列表里选中的那一行一个颜色，读屏也读出选中了哪一项。不打开页的行（帮助）照旧传 null。
+ */
 @Composable
 internal fun NavigationRow(
     title: String,
@@ -311,12 +324,23 @@ internal fun NavigationRow(
     iconColors: SettingsIconColor,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean? = null,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val container by animateColorAsState(
+        if (selected == true) colors.secondaryContainer else colors.surfaceBright,
+        label = "row container",
+    )
     SettingsRow(
         title = title,
         summary = summary,
         modifier = modifier,
-        interaction = Modifier.clickable(onClick = onClick),
+        container = container,
+        interaction = if (selected == null) {
+            Modifier.clickable(onClick = onClick)
+        } else {
+            Modifier.selectable(selected = selected, role = Role.Tab, onClick = onClick)
+        },
         leading = { SettingsIcon(icon, iconColors) },
     )
 }

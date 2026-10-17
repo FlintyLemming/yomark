@@ -57,7 +57,8 @@ object EditorLayouts {
         else -> EditorLayout.PHONE
     }
 
-    private fun isWide(widthDp: Int, heightDp: Int, smallestWidthDp: Int): Boolean {
+    /** 平板、折叠屏展开、阔折叠这类宽屏。设置分不分两栏也先看这一条（见 SettingsLayouts）。 */
+    internal fun isWide(widthDp: Int, heightDp: Int, smallestWidthDp: Int): Boolean {
         if (smallestWidthDp >= TABLET_SMALLEST_WIDTH_DP) return true
         if (smallestWidthDp < WIDE_FOLD_SMALLEST_WIDTH_DP) return false
         val short = min(widthDp, heightDp)
