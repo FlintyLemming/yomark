@@ -9,13 +9,16 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -53,6 +56,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.Button
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -73,9 +77,18 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -85,9 +98,9 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -106,13 +119,15 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import androidx.core.content.ContextCompat
-import androidx.core.graphics.drawable.toBitmap
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.toPath
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import moe.flinty.yomark.R
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.export.BrandGlyph
+import moe.flinty.yomark.ui.canvas.ExpressiveShapes
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.contentFoldSpec
 import moe.flinty.yomark.ui.components.contentFoldTween
@@ -130,7 +145,7 @@ import kotlin.math.roundToInt
 
 /**
  * 第一次打开时的引导（见 [TourPage]），随时可以跳过：
- * 1. 欢迎：应用图标、一句话说清是干什么的、两条承诺；
+ * 1. 欢迎：图标摆在几块慢慢转的 Material 形状上、一句话说清是干什么的、两条承诺；
  * 2. 自动打码：样图上演一遍编辑器的识别动效，码落下来（码是现成的，不现场识别，见 [TourSample]）；
  * 3. 点文字打码：框出一段没遮住的链接，点一下就抹上码；
  * 4. 识别引擎：按后台给 PP-OCR 测的速度（见 [EngineProbeModel]）推荐一个、替人选好，说为什么，可以改；
@@ -150,7 +165,7 @@ import kotlin.math.roundToInt
  * @param engine 设置里眼下用的识别引擎
  * @param onEngineChange 「识别引擎」那一页选了一个（替人选好的，或者点的）：写进设置
  * @param interactive false 时正在退场淡出：不接触摸、读屏看不见它、返回键不归它
- * @param animate false 时（系统关了动画）不演识别动效，一进来码就在图上
+ * @param animate false 时（系统关了动画）不演识别动效，一进来码就在图上；欢迎页的形状也不转
  */
 @Composable
 internal fun OnboardingTour(
@@ -200,7 +215,7 @@ internal fun OnboardingTour(
     // 最后一页的按钮要等这一页停稳才算数：快点两下「下一步」，第二下落在正滑进来的最后一页上，不能当成「选择图片」走掉
     val landed = { pager.settledPage == state.lastStep && !pager.isScrollInProgress }
 
-    // 入场：欢迎页的图标淡入、从略小长到原大，说明和按钮慢一拍往上浮出来。只演一回，转屏回来不再演
+    // 入场：欢迎页的图淡入、从略小长到原大，说明和按钮慢一拍往上浮出来。只演一回，转屏回来不再演
     var entered by rememberSaveable { mutableStateOf(false) }
     val entering = remember { animate && !entered }
     val stageIn = remember { Animatable(if (entering) 0f else 1f) }
@@ -265,7 +280,7 @@ internal fun OnboardingTour(
     ) {
         val side = sideBySide(maxWidth, maxHeight)
         val geometry = if (side) SideGeometry.of(maxWidth, maxHeight) else null
-        // 说明最高多高：图至少留 [stage] 那么高（欢迎页的图标小，留得少）；屏幕很矮（分屏、小外屏）时说明至少留 MIN_PANEL，图再小也让它
+        // 说明最高多高：图至少留 [stage] 那么高（欢迎页的图缩得小，留得少）；屏幕很矮（分屏、小外屏）时说明至少留 MIN_PANEL，图再小也让它
         val panelCap = { stage: Dp ->
             max((maxHeight - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - stage - STAGE_PAD_V * 2).value, MIN_PANEL.value).dp
         }
@@ -352,7 +367,7 @@ internal fun OnboardingTour(
                         .padding(start = geometry.start),
                 ) {
                     Box(Modifier.width(geometry.stage).fillMaxHeight().padding(vertical = SIDE_PAD), Alignment.Center) {
-                        if (welcome) WelcomeMark(enter = { stageIn.value })
+                        if (welcome) WelcomeMark(enter = { stageIn.value }, spin = animate)
                     }
                     Spacer(Modifier.width(SIDE_GAP))
                     Column(Modifier.width(geometry.text).fillMaxHeight()) {
@@ -384,7 +399,7 @@ internal fun OnboardingTour(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = STAGE_PAD_H, vertical = STAGE_PAD_V),
                         Alignment.Center,
                     ) {
-                        if (welcome) WelcomeMark(enter = { stageIn.value })
+                        if (welcome) WelcomeMark(enter = { stageIn.value }, spin = animate)
                     }
                     // 字放得很大、屏幕又矮时，图至少留这么高，说明自己滚
                     panel(
@@ -408,7 +423,7 @@ internal fun OnboardingTour(
                             )
                             .widthIn(max = COLUMN_TEXT_MAX)
                             .fillMaxWidth()
-                            .heightIn(max = panelCap(if (welcome) WELCOME_ICON else MIN_STAGE))
+                            .heightIn(max = panelCap(if (welcome) WELCOME_STAGE else MIN_STAGE))
                             .verticalScroll(rememberScrollState())
                             .padding(horizontal = 24.dp, vertical = 8.dp),
                     )
@@ -734,26 +749,90 @@ private fun TapHint(tapped: Boolean) {
     }
 }
 
-/** 欢迎页上的图：桌面上那个图标（自适应图标，系统按桌面图标的形状裁好），入场时淡入、从略小长到原大（[enter] 0 到 1）。 */
+/**
+ * 欢迎页上的图：图标里的截图和胶带（不带墨色底板）摆在几块 Material 3 Expressive 的形状上（[ExpressiveShapes]，
+ * 摆法见 [WELCOME_PIECES]）：主题色的九瓣曲奇，底下垫一块浅色的柔星，右下两颗小的点缀。各块慢慢转，
+ * 系统关了动画（[spin] 为 false）时不转。入场时整块淡入、从略小长到原大（[enter] 0 到 1）。
+ */
 @Composable
-private fun WelcomeMark(enter: () -> Float, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val px = with(LocalDensity.current) { WELCOME_ICON.roundToPx() }
-    val icon = remember(px) { ContextCompat.getDrawable(context, R.mipmap.ic_launcher)!!.toBitmap(px, px).asImageBitmap() }
+private fun WelcomeMark(enter: () -> Float, spin: Boolean, modifier: Modifier = Modifier) {
+    val glyph = painterResource(R.drawable.brand_glyph)
+    val colors = MaterialTheme.colorScheme
+    val spinners = remember { WELCOME_PIECES.map { Spinner(it.shape()) } }
+    val turns = if (spin) rememberInfiniteTransition(label = "welcomeTurn") else null
+    val angles = WELCOME_PIECES.map { piece ->
+        turns?.animateFloat(
+            0f, if (piece.turnMs > 0) 360f else -360f,
+            infiniteRepeatable(tween(abs(piece.turnMs), easing = LinearEasing)), label = "welcomeTurn",
+        )
+    }
     Box(modifier.fillMaxSize(), Alignment.Center) {
-        Image(
-            icon,
-            contentDescription = null,
-            // 屏幕矮得放不下时跟着缩小
-            modifier = Modifier.heightIn(max = WELCOME_ICON).aspectRatio(1f, matchHeightConstraintsFirst = true).graphicsLayer {
-                val t = enter()
-                alpha = t
-                scaleX = ENTER_SCALE + (1f - ENTER_SCALE) * t
-                scaleY = scaleX
-            },
+        Spacer(
+            Modifier
+                // 屏幕矮得放不下时跟着缩小
+                .heightIn(max = WELCOME_ART)
+                .aspectRatio(ART.width / ART.height, matchHeightConstraintsFirst = true)
+                .graphicsLayer {
+                    val t = enter()
+                    alpha = t
+                    scaleX = ENTER_SCALE + (1f - ENTER_SCALE) * t
+                    scaleY = scaleX
+                }
+                .drawWithCache {
+                    // 以曲奇的半径为单位摆（见 Piece）；转的时候只转，路径按这个大小备好
+                    val r = size.height / ART.height
+                    val origin = Offset(-ART.left * r, -ART.top * r)
+                    val paths = spinners.mapIndexed { i, spinner -> spinner.path(WELCOME_PIECES[i].radius * r) }
+                    val side = GLYPH * r
+                    onDrawBehind {
+                        WELCOME_PIECES.forEachIndexed { i, piece ->
+                            drawTurned(paths[i], origin + piece.at * r, angles[i]?.value ?: 0f, piece.color(colors))
+                        }
+                        translate(origin.x - side / 2, origin.y - side / 2) { with(glyph) { draw(Size(side, side)) } }
+                    }
+                },
         )
     }
 }
+
+/**
+ * 欢迎页图里的一块形状：摆在哪儿、多大（以曲奇的半径为单位、曲奇中心为原点，按转到哪个角度最远到哪儿算），
+ * 转一圈多久（负的逆时针转），取主题里的哪个颜色。
+ */
+private class Piece(
+    val shape: () -> RoundedPolygon,
+    val at: Offset,
+    val radius: Float,
+    val turnMs: Int,
+    val color: (ColorScheme) -> Color,
+)
+
+/**
+ * 绕自己中心转的形状：挪到原点，按它转到哪个角度都够得着的最远处算半径。按这个半径摆，转起来不会出界。
+ */
+private class Spinner(polygon: RoundedPolygon) {
+    private val unit = polygon.toPath().apply {
+        val reach = polygon.calculateMaxBounds()
+        val radius = (reach[2] - reach[0]) / 2
+        transform(
+            android.graphics.Matrix().apply {
+                setTranslate(-polygon.centerX, -polygon.centerY)
+                postScale(1 / radius, 1 / radius)
+            },
+        )
+    }
+
+    /** 半径 [radius]（像素）的路径，中心在原点。 */
+    fun path(radius: Float): Path =
+        android.graphics.Path(unit).apply { transform(android.graphics.Matrix().apply { setScale(radius, radius) }) }.asComposePath()
+}
+
+/** 在 [at] 画顺时针转了 [degrees] 度的 [path]（中心在原点，见 [Spinner.path]）。 */
+private fun DrawScope.drawTurned(path: Path, at: Offset, degrees: Float, color: Color) =
+    withTransform({
+        translate(at.x, at.y)
+        rotate(degrees, Offset.Zero)
+    }) { drawPath(path, color) }
 
 /** 欢迎页的一条承诺：前面一个对勾，对着第一行的中间（折成两行时不跑到两行中间，字放大了也对得上）。 */
 @Composable
@@ -883,11 +962,39 @@ private val DOT_ACTIVE = 18.dp
 
 private val SETTINGS_CARD_RADIUS = 28.dp
 
-/** 欢迎页上的图标多大，竖排时那一块至少也留这么高。 */
-private val WELCOME_ICON = 120.dp
+/** 欢迎页上的图（方的）最大多大；竖排时那一块至少留 [WELCOME_STAGE] 这么高，屏幕矮时图跟着缩小。 */
+private val WELCOME_ART = 260.dp
+private val WELCOME_STAGE = 120.dp
 private val PROMISE_ICON = 20.dp
 
-/** 入场时图标从这么大长到原大；说明从下面浮上来 [ENTER_RISE] 这么远，比图标慢 [PANEL_DELAY_MS] 这么一拍。 */
+/**
+ * 欢迎页的图从下往上画哪几块：浅色的柔星垫底，比曲奇大一圈，尖角从瓣之间探出来；主题色的九瓣曲奇；
+ * 右下压着曲奇边的一块小四瓣、再往下一颗更小的柔星。转一圈多久：慢得不抢字的眼，又看得出在转；
+ * 柔星和曲奇反着转，尖角在瓣之间慢慢错开，小的转得快些。图标画在它们上面，不转。
+ */
+private val WELCOME_PIECES = with(ExpressiveShapes) {
+    listOf(
+        Piece(::sunny, Offset.Zero, 1.24f, -60_000) { it.secondaryContainer },
+        Piece(::cookie9, Offset.Zero, 1f, 40_000) { it.primary },
+        Piece(::cookie4, Offset(1f, 0.74f), 0.24f, 24_000) { it.tertiary },
+        Piece(::sunny, Offset(0.62f, 1.12f), 0.13f, 16_000) { it.tertiary },
+    )
+}
+
+/** 整块图转起来也出不去的框：各块的外接圆合起来。 */
+private val ART = WELCOME_PIECES.fold(Rect(-1f, -1f, 1f, 1f)) { b, p ->
+    Rect(
+        left = min(b.left, p.at.x - p.radius),
+        top = min(b.top, p.at.y - p.radius),
+        right = max(b.right, p.at.x + p.radius),
+        bottom = max(b.bottom, p.at.y + p.radius),
+    )
+}
+
+/** 图标那块（1024 见方的母版）画多大，以曲奇的半径为单位：截图比曲奇的半径稍高，四角离曲奇的凹处还有富余。 */
+private val GLYPH = 1.08f * 1024f / BrandGlyph.PAPER.height()
+
+/** 入场时图从这么大长到原大；说明从下面浮上来 [ENTER_RISE] 这么远，比图慢 [PANEL_DELAY_MS] 这么一拍。 */
 private const val ENTER_SCALE = 0.9f
 private val ENTER_RISE = 24.dp
 private const val PANEL_DELAY_MS = 60

@@ -6,6 +6,7 @@
 //   app/src/main/res/drawable/ic_launcher_background.xml   自适应图标的背景层：底板和截图
 //   app/src/main/res/drawable/ic_launcher_foreground.xml   自适应图标的前景层：只有胶带
 //   app/src/main/res/drawable/ic_launcher_monochrome.xml   Android 13 起的主题图标：单色剪影
+//   app/src/main/res/drawable/brand_glyph.xml          不带底板的截图和胶带：引导欢迎页摆在主题色的形状上
 //   docs/icon/icon-monochrome.svg                      上面那个剪影的预览，只给人看
 //   site/favicon.svg                                    官网的网页图标和品牌标，圆角方形
 //
@@ -230,7 +231,8 @@ function toSvg(nodes, { shadows = true, clip } = {}) {
 }
 
 // ── 输出：Android 矢量图（108 dp 画布，母版居中，四周各让出 256） ────────────────────────
-function toVector(nodes) {
+// bleed 为 0 时不让：画布就是母版的 1024，对 72 dp
+function toVector(nodes, { bleed = 256 } = {}) {
   let gradients = false;
   const hex = (c, a = 1) => `#${Math.round(a * 255).toString(16).padStart(2, '0').toUpperCase()}${c.slice(1).toUpperCase()}`;
   const walk = (n, ind) => {
@@ -265,13 +267,15 @@ function toVector(nodes) {
       g.stops.map(([o, c, a = 1]) => `${ind}            <item android:offset="${off(o)}" android:color="${hex(c, a)}" />\n`).join('') +
       `${ind}        </gradient>\n${ind}    </aapt:attr>\n${ind}</path>\n`;
   };
-  const body = nodes.map((n) => walk(n, '        ')).join('');
+  const body = nodes.map((n) => walk(n, bleed ? '        ' : '    ')).join('');
+  const view = 1024 + 2 * bleed, dp = (view / 1024) * 72;
   return `<?xml version="1.0" encoding="utf-8"?>\n` +
     `<!-- 由 docs/icon/src/icons.mjs 生成，改图标去改那里再重新生成 -->\n` +
     `<vector xmlns:android="http://schemas.android.com/apk/res/android"` +
     (gradients ? `\n    xmlns:aapt="http://schemas.android.com/aapt"` : '') +
-    `\n    android:width="108dp"\n    android:height="108dp"\n    android:viewportWidth="1536"\n    android:viewportHeight="1536">\n` +
-    `    <group android:translateX="256" android:translateY="256">\n${body}    </group>\n</vector>\n`;
+    `\n    android:width="${dp}dp"\n    android:height="${dp}dp"\n    android:viewportWidth="${view}"\n    android:viewportHeight="${view}">\n` +
+    (bleed ? `    <group android:translateX="${bleed}" android:translateY="${bleed}">\n${body}    </group>\n` : body) +
+    `</vector>\n`;
 }
 
 // ── 写文件 ───────────────────────────────────────────────────────────────────────────────
@@ -289,5 +293,7 @@ write('site/favicon.svg', toSvg([page, ...foreground], { shadows: false, clip: r
 write('app/src/main/res/drawable/ic_launcher_background.xml', toVector([background, ...screenshot]));
 write('app/src/main/res/drawable/ic_launcher_foreground.xml', toVector([tapeGroup]));
 write('app/src/main/res/drawable/ic_launcher_monochrome.xml', toVector(monochrome));
+// 引导的欢迎页：去掉底板，截图和胶带摆在主题色的形状上（ui/onboarding/OnboardingTour.kt 的 WelcomeMark）
+write('app/src/main/res/drawable/brand_glyph.xml', toVector(foreground, { bleed: 0 }));
 // 主题图标的预览，只给人看，不进应用
 write('docs/icon/icon-monochrome.svg', toSvg([{ d: 'M0 0H1024V1024H0Z', fill: '#2B2E3A' }, ...monochrome]));
