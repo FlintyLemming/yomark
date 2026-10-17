@@ -1,5 +1,7 @@
 package moe.flinty.yomark.ui.onboarding
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.os.Looper
 import androidx.activity.ComponentActivity
 import androidx.compose.material3.Surface
@@ -276,6 +278,38 @@ class OnboardingTourTest {
         show(animate = false)
         next(animate = false)
         stageSays("遮住了 4 处")
+    }
+
+    /** 欢迎页上图标底下的形状一直在慢慢转：入场演完以后过一会儿，图上还有一大片像素在变。 */
+    @Test fun `the welcome shapes keep turning`() {
+        show()
+        advance(1_000)
+        val before = window()
+        advance(1_500)
+        assertThat(window().changedFrom(before)).isGreaterThan(1_000)
+    }
+
+    @Test fun `with animations off the welcome shapes stand still`() {
+        show(animate = false)
+        val before = window()
+        compose.mainClock.advanceTimeBy(1_500)
+        assertThat(window().changedFrom(before)).isEqualTo(0)
+    }
+
+    /** captureToImage 在 Robolectric 上等不到重绘，直接把整个窗口画进一张位图。 */
+    private fun window(): Bitmap {
+        idle()
+        val view = compose.activity.window.decorView
+        val bmp = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnUiThread { view.draw(Canvas(bmp)) }
+        return bmp
+    }
+
+    /** 和一样大的 [other] 比，有几个像素不一样。 */
+    private fun Bitmap.changedFrom(other: Bitmap): Int {
+        val a = IntArray(width * height).also { getPixels(it, 0, width, 0, 0, width, height) }
+        val b = IntArray(width * height).also { other.getPixels(it, 0, width, 0, 0, width, height) }
+        return a.indices.count { a[it] != b[it] }
     }
 
     /** 划开「自动打码」时识别动效还在演：码当场落下，不再从头演一遍。划的是图：图叠在翻页上面，照样翻得动。 */
