@@ -2,6 +2,7 @@ package moe.flinty.yomark.ui
 
 import android.app.TaskStackBuilder
 import android.content.ClipData
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -72,6 +73,8 @@ class EditorActivity : YomarkActivity() {
                     // 从 Activity 取：Android 12 及以下应用内选的语言只换在 Activity 上（见 AppLocale）
                     defaultPurposeText = getString(R.string.purpose_default),
                     forCaller = forCaller,
+                    // 别的应用来要图时没有分享：导出就是把图交回去
+                    shareSink = if (forCaller) null else FileProviderSink(app, FileProviderSink.SHARE),
                 )
             }
         }
@@ -105,6 +108,9 @@ class EditorActivity : YomarkActivity() {
                         onSettings = { startActivity(Intent(this, SettingsActivity::class.java)) },
                         onNavigateUp = if (forCaller) ::finish else ::navigateUpToHome,
                         onHandOver = ::handOver,
+                        onShareImages = { images, mimeType ->
+                            if (images.isNotEmpty()) startActivity(shareChooser(this, images, mimeType))
+                        },
                     )
                 }
             }
@@ -193,6 +199,22 @@ class EditorActivity : YomarkActivity() {
             Intent()
                 .setClassName(context, if (forCaller) CALLER_ENTRY else EditorActivity::class.java.name)
                 .setData(images.first())
+                .apply { clipData = clipOf(images) }
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+
+        /**
+         * 顶栏的分享：系统的分享面板，上面不列有码自己（它也收分享来的图，分享给自己没有意义）。
+         * 面板带着 [shareIntent] 的 clipData 和读权限，看得到图。
+         */
+        internal fun shareChooser(context: Context, images: List<Uri>, mimeType: String): Intent =
+            Intent.createChooser(shareIntent(images, mimeType), null)
+                .putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(context, EditorActivity::class.java)))
+
+        /** 分享打好码的图：一张是 ACTION_SEND，多张是 ACTION_SEND_MULTIPLE。读权限随 clipData 授予收到的应用。 */
+        internal fun shareIntent(images: List<Uri>, mimeType: String): Intent =
+            (if (images.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, images.first())
+            else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(images)))
+                .setType(mimeType)
                 .apply { clipData = clipOf(images) }
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 

@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
 
-/** 交给别的应用的图：经自己的 FileProvider 读得到，重名不覆盖，下一次来要图时清掉。 */
+/** 交给别的应用的图：经自己的 FileProvider 读得到，重名不覆盖，下一次来要图时清掉。分享出去的在自己的目录里，各清各的。 */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class FileProviderSinkTest {
@@ -71,5 +71,31 @@ class FileProviderSinkTest {
         sink.clear()
 
         assertThat(file.exists()).isFalse()
+    }
+
+    @Test
+    fun `a shared image is readable through the provider too`() = runTest {
+        assumeTrue("FileProvider 按 / 拼路径，Windows 上的 Robolectric 对不上", File.separatorChar == '/')
+        val shared = FileProviderSink(context, FileProviderSink.SHARE)
+        val uri = shared.write("YOMARK_20261017_120000.jpg")
+
+        val decoded = context.contentResolver.openInputStream(uri)!!.use { BitmapFactory.decodeStream(it) }
+        assertThat(decoded.width).isEqualTo(20)
+        shared.clear()
+    }
+
+    @Test
+    fun `shared images keep to their own folder, cleared on their own`() = runTest {
+        val shared = FileProviderSink(context, FileProviderSink.SHARE) { Uri.fromFile(it) }
+        val sharedFile = File(shared.write("YOMARK_20261017_120000.jpg").path!!)
+        assertThat(sharedFile.parentFile).isEqualTo(File(context.cacheDir, "share"))
+
+        // 有应用来要图时只清交回去的，分享出去的还在；下一次分享也只清分享出去的
+        sink.clear()
+        assertThat(sharedFile.exists()).isTrue()
+        val handedOver = File(sink.write("YOMARK_20261017_120000.jpg").path!!)
+        shared.clear()
+        assertThat(sharedFile.exists()).isFalse()
+        assertThat(handedOver.exists()).isTrue()
     }
 }

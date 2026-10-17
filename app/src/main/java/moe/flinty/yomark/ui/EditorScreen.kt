@@ -111,6 +111,8 @@ fun EditorScreen(
     onUnlockFree: () -> Unit = {},
     /** 别的应用来要图（vm.forCaller），图导出好了：交回给它。 */
     onHandOver: (List<Uri>) -> Unit = {},
+    /** 点了顶栏的分享，图写进缓存了：交给系统的分享面板（图、MIME 类型）。 */
+    onShareImages: (List<Uri>, String) -> Unit = { _, _ -> },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -153,6 +155,11 @@ fun EditorScreen(
             is EditorMessage.BatchPartial -> snackbar.showMessage(context.getString(R.string.error_batch_partial, m.ok, m.failed), vm)
             is EditorMessage.Error -> snackbar.showMessage(context.getString(m.text), vm)
             is EditorMessage.HandedOver -> onHandOver(m.uris)
+            // 马上收掉：转个屏不再弹一次分享面板
+            is EditorMessage.Shared -> {
+                vm.consumeMessage()
+                onShareImages(m.uris, m.mimeType)
+            }
             null -> Unit
         }
     }
@@ -165,6 +172,7 @@ fun EditorScreen(
                 onReview = vm::reviewUnopened,
                 onExportOpened = vm::exportOpenedOnly,
                 onDismiss = vm::dismissDialog,
+                share = state.sharing,
             )
         }
     }
@@ -201,6 +209,8 @@ fun EditorScreen(
             val batch = state.batch
             val phone = layout == EditorLayout.PHONE
             val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+            // 分享：图不进相册，写进缓存交给分享面板。别的应用来要图时没有它（见 vm.canShare）
+            val onShare = if (vm.canShare) ({ if (batch != null) vm.exportBatch(share = true) else vm.requestExport(share = true) }) else null
             // 别的应用来要图时，导出就是把图交回去
             val exportLabel = if (vm.forCaller) R.string.done else R.string.export
             val canCompare = state.image != null &&
@@ -232,8 +242,10 @@ fun EditorScreen(
                     onNavigateUp = onNavigateUp,
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
                     onExport = onExport,
+                    onShare = onShare,
                     exportLabel = exportLabel,
                     exporting = state.exporting,
+                    sharing = state.sharing,
                 )
                 if (panelUp) FoldOnTouch(foldPanel, Modifier.matchParentSize())
             }

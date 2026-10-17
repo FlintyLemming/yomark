@@ -34,6 +34,7 @@ import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
+import moe.flinty.yomark.export.FileProviderSink
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.batch.BatchItem
@@ -92,10 +93,22 @@ class EditorViewModel(
      * 编辑器随之关掉。导出到哪儿由 Activity 给的 [exporter] 定。
      */
     val forCaller: Boolean = false,
+    /**
+     * 分享（顶栏导出左边那颗）写到哪儿：应用私有缓存里的一个目录，经 FileProvider 交给分享面板，不进相册。
+     * 每次分享先清掉上一次的（收到的应用什么时候读由它定，所以不随手删）。
+     * null 是没有分享，顶栏上也就没有这颗：别的应用来要图时，导出就是把图交回去。
+     */
+    private val shareSink: FileProviderSink? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
+
+    /** 同一条导出管线，写到 [shareSink]。 */
+    private val shareExporter: Exporter? = shareSink?.let(exporter::writingTo)
+
+    /** 顶栏上有没有分享。 */
+    val canShare: Boolean get() = shareExporter != null
 
     /**
      * 识别动效的样式（设置里选的）。只影响画布上的过渡，所以不进 EditorUiState——那里每换一张图就整个重建，
@@ -1498,33 +1511,39 @@ class EditorViewModel(
 
     /**
      * 导出。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
+     *
+     * @param share 分享（顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册。没有分享时（见 [canShare]）什么也不做
      */
-    fun requestExport() {
-        runExport(_state.value.plan)
+    fun requestExport(share: Boolean = false) {
+        runExport(_state.value.plan, share)
     }
 
     /**
      * 批量导出：看过的一次性全部导出（spec §7.6）。
      *
      * 先等还没跑完的识别：切走的那几张可能还在后台识别，这时导出，本该直接打码的东西就原样出去了——
-     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」。
+     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」（分享时是分享那颗转圈）。
      *
      * 还有没打开过的图时先问一句（[reviewUnopened] / [exportOpenedOnly]）：没打开过的图没识别、也没人看过，不能替用户导出。
+     *
+     * @param share 同 [requestExport]：看过的一起交给分享面板
      */
-    fun exportBatch() {
+    fun exportBatch(share: Boolean = false) {
         if (_state.value.batch == null || _state.value.exporting) return
+        if (share && shareExporter == null) return
         finishLookEdit()
-        uiState = _state.value.copy(exporting = true)
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
             awaitBatchScans()
             val batch = _state.value.liveBatch
             if (batch == null) {
-                uiState = _state.value.copy(exporting = false)
+                uiState = _state.value.copy(exporting = false, sharing = false)
                 return@launch
             }
             uiState = _state.value.copy(batch = batch, exporting = false)
+            // 问的时候还记着是哪一种（sharing），按钮上照它写，选了「只……看过的」照它导出
             if (batch.unopened > 0) uiState = _state.value.copy(unopenedDialogVisible = true)
-            else runBatchExport(batch)
+            else runBatchExport(batch, share)
         }
     }
 
@@ -1540,15 +1559,16 @@ class EditorViewModel(
 
     /** 「还有几张没看过」里的「去看看」：跳到第一张没打开过的，它这时开始识别。 */
     fun reviewUnopened() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
         val first = _state.value.batch?.firstUnopened ?: return
         selectImage(first)
     }
 
-    /** 「还有几张没看过」里的「只导出看过的」：没打开过的不导出，看过的照常导出。 */
+    /** 「还有几张没看过」里的「只导出看过的」（分享时是「只分享看过的」）：没打开过的不导出，看过的照常导出、分享。 */
     fun exportOpenedOnly() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
-        runBatchExport(_state.value.liveBatch ?: return)
+        val share = _state.value.sharing
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
+        runBatchExport(_state.value.liveBatch ?: return, share)
     }
 
     /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
@@ -1622,7 +1642,7 @@ class EditorViewModel(
     fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
     }
 
     fun consumeMessage() {
@@ -1635,12 +1655,17 @@ class EditorViewModel(
      */
     private fun applyWatermark(): Boolean = brandWatermarkApplies(_state.value.isPro, watermarkOff)
 
-    private fun runExport(plan: MaskPlan) {
+    /** @param share 写进缓存交给分享面板，不进相册（见 [requestExport]） */
+    private fun runExport(plan: MaskPlan, share: Boolean = false) {
         val image = _state.value.image ?: return
         val source = intakeResult ?: return
-        uiState = _state.value.copy(exporting = true)
+        val out = (if (share) shareExporter else exporter) ?: return
+        // 导出、分享两颗挨着：一颗还在跑时点了另一颗，不再起一份
+        if (_state.value.exporting) return
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
-            val outcome = exporter.export(
+            if (share) clearShared()
+            val outcome = out.export(
                 ExportRequest(
                     file = source.file,
                     mimeType = source.mimeType,
@@ -1654,32 +1679,45 @@ class EditorViewModel(
                 dispatcher = ioDispatcher,
             )
             uiState = when (outcome) {
-                // 交回去编辑器就关了，按钮不再放开，免得又导出一张
-                is ExportOutcome.Success -> if (forCaller) {
-                    _state.value.copy(message = EditorMessage.HandedOver(listOf(outcome.uri)))
-                } else {
-                    _state.value.copy(
+                is ExportOutcome.Success -> when {
+                    share -> _state.value.copy(
+                        exporting = false,
+                        sharing = false,
+                        message = EditorMessage.Shared(listOf(outcome.uri), outcome.mimeType),
+                    )
+                    // 交回去编辑器就关了，按钮不再放开，免得又导出一张
+                    forCaller -> _state.value.copy(message = EditorMessage.HandedOver(listOf(outcome.uri)))
+                    else -> _state.value.copy(
                         exporting = false,
                         message = EditorMessage.Exported(outcome.uri, outcome.downscaled, outcome.width, outcome.height),
                     )
                 }
                 is ExportOutcome.Failure -> _state.value.copy(
                     exporting = false,
-                    message = EditorMessage.Error(R.string.error_export),
+                    sharing = false,
+                    message = EditorMessage.Error(if (share) R.string.error_share else R.string.error_export),
                 )
             }
         }
     }
 
-    private fun runBatchExport(batch: BatchSession) {
-        uiState = _state.value.copy(exporting = true)
+    /** 上一次分享出去的图：收到的应用早就读走了。 */
+    private suspend fun clearShared() {
+        withContext(ioDispatcher) { shareSink?.clear() }
+    }
+
+    private fun runBatchExport(batch: BatchSession, share: Boolean = false) {
+        val out = (if (share) shareExporter else exporter) ?: return
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
+            if (share) clearShared()
             val written = ArrayList<Uri>()
+            val types = LinkedHashSet<String>()
             var failed = 0
             batch.items.forEach { item ->
                 val file = item.file ?: return@forEach     // 还没走到的图没有副本，也没有编辑
                 val plan = item.plan ?: return@forEach
-                val outcome = exporter.export(
+                val outcome = out.export(
                     ExportRequest(
                         file = file,
                         mimeType = item.mimeType,
@@ -1692,9 +1730,20 @@ class EditorViewModel(
                     ),
                     dispatcher = ioDispatcher,
                 )
-                if (outcome is ExportOutcome.Success) written += outcome.uri else failed++
+                if (outcome is ExportOutcome.Success) {
+                    written += outcome.uri
+                    types += outcome.mimeType
+                } else failed++
             }
             uiState = when {
+                // 都是 JPEG（或者都是 PNG）就照实说，混着的说是图片
+                share && failed == 0 && written.isNotEmpty() -> _state.value.copy(
+                    exporting = false,
+                    sharing = false,
+                    message = EditorMessage.Shared(written, types.singleOrNull() ?: "image/*"),
+                )
+                // 分享面板上看不出少了几张：这次一张都不分享，再试一次
+                share -> _state.value.copy(exporting = false, sharing = false, message = EditorMessage.Error(R.string.error_share))
                 !forCaller -> _state.value.copy(
                     exporting = false,
                     message = if (failed == 0) EditorMessage.BatchExported(written.size)

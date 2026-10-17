@@ -19,11 +19,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -88,9 +90,17 @@ fun EditorTopBar(
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
+    /**
+     * 分享，挨在导出左边（2026-10-17）：图不进相册，写进缓存交给分享面板。和导出一样是收尾，一样一直在，不让出来。
+     * 别的应用来要图时（导出是「完成」）传 null，就没有这一颗。
+     */
+    onShare: (() -> Unit)? = null,
     /** 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去。 */
     @StringRes exportLabel: Int = R.string.export,
+    /** 在导出（分享也是先导出）：导出、分享都点不动。 */
     exporting: Boolean = false,
+    /** 这一次导出是为了分享：转圈的是分享那颗，导出那颗不换字。 */
+    sharing: Boolean = false,
 ) {
     Layout(
         content = {
@@ -107,7 +117,20 @@ fun EditorTopBar(
                 IconButton(onClick = onDebug, Modifier.layoutId(TopBarItem.DEBUG)) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
             }
             IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-            val label = stringResource(if (exporting) R.string.exporting else exportLabel)
+            if (onShare != null) {
+                // 浅色底的圆钮，和实心的导出挨着成一对；分享中转圈，读屏念「分享中…」
+                val shareLabel = stringResource(if (exporting && sharing) R.string.sharing else R.string.share)
+                FilledTonalIconButton(
+                    onClick = onShare,
+                    modifier = Modifier.layoutId(TopBarItem.SHARE).semantics { contentDescription = shareLabel },
+                    enabled = !exporting,
+                ) {
+                    if (exporting && sharing) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                    else Icon(Icons.Filled.Share, contentDescription = null)
+                }
+            }
+            val saving = exporting && !sharing
+            val label = stringResource(if (saving) R.string.exporting else exportLabel)
             Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
                 Text(label, maxLines = 1, softWrap = false)
             }
@@ -117,7 +140,7 @@ fun EditorTopBar(
                 modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
                 enabled = !exporting,
             ) {
-                if (exporting) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                if (saving) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
                 // 别的应用来要图时是「完成」：交回去
                 else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
             }
@@ -127,16 +150,19 @@ fun EditorTopBar(
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val part = { item: TopBarItem -> measurables.firstOrNull { it.layoutId == item } }
         val back = part(TopBarItem.BACK)!!.measure(loose)
+        // 分享挨在导出左边，和返回、导出一样不让出来
+        val share = part(TopBarItem.SHARE)?.measure(loose)
+        val shareWidth = share?.width ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
         val gap = EXPORT_GAP.roundToPx()
         val label = part(TopBarItem.EXPORT)!!.maxIntrinsicWidth(Constraints.Infinity)
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + gap + label
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + shareWidth + gap + label
         // 别的按钮都摆上，导出的字还整个放得下才写字
-        val withLabel = back.width + allIcons + gap + label <= width
-        val button = if (withLabel) part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - gap))
+        val withLabel = back.width + allIcons + shareWidth + gap + label <= width
+        val button = if (withLabel) part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - shareWidth - gap))
         else part(TopBarItem.EXPORT_ICON)!!.measure(loose)
-        var room = width - back.width - gap - button.width
+        var room = width - back.width - shareWidth - gap - button.width
         val kept = mutableSetOf<TopBarItem>()
         for ((item, icon) in icons.sortedBy { it.first }) {
             if (icon.width > room) break
@@ -145,14 +171,15 @@ fun EditorTopBar(
         }
         val shown = icons.filter { it.first in kept }.map { it.second }
         val iconsWidth = shown.sumOf { it.width }
-        val barHeight = (listOf(back) + shown + button).maxOf { it.height }
+        val barHeight = (listOf(back) + shown + listOfNotNull(share) + button).maxOf { it.height }
             .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, barHeight) {
             val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
             centered(back, 0)
-            // 中间这几个靠在导出左边，和返回之间空着
-            var x = width - button.width - gap - iconsWidth
+            // 中间这几个靠在分享（没有分享时是导出）左边，和返回之间空着
+            var x = width - button.width - gap - shareWidth - iconsWidth
             shown.forEach { centered(it, x); x += it.width }
+            share?.let { centered(it, x) }
             centered(button, width - button.width)
         }
     }
@@ -160,20 +187,20 @@ fun EditorTopBar(
 
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
- * 还放不下（再开着调试信息）时，中间那几个照要紧的先后从最后一个起不摆出来，返回和导出一直在。
+ * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享和导出一直在。
  * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
 private enum class TopBarItem {
-    BACK, EXPORT, EXPORT_ICON, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
+    BACK, EXPORT, EXPORT_ICON, SHARE, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
 
     companion object {
         /** 两头的，不参与让出来。 */
-        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON)
+        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON, SHARE)
     }
 }
 
-/** 导出和它左边的按钮之间多空一点。 */
+/** 导出和它左边的按钮（分享，没有分享时是中间那几个）之间多空一点。 */
 private val EXPORT_GAP = 4.dp
 
 /**

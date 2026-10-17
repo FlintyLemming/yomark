@@ -32,7 +32,8 @@ data class ExportRequest(
 )
 
 sealed interface ExportOutcome {
-    data class Success(val uri: Uri, val width: Int, val height: Int, val downscaled: Boolean) : ExportOutcome
+    /** @param mimeType 写出的格式（PNG 还是 PNG，别的都编成 JPEG）：分享时要告诉分享面板 */
+    data class Success(val uri: Uri, val width: Int, val height: Int, val downscaled: Boolean, val mimeType: String) : ExportOutcome
     data class Failure(val cause: Throwable) : ExportOutcome
 }
 
@@ -49,6 +50,9 @@ class Exporter(
     private val sink: ImageSink,
     private val purposeWatermark: PurposeWatermarkDrawer = PurposeWatermarkDrawer(),
 ) {
+
+    /** 同一条管线，写到 [sink]：分享的图写进缓存，不进相册（见 EditorViewModel 的 shareSink）。 */
+    fun writingTo(sink: ImageSink) = Exporter(registry, watermark, sink, purposeWatermark)
 
     /** @param dispatcher 整条管线跑在哪个调度器上；默认 Default，调用方可换成自己的。 */
     suspend fun export(
@@ -93,7 +97,7 @@ class Exporter(
                 if (png) ".png" else ".jpg"
 
             val uri = sink.write(bitmap, format, if (png) 100 else JPEG_QUALITY, name, mime)
-            ExportOutcome.Success(uri, bitmap.width, bitmap.height, decoded.downscaled)
+            ExportOutcome.Success(uri, bitmap.width, bitmap.height, decoded.downscaled, mime)
         }.getOrElse { ExportOutcome.Failure(it) }
     }
 
