@@ -100,7 +100,7 @@ internal abstract class TourSampleTest(
         assertThat(line.text).contains(link)
     }
 
-    /** 第二步让人点的链接，出厂设置下不能已经遮上了。 */
+    /** 「点文字打码」让人点的链接，出厂设置下不能已经遮上了。 */
     @Test fun `the link the tour asks for is not masked by default`() {
         val bounds = expected.link.bounds()
         val hits = masked(RecognitionConfig()).filter { RectF.intersects(it.quad.bounds(), bounds) }

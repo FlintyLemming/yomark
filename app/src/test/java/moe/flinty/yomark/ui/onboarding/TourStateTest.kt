@@ -87,14 +87,42 @@ class TourStateTest {
         assertThat(s.linkMasked).isFalse()
     }
 
-    @Test fun `leaving the first page during the scan lands the masks with the same step`() {
+    @Test fun `leaving the scan page lands the masks with the same step`() {
         val s = state(progress = TourProgress())
-        s.goTo(1)
-        assertThat(s.progress).isEqualTo(TourProgress(step = 1, revealed = true, sample = "zh"))
-        s.goTo(TourState.STEPS)
-        assertThat(s.progress.step).isEqualTo(TourState.LAST_STEP)
+        // 欢迎页之后才演识别动效
+        s.goTo(s.autoStep)
+        assertThat(s.progress).isEqualTo(TourProgress(step = 1, revealed = false, sample = "zh"))
+        s.goTo(s.autoStep + 1)
+        assertThat(s.progress).isEqualTo(TourProgress(step = 2, revealed = true, sample = "zh"))
+        s.goTo(s.pages.size)
+        assertThat(s.progress.step).isEqualTo(s.lastStep)
         s.goTo(0)
         assertThat(s.progress).isEqualTo(TourProgress(step = 0, revealed = true, sample = "zh"))
+    }
+
+    @Test fun `skipping past the scan page lands the masks too`() {
+        val s = state(progress = TourProgress())
+        s.goTo(s.autoStep + 2)
+        assertThat(s.progress.revealed).isTrue()
+    }
+
+    @Test fun `the first run has the engine page and the replay does not`() {
+        val first = state()
+        assertThat(first.pages).containsExactly(
+            TourPage.WELCOME, TourPage.AUTO, TourPage.TAP, TourPage.ENGINE, TourPage.MORE,
+        ).inOrder()
+        val replay = TourState(mutableStateOf(TourProgress()), chatOn = false, sample, pages = TourState.WITHOUT_ENGINE)
+        assertThat(replay.pages).doesNotContain(TourPage.ENGINE)
+        assertThat(replay.autoStep).isEqualTo(1)
+        assertThat(replay.lastStep).isEqualTo(3)
+    }
+
+    @Test fun `an engine choice is kept`() {
+        val s = state()
+        assertThat(s.progress.engineChosen).isFalse()
+        s.chooseEngine()
+        s.chooseEngine()
+        assertThat(s.progress).isEqualTo(TourProgress(revealed = true, engineChosen = true, sample = "zh"))
     }
 
     @Test fun `chat masks start shown when the setting is already on`() {
@@ -129,7 +157,7 @@ class TourStateTest {
 
     /** 进程被杀后靠它接着来：真的写进 Parcel 再读回来（同一进程里 Bundle 只是存着同一个对象）。 */
     @Test fun `progress survives being parcelled`() {
-        val progress = TourProgress(step = 2, revealed = true, toggled = listOf("tour-phone", "line-12"), tapped = true, sample = "zh")
+        val progress = TourProgress(step = 2, revealed = true, toggled = listOf("tour-phone", "line-12"), tapped = true, engineChosen = true, sample = "zh")
         val parcel = Parcel.obtain()
         try {
             parcel.writeParcelable(progress, 0)

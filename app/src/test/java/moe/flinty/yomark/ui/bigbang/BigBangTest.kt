@@ -157,7 +157,7 @@ class BigBangTest {
         assertThat(p.boxes(0, 1, 2, 3)).containsExactly(RectF(0f, 0f, 40f, 20f), RectF(160f, 0f, 200f, 20f)).inOrder()
     }
 
-    /** 「ML Kit 中英」两个识别器把同一行各读一遍：只留置信度高的那一遍。 */
+    /** ML Kit 的英文、中文两个识别器把同一行各读一遍：只留置信度高的那一遍。 */
     @Test fun `a line read twice is kept once`() {
         val latin = TextLine(rect(0f, 0f, 100f, 20f), "AE", 0.4f, listOf(TextElement(rect(0f, 0f, 100f, 20f), "AE", 0..1)))
         val han = TextLine(rect(2f, 1f, 100f, 21f), "收货", 0.9f, listOf(TextElement(rect(2f, 1f, 100f, 21f), "收货", 0..1)))

@@ -74,7 +74,7 @@ class SettingsInsetsTest {
 
     /** 列表可以从导航条底下滚过去，但滚到底时最后一行得整个露在它上面。 */
     @Test fun `the last kind scrolls clear of the navigation bar`() {
-        show { TextSettingsScreen(RecognitionConfig(), {}, {}, {}, onNavigateUp = {}) }
+        show { TextSettingsScreen(RecognitionConfig(), {}, {}, onNavigateUp = {}) }
         val last = RuleCatalog.inSettingsOrder.last()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey(last.id)
         val row = compose.onNodeWithText(compose.activity.getString(RuleCatalog.label(last))).getUnclippedBoundsInRoot()
@@ -98,7 +98,7 @@ class SettingsInsetsTest {
     }
 
     @Test fun `the text page leaves system back to the activity`() {
-        show { TextSettingsScreen(RecognitionConfig(), {}, {}, {}, onNavigateUp = {}) }
+        show { TextSettingsScreen(RecognitionConfig(), {}, {}, onNavigateUp = {}) }
         assertThat(compose.activity.onBackPressedDispatcher.hasEnabledCallbacks()).isFalse()
     }
 }

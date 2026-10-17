@@ -28,7 +28,7 @@ import moe.flinty.yomark.core.model.SensitiveKind
  * @param auto 出厂设置下识别出来直接打码的几处
  * @param chat 实验室里打开「识别聊天记录」后多出来的：顶栏的聊天标题，四个头像。按读的顺序，标题在前
  * @param lines 文字识别认出的每一段字（TextLine.segments）：点字打码点的就是它们，和编辑器里一样
- * @param linkIndex 第二步让用户点的那一段：链接，出厂不打码，又是该遮的
+ * @param linkIndex 「点文字打码」让用户点的那一段：链接，出厂不打码，又是该遮的
  */
 internal class TourSample private constructor(
     val key: String,

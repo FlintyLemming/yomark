@@ -112,9 +112,9 @@ class EditorViewModelRecognitionTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         assertThat(ids(vm)).contains("from-${TextEngineOption.PADDLE}")
 
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
 
-        assertThat(ids(vm)).contains("from-${TextEngineOption.LATIN}")
+        assertThat(ids(vm)).contains("from-${TextEngineOption.MLKIT}")
         assertThat(ids(vm)).doesNotContain("from-${TextEngineOption.PADDLE}")
     }
 
@@ -124,7 +124,7 @@ class EditorViewModelRecognitionTest {
         vm.onManualBox(Quad.fromRect(RectF(200f, 200f, 260f, 240f)))
         val manualId = vm.state.value.plan.items.single { it.kind == SensitiveKind.MANUAL }.candidateId
 
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.CHINESE)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
 
         assertThat(ids(vm)).contains(manualId)
     }
@@ -134,7 +134,7 @@ class EditorViewModelRecognitionTest {
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
         val before = vm.state.value.plan
 
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
         assertThat(vm.state.value.plan).isNotEqualTo(before)
         assertThat(vm.state.value.canUndo).isTrue()
 
@@ -169,21 +169,21 @@ class EditorViewModelRecognitionTest {
 
     @Test fun `no image means no re-run and no crash`() = runTest(dispatcher) {
         val vm = vm()
-        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN)); advanceUntilIdle()
+        vm.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT)); advanceUntilIdle()
 
         assertThat(vm.state.value.plan.items).isEmpty()
         assertThat(vm.state.value.analyzing).isFalse()
-        assertThat(vm.state.value.recognitionConfig.textEngine).isEqualTo(TextEngineOption.LATIN)
+        assertThat(vm.state.value.recognitionConfig.textEngine).isEqualTo(TextEngineOption.MLKIT)
     }
 
     /** 冷启动时读到的持久化 config 必须用在第一张图上，不能等到用户再改一次才生效。 */
     @Test fun `a persisted config applies to the first image`() = runTest(dispatcher) {
         val settings = isolatedSettingsStore(context)
-        settings.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.LATIN))
+        settings.setRecognitionConfig(RecognitionConfig(textEngine = TextEngineOption.MLKIT))
         val vm = vm(settings); advanceUntilIdle()
 
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
 
-        assertThat(ids(vm)).contains("from-${TextEngineOption.LATIN}")
+        assertThat(ids(vm)).contains("from-${TextEngineOption.MLKIT}")
     }
 }

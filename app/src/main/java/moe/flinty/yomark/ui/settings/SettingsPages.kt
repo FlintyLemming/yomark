@@ -75,32 +75,30 @@ import moe.flinty.yomark.ui.theme.colorScheme
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、通用、外观、实验室。
+ * 设置一级页下面的各页：文字（下面还有各类文字自己的页）、人脸、条码、AI（下面还有识别引擎）、通用、外观、实验室。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 通用和外观两页不影响识别，换它们不重跑。AI 页显示本机的 Gemini Nano 和随包的 PP-OCR；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
+ * 通用和外观两页不影响识别，换它们不重跑。AI 页上选识别引擎，下面显示本机的 Gemini Nano 和随包的 PP-OCR、ML Kit；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
  *
  * 行下的小字、页尾说明都不带句号（2026-10-15 起），几句话并成一句，中间用逗号、分号隔开。
  */
 
 /**
- * 文字：上面一组是「怎么认字」（识别引擎），下面一组是认出来的各类敏感信息，
- * 每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
+ * 文字：认出来的各类敏感信息，每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
  *
  * 各类原先在行尾直接摆一排「关 / 圈出 / 打码」；人名多了一个只属于它的开关之后，行尾放不下，
  * 一类一页又和人脸、条码的页是同一个样子：先是「识别到时怎么办」，再是这一类自己的选项和认法。
- * 原先单独一页的「文字识别」并进来：认字和认出来怎么处理都是「文字」的事，分在两处找不到。
- * 「文字识别」一组里原先还有 AI 增强识别的开关，2026-10-15 去掉了，它总是开着（见 refinersFor）。
+ * 上面原先还有「文字识别」一组（2026-10-09 由单独一页并进来）：识别引擎，和 AI 增强识别的开关（2026-10-15 去掉了，
+ * 它总是开着，见 refinersFor）。识别引擎 2026-10-16 挪去了「AI」页，和它选的 PP-OCR、ML Kit 两个模型放在一起。
  *
- * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、各类的处理方式和人名的开关。
+ * 右上角的「恢复默认」只管这一页和它下面的各页：各类的处理方式和人名的开关。
  */
 @Composable
 fun TextSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onOpenEngine: () -> Unit,
     onOpenRule: (ruleId: String) -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
@@ -114,18 +112,7 @@ fun TextSettingsScreen(
             TextButton(onClick = { onChange(reset) }, enabled = config != reset) { Text(stringResource(R.string.reset_defaults)) }
         },
     ) {
-        item {
-            SectionHeader(stringResource(R.string.text_recognition), first = true)
-            SettingsGroup {
-                LinkRow(
-                    title = stringResource(R.string.engine),
-                    summary = stringResource(textEngineLabel(config.textEngine)),
-                    icon = Icons.Outlined.DocumentScanner,
-                    onClick = onOpenEngine,
-                )
-            }
-            SectionHeader(stringResource(R.string.sensitive_info))
-        }
+        item { SectionHeader(stringResource(R.string.sensitive_info), first = true) }
         val rules = RuleCatalog.inSettingsOrder
         itemsIndexed(rules, key = { _, rule -> rule.id }) { i, rule ->
             LinkRow(
@@ -141,7 +128,7 @@ fun TextSettingsScreen(
     }
 }
 
-/** 识别引擎：OCR 用哪一家。从「文字」页点进来。 */
+/** 识别引擎：OCR 用 PP-OCR 还是 ML Kit。从「AI」页点进来。 */
 @Composable
 fun TextEngineSettingsScreen(
     config: RecognitionConfig,
@@ -159,9 +146,7 @@ fun TextEngineSettingsScreen(
                         summary = stringResource(
                             when (option) {
                                 TextEngineOption.PADDLE -> R.string.engine_paddle_summary
-                                TextEngineOption.LATIN -> R.string.engine_latin_summary
-                                TextEngineOption.CHINESE -> R.string.engine_chinese_summary
-                                TextEngineOption.BOTH -> R.string.engine_both_summary
+                                TextEngineOption.MLKIT -> R.string.engine_mlkit_summary
                             },
                         ),
                         selected = config.textEngine == option,
@@ -330,13 +315,14 @@ fun LabsSettingsScreen(
 }
 
 /**
- * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
- * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。这几样只显示，没有可设的项。
- * 识别引擎在「文字」页里选；AI 增强识别没有开关，总是开着。
+ * AI：最上面是识别引擎（2026-10-16 从「文字」页挪来），点进去选 PP-OCR 还是 ML Kit（[TextEngineSettingsScreen]）。
+ * 下面是本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
+ * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。这几样只显示。
+ * AI 增强识别没有开关，总是开着。
  *
  * Gemini Nano 卡片下面是一段话：先说它是什么，再接着说本机这边要知道的（[nanoNote]），不换行。
  *
- * 实验室里打开了外部模型时，最上面多一组「外部模型」：接口地址、API Key、模型，点一行弹框改；再加一行测试连接。
+ * 实验室里打开了外部模型时，识别引擎下面多一组「外部模型」：接口地址、API Key、模型，点一行弹框改；再加一行测试连接。
  *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
  * @param external 实验室里的外部模型；没打开时为 null，不显示那一组。
@@ -345,6 +331,8 @@ fun LabsSettingsScreen(
 @Composable
 fun AiSettingsScreen(
     nano: NanoStatus?,
+    textEngine: TextEngineOption,
+    onOpenEngine: () -> Unit,
     onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier,
     external: ExternalModelSettings? = null,
@@ -352,11 +340,23 @@ fun AiSettingsScreen(
     onTestExternal: suspend () -> Long = { 0L },
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_ai), onNavigateUp = onNavigateUp, modifier = modifier) {
+        item {
+            SectionHeader(stringResource(R.string.text_recognition), first = true)
+            SettingsGroup {
+                LinkRow(
+                    title = stringResource(R.string.engine),
+                    summary = stringResource(textEngineLabel(textEngine)),
+                    icon = Icons.Outlined.DocumentScanner,
+                    onClick = onOpenEngine,
+                    modifier = Modifier.testTag("engine"),
+                )
+            }
+        }
         if (external != null) {
             item { ExternalModelGroup(external, onExternalChange, onTestExternal) }
         }
         item {
-            SectionHeader(stringResource(R.string.ai_model), first = external == null)
+            SectionHeader(stringResource(R.string.ai_model))
             SettingsGroup {
                 SettingsRow(
                     title = "Gemini Nano",
@@ -601,13 +601,12 @@ internal fun ruleSummary(config: RecognitionConfig, ruleId: String): String {
 }
 
 /**
- * 「文字」页右上角的「恢复默认」：这一页和它下面各页的项回到出厂值，人脸、条码不动。
- * 出厂值取自 [RecognitionConfig] 的缺省值，不另抄一份。
+ * 「文字」页右上角的「恢复默认」：这一页和它下面各页的项回到出厂值，人脸、条码不动，
+ * 识别引擎（2026-10-16 挪去了「AI」页）也不动。出厂值取自 [RecognitionConfig] 的缺省值，不另抄一份。
  */
 internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
     val factory = RecognitionConfig()
     return copy(
-        textEngine = factory.textEngine,
         maskUnanchoredNames = factory.maskUnanchoredNames,
         ruleOverrides = emptyMap(),
     )
@@ -680,9 +679,7 @@ internal fun mlKitSummary(res: Resources, text: String, textChinese: String, fac
 @StringRes
 internal fun textEngineLabel(option: TextEngineOption): Int = when (option) {
     TextEngineOption.PADDLE -> R.string.engine_paddle
-    TextEngineOption.LATIN -> R.string.engine_latin
-    TextEngineOption.CHINESE -> R.string.engine_chinese
-    TextEngineOption.BOTH -> R.string.engine_both
+    TextEngineOption.MLKIT -> R.string.engine_mlkit
 }
 
 @StringRes

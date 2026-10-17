@@ -145,7 +145,7 @@ class BigBangPage(val lines: List<BigBangLine>) {
         /** 和上一行之间空出这么多个字高以上，面板上当作另起一段（[BigBangLine.paragraphBefore]）。 */
         const val PARAGRAPH_GAP = 0.8f
 
-        /** 两行的框重叠过这么多（交并比），是同一行读了两遍：「ML Kit 中英」两个识别器各读一遍，留读得有把握的那个。 */
+        /** 两行的框重叠过这么多（交并比），是同一行读了两遍：ML Kit 的英文、中文两个识别器各读一遍，留读得有把握的那个。 */
         const val SAME_LINE_IOU = 0.5f
 
         val EMPTY = BigBangPage(emptyList())
@@ -167,7 +167,7 @@ class BigBangPage(val lines: List<BigBangLine>) {
 
         /**
          * 框重叠过 [SAME_LINE_IOU] 的两行只留一行：置信度高的，一样高留先来的。PP-OCR 拼过行，不会有这种两行；
-         * 「ML Kit 中英」把拉丁和中文两个识别器的结果直接摞在一起（CompositeTextRecognizer），每一行都有两份，
+         * ML Kit 把拉丁和中文两个识别器的结果直接摞在一起（CompositeTextRecognizer），每一行都有两份，
          * 拉丁那份在中文上多半是乱码。
          */
         private fun distinct(lines: List<TextLine>): List<TextLine> {

@@ -28,9 +28,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -62,57 +60,36 @@ import moe.flinty.yomark.ui.components.foldTween
  *
  * 画布上面盖一层只认点一下的：两指缩放、拖出框、长按大爆炸在引导里都不要。
  *
- * 三页各有一块（翻页时两页的图一起在屏幕上），画的是同一份码。
+ * 欢迎页以外每页各有一块（翻页时两页的图一起在屏幕上），画的是同一份码。
  *
- * @param page 第几页的图：第二页起读屏能双击遮住链接
- * @param showRing 第二页框出让人点的那段链接
- * @param enter 入场进度（0..1），只在绘制里读
+ * @param page 哪一页的图：识别动效只在「自动打码」上演；从「点文字打码」起读屏能双击遮住链接
+ * @param showRing 「点文字打码」框出让人点的那段链接
  */
 @Composable
 internal fun TourStage(
     state: TourState,
     sample: SourceImage,
     scanStyle: ScanStyle,
-    page: Int,
+    page: TourPage,
     showRing: Boolean,
     animate: Boolean,
-    enter: () -> Float,
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(CARD_RADIUS)
     val colors = MaterialTheme.colorScheme
-    Box(
-        modifier
-            .aspectRatio(TourSample.WIDTH / TourSample.HEIGHT.toFloat(), matchHeightConstraintsFirst = true)
-            .graphicsLayer {
-                val s = ENTER_SCALE + (1f - ENTER_SCALE) * enter()
-                scaleX = s
-                scaleY = s
-            },
-    ) {
-        // 投影单独一层：它画在边界外面，不能和图一起离屏淡入（会被裁掉），按透明度逐笔淡
+    Box(modifier.aspectRatio(TourSample.WIDTH / TourSample.HEIGHT.toFloat(), matchHeightConstraintsFirst = true)) {
+        Box(Modifier.matchParentSize().floatingSurface(colors.surfaceContainer, Color.Transparent, CARD_RADIUS))
         Box(
             Modifier
                 .matchParentSize()
-                .graphicsLayer {
-                    alpha = enter()
-                    compositingStrategy = CompositingStrategy.ModulateAlpha
-                }
-                .floatingSurface(colors.surfaceContainer, Color.Transparent, CARD_RADIUS),
-        )
-        // 图这一层离屏淡入：逐笔淡的话，磨砂底下的原图会透出来
-        Box(
-            Modifier
-                .matchParentSize()
-                .graphicsLayer { alpha = enter() }
                 .clip(shape)
                 .background(colors.surfaceContainer)
                 // 细边画在图上面：floatingSurface 的边画在底下，满幅的图会把它盖住
                 .border(1.dp, colors.outlineVariant.copy(alpha = EDGE_ALPHA), shape),
         ) {
             val registry = remember { RendererRegistry.default() }
-            // 识别动效只在第一页的图上演：后面几页的图在第一页一动时才出来，那时码已经落下
-            val analyzing = !state.progress.revealed && page == 0
+            // 识别动效只在「自动打码」的图上演：后面几页的图在这一页一动时才出来，那时码已经落下
+            val analyzing = !state.progress.revealed && page == TourPage.AUTO
             val plan = state.plan
             val ui = remember(sample, plan, analyzing) { EditorUiState(image = sample, plan = plan, analyzing = analyzing) }
             ImageCanvas(
@@ -126,7 +103,7 @@ internal fun TourStage(
                 scanStyle = scanStyle,
             )
             LinkRing(sample, state.sample.link, showRing, animate)
-            TapCatcher(state, sample, linkAction = page >= 1)
+            TapCatcher(state, sample, linkAction = page > TourPage.AUTO)
             // 读屏从图上就念得到「识别中…」（见 TapCatcher），提示条不再念一遍
             AnalyzingPill(visible = analyzing, Modifier.align(Alignment.TopCenter).padding(top = 12.dp).clearAndSetSemantics {})
         }
@@ -135,7 +112,7 @@ internal fun TourStage(
 
 /**
  * 盖在画布上、只认点一下：点在哪儿换成图像坐标交给 [TourState.onTap]，手指的余量和编辑器一样。
- * 读屏把整张图当一个节点：念「示例聊天截图」、遮住了几处；第二页起双击就是点那段链接。
+ * 读屏把整张图当一个节点：念「示例聊天截图」、遮住了几处；从「点文字打码」起双击就是点那段链接。
  */
 @Composable
 private fun BoxScope.TapCatcher(state: TourState, sample: SourceImage, linkAction: Boolean) {
@@ -175,7 +152,7 @@ private fun BoxScope.TapCatcher(state: TourState, sample: SourceImage, linkActio
 }
 
 /**
- * 第二步框出那段链接：主题色的一圈细线，外面衬一圈底色，白底的气泡上、天蓝的码上都看得清。
+ * 「点文字打码」框出那段链接：主题色的一圈细线，外面衬一圈底色，白底的气泡上、天蓝的码上都看得清。
  * 等落码停稳一会儿再淡进来，之后慢慢一明一暗；点过字就淡掉。系统关了动画时不闪。
  */
 @Composable
@@ -213,9 +190,6 @@ private fun BoxScope.LinkRing(sample: SourceImage, link: Quad, show: Boolean, an
 }
 
 private val CARD_RADIUS = 20.dp
-
-/** 入场时卡片从这么大长到原大。 */
-private const val ENTER_SCALE = 0.96f
 
 private val RING_PAD = 4.dp
 private val RING_CORNER = 6.dp

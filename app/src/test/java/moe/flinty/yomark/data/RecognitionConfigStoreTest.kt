@@ -28,7 +28,7 @@ class RecognitionConfigStoreTest {
     @Test fun `every axis survives a write and read`() = runTest {
         val store = store()
         val cfg = RecognitionConfig(
-            textEngine = TextEngineOption.CHINESE,
+            textEngine = TextEngineOption.MLKIT,
             barcode = BarcodeOption.LOOSE,
             barcodeState = RuleState.OFF,
             face = FaceOption.ACCURATE,
@@ -49,6 +49,18 @@ class RecognitionConfigStoreTest {
         val read = store.recognitionConfig.first()
         assertThat(read.textEngine).isEqualTo(RecognitionConfig().textEngine)   // 该项退回默认
         assertThat(read.barcodeState).isEqualTo(RuleState.OFF)                  // 其余项不受牵连
+    }
+
+    /** ML Kit 的英文、中文、中英三档 2026-10-16 并成了一档：选过哪一档的，升级后还是 ML Kit，别的设置不受牵连。 */
+    @Test fun `an engine stored before ml kit was merged reads as ml kit`() = runTest {
+        listOf("LATIN", "CHINESE", "BOTH").forEach { old ->
+            val store = store()
+            store.setRecognitionConfig(RecognitionConfig(faceState = RuleState.OFF))
+            store.writeRawTextEngineForTest(old)
+            val read = store.recognitionConfig.first()
+            assertThat(read.textEngine).isEqualTo(TextEngineOption.MLKIT)
+            assertThat(read.faceState).isEqualTo(RuleState.OFF)
+        }
     }
 
     @Test fun `resetting goes back to the factory default`() = runTest {
@@ -116,7 +128,7 @@ class RecognitionConfigStoreTest {
         val store = store()
         store.setRecognitionConfig(
             RecognitionConfig(
-                textEngine = TextEngineOption.LATIN,
+                textEngine = TextEngineOption.MLKIT,
                 faceState = RuleState.OFF,
                 barcodeState = RuleState.OFF,
                 maskUnanchoredNames = true,
