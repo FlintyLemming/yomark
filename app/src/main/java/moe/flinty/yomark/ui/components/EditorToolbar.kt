@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.components
 
+import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
@@ -50,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -80,6 +82,7 @@ import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -166,6 +169,8 @@ enum class ToolGroup(@StringRes val label: Int) {
  * 这一行只摆胶囊里的东西，胶囊眼下左右到哪儿用 [PillLeft]、[PillRight] 告诉底栏。
  *
  * 圆钮上没有字。AI 跑完那一下画布顶上说一声结果（见 AiReviewResultPill）；对比点一下没有比上，弹个提示说要按住。
+ *
+ * 点这一行上的哪一样都轻震一下，照 Bettbox 的底栏（见 [withTick]）。
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
@@ -641,6 +646,24 @@ private fun styleTool(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
 // ---------- 按钮 ----------
 
 /**
+ * 点这一行上的哪一样，先轻震一下再干 [onClick] 的事（2026-10-17）。照 Bettbox 的底栏（它设置里的「底部导航栏切换震动反馈」）：
+ * Flutter 的 HapticFeedback.selectionClick()，在 Android 上是 CLOCK_TICK，很轻的一下。
+ * Compose 的 HapticFeedbackType 里没有它：相近的 SegmentFrequentTick 要 Android 14，之前的系统只有拖文字光标的那一下（见 DETENT），
+ * 那一下要机型开着才震，所以直接让 View 震。点不动时不震；系统设置里关了触摸反馈也不震。
+ */
+@Composable
+private fun withTick(onClick: () -> Unit): () -> Unit {
+    val view = LocalView.current
+    val latest by rememberUpdatedState(onClick)
+    return remember(view) {
+        {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            latest()
+        }
+    }
+}
+
+/**
  * 收着时胶囊里的一组：左边是这一组眼下的样子，右边是名字，名字后面一个小箭头，说明点开里面还有东西。
  * 样式栏上那一份（画笔，或者选中的那一块的）在这一组时，样子就是它的样子（色块是当前的颜色，和图上的码一个颜色）；
  * 不在时是这一组自己的图标。收着时画笔总在「打码」里（「编辑」收回来就放下了，见 EditorScreen），
@@ -673,7 +696,7 @@ private fun GroupButton(
                 if (away) Modifier.clearAndSetSemantics {}
                 else Modifier.semantics { if (inUseName != null) stateDescription = inUseName },
             )
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = withTick(onClick))
             .padding(start = GROUP_PAD_START, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -713,7 +736,7 @@ private fun BackButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier
         modifier
             .size(BACK_SIZE)
             .clip(CircleShape)
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_collapse), onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_collapse), onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -886,7 +909,7 @@ private fun ToolboxCircle(running: Boolean, enabled: Boolean, onClick: () -> Uni
                 contentDescription = label
                 if (running) stateDescription = runningText
             }
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         if (running) {
@@ -911,7 +934,7 @@ private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit,
             .fillMaxSize()
             .clip(CircleShape)
             .semantics { contentDescription = label }
-            .clickable(enabled = ready && enabled, role = Role.Button, onClick = onClick),
+            .clickable(enabled = ready && enabled, role = Role.Button, onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -934,7 +957,8 @@ internal fun aiReviewLabel(state: AiReview): String = when (state) {
 
 /**
  * 「按住对比」：按住时画布换成打码前的原图，松手回来（见 EditorScreen）。来回比的时候，手一松就该回到打码后的样子。
- * 圆钮上写不下「按住」：点一下（没比上）就在它上面弹个提示。长按是在比，不弹提示、也不震。没打码、也没设水印时没有可比的，灰掉。
+ * 圆钮上写不下「按住」：点一下（没比上）就在它上面弹个提示，和这一行上别的一样轻震一下（见 [withTick]）。
+ * 长按是在比，不弹提示、也不震。没打码、也没设水印时没有可比的，灰掉。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -963,7 +987,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
                         role = Role.Button,
                         onLongClick = {},
                         hapticFeedbackEnabled = false,
-                        onClick = { scope.launch { hint.show() } },
+                        onClick = withTick { scope.launch { hint.show() } },
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1025,12 +1049,13 @@ private fun ToolItem(tool: Tool, room: Int) {
     val colors = MaterialTheme.colorScheme
     val selected = tool.selected
     val interaction = remember { MutableInteractionSource() }
+    val onClick = withTick(tool.onClick)
     val press = if (tool.role == Role.RadioButton) {
         Modifier.selectable(
-            selected = selected, interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = tool.onClick,
+            selected = selected, interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = onClick,
         )
     } else {
-        Modifier.clickable(interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = tool.onClick)
+        Modifier.clickable(interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = onClick)
     }
     // 一条匀速的进度推着几样东西，各按各的曲线走，和 GNav 一个 AnimationController 推着几样一样
     val pick by animateFloatAsState(if (selected) 1f else 0f, tween(PICK_MS, easing = LinearEasing), label = "pick")
