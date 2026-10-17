@@ -244,7 +244,7 @@
     <string name="sensitive_info">敏感信息</string>
     <string name="engine_paddle">PP-OCR</string>
     <string name="engine_mlkit">ML Kit</string>
-    <string name="engine_paddle_summary">中文最准，速度稍慢</string>
+    <string name="engine_paddle_summary">识别更准，速度稍慢</string>
     <string name="engine_mlkit_summary">中英文都能认</string>
     <string name="when_found">识别到%1$s时</string>
     <string name="guessed_names">从字面猜出的人名</string>

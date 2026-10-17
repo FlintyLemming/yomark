@@ -401,7 +401,7 @@ class SettingsScreenTest {
     @Test fun pickingAnEngineEmitsIt() {
         var latest: RecognitionConfig? = null
         show { TextEngineSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNode(hasText("PP-OCR") and hasText("中文最准，速度稍慢")).assertIsSelected()
+        compose.onNode(hasText("PP-OCR") and hasText("识别更准，速度稍慢")).assertIsSelected()
         compose.onAllNodes(isSelectable()).assertCountEquals(2)
         listOf("ML Kit 英文", "ML Kit 中文", "ML Kit 中英").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
         compose.onNode(hasText("ML Kit") and hasText("中英文都能认")).performClick()

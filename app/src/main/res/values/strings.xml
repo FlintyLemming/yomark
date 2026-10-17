@@ -244,7 +244,7 @@
     <string name="sensitive_info">Sensitive information</string>
     <string name="engine_paddle">PP-OCR</string>
     <string name="engine_mlkit">ML Kit</string>
-    <string name="engine_paddle_summary">Best for Chinese, a bit slower</string>
+    <string name="engine_paddle_summary">More accurate, a bit slower</string>
     <string name="engine_mlkit_summary">Chinese and English</string>
     <string name="when_found">When %1$s is found</string>
     <string name="guessed_names">Names guessed from text</string>
