@@ -83,8 +83,6 @@
     <string name="list_count">%1$d boxes</string>
     <string name="list_empty">Nothing sensitive found</string>
     <string name="list_empty_hint">Missed something? Drag a box on the image with one finger</string>
-    <string name="item_selected">Selected</string>
-    <string name="item_manual">Drawn by hand</string>
     <string name="item_unmask">Unmask</string>
 
     <!-- kinds -->
