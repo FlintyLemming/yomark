@@ -3,6 +3,10 @@
 对 `2026-09-30-yomark-ppocr-gemini-nano-design.md` 的增补：「AI 增强识别」除了本机的 Gemini Nano，
 还可以接一个用户自己配置的外部大模型（OpenAI 兼容的 Chat Completions 接口）。
 
+> **2026-10-18 删掉**：上架要声明没有联网权限，这个功能整个去掉了，`INTERNET` 照旧在合并阶段摘掉、不进权限白名单。
+> 0.18.0 起填过的开关、接口地址、API Key、模型，升级后头一回读设置时清掉（`SettingsStore.kt` 的 `DropExternalModel`）。
+> 下面的调研留作记录；「相邻两行拼起来找原文」那一条对 Nano 也有用，留下了（`SemanticPrompt.acrossLines`）。
+
 ## 起因
 
 Gemini Nano 只有近两年带 GMS 的旗舰上有，召回也有限：同一套提示词在 55 页标注（`tools/model-eval/nano-pages-zh.json`）上

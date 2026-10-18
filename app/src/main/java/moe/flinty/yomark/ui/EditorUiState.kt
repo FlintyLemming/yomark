@@ -34,7 +34,7 @@ sealed interface EditorMessage {
  * （见 [EditorUiState.aiReviewsFinished]）。
  */
 sealed interface AiReview {
-    /** 不出现：机型不支持（也没配外部模型）、文字各类全关了、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
+    /** 不出现：机型不支持、文字各类全关了、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
     data object Hidden : AiReview
     data object Ready : AiReview
     data object Running : AiReview

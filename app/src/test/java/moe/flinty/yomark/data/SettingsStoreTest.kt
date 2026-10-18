@@ -1,13 +1,16 @@
 package moe.flinty.yomark.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.StrokeShape
@@ -45,6 +48,28 @@ class SettingsStoreTest {
         val options = SettingsStore(data).maskOptions.first()
         assertThat(options.pixelBlockDivisor).isEqualTo(MaskOptions.DEFAULT_PIXEL_DIVISOR)
         assertThat(options.blurRadiusRatio).isEqualTo(MaskOptions.DEFAULT_BLUR_RATIO)
+    }
+
+    /** 0.18–0.20 在实验室「外部模型」里填过的接口和 API Key：功能删了，头一回读设置就清掉，别的设置原样留着。 */
+    @Test
+    fun `what was filled in for the removed external model is wiped on first read`() = runTest {
+        val file = File(context.filesDir, "settings-test-${UUID.randomUUID()}.preferences_pb")
+        val old = CoroutineScope(Dispatchers.Unconfined + SupervisorJob())
+        PreferenceDataStoreFactory.create(scope = old) { file }.edit {
+            it[booleanPreferencesKey("external_model_enabled")] = true
+            it[stringPreferencesKey("external_model_base_url")] = "https://api.example.com/v1"
+            it[stringPreferencesKey("external_model_api_key")] = "sk-secret"
+            it[stringPreferencesKey("external_model_name")] = "glm"
+            it[stringPreferencesKey("last_style")] = MaskStyle.PIXELATE.name
+        }
+        old.cancel()                                        // 同一个文件同时只能开着一个 DataStore
+
+        val data = PreferenceDataStoreFactory.create(
+            migrations = listOf(DropExternalModel),
+            scope = CoroutineScope(Dispatchers.Unconfined + SupervisorJob()),
+        ) { file }
+        assertThat(data.data.first().asMap().keys.map { it.name }).containsExactly("last_style")
+        assertThat(SettingsStore(data).lastStyle.first()).isEqualTo(MaskStyle.PIXELATE)
     }
 
     @Test

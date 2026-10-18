@@ -8,7 +8,7 @@
   <img src="https://img.shields.io/badge/Android-10%2B-3ddc84?logo=android&logoColor=white" alt="Android 10+">
 </p>
 
-<p align="center">自动找出截图里的手机号、地址、人名、人脸、二维码并打码<br>本机识别，默认不联网，不申请任何运行期权限</p>
+<p align="center">自动找出截图里的手机号、地址、人名、人脸、二维码并打码<br>本机识别，没有联网权限，不申请任何运行期权限</p>
 
 <table>
   <tr>

@@ -54,7 +54,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -246,8 +245,6 @@ class EditorViewModel(
         brushRestored = restoreBrush()
         restorePurposeStyle()
         observeRecognitionConfig()
-        // 外部模型的设置不在 config 里，变了不重跑识别，只重新看一下「AI 增强识别」能不能用
-        viewModelScope.launch { settings.externalModel.drop(1).collect { reprobeAiReview() } }
         viewModelScope.launch { settings.restyleAllMasks.collect { restyleAll = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
         viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
@@ -664,7 +661,7 @@ class EditorViewModel(
             aiReview = AiReview.Hidden,
             plan = current.plan.copy(items = detected + keep(current.plan.items)),
             bigBang = null,
-            // 换成了用不了 AI 的方案（实验室里关了外部模型）：宽屏不再给它留那一块
+            // 换成了用不了 AI 的方案（文字各类全关了，聊天记录也关着）：宽屏不再给它留那一块
             aiOffered = current.aiOffered && ranOn.canRefine,
         )
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn, trace)
@@ -751,29 +748,7 @@ class EditorViewModel(
     }
 
     /**
-     * 实验室里的外部模型开了、关了、改了接口：这张图识别早就跑完了，按钮出不出现要重新看一次。
-     * 变得能用就摆出来——跑过的（Done、Failed）也重新可点，换了模型结果可能不一样；变得不能用就收起来。
-     * 正在跑的那一次不动。
-     */
-    private fun reprobeAiReview() {
-        val current = _state.value
-        val image = current.image ?: return
-        val ranWith = analyzedWith ?: return
-        if (current.analyzing || reviewLines == null || current.aiReview == AiReview.Running) return
-        val ranOn = engine
-        if (!ranOn.canRefine) return
-        aiReviewJob?.cancel()
-        aiReviewJob = viewModelScope.launch {
-            val ready = withContext(ioDispatcher) { ranOn.refineReady() }
-            val now = _state.value
-            if (now.image !== image || analyzedWith != ranWith || now.analyzing || now.aiReview == AiReview.Running) return@launch
-            val next = if (ready) AiReview.Ready else AiReview.Hidden
-            if (now.aiReview != next || now.aiOffered != ready) uiState = now.copy(aiReview = next, aiOffered = ready)
-        }
-    }
-
-    /**
-     * 用户点了「AI 增强识别」：大模型（本机的 Gemini Nano，或实验室里的外部模型）把整页文字再看一遍，
+     * 用户点了「AI 增强识别」：端侧大模型（Gemini Nano）把整页文字再看一遍，
      * 新发现的直接打上码追加进 plan（宽屏列表上标「AI」），用「打码」里眼下的样式。
      *
      * 是用户点出来的，所以进撤销栈——不想要这批框，撤销一下就整批拿掉。

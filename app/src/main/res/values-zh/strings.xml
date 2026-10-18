@@ -20,7 +20,7 @@
     <string name="onboarding_open_settings">打开设置</string>
     <string name="onboarding_welcome_title">欢迎</string>
     <string name="onboarding_tagline">自动找出截图里的手机号、地址、人脸并打码</string>
-    <string name="onboarding_offline">默认不联网，图片不离开手机</string>
+    <string name="onboarding_offline">不联网，图片不离开手机</string>
     <string name="onboarding_metadata">导出时去掉位置、机型等隐藏信息</string>
     <string name="onboarding_auto_title">自动打码</string>
     <string name="onboarding_auto_body">打开图片就会遮住地址、电话等隐私信息</string>
@@ -229,7 +229,7 @@
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
     <string name="settings_general_summary">编辑、识别、水印样式</string>
     <string name="settings_appearance_summary">深色模式、主题色、识别动效</string>
-    <string name="settings_labs_summary">识别聊天记录、外部模型</string>
+    <string name="settings_labs_summary">识别聊天记录</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
     <string name="settings_help_summary">重新观看引导</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 反馈 · 恢复默认设置</string>
@@ -318,25 +318,6 @@
     <string name="mlkit_footer">Google 的端侧机器学习工具包</string>
     <string name="mlkit_summary">文字 %1$s · 人脸 %2$s · 条码 %3$s</string>
     <string name="mlkit_text_versions">%1$s（英文）/ %2$s（中文）</string>
-
-    <!-- settings: external model (Labs) -->
-    <string name="external_model">外部模型</string>
-    <string name="external_model_footer">AI 增强识别改用 OpenAI 兼容接口，识别出的文字会发给它，在「AI」里配置</string>
-    <string name="external_base_url">接口地址</string>
-    <string name="external_api_key">API Key</string>
-    <string name="external_model_name">模型</string>
-    <string name="external_not_set">未填写</string>
-    <string name="external_key_set">已填写</string>
-    <string name="external_test">测试连接</string>
-    <string name="external_testing">测试中…</string>
-    <string name="external_test_ok">可用 · %1$s 秒</string>
-    <string name="external_test_failed">失败：%1$s</string>
-    <string name="external_err_https">接口地址要以 https:// 开头</string>
-    <string name="external_err_timeout">超时</string>
-    <string name="external_err_network">连不上</string>
-    <string name="external_err_reply">回答格式不对</string>
-    <string name="external_ai_footer">代替 Gemini Nano，接口地址写到 /v1 为止</string>
-    <string name="save">保存</string>
 
     <!-- settings: export / appearance -->
     <string name="restyle_all">换样式时一起换掉已有的打码</string>
