@@ -118,7 +118,7 @@ fun EditorTopBar(
             }
             IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
             if (onShare != null) {
-                // 浅色底的圆钮，和实心的导出挨着成一对；分享中转圈，读屏念「分享中…」
+                // 色调底（tonal）的圆钮，和实心的导出挨着成一对；分享中转圈，读屏念「分享中…」
                 val shareLabel = stringResource(if (exporting && sharing) R.string.sharing else R.string.share)
                 FilledTonalIconButton(
                     onClick = onShare,

@@ -1,11 +1,13 @@
 package moe.flinty.yomark.ui.theme
 
 import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
 
 // 由 tools/theme/gen_theme_palettes.mjs 生成，不要手改。
 // 算法是 Material Color Utilities 的 SchemeContent（主色贴近种子色），每套注明了种子色。
+// 每个颜色浅色、深色各一套，深色的名字后面带 Dark。
 
 internal object ThemePalettes {
 
@@ -49,6 +51,46 @@ internal object ThemePalettes {
         surfaceDim = Color(0xFFD8D9E3),
     )
 
+    /** 种子色 #1A73E8，深色 */
+    val blueDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFFADC7FF),
+        onPrimary = Color(0xFF002E68),
+        primaryContainer = Color(0xFF1A73E8),
+        onPrimaryContainer = Color(0xFFFFFFFF),
+        inversePrimary = Color(0xFF005BC0),
+        secondary = Color(0xFFAFC7FB),
+        onSecondary = Color(0xFF15305B),
+        secondaryContainer = Color(0xFF2E4673),
+        onSecondaryContainer = Color(0xFF9EB5E8),
+        tertiary = Color(0xFFEFB0FF),
+        onTertiary = Color(0xFF53006E),
+        tertiaryContainer = Color(0xFFA851C6),
+        onTertiaryContainer = Color(0xFFFFFFFF),
+        background = Color(0xFF10131A),
+        onBackground = Color(0xFFE0E2EC),
+        surface = Color(0xFF10131A),
+        onSurface = Color(0xFFE0E2EC),
+        surfaceVariant = Color(0xFF414754),
+        onSurfaceVariant = Color(0xFFC1C6D6),
+        surfaceTint = Color(0xFFADC7FF),
+        inverseSurface = Color(0xFFE0E2EC),
+        inverseOnSurface = Color(0xFF2D3038),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFF8B909F),
+        outlineVariant = Color(0xFF414754),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF363941),
+        surfaceContainer = Color(0xFF1D2027),
+        surfaceContainerHigh = Color(0xFF272A31),
+        surfaceContainerHighest = Color(0xFF32353C),
+        surfaceContainerLow = Color(0xFF191C23),
+        surfaceContainerLowest = Color(0xFF0B0E15),
+        surfaceDim = Color(0xFF10131A),
+    )
+
     /** 种子色 #00897B */
     val teal: ColorScheme = lightColorScheme(
         primary = Color(0xFF00685D),
@@ -87,6 +129,46 @@ internal object ThemePalettes {
         surfaceContainerLow = Color(0xFFF0F5F2),
         surfaceContainerLowest = Color(0xFFFFFFFF),
         surfaceDim = Color(0xFFD6DBD9),
+    )
+
+    /** 种子色 #00897B，深色 */
+    val tealDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFF70D8C8),
+        onPrimary = Color(0xFF003731),
+        primaryContainer = Color(0xFF32A192),
+        onPrimaryContainer = Color(0xFF000F0C),
+        inversePrimary = Color(0xFF006B5F),
+        secondary = Color(0xFFA8CEC6),
+        onSecondary = Color(0xFF103631),
+        secondaryContainer = Color(0xFF2B4F49),
+        onSecondaryContainer = Color(0xFF9AC0B8),
+        tertiary = Color(0xFFD4BBFF),
+        onTertiary = Color(0xFF3B2264),
+        tertiaryContainer = Color(0xFF9F84CD),
+        onTertiaryContainer = Color(0xFF130032),
+        background = Color(0xFF0F1413),
+        onBackground = Color(0xFFDFE4E1),
+        surface = Color(0xFF0F1413),
+        onSurface = Color(0xFFDFE4E1),
+        surfaceVariant = Color(0xFF3D4946),
+        onSurfaceVariant = Color(0xFFBCC9C5),
+        surfaceTint = Color(0xFF70D8C8),
+        inverseSurface = Color(0xFFDFE4E1),
+        inverseOnSurface = Color(0xFF2C3130),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFF879390),
+        outlineVariant = Color(0xFF3D4946),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF353A39),
+        surfaceContainer = Color(0xFF1B211F),
+        surfaceContainerHigh = Color(0xFF262B2A),
+        surfaceContainerHighest = Color(0xFF313634),
+        surfaceContainerLow = Color(0xFF171D1B),
+        surfaceContainerLowest = Color(0xFF0A0F0E),
+        surfaceDim = Color(0xFF0F1413),
     )
 
     /** 种子色 #43A047 */
@@ -129,6 +211,46 @@ internal object ThemePalettes {
         surfaceDim = Color(0xFFD6DCD1),
     )
 
+    /** 种子色 #43A047，深色 */
+    val greenDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFF7DDC7A),
+        onPrimary = Color(0xFF00390A),
+        primaryContainer = Color(0xFF46A34A),
+        onPrimaryContainer = Color(0xFF002E07),
+        inversePrimary = Color(0xFF006E1C),
+        secondary = Color(0xFFAAD1A2),
+        onSecondary = Color(0xFF163716),
+        secondaryContainer = Color(0xFF2F512D),
+        onSecondaryContainer = Color(0xFF9CC395),
+        tertiary = Color(0xFF90CDFF),
+        onTertiary = Color(0xFF003350),
+        tertiaryContainer = Color(0xFF1199E0),
+        onTertiaryContainer = Color(0xFF002941),
+        background = Color(0xFF0F150E),
+        onBackground = Color(0xFFDFE4D9),
+        surface = Color(0xFF0F150E),
+        onSurface = Color(0xFFDFE4D9),
+        surfaceVariant = Color(0xFF3F4A3D),
+        onSurfaceVariant = Color(0xFFBFCAB9),
+        surfaceTint = Color(0xFF7DDC7A),
+        inverseSurface = Color(0xFFDFE4D9),
+        inverseOnSurface = Color(0xFF2C322A),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFF899484),
+        outlineVariant = Color(0xFF3F4A3D),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF353B33),
+        surfaceContainer = Color(0xFF1C211A),
+        surfaceContainerHigh = Color(0xFF262B24),
+        surfaceContainerHighest = Color(0xFF31362F),
+        surfaceContainerLow = Color(0xFF181D16),
+        surfaceContainerLowest = Color(0xFF0A1009),
+        surfaceDim = Color(0xFF0F150E),
+    )
+
     /** 种子色 #F57C00 */
     val orange: ColorScheme = lightColorScheme(
         primary = Color(0xFF964900),
@@ -167,6 +289,46 @@ internal object ThemePalettes {
         surfaceContainerLow = Color(0xFFFFF1EA),
         surfaceContainerLowest = Color(0xFFFFFFFF),
         surfaceDim = Color(0xFFEBD6CA),
+    )
+
+    /** 种子色 #F57C00，深色 */
+    val orangeDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFFFFB786),
+        onPrimary = Color(0xFF502400),
+        primaryContainer = Color(0xFFF57C00),
+        onPrimaryContainer = Color(0xFF572800),
+        inversePrimary = Color(0xFF964900),
+        secondary = Color(0xFFFFB786),
+        onSecondary = Color(0xFF502400),
+        secondaryContainer = Color(0xFF6D3910),
+        onSecondaryContainer = Color(0xFFEEA573),
+        tertiary = Color(0xFFC8CE39),
+        onTertiary = Color(0xFF313300),
+        tertiaryContainer = Color(0xFF9FA400),
+        onTertiaryContainer = Color(0xFF353700),
+        background = Color(0xFF1B110A),
+        onBackground = Color(0xFFF4DED2),
+        surface = Color(0xFF1B110A),
+        onSurface = Color(0xFFF4DED2),
+        surfaceVariant = Color(0xFF574235),
+        onSurfaceVariant = Color(0xFFDEC1AF),
+        surfaceTint = Color(0xFFFFB786),
+        inverseSurface = Color(0xFFF4DED2),
+        inverseOnSurface = Color(0xFF3B2E26),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFFA68B7C),
+        outlineVariant = Color(0xFF574235),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF44362E),
+        surfaceContainer = Color(0xFF291D16),
+        surfaceContainerHigh = Color(0xFF342720),
+        surfaceContainerHighest = Color(0xFF3F322A),
+        surfaceContainerLow = Color(0xFF241912),
+        surfaceContainerLowest = Color(0xFF160C06),
+        surfaceDim = Color(0xFF1B110A),
     )
 
     /** 种子色 #E53935 */
@@ -209,6 +371,46 @@ internal object ThemePalettes {
         surfaceDim = Color(0xFFF1D3D0),
     )
 
+    /** 种子色 #E53935，深色 */
+    val redDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFFFFB4AC),
+        onPrimary = Color(0xFF690006),
+        primaryContainer = Color(0xFFFF544C),
+        onPrimaryContainer = Color(0xFF290001),
+        inversePrimary = Color(0xFFBB171C),
+        secondary = Color(0xFFFFB4AC),
+        onSecondary = Color(0xFF630F0E),
+        secondaryContainer = Color(0xFF822622),
+        onSecondaryContainer = Color(0xFFFF998F),
+        tertiary = Color(0xFFFFB866),
+        onTertiary = Color(0xFF482900),
+        tertiaryContainer = Color(0xFFC9811E),
+        onTertiaryContainer = Color(0xFF1A0C00),
+        background = Color(0xFF1E0F0E),
+        onBackground = Color(0xFFFADCD8),
+        surface = Color(0xFF1E0F0E),
+        onSurface = Color(0xFFFADCD8),
+        surfaceVariant = Color(0xFF5B403D),
+        onSurfaceVariant = Color(0xFFE4BEB9),
+        surfaceTint = Color(0xFFFFB4AC),
+        inverseSurface = Color(0xFFFADCD8),
+        inverseOnSurface = Color(0xFF3E2C2A),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFFAB8985),
+        outlineVariant = Color(0xFF5B403D),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF483432),
+        surfaceContainer = Color(0xFF2C1B1A),
+        surfaceContainerHigh = Color(0xFF372624),
+        surfaceContainerHighest = Color(0xFF43302E),
+        surfaceContainerLow = Color(0xFF271716),
+        surfaceContainerLowest = Color(0xFF180A09),
+        surfaceDim = Color(0xFF1E0F0E),
+    )
+
     /** 种子色 #D81B60 */
     val pink: ColorScheme = lightColorScheme(
         primary = Color(0xFFB0004A),
@@ -247,5 +449,45 @@ internal object ThemePalettes {
         surfaceContainerLow = Color(0xFFFFF0F1),
         surfaceContainerLowest = Color(0xFFFFFFFF),
         surfaceDim = Color(0xFFF0D3D7),
+    )
+
+    /** 种子色 #D81B60，深色 */
+    val pinkDark: ColorScheme = darkColorScheme(
+        primary = Color(0xFFFFB2BF),
+        onPrimary = Color(0xFF660028),
+        primaryContainer = Color(0xFFD81B60),
+        onPrimaryContainer = Color(0xFFFFF2F3),
+        inversePrimary = Color(0xFFBC004F),
+        secondary = Color(0xFFFFB2BF),
+        onSecondary = Color(0xFF650428),
+        secondaryContainer = Color(0xFF84203E),
+        onSecondaryContainer = Color(0xFFFF96AC),
+        tertiary = Color(0xFFFFB59A),
+        onTertiary = Color(0xFF5B1B00),
+        tertiaryContainer = Color(0xFFC64500),
+        onTertiaryContainer = Color(0xFFFFF3F0),
+        background = Color(0xFF1E0F12),
+        onBackground = Color(0xFFF9DBDF),
+        surface = Color(0xFF1E0F12),
+        onSurface = Color(0xFFF9DBDF),
+        surfaceVariant = Color(0xFF5A4044),
+        onSurfaceVariant = Color(0xFFE3BDC3),
+        surfaceTint = Color(0xFFFFB2BF),
+        inverseSurface = Color(0xFFF9DBDF),
+        inverseOnSurface = Color(0xFF3E2C2F),
+        error = Color(0xFFFFB4AB),
+        onError = Color(0xFF690005),
+        errorContainer = Color(0xFF93000A),
+        onErrorContainer = Color(0xFFFFDAD6),
+        outline = Color(0xFFAA888D),
+        outlineVariant = Color(0xFF5A4044),
+        scrim = Color(0xFF000000),
+        surfaceBright = Color(0xFF473437),
+        surfaceContainer = Color(0xFF2B1B1E),
+        surfaceContainerHigh = Color(0xFF372528),
+        surfaceContainerHighest = Color(0xFF423033),
+        surfaceContainerLow = Color(0xFF27171A),
+        surfaceContainerLowest = Color(0xFF180A0D),
+        surfaceDim = Color(0xFF1E0F12),
     )
 }

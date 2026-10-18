@@ -68,18 +68,24 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
+import moe.flinty.yomark.ui.theme.isDark
 
 /*
  * 设置各页共用的部件，照 Android 16 的系统设置排：
  *
- * - 页面底色是 surfaceContainer，行是一张张浅色卡片（surfaceBright）。同一组的行之间只留一道 2 dp 的缝，
+ * - 页面底色是 surfaceContainer，行是一张张比底色亮一档的卡片（surfaceBright），深色界面也是这样配的。同一组的行之间只留一道 2 dp 的缝，
  *   组的外侧是大圆角、组内相邻处是小圆角，看上去是一整块被切开的卡片；
  * - 大标题栏，列表往上滚时收成普通标题栏；
  * - 一级页每一项前面一个彩色圆底图标（SettingsIconColors），二级页的分组标题用主题色。
  */
 
-/** 设置一级页图标的一对颜色：圆底与图标。配色表见 [SettingsIconColors]。 */
-internal class SettingsIconColor(val container: Color, val content: Color)
+/** 设置一级页图标的颜色：圆底与图标，浅色、深色界面各一对。配色表见 [SettingsIconColors]。 */
+internal class SettingsIconColor(
+    val container: Color,
+    val content: Color,
+    val darkContainer: Color,
+    val darkContent: Color,
+)
 
 private val OuterCorner = 20.dp
 private val InnerCorner = 4.dp
@@ -109,7 +115,7 @@ internal fun RowGapSpacer() {
 }
 
 /**
- * 每一页的骨架。应用是边到边的（见 enableLightEdgeToEdge），系统栏让不让开由各屏自己管：
+ * 每一页的骨架。应用是边到边的（见 layoutEdgeToEdge），系统栏让不让开由各屏自己管：
  * 标题栏垫在状态栏下面、固定在顶上，列表滚上去时从它底下穿过；列表一直画到屏幕底边，
  * 最后一行下面留出导航条的高度。横屏时左右再让开挖孔与三键导航。
  *
@@ -288,14 +294,15 @@ internal fun SettingsRow(
 
 private const val DisabledAlpha = 0.38f
 
-/** 一级页的彩色图标：浅色圆底上一个同色相的深色图标。 */
+/** 一级页的彩色图标：浅色界面是浅色圆底上一个同色相的深色图标，深色界面反过来。 */
 @Composable
 internal fun SettingsIcon(icon: ImageVector, colors: SettingsIconColor, modifier: Modifier = Modifier) {
+    val dark = MaterialTheme.colorScheme.isDark
     Box(
-        modifier.size(40.dp).background(colors.container, CircleShape),
+        modifier.size(40.dp).background(if (dark) colors.darkContainer else colors.container, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = colors.content, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = if (dark) colors.darkContent else colors.content, modifier = Modifier.size(22.dp))
     }
 }
 

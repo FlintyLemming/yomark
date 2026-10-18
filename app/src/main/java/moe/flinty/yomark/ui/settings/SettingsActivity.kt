@@ -35,8 +35,9 @@ import moe.flinty.yomark.engine.genai.NanoClient
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.brandWatermarkApplies
-import moe.flinty.yomark.ui.enableLightEdgeToEdge
+import moe.flinty.yomark.ui.layoutEdgeToEdge
 import moe.flinty.yomark.ui.onboarding.TourActivity
+import moe.flinty.yomark.ui.theme.AppThemeMode
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -57,7 +58,7 @@ class SettingsActivity : YomarkActivity() {
     private var opened by mutableStateOf<List<SettingsDestination>?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
         // 存过就以存的为准（存的是 null 也算：退回一级页之后转个屏，不能又按启动时的 intent 打开）
         opened = if (savedInstanceState != null) savedInstanceState.opened() else intent.opened()
@@ -137,7 +138,7 @@ class SettingsActivity : YomarkActivity() {
 class SettingsPageActivity : YomarkActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
         val destination = intent.getStringExtra(EXTRA_PAGE)
             ?.let { name -> SettingsPage.entries.firstOrNull { it.name == name } }
@@ -280,12 +281,19 @@ internal fun SettingsPageContent(
             }
         }
         SettingsPage.APPEARANCE -> {
+            // 换了深浅时各页重建，读回来的就是新的；深浅没变（比如系统本来就是浅色，从跟随系统换到浅色）不重建，靠这里记着
+            var themeMode by remember { mutableStateOf(AppThemeMode.current(activity)) }
             val themeColor by store.themeColor.collectAsStateWithLifecycle(initialValue = null)
             val scanStyle by store.scanStyle.collectAsStateWithLifecycle(initialValue = null)
             val color = themeColor
             val style = scanStyle
             if (color != null && style != null) {
                 AppearanceSettingsScreen(
+                    themeMode = themeMode,
+                    onThemeModeChange = { next ->
+                        themeMode = next
+                        AppThemeMode.set(activity, next)
+                    },
                     themeColor = color,
                     onThemeColorChange = { next -> scope.launch { store.setThemeColor(next) } },
                     scanStyle = style,

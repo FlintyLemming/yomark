@@ -37,7 +37,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,7 +56,6 @@ import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
@@ -65,8 +63,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.core.view.WindowCompat
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.MaskLook
@@ -251,22 +247,6 @@ internal fun StylePanelContent(
         collapseLabel = stringResource(R.string.collapse_style_panel),
     )
     StylePanelBody(model, actions, compactWhileTyping = compactWhileTyping && imeVisible)
-}
-
-/**
- * 弹出的面板在一个铺满屏幕的对话框窗口里，Material 3 按系统的深色模式给这个窗口定系统栏图标的颜色。
- * 本应用只有浅色界面（见 enableLightEdgeToEdge），深色模式下变白的图标落在浅色的面板和暗幕上看不清：扳回深色。
- */
-@Composable
-internal fun DarkSystemBarIcons() {
-    val view = LocalView.current
-    SideEffect {
-        val window = (view.parent as? DialogWindowProvider)?.window ?: return@SideEffect
-        WindowCompat.getInsetsController(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
-        }
-    }
 }
 
 /**

@@ -37,7 +37,7 @@ import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.components.foldTween
 import moe.flinty.yomark.ui.components.restorePurchase
-import moe.flinty.yomark.ui.enableLightEdgeToEdge
+import moe.flinty.yomark.ui.layoutEdgeToEdge
 import moe.flinty.yomark.ui.onboarding.EngineProbeModel
 import moe.flinty.yomark.ui.onboarding.OnboardingTour
 import moe.flinty.yomark.ui.onboarding.PpOcrProbe
@@ -78,7 +78,7 @@ class HomeActivity : YomarkActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // 先用缓存点亮购买态，再尝试联网校验。只在 Play 商店进程里发生（spec §10 / §13）。

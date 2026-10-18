@@ -43,6 +43,7 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -71,7 +72,9 @@ import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.ColorSwatch
 import moe.flinty.yomark.ui.theme.ThemeColor
+import moe.flinty.yomark.ui.theme.ThemeMode
 import moe.flinty.yomark.ui.theme.colorScheme
+import moe.flinty.yomark.ui.theme.isDark
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
@@ -476,14 +479,18 @@ fun GeneralSettingsScreen(
 }
 
 /**
- * 外观：主题色与识别动效，都只是样子。
+ * 外观：深色模式、主题色与识别动效，都只是样子。
+ *
+ * 深色模式不在 SettingsStore 里，由调用方从 AppThemeMode 读、交给它改。
  *
  * 主题色：「跟随系统」（莫奈取色）是一个单选项，下面一排是预设色。
- * 色块画的是选它之后的主色，不是种子色——按钮、选中态最后就是这个颜色。
+ * 色块画的是选它之后的主色，不是种子色——按钮、选中态最后就是这个颜色，深色界面里就是深色那套的主色。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceSettingsScreen(
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     themeColor: ThemeColor,
     onThemeColorChange: (ThemeColor) -> Unit,
     scanStyle: ScanStyle,
@@ -492,12 +499,25 @@ fun AppearanceSettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val presets = remember(context) {
-        ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context).primary }
+    val dark = MaterialTheme.colorScheme.isDark
+    val presets = remember(context, dark) {
+        ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context, dark).primary }
     }
     SettingsScaffold(title = stringResource(R.string.settings_appearance), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader(stringResource(R.string.theme_color), first = true)
+            SectionHeader(stringResource(R.string.theme_mode), first = true)
+            SettingsGroup(Modifier.selectableGroup()) {
+                ThemeMode.entries.forEach { mode ->
+                    RadioRow(
+                        title = stringResource(themeModeLabel(mode)),
+                        selected = themeMode == mode,
+                        onClick = { onThemeModeChange(mode) },
+                    )
+                }
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.theme_color))
             SettingsGroup {
                 RadioRow(
                     title = stringResource(themeColorLabel(ThemeColor.SYSTEM)),
@@ -698,6 +718,13 @@ internal fun barcodeModeLabel(option: BarcodeOption): Int = when (option) {
 internal fun scanStyleLabel(style: ScanStyle): Int = when (style) {
     ScanStyle.FROST -> R.string.scan_frost
     ScanStyle.SWEEP -> R.string.scan_sweep
+}
+
+@StringRes
+internal fun themeModeLabel(mode: ThemeMode): Int = when (mode) {
+    ThemeMode.SYSTEM -> R.string.follow_system
+    ThemeMode.LIGHT -> R.string.theme_mode_light
+    ThemeMode.DARK -> R.string.theme_mode_dark
 }
 
 @StringRes

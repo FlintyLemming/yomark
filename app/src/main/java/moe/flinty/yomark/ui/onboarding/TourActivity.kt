@@ -19,7 +19,7 @@ import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.ui.EditorActivity
 import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.ui.canvas.ScanStyle
-import moe.flinty.yomark.ui.enableLightEdgeToEdge
+import moe.flinty.yomark.ui.layoutEdgeToEdge
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -43,7 +43,7 @@ class TourActivity : YomarkActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         setContent {

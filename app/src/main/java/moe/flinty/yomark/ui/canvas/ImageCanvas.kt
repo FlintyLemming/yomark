@@ -686,7 +686,7 @@ private const val HANDLE_HIT_DP = 32f
 /** 选中框、草稿框的线宽（dp）。 */
 private const val SELECTION_LINE_DP = 2f
 
-/** 线两侧垫的浅色细边各多宽（dp）。 */
+/** 线两侧垫的细边（surface 色）各多宽（dp）。 */
 private const val HALO_DP = 1f
 
 /** 工具条与框之间的距离（dp），让开角上的手柄。 */
@@ -702,8 +702,8 @@ private const val DRAFT_FILL_ALPHA = 0x1F
 private class SelectionColors(val primary: Int, val surface: Int)
 
 /**
- * 线底下垫的那道浅色细边（surface 色）。主题色的线落在白底截图上很清楚，落在深色或同色的图上就看不清了，
- * 垫一道浅色的边哪里都看得见。[dp] 是 1dp 在图像坐标下的长度。
+ * 线底下垫的那道细边（surface 色）。主题色的线落在白底截图上很清楚，落在深色或同色的图上就看不清了，
+ * 垫一道和线一深一浅的边哪里都看得见：浅色界面是深色的线垫浅色的边，深色界面倒过来。[dp] 是 1dp 在图像坐标下的长度。
  */
 private fun haloPaint(colors: SelectionColors, dp: Float) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE
@@ -723,7 +723,7 @@ private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: S
     canvas.drawPath(path, haloPaint(colors, dp))
     canvas.drawPath(path, linePaint(colors, dp))
     if (!handles) return
-    // 手柄：主题色圆点套一圈浅色，再带一点投影——Material 滑块上那个拖动点的样子
+    // 手柄：主题色圆点套一圈 surface 色，再带一点投影——Material 滑块上那个拖动点的样子
     val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.FILL
         color = colors.surface
@@ -741,7 +741,7 @@ private fun drawSelection(canvas: android.graphics.Canvas, quad: Quad, colors: S
 }
 
 /**
- * 要写字的那一处还没有字：立一道光标，和输入框里的光标一个意思。主题色、垫一道浅色的边，和选中框一样哪里都看得见；
+ * 要写字的那一处还没有字：立一道光标，和输入框里的光标一个意思。主题色、垫一道 surface 色的边，和选中框一样哪里都看得见；
  * 一行字多高它就多高，摆在第一个字将来落下的地方（见 TextStamp.boxAt）。
  */
 private fun drawCaret(

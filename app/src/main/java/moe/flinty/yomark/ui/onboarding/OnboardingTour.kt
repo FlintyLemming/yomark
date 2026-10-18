@@ -751,7 +751,7 @@ private fun TapHint(tapped: Boolean) {
 
 /**
  * 欢迎页上的图：图标里的截图和胶带（不带墨色底板）摆在几块 Material 3 Expressive 的形状上（[ExpressiveShapes]，
- * 摆法见 [WELCOME_PIECES]）：主题色的九瓣曲奇，底下垫一块浅色的柔星，右下两颗小的点缀。各块慢慢转，
+ * 摆法见 [WELCOME_PIECES]）：主题色的九瓣曲奇，底下垫一块 secondaryContainer 色的柔星，右下两颗小的点缀。各块慢慢转，
  * 系统关了动画（[spin] 为 false）时不转。入场时整块淡入、从略小长到原大（[enter] 0 到 1）。
  */
 @Composable
@@ -968,7 +968,7 @@ private val WELCOME_STAGE = 120.dp
 private val PROMISE_ICON = 20.dp
 
 /**
- * 欢迎页的图从下往上画哪几块：浅色的柔星垫底，比曲奇大一圈，尖角从瓣之间探出来；主题色的九瓣曲奇；
+ * 欢迎页的图从下往上画哪几块：secondaryContainer 色的柔星垫底，比曲奇大一圈，尖角从瓣之间探出来；主题色的九瓣曲奇；
  * 右下压着曲奇边的一块小四瓣、再往下一颗更小的柔星。转一圈多久：慢得不抢字的眼，又看得出在转；
  * 柔星和曲奇反着转，尖角在瓣之间慢慢错开，小的转得快些。图标画在它们上面，不转。
  */
