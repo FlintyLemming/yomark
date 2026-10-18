@@ -78,6 +78,17 @@ class AppThemeModeTest {
         }
     }
 
+    @Test @Config(qualifiers = "night") fun `the dark window background is a resource the splash screen can read`() {
+        // Android 12 起冷启动的启动画面只认资源，主题里直接写的色值它取不到，整屏画成纯黑
+        val page = Robolectric.buildActivity(Page::class.java).setup().get()
+        val attrs = page.theme.obtainStyledAttributes(intArrayOf(android.R.attr.windowBackground))
+        try {
+            assertThat(attrs.getResourceId(0, 0)).isEqualTo(R.color.window_background_dark)
+        } finally {
+            attrs.recycle()
+        }
+    }
+
     @Test @Config(sdk = [30]) fun `swapping in the language and the night bit leaves the rest as the system has it`() {
         val system = app.resources.configuration
         val config = withAppConfiguration(app, Locale.ENGLISH, Configuration.UI_MODE_NIGHT_YES).resources.configuration
