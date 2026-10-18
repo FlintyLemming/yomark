@@ -30,7 +30,6 @@ import moe.flinty.yomark.billing.PurchaseStore
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.RecognitionConfig
-import moe.flinty.yomark.engine.genai.ExternalModelClient
 import moe.flinty.yomark.engine.genai.NanoClient
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
@@ -40,7 +39,6 @@ import moe.flinty.yomark.ui.onboarding.TourActivity
 import moe.flinty.yomark.ui.theme.AppThemeMode
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 /**
@@ -233,20 +231,13 @@ internal fun SettingsPageContent(
         SettingsPage.AI -> {
             // 进页时问一次 AICore；只看不下，见 NanoStatus
             val nano by produceState<NanoStatus?>(initialValue = null) { value = NanoClient.status() }
-            val external by store.externalModel.collectAsStateWithLifecycle(initialValue = null)
             WithRecognitionConfig(store, scope) { config, _ ->
-                external?.let { ext ->
-                    AiSettingsScreen(
-                        nano = nano,
-                        textEngine = config.textEngine,
-                        onOpenEngine = { onOpen(SettingsDestination(SettingsPage.TEXT_ENGINE)) },
-                        onNavigateUp = onNavigateUp,
-                        external = ext.takeIf { it.enabled },
-                        onExternalChange = { change -> scope.launch { store.updateExternalModel(change) } },
-                        // 测的是眼下存着的设置，不是画面上那一份：弹框保存之后才算数
-                        onTestExternal = { ExternalModelClient.check(store.externalModel.first()) },
-                    )
-                }
+                AiSettingsScreen(
+                    nano = nano,
+                    textEngine = config.textEngine,
+                    onOpenEngine = { onOpen(SettingsDestination(SettingsPage.TEXT_ENGINE)) },
+                    onNavigateUp = onNavigateUp,
+                )
             }
         }
         SettingsPage.GENERAL -> {
@@ -302,21 +293,8 @@ internal fun SettingsPageContent(
                 )
             }
         }
-        SettingsPage.LABS -> {
-            val external by store.externalModel.collectAsStateWithLifecycle(initialValue = null)
-            WithRecognitionConfig(store, scope) { config, onChange ->
-                external?.let { ext ->
-                    LabsSettingsScreen(
-                        config = config,
-                        onChange = onChange,
-                        onNavigateUp = onNavigateUp,
-                        externalModel = ext.enabled,
-                        onExternalModelChange = { on ->
-                            scope.launch { store.updateExternalModel { it.copy(enabled = on) } }
-                        },
-                    )
-                }
-            }
+        SettingsPage.LABS -> WithRecognitionConfig(store, scope) { config, onChange ->
+            LabsSettingsScreen(config, onChange, onNavigateUp = onNavigateUp)
         }
         SettingsPage.DEVELOPER -> {
             val debugTrace by store.debugTrace.collectAsStateWithLifecycle(initialValue = null)

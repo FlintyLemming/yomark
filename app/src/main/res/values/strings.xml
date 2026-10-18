@@ -20,7 +20,7 @@
     <string name="onboarding_open_settings">Open Settings</string>
     <string name="onboarding_welcome_title">Welcome</string>
     <string name="onboarding_tagline">Finds phone numbers, addresses and faces in screenshots and masks them</string>
-    <string name="onboarding_offline">Offline by default, images never leave the phone</string>
+    <string name="onboarding_offline">Works offline, images never leave the phone</string>
     <string name="onboarding_metadata">Location and device info stripped on export</string>
     <string name="onboarding_auto_title">Masked automatically</string>
     <string name="onboarding_auto_body">Opening an image masks addresses, phone numbers and other private info</string>
@@ -229,7 +229,7 @@
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
     <string name="settings_general_summary">Editing, recognition, watermark style</string>
     <string name="settings_appearance_summary">Dark theme, theme color, scan effect</string>
-    <string name="settings_labs_summary">Detect chat screenshots, external model</string>
+    <string name="settings_labs_summary">Detect chat screenshots</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
     <string name="settings_help_summary">Replay the intro tour</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Feedback · Reset</string>
@@ -318,25 +318,6 @@
     <string name="mlkit_footer">Google\'s on-device ML toolkit</string>
     <string name="mlkit_summary">Text %1$s · Faces %2$s · Barcodes %3$s</string>
     <string name="mlkit_text_versions">%1$s (Latin) / %2$s (Chinese)</string>
-
-    <!-- settings: external model (Labs) -->
-    <string name="external_model">External model</string>
-    <string name="external_model_footer">AI review uses an OpenAI-compatible API instead and sends it the recognized text; set it up under AI</string>
-    <string name="external_base_url">Base URL</string>
-    <string name="external_api_key">API key</string>
-    <string name="external_model_name">Model</string>
-    <string name="external_not_set">Not set</string>
-    <string name="external_key_set">Set</string>
-    <string name="external_test">Test connection</string>
-    <string name="external_testing">Testing…</string>
-    <string name="external_test_ok">Works · %1$s s</string>
-    <string name="external_test_failed">Failed: %1$s</string>
-    <string name="external_err_https">The base URL must start with https://</string>
-    <string name="external_err_timeout">timed out</string>
-    <string name="external_err_network">can\'t connect</string>
-    <string name="external_err_reply">unexpected reply</string>
-    <string name="external_ai_footer">Replaces Gemini Nano; write the base URL up to /v1</string>
-    <string name="save">Save</string>
 
     <!-- settings: export / appearance -->
     <string name="restyle_all">Change existing masks when switching style</string>

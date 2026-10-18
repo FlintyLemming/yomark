@@ -173,7 +173,7 @@ class OnboardingTourTest {
         advance(3_000)
         compose.onNodeWithText("有码").assertIsDisplayed()
         compose.onNodeWithText("自动找出截图里的手机号、地址、人脸并打码").assertIsDisplayed()
-        compose.onNodeWithText("默认不联网，图片不离开手机").assertIsDisplayed()
+        compose.onNodeWithText("不联网，图片不离开手机").assertIsDisplayed()
         compose.onNodeWithText("导出时去掉位置、机型等隐藏信息").assertIsDisplayed()
         compose.onNodeWithContentDescription("第 1 步，共 4 步：欢迎").assertExists()
         stage.assertDoesNotExist()

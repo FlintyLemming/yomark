@@ -279,30 +279,4 @@ class SemanticPromptTest {
         val page = listOf("长江路88号", "收件人", "阳光新村5幢")
         assertThat(SemanticPrompt.parse("地址|长江路88号阳光新村5幢", page)).isEmpty()
     }
-
-    @Test fun `masking replaces the given spans with their type and keeps unsent lines`() {
-        val masked = SemanticPrompt.mask(listOf("王小明 13800138000", null, "无号码")) { text ->
-            Regex("""1\d{10}""").findAll(text).map { it.range to SensitiveKind.PHONE }.toList()
-        }
-        assertThat(masked).containsExactly("王小明 〔电话〕", null, "无号码").inOrder()
-    }
-
-    /** 两类认出了同一处（手机号也像长数字串）：只换一次，先开始、更长的那一段。 */
-    @Test fun `overlapping spans are masked once`() {
-        val masked = SemanticPrompt.mask(listOf("证件 330106199307180423")) {
-            listOf(3..20 to SensitiveKind.ID_NUMBER, 3..13 to SensitiveKind.LONG_NUMBER, 10..20 to SensitiveKind.PHONE)
-        }
-        assertThat(masked).containsExactly("证件 〔证件号〕")
-    }
-
-    @Test fun `a masked page tells the model what the placeholders are`() {
-        assertThat(SemanticPrompt.instructions(SemanticPrompt.KINDS, masked = true)).contains("〔电话〕〔证件号〕这类标记")
-        assertThat(SemanticPrompt.instructions(SemanticPrompt.KINDS)).doesNotContain("〔")
-        assertThat(SemanticPrompt.placeholder(SensitiveKind.FACE)).isEqualTo("〔号码〕")
-    }
-
-    /** 模型把占位符当原文抄回来：页上没有这几个字，丢掉。 */
-    @Test fun `a placeholder quoted back is not on the page and is dropped`() {
-        assertThat(SemanticPrompt.parse("电话|〔电话〕", listOf("王小明 13800138000"))).isEmpty()
-    }
 }

@@ -7,6 +7,7 @@ import com.google.mlkit.genai.prompt.GenerativeModel
 import com.google.mlkit.genai.prompt.TextPart
 import com.google.mlkit.genai.prompt.generateContentRequest
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.core.model.TextLine
@@ -35,7 +36,7 @@ import kotlin.coroutines.cancellation.CancellationException
  * 交给设备上的 Gemini Nano（ML Kit GenAI Prompt API，经系统的 AICore 服务），
  * 让它把规则漏掉的指出来。问的是用户开着的每一类文字（[kinds]），聊天记录开着时也问昵称和聊天标题。
  *
- * - **全程在本机**：推理在 AICore 里跑，文字不离开手机（要发出去的是实验室里的外部模型，见 ExternalModelClassifier）；
+ * - **全程在本机**：推理在 AICore 里跑，本应用不联网、不加 INTERNET 权限；
  * - **找到的直接打码**（2026-10-14 起没有「圈出」）：是用户点了才跑的，模型猜错的点一下就拿掉，整批不要撤销一下；
  *   宽屏列表上标「AI」，与规则命中区分开（spec §3 DetectorSource 的本意）；
  * - **只加不减**：它不能撤销规则的结果。漏检是事故，让模型否决规则等于让它制造漏检；
@@ -50,13 +51,12 @@ class GeminiNanoClassifier(
      * 提示词只列这几类，回答里别的类型不认。
      */
     private val kinds: Set<SensitiveKind> = SemanticPrompt.KINDS,
-    /** 用户关掉的那几类的规则，拿它们拦回答（见 [vetoBy]）。 */
-    offRules: List<Rule> = emptyList(),
     /**
-     * 让开：实验室里的外部模型开着、配好了时为 true，AI 增强识别改用它，这里就当不可用（见 EngineFactory）。
-     * 两个都跑要等两遍，用户打开外部模型就是要换掉 Nano。
+     * 用户关掉的那几类的规则。模型把关掉的那一类报成开着的另一类时（关了电话，它把手机号报成证件号；
+     * 日期出厂关着，它把下单时间报成取件码），拿它们认一遍原文：整段就是关掉那一类的东西，这一条不认。
+     * 生日、取件码（「3-2-2025」）也可能是日期的样子，关了日期不拦它们。
      */
-    private val yieldTo: suspend () -> Boolean = { false },
+    private val offRules: List<Rule> = emptyList(),
     /**
      * 问模型一句、拿回它的回答。默认是本机的 Gemini Nano；拆成参数是为了单测——
      * ML Kit 的 GenerativeModel 在 JVM 上造不出来。
@@ -66,13 +66,11 @@ class GeminiNanoClassifier(
 
     override val id = "gemini-nano"
 
-    private val vetoed = vetoBy(offRules)
-
-    override suspend fun isAvailable(): Boolean = !yieldTo() && NanoClient.ready()
+    override suspend fun isAvailable(): Boolean = NanoClient.ready()
 
     override suspend fun classify(lines: List<TextLine>): List<Candidate> {
         val trace = currentTrace()
-        val texts = reviewTexts(lines)
+        val texts = lines.map { l -> l.text.takeIf { l.confidence >= RuleClassifier.MIN_LINE_CONFIDENCE && it.hasContent() } }
         val chunks = SemanticPrompt.chunks(texts, kinds)
         trace?.add(
             TraceSection(
@@ -94,12 +92,41 @@ class GeminiNanoClassifier(
                 throw e
             }
             // 原文在整页里找：一段里说到的昵称，别的段里出现的那几处也算
-            val found = reply?.text?.let { SemanticPrompt.parse(it, all, kinds, vetoed) }.orEmpty()
+            val found = reply?.text?.let { SemanticPrompt.parse(it, all, kinds, ::vetoed) }.orEmpty()
             trace?.recordExchange(n, chunks.size, chunk, lines, started, reply, findings = found)
             found
         }.let(SemanticPrompt::collapse)
-        return findings.toCandidates(lines)
+        // 合并时同规则的候选一样按各自的阅读方向量：截图里转过的证件照上两行地址不拼成一块
+        val directions by lazy { RuleClassifier.readingDegrees(lines) }
+        return findings.map { f ->
+            Candidate(
+                id = "llm-${f.lineIndex}-${f.range.first}-${f.kind}",
+                quad = lines[f.lineIndex].quadForRange(f.range),
+                kind = f.kind,
+                source = DetectorSource.LLM,
+                confidence = CONFIDENCE,
+                readingDegrees = directions[f.lineIndex],
+            )
+        }
     }
+
+    /**
+     * 关掉的哪一条规则认得出整段原文。日期、IP（置信度 0.6）往上的算；没有校验位的长数字串是猜的（0.4），
+     * 出厂又关着，拿它来拦，银行账号报成银行卡也会被拦掉。网址规则只认 ? 和路径那一截，整段的网址拦不住。
+     */
+    private fun vetoed(kind: SensitiveKind, quote: String): Boolean = offRules.any { rule ->
+        !(rule.kind == SensitiveKind.DATETIME && kind in rule.yieldsTo) &&
+            rule.findIn(quote).any { m ->
+                m.confidence >= VETO_CONFIDENCE && !m.needsAnchor && !m.outlineOnly &&
+                    m.range.first == 0 && m.range.last == quote.lastIndex
+            }
+    }
+
+    /**
+     * 至少两个字母、汉字或数字。纯数字的行也送：单独一行的取件码、手机号，模型要看到才认得出，
+     * 打了星的证件号也是上一行是人名的线索。纯符号、单个字的行没什么可看的。
+     */
+    private fun String.hasContent() = count { it.isLetterOrDigit() } >= 2
 
     /**
      * 一段的来回记成一节：送了几行、用了多久、结果如何；解析出的每一处写明是 OCR 的第几行（与「文字识别」那一节的行号一致）。
@@ -142,6 +169,8 @@ class GeminiNanoClassifier(
 
     private companion object {
         const val TIMEOUT_MS = 20_000L
+        const val CONFIDENCE = 0.5f
+        const val VETO_CONFIDENCE = 0.6f
     }
 }
 

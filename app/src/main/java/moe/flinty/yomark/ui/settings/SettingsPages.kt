@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.CarRepair
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -64,7 +63,6 @@ import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
-import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.engine.ppocr.PpOcrModels
@@ -83,7 +81,7 @@ import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 通用和外观两页不影响识别，换它们不重跑。AI 页上选识别引擎，下面显示本机的 Gemini Nano 和随包的 PP-OCR、ML Kit；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
+ * 通用和外观两页不影响识别，换它们不重跑。AI 页上选识别引擎，下面显示本机的 Gemini Nano 和随包的 PP-OCR、ML Kit。
  *
  * 行下的小字、页尾说明都不带句号（2026-10-15 起），几句话并成一句，中间用逗号、分号隔开。
  */
@@ -276,8 +274,7 @@ fun BarcodeSettingsScreen(
  * 三类共用一个开关：用户要遮的是「这段对话是谁和谁」，分开设没有意义。开着就是打码。
  * 页脚只说遮什么和一句局限（认不全、可能认错），怎么认的、适用哪些应用不写。
  *
- * 外部模型（2026-10-15）：AI 增强识别改用用户自己配置的大模型。接口在「AI」页上填，这里只是开关。
- * 它不在识别方案里（见 SettingsStore.externalModel），所以单独传。
+ * 原先还有一项「外部模型」（2026-10-15）：AI 增强识别改用用户自己配置的大模型。2026-10-18 删掉了，应用要能声明没有联网权限。
  */
 @Composable
 fun LabsSettingsScreen(
@@ -285,8 +282,6 @@ fun LabsSettingsScreen(
     onChange: (RecognitionConfig) -> Unit,
     onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    externalModel: Boolean = false,
-    onExternalModelChange: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_labs), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -301,19 +296,6 @@ fun LabsSettingsScreen(
             }
             FooterText(stringResource(R.string.chat_footer))
         }
-        item {
-            GroupSpacer()
-            SettingsGroup {
-                SwitchRow(
-                    title = stringResource(R.string.external_model),
-                    icon = Icons.Outlined.Cloud,
-                    checked = externalModel,
-                    onCheckedChange = onExternalModelChange,
-                    modifier = Modifier.testTag("labs-external-model"),
-                )
-            }
-            FooterText(stringResource(R.string.external_model_footer))
-        }
     }
 }
 
@@ -325,11 +307,7 @@ fun LabsSettingsScreen(
  *
  * Gemini Nano 卡片下面是一段话：先说它是什么，再接着说本机这边要知道的（[nanoNote]），不换行。
  *
- * 实验室里打开了外部模型时，识别引擎下面多一组「外部模型」：接口地址、API Key、模型，点一行弹框改；再加一行测试连接。
- *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
- * @param external 实验室里的外部模型；没打开时为 null，不显示那一组。
- * @param onTestExternal 测试连接：问一句最短的话，回答所用的毫秒数；没答上来抛 [ExternalModelException]。
  */
 @Composable
 fun AiSettingsScreen(
@@ -338,9 +316,6 @@ fun AiSettingsScreen(
     onOpenEngine: () -> Unit,
     onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    external: ExternalModelSettings? = null,
-    onExternalChange: ((ExternalModelSettings) -> ExternalModelSettings) -> Unit = {},
-    onTestExternal: suspend () -> Long = { 0L },
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_ai), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -354,9 +329,6 @@ fun AiSettingsScreen(
                     modifier = Modifier.testTag("engine"),
                 )
             }
-        }
-        if (external != null) {
-            item { ExternalModelGroup(external, onExternalChange, onTestExternal) }
         }
         item {
             SectionHeader(stringResource(R.string.ai_model))
