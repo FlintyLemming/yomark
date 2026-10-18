@@ -3,9 +3,11 @@
 // 每一项一个色相：圆底取色调 90、图标取色调 30（Material Color Utilities 的 TonalPalette），
 // 和主题色的 primaryContainer 同一档明度，换哪个主题色都不跳；色相固定，不随主题色变，
 // 认图标靠的就是「文字是蓝的、人脸是橙的」。
+// 深色界面里反过来：圆底取色调 30、图标取色调 80，暗底上一圈不扎眼的深色，图标亮、色相一眼认得出。
 //
 // 圆底的彩度压到 CONTAINER_MAX_CHROMA：色调 90 上蓝、紫、粉、橙的彩度本来就只到 14–20，
-// 绿和青能到 40 以上，不压的话这两个会亮得扎眼。图标保留种子色的彩度。
+// 绿和青能到 40 以上，不压的话这两个会亮得扎眼。深色的色调 30 上各色从 30 到 70 不等，一样压，几种颜色才一样沉。
+// 图标保留种子色的彩度。
 //
 //   cd tools/theme && npm install
 //   node gen_settings_icon_colors.mjs > ../../app/src/main/java/moe/flinty/yomark/ui/settings/SettingsIconColors.kt
@@ -15,6 +17,8 @@ import { Hct, TonalPalette } from '@material/material-color-utilities';
 
 const CONTAINER_TONE = 90;
 const CONTENT_TONE = 30;
+const DARK_CONTAINER_TONE = 30;
+const DARK_CONTENT_TONE = 80;
 const CONTAINER_MAX_CHROMA = 24;
 
 // [名字, 种子色, 彩度上限]。灰色是蓝色压到几乎没有彩度，给「恢复默认」这种不属于任何一类的项。
@@ -39,7 +43,8 @@ out.push('');
 out.push('import androidx.compose.ui.graphics.Color');
 out.push('');
 out.push('// 由 tools/theme/gen_settings_icon_colors.mjs 生成，不要手改。');
-out.push(`// 每种颜色是种子色的两条色调（Material Color Utilities 的 TonalPalette）：圆底取 ${CONTAINER_TONE}、彩度不超过 ${CONTAINER_MAX_CHROMA}，图标取 ${CONTENT_TONE}。`);
+out.push(`// 每种颜色是种子色的两条色调（Material Color Utilities 的 TonalPalette）：圆底取 ${CONTAINER_TONE}、彩度不超过 ${CONTAINER_MAX_CHROMA}，图标取 ${CONTENT_TONE}；`);
+out.push(`// 深色界面里圆底取 ${DARK_CONTAINER_TONE}、图标取 ${DARK_CONTENT_TONE}。`);
 out.push('');
 out.push('internal object SettingsIconColors {');
 for (const [name, seed, maxChroma] of SEEDS) {
@@ -52,6 +57,8 @@ for (const [name, seed, maxChroma] of SEEDS) {
   out.push(`    val ${name} = SettingsIconColor(`);
   out.push(`        container = Color(${hex(container.tone(CONTAINER_TONE))}),`);
   out.push(`        content = Color(${hex(content.tone(CONTENT_TONE))}),`);
+  out.push(`        darkContainer = Color(${hex(container.tone(DARK_CONTAINER_TONE))}),`);
+  out.push(`        darkContent = Color(${hex(content.tone(DARK_CONTENT_TONE))}),`);
   out.push('    )');
 }
 out.push('}');

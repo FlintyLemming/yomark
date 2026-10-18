@@ -200,7 +200,7 @@ fun EditorScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
+        // 边到边（见 layoutEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
         // 输入法不在这里：只有用途水印面板里有输入框，开着它时画布和面板那一块自己让开（见下方 imePadding）。
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
     ) { padding ->

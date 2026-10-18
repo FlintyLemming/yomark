@@ -54,6 +54,7 @@ import moe.flinty.yomark.ui.settings.TextRuleSettingsScreen
 import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import moe.flinty.yomark.ui.settings.mlKitSummary
 import moe.flinty.yomark.ui.theme.ThemeColor
+import moe.flinty.yomark.ui.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -892,6 +893,7 @@ class SettingsScreenTest {
         var latest: ScanStyle? = null
         show {
             AppearanceSettingsScreen(
+                themeMode = ThemeMode.SYSTEM, onThemeModeChange = {},
                 themeColor = ThemeColor.SYSTEM, onThemeColorChange = {},
                 scanStyle = ScanStyle.FROST, onScanStyleChange = { latest = it },
                 onNavigateUp = {},

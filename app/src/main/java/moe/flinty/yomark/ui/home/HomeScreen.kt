@@ -59,7 +59,7 @@ fun HomeScreen(
                     }
                     IconButton(onClick = onSettings) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
                 },
-                // 边到边（见 enableLightEdgeToEdge）：横屏时左右还要让开挖孔与三键导航
+                // 边到边（见 layoutEdgeToEdge）：横屏时左右还要让开挖孔与三键导航
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
             )
         },

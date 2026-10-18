@@ -85,7 +85,7 @@ class EditorActivity : YomarkActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
 
         // 先用缓存点亮购买态，再尝试联网校验。只在 Play 商店进程里发生（spec §10 / §13）。

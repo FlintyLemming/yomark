@@ -228,7 +228,7 @@
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
     <string name="settings_general_summary">编辑、识别、水印样式</string>
-    <string name="settings_appearance_summary">主题色、识别动效</string>
+    <string name="settings_appearance_summary">深色模式、主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录、外部模型</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
     <string name="settings_help_summary">重新观看引导</string>
@@ -347,6 +347,9 @@
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>
+    <string name="theme_mode">深色模式</string>
+    <string name="theme_mode_light">浅色</string>
+    <string name="theme_mode_dark">深色</string>
     <string name="theme_color">主题色</string>
     <string name="follow_system">跟随系统</string>
     <string name="dynamic_color">随壁纸取色</string>

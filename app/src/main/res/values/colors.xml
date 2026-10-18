@@ -1,0 +1,7 @@
+<resources>
+    <!--
+      深色界面的窗口底色（values-night/themes.xml）：Material 3 深色的表面色。
+      得是颜色资源，不能在主题里直接写色值：Android 12 起冷启动的启动画面只认资源，直接写的色值它取不到，整屏画成纯黑。
+    -->
+    <color name="window_background_dark">#FF141218</color>
+</resources>

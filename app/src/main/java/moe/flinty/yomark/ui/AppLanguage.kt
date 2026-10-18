@@ -2,7 +2,6 @@ package moe.flinty.yomark.ui
 
 import android.app.LocaleManager
 import android.content.Context
-import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
 import android.os.LocaleList
@@ -38,7 +37,7 @@ enum class AppLanguage(val tag: String?, val nativeName: String?) {
  * 改了之后系统自己让各个 Activity 重建。
  *
  * Android 10–12 没有这套，自己记在 SharedPreferences 里（DataStore 是异步的，attachBaseContext 等不了），
- * 每个 Activity 建出来时换上这个语言的 Context（[YomarkActivity]）。只换 Activity 的，Application 的不换，
+ * 每个 Activity 建出来时换上这个语言（[localeFor]，由 [YomarkActivity] 换）。只换 Activity 的，Application 的不换，
  * 所以界面文字要从 Activity / Compose 的 Context 取，不要从 applicationContext 取。
  */
 object AppLocale {
@@ -66,40 +65,18 @@ object AppLocale {
         }
     }
 
-    /** Android 12 及以下：给 Activity 换上选定语言的 Context。跟随系统、或 13 及以上时原样返回。 */
-    internal fun wrap(base: Context): Context {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return base
+    /**
+     * Android 12 及以下：Activity 建出来时该换成的语言，跟随系统、或 13 及以上时为 null，不换。
+     * 默认 Locale 也跟着换（日期、数字的格式）；改回跟随系统时换回系统的。
+     */
+    internal fun localeFor(base: Context): Locale? {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return null
         val locale = storedTag(base)?.let(Locale::forLanguageTag)
-        // 默认 Locale 也跟着换（日期、数字的格式）；改回跟随系统时换回系统的
         Locale.setDefault(locale ?: Resources.getSystem().configuration.locales[0])
-        if (locale == null) return base
-        val config = Configuration(base.resources.configuration).apply { setLocales(LocaleList(locale)) }
-        return base.createConfigurationContext(config)
+        return locale
     }
 
     /** Android 12 及以下：这个 Activity 建出来时用的语言。 */
     internal fun storedTag(context: Context): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_TAG, null)
-}
-
-/**
- * 各 Activity 的基类，只为 Android 10–12 上的应用内语言（见 [AppLocale]）：
- * 建出来时换上选定语言的 Context；回到前台时语言已经改过了（在设置里改的，这一页压在下面）就重建一次。
- * Android 13 起这两件事系统都做了，这里什么也不做。
- */
-open class YomarkActivity : ComponentActivity() {
-
-    private var createdWithTag: String? = null
-
-    override fun attachBaseContext(newBase: Context) {
-        createdWithTag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) null else AppLocale.storedTag(newBase)
-        super.attachBaseContext(AppLocale.wrap(newBase))
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU && AppLocale.storedTag(this) != createdWithTag) {
-            recreate()
-        }
-    }
 }

@@ -397,5 +397,5 @@ private const val PHONE_FRACTION = 0.5f
 /** 面板至少这么高：名字那一行、两排字块、按钮那一行（见 [capHeight]）。 */
 private val MIN_PANEL = 220.dp
 
-/** 已经打了码的字块的底：正文颜色的这么多，比主题色的选中浅、比没选的深。 */
+/** 已经打了码的字块的底：正文颜色的这么多，深浅落在没选的和主题色的选中之间（深色界面里三者的深浅整个倒过来）。 */
 private const val COVERED_ALPHA = 0.38f

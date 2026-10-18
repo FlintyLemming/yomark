@@ -1,0 +1,13 @@
+<resources>
+    <!--
+      深色界面，和 values/themes.xml 里的浅色版一一对应：系统栏透明、图标白色。
+      窗口底色换成 Material 3 深色的表面色，冷启动的启动窗口、各页内容画上来之前那一下不露出父主题的灰色。
+    -->
+    <style name="Theme.Yomark" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="android:windowBackground">@color/window_background_dark</item>
+    </style>
+</resources>
