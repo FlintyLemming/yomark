@@ -23,16 +23,23 @@ object DefaultRuleSet {
     /** 卡面上的「月/年」：「12/28」「09/2031」「12 / 28」。 */
     private const val CARD_MONTH_YEAR = """(?:0[1-9]|1[0-2]) ?/ ?(?:20)?\d{2}"""
 
+    /** 安全码的字段名。 */
+    private val CVV_LABELS = listOf("CVV2", "CVC2", "CVN2", "CVV", "CVC", "安全码", "卡验证码", "卡片验证码")
+
     /**
-     * 银行卡 = Luhn 校验过的卡号 + 字段名后面的安全码和有效期。
+     * 银行卡 = Luhn 校验过的卡号 + 字段名后面的安全码和有效期 + 卡背面签名条旁边的安全码。
      *
      * 卡背面的「CVV2 123」、正面的「VALID THRU 12/28」单凭形状什么都不是，跟在字段名后面才认。
+     * 字段名自己成一段、码在它右边或者下面另成一段的（竖版卡上「CVV2」下面一行的「123」）也认，见 LoneLabel。
      * 字段名照卡面上印的认，英文的只认大写：网址里的「?cid=1234」、一句话里的「Offer valid thru 12/31」、
      * 游戏里的「EXP 08/20」都不是卡。「CID」「CSC」大写的也常是别的意思（客户号、来电号码），不认。
      * 中文的「有效期」「有效期至」不认：优惠券上的「有效期至 06/30」是月/日，和卡的月/年分不开，到处都是。
      * 有效期只认「月/年」，年份在去年到十二年后之间，后面不接连字符（「10/12-10/19」是一段日期）：
      * 身份证背面的「有效期限 2015.08.20-2035.08.20」不是卡。「VALID FROM/THRU」后面是起止两个，一起遮。
      * 优惠券上也印「VALID THRU 12/26」：有效期还要页上有卡（Luhn 对得上的卡号、打了星的卡号，或者 VISA、银联、信用卡这类字）。
+     *
+     * 卡背面签名条右头、旁边白框里没有字段名的那个码（斜体的「357」，常带着卡号末四位「8810 357」）
+     * 靠挨着它的「持卡人签名」「AUTHORIZED SIGNATURE」认，页上也要有卡，见 CardBackCode。
      *
      * 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn；身份证号也是，十个里有一个，
      * 同一处让给护照和证件号码，不在身份证号上标「银行卡号」。
@@ -45,13 +52,11 @@ object DefaultRuleSet {
             CARD_NUMBER.findAll(text).filter { Checksums.luhn(it.value.filter(Char::isDigit)) }
                 .map { RuleMatch(it.range, 0.95f) }.toList()
         },
-        LabeledField(
-            labels = listOf("CVV2", "CVC2", "CVN2", "CVV", "CVC", "安全码", "卡验证码", "卡片验证码"),
-            value = Regex("""\d{3,4}(?!\d)"""),
-            confidence = 0.8f,
-        ),
+        LabeledField(labels = CVV_LABELS, value = Regex("""\d{3,4}(?!\d)"""), confidence = 0.8f),
+        LoneLabel(CVV_LABELS, Regex("""\d{3,4}"""), confidence = 0.8f),
         cardExpiry(listOf("VALID THRU", "VALIDTHRU", "GOOD THRU", "EXPIRES END", "EXP DATE"), CARD_MONTH_YEAR),
         cardExpiry(listOf("VALID FROM/THRU"), "(?:$CARD_MONTH_YEAR ?[-–] ?)?$CARD_MONTH_YEAR"),
+        CardBackCode(onCard = { text -> CARD_BACK_WORDS.containsMatchIn(text) || hasCardNumber(text) }, confidence = 0.8f),
         yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER),
     )
 
@@ -62,14 +67,25 @@ object DefaultRuleSet {
             val now = LocalDate.now().year
             r.takeIf { year in now - 1..now + 12 }
         },
-        cue = { text -> CARD_WORDS.containsMatchIn(text) || CARD_NUMBER.findAll(text).any { Checksums.luhn(it.value.filter(Char::isDigit)) } },
+        cue = { text -> CARD_WORDS.containsMatchIn(text) || hasCardNumber(text) },
     )
+
+    private fun hasCardNumber(text: String) = CARD_NUMBER.findAll(text).any { Checksums.luhn(it.value.filter(Char::isDigit)) }
 
     /** 卡上、刷卡小票上的字，和打了星的卡号「6222 **** 1234」。 */
     private val CARD_WORDS = Regex(
         cue("VISA", "Visa", "MASTERCARD", "Mastercard", "UnionPay", "AMERICAN EXPRESS", "AMEX", "JCB", "DISCOVER", "CARD NO",
             "CARDHOLDER", "DEBIT", "CREDIT", "银联", "信用卡", "借记卡", "储蓄卡", "银行卡", "卡号").pattern +
             """|\d{4} ?[*＊•●]{4}|[*＊•●]{4} ?\d{4}"""
+    )
+
+    /**
+     * 卡背面的字：背面常常只有银行名、章程和客服热线，卡组织的标多在正面。
+     * CARD_WORDS 之外再认「银行」「本卡」「持卡人」和英文的「card」「bank」（「This card is issued by Example Bank」）。
+     */
+    private val CARD_BACK_WORDS = Regex(
+        CARD_WORDS.pattern + "|" + cue("持卡人", "本卡", "此卡", "银行", "銀行").pattern +
+            """|(?i:(?<![A-Za-z])(?:card|bank)(?![A-Za-z]))"""
     )
 
     private val IBAN = RegexRule(
@@ -221,10 +237,11 @@ object DefaultRuleSet {
     /**
      * 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。
      * 表头里跟在「姓名」后面的「学号 姓名 班级 备注」也是它们，不是名字。OCR 连成一串的「姓名张三车牌苏A12345」到「车牌」为止。
+     * 卡背面、快递单上的「持卡人签名」「收件人签名」：「签名」是签名栏，不是持卡人、收件人叫「签名」。
      */
     private const val NEXT_FIELD =
         "电话|手机|性别|性別|民族|出生|年龄|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名|学号|工号|班级|部门|职位|职务|备注|成绩|" +
-            "车牌|号牌|車牌"
+            "车牌|号牌|車牌|签名|簽名|签字"
 
     /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
     private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""

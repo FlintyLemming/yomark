@@ -14,7 +14,7 @@ import kotlin.math.min
  *   StackedField 从字段名左沿起分栏，切下来的是半截；
  * - 那一段整段对得上 [value] 才遮，不像就不往别处找了：右边的「复制」、下面的下一个字段名、一句话都不是值。
  *
- * 一段：一行里字与字之间的空白不到一个字高的一串。RowGrouper 拼成一行的几段之间只补了一个空格，按框断开。
+ * 一段：一行里字与字之间的空白不到一个字高的一串（[cells]）。RowGrouper 拼成一行的几段之间只补了一个空格，按框断开。
  *
  * @param labels 字段名，汉字之间可夹空格（逐字切开的「取 件 码」）。
  */
@@ -26,7 +26,7 @@ class LoneLabel(labels: List<String>, private val value: Regex, private val conf
 
     override fun findOnPage(page: Page): List<PageMatch> {
         if (page.texts.none { anywhere.containsMatchIn(it) }) return emptyList()
-        val cells = page.texts.indices.map { cellsOf(page, it) }
+        val cells = page.texts.indices.map { page.cells(it) }
         val out = ArrayList<PageMatch>()
         cells.forEachIndexed { i, row ->
             row.filter { lone.matches(page.texts[i].substring(it)) }.forEach { c ->
@@ -61,39 +61,7 @@ class LoneLabel(labels: List<String>, private val value: Regex, private val conf
             }
             .minByOrNull { (_, b) -> b.top }?.first
 
-    /** 第 [j] 行里的一段段字：字与字之间的空白宽过一个字高（按两边高的那个）就断开，同 StackedField 分栏。 */
-    private fun cellsOf(page: Page, j: Int): List<IntRange> {
-        val text = page.texts[j]
-        val out = ArrayList<IntRange>()
-        var start = -1
-        var end = -1
-        var right = 0f
-        var height = 0f
-        for (k in text.indices) {
-            if (text[k].isWhitespace()) continue
-            val b = page.box(j, k..k)
-            if (start >= 0 && b.left - right > CELL_GAP * max(height, b.height)) {
-                out += start..end
-                start = -1
-            }
-            if (start < 0) {
-                start = k
-                right = b.right
-                height = b.height
-            } else {
-                right = max(right, b.right)
-                height = max(height, b.height)
-            }
-            end = k
-        }
-        if (start >= 0) out += start..end
-        return out
-    }
-
     private companion object {
-        /** 一段里两个字之间最宽的空白，按字高算。 */
-        const val CELL_GAP = 1f
-
         /** 值的上沿离字段名的下沿最多几个字高。 */
         const val ROW_GAP = 1.5f
 

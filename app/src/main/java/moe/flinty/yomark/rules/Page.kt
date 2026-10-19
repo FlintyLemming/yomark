@@ -56,6 +56,41 @@ internal fun Page.wrapOf(line: Int): Int? {
 }
 
 /**
+ * 第 [line] 行里的一段段字：字与字之间的空白宽过一个字高（按两边高的那个）就断开，同 StackedField 分栏。
+ * RowGrouper 拼成一行的几段之间只补了一个空格，按框断开。
+ */
+internal fun Page.cells(line: Int): List<IntRange> {
+    val text = texts[line]
+    val out = ArrayList<IntRange>()
+    var start = -1
+    var end = -1
+    var right = 0f
+    var height = 0f
+    for (k in text.indices) {
+        if (text[k].isWhitespace()) continue
+        val b = box(line, k..k)
+        if (start >= 0 && b.left - right > CELL_GAP * kotlin.math.max(height, b.height)) {
+            out += start..end
+            start = -1
+        }
+        if (start < 0) {
+            start = k
+            right = b.right
+            height = b.height
+        } else {
+            right = kotlin.math.max(right, b.right)
+            height = kotlin.math.max(height, b.height)
+        }
+        end = k
+    }
+    if (start >= 0) out += start..end
+    return out
+}
+
+/** 一段里两个字之间最宽的空白，按字高算。 */
+private const val CELL_GAP = 1f
+
+/**
  * 一页上的一处：第 [line] 行（Page.texts 的下标）上的 [match]。
  *
  * @param also 同一处落在别的行上的部分：上下两行的车牌，上一行「苏B」、下一行「12345」。
