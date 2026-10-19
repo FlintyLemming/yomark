@@ -17,6 +17,7 @@ $ErrorActionPreference = 'Stop'
 . "$PSScriptRoot\common.ps1"
 
 $file = Get-Item -LiteralPath $Path
+# claim.ps1 顺带把这个进程的 adb 指向了那台的私有服务，下面的 & $adb 都走它
 $serial = & "$PSScriptRoot\claim.ps1"
 
 # 文件名要拼进设备上的 shell 命令，只留安全字符
