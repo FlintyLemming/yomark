@@ -105,6 +105,17 @@ class LabeledFieldRuleTest {
         assertThat(matched("name", "联 系 人 张 三 手 机 号 码")).containsExactly("张 三")
     }
 
+    /**
+     * 卡背面、快递单上的签名栏：「持卡人」「收件人」后面的「签名」不是名字（卡背面的「签名」以前遮成了人名）；
+     * 名字后面接着「签名」的，名字到它前面为止。
+     */
+    @Test fun `a signature box after a name label is not a name`() {
+        assertThat(matched("name", "持卡人签名 AUTHORIZED SIGNATURE")).isEmpty()
+        assertThat(matched("name", "收件人签名：")).isEmpty()
+        assertThat(matched("name", "收 件 人 签 名")).isEmpty()
+        assertThat(matched("name", "收件人 张三签名")).containsExactly("张三")
+    }
+
     /** 菜鸟快递详情页的收件地址只有「送至」两个字领着。 */
     @Test fun `address follows the song zhi label of a logistics page`() {
         assertThat(matched("address", "送至 祁门路33号四方新村23幢605室"))
