@@ -22,16 +22,17 @@
 
 改了代码，除了跑单元测试，还要在本机模拟器上装上跑一遍、截图看过再收尾。都在 worktree 里做。
 
-- **模拟器：每个窗口用自己的一台，不要共用。** 在 worktree 根目录跑 `$s = .\tools\emu\claim.ps1`，它会用 `-read-only` 起一台 `Pixel_10_Pro` 的独立实例（端口 5560–5574），等开机完成后返回 serial（如 `emulator-5560`）。shell 状态不保留，所以每次要用 serial 就再跑一遍 `claim.ps1`，同一个 worktree 拿回的总是同一台。之后**所有 adb 命令都带 `-s $s`**，别的窗口的实例别碰。
+- **模拟器：每个窗口用自己的一台，不要共用。** 在 worktree 根目录跑 `.\tools\emu\claim.ps1`，它会用 `-read-only` 起一台 `Pixel_10_Pro` 的独立实例（端口 5560–5574），等开机完成后返回 serial（如 `emulator-5560`），同一个 worktree 再跑拿回的总是同一台。别的窗口的实例别碰。
+  - **adb 命令一律用 `.\tools\emu\adb.ps1 <参数>`**，参数原样转给 adb。它找到这个 worktree 那台（没领就先领）、自动带 `-s`，走那台自己的 adb 服务（端口 = 模拟器端口 + 1000），不走共用的 5037：5037 被 Android Studio 弄卡死或者没起时照样能用。别直接跑 SDK 里的 `adb.exe`，它连的是 5037。Android Studio 照样看得到这些模拟器。
   - `Pixel_10_Pro` 被不带 `-read-only` 的实例（比如 Android Studio 开的那台）锁住时，`claim.ps1` 自动换用它的克隆 `Pixel_10_Pro_yomark`，照常领，不用去关别人的。自己别手动 `Start-Process` 起这两个 AVD。
   - `Galaxy_Z_Fold8` 可能正被别的窗口或 Android Studio 用着，别关它、别往上装。
-  - 收尾时跑 `.\tools\emu\release.ps1` 关掉自己那台。忘了也没关系，下次有人领的时候会回收已经没有进程的锁，但还开着的实例会一直占内存。
-  - 脚本要用 pwsh 7 跑（PowerShell 工具默认就是），Windows PowerShell 5.1 读中文会乱码。锁和启动日志在 `$env:TEMP\yomark-emu`。
+  - 收尾时跑 `.\tools\emu\release.ps1` 关掉自己那台和它的 adb 服务。忘了也没关系，下次有人领的时候会回收已经没有进程的锁，但还开着的实例会一直占内存。
+  - 脚本要用 pwsh 7 跑（PowerShell 工具默认就是），Windows PowerShell 5.1 读中文会乱码。锁和日志在 `$env:TEMP\yomark-emu`。
 - **JDK：** 直接跑 `.\gradlew.bat :app:assembleDebug`，不用先设 `JAVA_HOME`：`gradle/gradle-daemon-jvm.properties` 让 Gradle 自己在本机挑 JDK 21（`$env:USERPROFILE\.jdks\jbr-21.0.11`），用 Android Studio 自带的 JDK 25 启动也行。要是报找不到 Java 21，再设 `$env:JAVA_HOME="$env:USERPROFILE\.jdks\jbr-21.0.11"`。
-- **安装：** APK 按 ABI 拆分，模拟器装 `app\build\outputs\apk\debug\app-x86_64-debug.apk`（没有 `app-debug.apk`）：`adb -s $s install -r <apk>`。
-- **启动与检查：** `adb -s $s shell monkey -p moe.flinty.yomark -c android.intent.category.LAUNCHER 1`，然后看 `pidof moe.flinty.yomark` 和 `logcat -d -b crash`。crash 日志里 `android.hardware.uwb-service` 的 SIGABRT 是模拟器自己的问题，不用管。
+- **安装：** APK 按 ABI 拆分，模拟器装 `app\build\outputs\apk\debug\app-x86_64-debug.apk`（没有 `app-debug.apk`）：`.\tools\emu\adb.ps1 install -r <apk>`。
+- **启动与检查：** `.\tools\emu\adb.ps1 shell monkey -p moe.flinty.yomark -c android.intent.category.LAUNCHER 1`，然后看 `shell pidof moe.flinty.yomark` 和 `logcat -d -b crash`。crash 日志里 `android.hardware.uwb-service` 的 SIGABRT 是模拟器自己的问题，不用管。
 - **打开测试图：** `.\tools\emu\open-image.ps1 <图片路径>`，把图放进媒体库并在编辑器里打开（现成的测试图在 `app\src\test\resources\`）。别自己用 `am start` 发分享 intent（`--eu android.intent.extra.STREAM`）：extra 里的 URI 拿不到读权限，编辑器是空白的。多张（批量）只能在首页点「选择图片」走 Photo Picker。截图时确认画布上真有图。
-- **截图：** `adb -s $s shell screencap -p /sdcard/x.png` 再 `adb pull` 到 scratchpad（别用 PowerShell 的 `exec-out ... >`，二进制会被弄坏），读图确认改动的界面，把图的路径告诉我。
+- **截图：** `.\tools\emu\adb.ps1 shell screencap -p /sdcard/x.png` 再 `.\tools\emu\adb.ps1 pull /sdcard/x.png <scratchpad>`（别用 PowerShell 的 `exec-out ... >`，二进制会被弄坏），读图确认改动的界面，把图的路径告诉我。
 
 ## 界面文案
 
