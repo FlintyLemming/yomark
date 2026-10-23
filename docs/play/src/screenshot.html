@@ -1,11 +1,12 @@
 <!doctype html>
-<!-- Play 手机截图的排版，1080×1920（9:16）。render.cjs 打开这一页，再把 screenshots.json 里的一项交给 show()。
+<!-- Play 手机截图的排版，1080×1920（9:16）。render.cjs 打开这一页，再把 screenshots.json（或 screenshots-en.json）里的一项交给 show()。
      上面一行标题、一行副标题，合起来不到整张图的五分之一（Play 要求说明文字不超过 20%）；
-     下面是 PlayScreenshots 在 Robolectric 上拍的编辑器截图，是应用的真实渲染结果。不套手机外框：Play 不建议画设备。 -->
+     下面是 PlayScreenshots 在 Robolectric 上拍的编辑器截图，是应用的真实渲染结果。不套手机外框：Play 不建议画设备。
+     英文那一套（lang 为 en）的副标题长，允许折成两行，仍在截图上沿以上。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@500;900&family=Noto+Sans+SC:wght@500;900&display=swap" rel="stylesheet">
 <style>
   :root {
     --ink: #101014;
@@ -32,6 +33,11 @@
   .hl { background: linear-gradient(180deg, transparent 58%, var(--sky) 58%, var(--sky) 92%, transparent 92%); padding: 0 4px; }
   p { margin-top: 18px; font-size: 34px; font-weight: 500; line-height: 1.4; letter-spacing: 1px; color: var(--sub); white-space: nowrap; }
 
+  /* 英文：拉丁字母用 Noto Sans，不加字距；标题收一点字号放得下一行，副标题折成两行时两行一样长 */
+  body:lang(en) { font-family: 'Noto Sans', 'Noto Sans SC', sans-serif; }
+  h1:lang(en) { font-size: 60px; letter-spacing: 0; }
+  p:lang(en) { margin-top: 14px; letter-spacing: 0; white-space: normal; text-wrap: balance; }
+
   .screen {
     position: absolute; left: 50%; top: var(--top);
     height: calc(1920px - var(--top) - var(--bottom));
@@ -52,11 +58,15 @@
   <div class="cap"><h1 id="title"></h1><p id="subtitle"></p></div>
   <div class="screen"><img id="shot" alt=""><span id="tap" class="tap" hidden></span></div>
   <script>
-    // 标题里用 {} 括起来的是要加底色的关键词
+    // 标题里用 {} 括起来的是要加底色的关键词。dir 是编辑器截图所在的目录（默认是中文那套的 ../shots/），lang 换版面的语言。
+    // 截图加载完、字体就位后返回放不下的那几行（标题宽过版面、副标题超过两行或碰到截图），都放得下就是空数组。
     function show(shot) {
+      if (shot.lang) document.documentElement.lang = shot.lang;
       const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-      document.getElementById('title').innerHTML = esc(shot.title).replace(/\{(.+?)\}/g, '<span class="hl">$1</span>');
-      document.getElementById('subtitle').textContent = shot.subtitle;
+      const title = document.getElementById('title');
+      const subtitle = document.getElementById('subtitle');
+      title.innerHTML = esc(shot.title).replace(/\{(.+?)\}/g, '<span class="hl">$1</span>');
+      subtitle.textContent = shot.subtitle;
       const tap = document.getElementById('tap');
       tap.hidden = !shot.tap;
       if (shot.tap) {
@@ -64,11 +74,20 @@
         tap.style.left = (shot.tap[0] / css.getPropertyValue('--shot-w')) * 100 + '%';
         tap.style.top = (shot.tap[1] / css.getPropertyValue('--shot-h')) * 100 + '%';
       }
+      const overflow = () => {
+        const out = [];
+        if (title.scrollWidth > title.clientWidth) out.push('标题');
+        const line = parseFloat(getComputedStyle(subtitle).lineHeight);
+        const screenTop = document.querySelector('.screen').getBoundingClientRect().top;
+        if (subtitle.scrollWidth > subtitle.clientWidth || subtitle.offsetHeight > line * 2.2 ||
+            subtitle.getBoundingClientRect().bottom > screenTop - 8) out.push('副标题');
+        return out;
+      };
       const img = document.getElementById('shot');
       return new Promise((resolve, reject) => {
-        img.onload = resolve;
+        img.onload = () => document.fonts.ready.then(() => resolve(overflow()));
         img.onerror = () => reject(new Error('截图没加载出来：' + shot.shot));
-        img.src = '../shots/' + shot.shot + '.png';
+        img.src = (shot.dir || '../shots/') + shot.shot + '.png';
       });
     }
   </script>
