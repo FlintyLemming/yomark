@@ -1,0 +1,30 @@
+[
+  {
+    "id": "01-auto",
+    "shot": "auto",
+    "title": "Sensitive info, {auto-redacted}",
+    "subtitle": "Phone numbers, addresses, names and emails, covered as soon as they're found",
+    "alt": "Package details after the scan: address, recipient, phone and email are under sky-blue blocks; the date and tracking number stay visible."
+  },
+  {
+    "id": "02-local",
+    "shot": "reveal",
+    "title": "{On-device}, done in seconds",
+    "subtitle": "No internet permission: your images never leave your phone",
+    "alt": "A chat being scanned: a light sweeps down, the address, phone number and name it has passed are masked, and the rest is still dimmed."
+  },
+  {
+    "id": "04-manual",
+    "shot": "manual",
+    "title": "Missed a spot? {Drag a box}",
+    "subtitle": "Drag the corners to resize, tap Delete to remove it",
+    "alt": "On the package details page a box is dragged over the product row by hand, with resize handles at its corners and Delete above it."
+  },
+  {
+    "id": "06-purpose",
+    "shot": "purpose",
+    "title": "Add a {purpose watermark}",
+    "subtitle": "Say what it's for, so any other use stands out at a glance",
+    "alt": "A faint diagonal \"For delivery claim use only\" watermark tiles the package details page, whose personal details are already masked."
+  }
+]

@@ -23,6 +23,7 @@ import moe.flinty.yomark.core.image.ImageIntake
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.TextLine
+import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.data.isolatedSettingsStore
 import moe.flinty.yomark.engine.CandidateMerger
 import moe.flinty.yomark.engine.RecognitionConfig
@@ -39,10 +40,12 @@ import moe.flinty.yomark.rules.RuleClassifier
 import moe.flinty.yomark.ui.EditorScreen
 import moe.flinty.yomark.ui.EditorUiState
 import moe.flinty.yomark.ui.EditorViewModel
+import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import moe.flinty.yomark.ui.theme.ThemeColor
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.runBlocking
 import org.junit.Assume.assumeTrue
 import org.junit.Before
 import org.junit.Rule
@@ -61,11 +64,12 @@ import java.io.File
  * Google Play 商品详情的手机截图（docs/play/screenshots/）用的编辑器截图。不是测试，平时跳过；要重拍时：
  *
  *     YOMARK_PLAY_SHOTS_DIR=$PWD/docs/play/shots ./gradlew -Pyomark.freeEdition=false \
- *         :app:testDebugUnitTest --tests '*PlayScreenshots*'
+ *         :app:testDebugUnitTest --tests '*.PlayScreenshots'
  *     NODE_PATH="$(npm root -g)" node docs/play/src/render.cjs screenshots
  *     python3 docs/play/src/finalize.py
  *
  * 带 -Pyomark.freeEdition=false 拍的是上架 Play 的内购版。截图本身不进仓库，只有配好文字的成品进。
+ * 英文商品详情的那一套（docs/play/screenshots-en/）由 [PlayScreenshotsEn] 拍。
  *
  * 和 ReadmeScreenshots 一样走真东西：随包的 PP-OCR 模型、出厂规则、真的 EditorViewModel，
  * 出厂的文字识别就是 PP-OCR，所以图上的框就是真机上会出的框。人脸和条码要 ML Kit 的原生库，JVM 上跑不了，
@@ -78,15 +82,96 @@ import java.io.File
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(qualifiers = "zh-rCN-w412dp-h860dp-xxhdpi")
-class PlayScreenshots {
+class PlayScreenshots : PlayScreenshotsBase("YOMARK_PLAY_SHOTS_DIR") {
+
+    override val orderPage = "/readme/order-page.png"
+    override val chatPage = "/play/chat-page.png"
+    override val purposeText = "仅供快递理赔使用"
+
+    // 样图里商品那一行（缩略图 + 品名 + 规格），量自 order-page.png 的像素：缩略图 (80, 1208)–(209, 1337)
+    override val productRow = RectF(68f, 1198f, 612f, 1348f)
+
+    /**
+     * Robolectric 上 ImageDecoder 解不了图（Only supported on Android），胶片条的缩略图出不来。
+     * BatchThumbnails 先走系统缩略图，这里替它用 BitmapFactory 降采样解：样图都是 file:// 的。
+     */
+    @Implements(ContentResolver::class)
+    class ThumbnailContentResolver : ShadowContentResolver() {
+        @Implementation
+        fun loadThumbnail(uri: Uri, size: Size, signal: CancellationSignal?): Bitmap {
+            val path = uri.path!!
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(path, bounds)
+            val sample = maxOf(1, minOf(bounds.outWidth / size.width, bounds.outHeight / size.height))
+            return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+        }
+    }
+
+    /**
+     * 选图之前先在「打码」里换成马赛克：识别出来直接打的码用的就是它。只换不点开调节面板，
+     * 面板开着时盖住下半截、压着暗幕，看不清码了。
+     */
+    @Test fun styles() {
+        open(sample(chatPage)) { it.onStyleChipClick(MaskStyle.PIXELATE) }
+        shoot("styles")
+    }
+
+    /** 网址出厂不打码：点一下那行字，整行打上码。点的是 chat-page.png 里网盘链接那一行的正中，量自样图的像素。 */
+    @Test fun tap() {
+        val vm = open(sample(chatPage))
+        compose.runOnUiThread { vm.onTap(PointF(440f, 1238f)) }
+        advance(1_000)
+        shoot("tap")
+    }
+
+    /** 从相册一次分享三张进来：底栏工具那一行上面是胶片条，停在第一张上。 */
+    @Config(shadows = [ThumbnailContentResolver::class])
+    @Test fun batch() {
+        open(
+            sample(chatPage),
+            sample(orderPage),
+            sample(orderPage, "order-page-2.png"),
+        )
+        shoot("batch")
+    }
+
+    /**
+     * 设置 › 文字：每一类一行，小字是它眼下打码还是关闭，点进去能改。出厂配置，列表滚到「取件码」，
+     * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（长数字串、日期时间、网址……）同在一屏。
+     */
+    @Test fun rules() {
+        show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenRule = {}, onNavigateUp = {}) }
+        compose.waitForIdle()
+        compose.onNode(hasScrollToKeyAction()).performScrollToKey("pickup")
+        compose.waitForIdle()
+        shoot("rules")
+    }
+}
+
+/**
+ * [PlayScreenshots] 与英文的 [PlayScreenshotsEn] 共用的部分：编辑器怎么搭、怎么等识别、怎么拍，
+ * 以及两种语言都拍的四张（auto、reveal、manual、purpose）。样图、用途水印的字、手动框的位置由各自给。
+ * 成品写进环境变量 [envVar] 指的目录，没设就整个类跳过，平时跑单元测试不受影响。
+ */
+abstract class PlayScreenshotsBase(private val envVar: String) {
 
     @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
 
-    private val outDir = System.getenv("YOMARK_PLAY_SHOTS_DIR")?.let(::File)
+    private val outDir = System.getenv(envVar)?.let(::File)
 
-    @Before fun onlyWhenAsked() = assumeTrue("YOMARK_PLAY_SHOTS_DIR 未设置", outDir != null)
+    @Before fun onlyWhenAsked() = assumeTrue("$envVar 未设置", outDir != null)
 
-    private val context get() = compose.activity.applicationContext
+    /** 快递详情、聊天记录两张样图在测试资源里的路径。 */
+    protected abstract val orderPage: String
+    protected abstract val chatPage: String
+
+    /** 用途水印那一行字。 */
+    protected abstract val purposeText: String
+
+    /** 快递详情样图里商品那一行（缩略图 + 品名 + 规格），样图的像素：规则不管它，manual 在这儿手动拖一个框。 */
+    protected abstract val productRow: RectF
+
+    protected val context get() = compose.activity.applicationContext
 
     private object NoSink : ImageSink {
         override suspend fun write(
@@ -105,27 +190,14 @@ class PlayScreenshots {
         }
     }
 
-    /**
-     * Robolectric 上 ImageDecoder 解不了图（Only supported on Android），胶片条的缩略图出不来。
-     * BatchThumbnails 先走系统缩略图，这里替它用 BitmapFactory 降采样解：样图都是 file:// 的。
-     */
-    @Implements(ContentResolver::class)
-    class ThumbnailContentResolver : ShadowContentResolver() {
-        @Implementation
-        fun loadThumbnail(uri: Uri, size: Size, signal: CancellationSignal?): Bitmap {
-            val path = uri.path!!
-            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(path, bounds)
-            val sample = maxOf(1, minOf(bounds.outWidth / size.width, bounds.outHeight / size.height))
-            return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
-        }
-    }
-
-    private fun show(content: @Composable () -> Unit) {
+    protected fun show(content: @Composable () -> Unit) {
         compose.setContent { YomarkTheme(ThemeColor.BLUE) { Surface { content() } } }
     }
 
-    private fun editor(recognizer: TextRecognizer = PaddleTextRecognizer(context)): EditorViewModel {
+    private fun editor(
+        recognizer: TextRecognizer = PaddleTextRecognizer(context),
+        settings: SettingsStore = isolatedSettingsStore(context),
+    ): EditorViewModel {
         val vm = EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink),
@@ -133,7 +205,7 @@ class PlayScreenshots {
             engineProvider = { config ->
                 RedactionEngine(recognizer, emptyList(), listOf(RuleClassifier(RuleCatalog.rulesFor(config))), CandidateMerger())
             },
-            settings = isolatedSettingsStore(context),
+            settings = settings,
             savedState = SavedStateHandle(),
             // 顶栏上和应用里一样有分享
             shareSink = FileProviderSink(context, FileProviderSink.SHARE),
@@ -144,7 +216,7 @@ class PlayScreenshots {
     }
 
     /** 把测试资源里的样图拷进缓存目录，像 Photo Picker 给的 Uri 一样交给编辑器。 */
-    private fun sample(resource: String, name: String = resource.substringAfterLast('/')): Uri {
+    protected fun sample(resource: String, name: String = resource.substringAfterLast('/')): Uri {
         val file = File(context.cacheDir, name)
         file.outputStream().use { out -> javaClass.getResourceAsStream(resource)!!.use { it.copyTo(out) } }
         return file.toUri()
@@ -165,7 +237,7 @@ class PlayScreenshots {
     }
 
     /** 选图、等识别完、等落码那一遍光走完。[before] 在选图之前做，比如先在「打码」里挑好样式。 */
-    private fun open(vararg samples: Uri, before: (EditorViewModel) -> Unit = {}): EditorViewModel {
+    protected fun open(vararg samples: Uri, before: (EditorViewModel) -> Unit = {}): EditorViewModel {
         val vm = editor()
         compose.runOnUiThread { before(vm) }
         if (samples.size == 1) vm.onImageChosen(samples.single()) else vm.onImagesChosen(samples.toList())
@@ -175,7 +247,7 @@ class PlayScreenshots {
         return vm
     }
 
-    private fun advance(ms: Long) {
+    protected fun advance(ms: Long) {
         repeat((ms / FRAME_MS).toInt()) {
             compose.mainClock.advanceTimeByFrame()
             shadowOf(Looper.getMainLooper()).idle()
@@ -187,7 +259,7 @@ class PlayScreenshots {
      * 「删除」工具条又是在布局里读 viewport 定位置的。所以先画一遍让 viewport 就位，推一帧让工具条按它重摆，再真拍。
      * 真机上每一帧都画，没有这个问题。
      */
-    private fun shoot(name: String) {
+    protected fun shoot(name: String) {
         render()
         compose.mainClock.advanceTimeByFrame()
         val bmp = render()
@@ -206,18 +278,28 @@ class PlayScreenshots {
 
     /** 快递详情页识别完：手机号、地址这些打上码，出厂关着的几类（快递单号这些长数字串、日期时间……）原样留着。 */
     @Test fun auto() {
-        open(sample("/readme/order-page.png"))
+        open(sample(orderPage))
         shoot("auto")
     }
 
     /**
      * 聊天记录识别完的那一下：光自上而下扫过，上半截已经落了码，光底下的正在盖实，下半截还压着暗幕。
      * 识别由闸门放行，放行时光走到哪儿、之后拍哪一帧都是定的，重拍出来是同一张。
+     *
+     * 动效取「外观」里的扫光：出厂的磨砂在结果到了半秒内就整个揭开，揭开的那一刻洞里是还没打码的原图，
+     * 拍不出「一边识别一边落码」的样子。
      */
     @Test fun reveal() {
         val recognizer = GatedRecognizer(PaddleTextRecognizer(context))
-        val vm = editor(recognizer)
-        vm.onImageChosen(sample("/play/chat-page.png"))
+        val settings = isolatedSettingsStore(context).also { runBlocking { it.setScanStyle(ScanStyle.SWEEP) } }
+        val vm = editor(recognizer, settings)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (vm.scanStyle.value != ScanStyle.SWEEP) {
+            check(System.currentTimeMillis() < deadline) { "设置里的扫光没读到" }
+            shadowOf(Looper.getMainLooper()).idle()
+            Thread.sleep(10)
+        }
+        vm.onImageChosen(sample(chatPage))
         waitFor(vm, frames = false) { it.image != null && it.analyzing }
         advance(SCAN_AT_MS)
         recognizer.gate.complete(Unit)
@@ -226,66 +308,25 @@ class PlayScreenshots {
         shoot("reveal")
     }
 
-    /**
-     * 选图之前先在「打码」里换成马赛克：识别出来直接打的码用的就是它。只换不点开调节面板，
-     * 面板开着时盖住下半截、压着暗幕，看不清码了。
-     */
-    @Test fun styles() {
-        open(sample("/play/chat-page.png")) { it.onStyleChipClick(MaskStyle.PIXELATE) }
-        shoot("styles")
-    }
-
     /** 商品那一行规则不管，自己拖一个框补上：刚画完的框是选中的，四角有手柄，上面是「删除」。 */
     @Test fun manual() {
-        val vm = open(sample("/readme/order-page.png"))
-        // 样图里商品那一行（缩略图 + 品名 + 规格），量自 order-page.png 的像素：缩略图 (80, 1208)–(209, 1337)
-        compose.runOnUiThread { vm.onManualBox(Quad.fromRect(RectF(68f, 1198f, 612f, 1348f))) }
+        val vm = open(sample(orderPage))
+        compose.runOnUiThread { vm.onManualBox(Quad.fromRect(productRow)) }
         advance(1_000)
         shoot("manual")
     }
 
-    /** 网址出厂不打码：点一下那行字，整行打上码。点的是 chat-page.png 里网盘链接那一行的正中，量自样图的像素。 */
-    @Test fun tap() {
-        val vm = open(sample("/play/chat-page.png"))
-        compose.runOnUiThread { vm.onTap(PointF(440f, 1238f)) }
-        advance(1_000)
-        shoot("tap")
-    }
-
     /** 用途水印：整张图铺一行字。调节面板收起后拍。 */
     @Test fun purpose() {
-        val vm = open(sample("/readme/order-page.png"))
+        val vm = open(sample(orderPage))
         compose.runOnUiThread {
-            vm.setPurposeText("仅供快递理赔使用")
+            vm.setPurposeText(purposeText)
             vm.showPurposeSheet()
             vm.setPurposeOn(true)
             vm.dismissPurposeSheet()
         }
         advance(1_000)
         shoot("purpose")
-    }
-
-    /** 从相册一次分享三张进来：底栏工具那一行上面是胶片条，停在第一张上。 */
-    @Config(shadows = [ThumbnailContentResolver::class])
-    @Test fun batch() {
-        open(
-            sample("/play/chat-page.png"),
-            sample("/readme/order-page.png"),
-            sample("/readme/order-page.png", "order-page-2.png"),
-        )
-        shoot("batch")
-    }
-
-    /**
-     * 设置 › 文字：每一类一行，小字是它眼下打码还是关闭，点进去能改。出厂配置，列表滚到「取件码」，
-     * 默认打码的几类（取件码、证件号码、银行卡号……）和默认关闭的几类（长数字串、日期时间、网址……）同在一屏。
-     */
-    @Test fun rules() {
-        show { TextSettingsScreen(RecognitionConfig(), onChange = {}, onOpenRule = {}, onNavigateUp = {}) }
-        compose.waitForIdle()
-        compose.onNode(hasScrollToKeyAction()).performScrollToKey("pickup")
-        compose.waitForIdle()
-        shoot("rules")
     }
 
     private companion object {
