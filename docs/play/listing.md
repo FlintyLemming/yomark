@@ -1,7 +1,8 @@
 # 有码 · Google Play 商品详情
 
 上架 Play 的是内购版（`-Pyomark.freeEdition=false`）：免费导出带「有码 Yomark」小水印，一次性买断去掉。
-下面的文字和图片都按这个版本写、按这个版本拍。应用界面只有简体中文，商品详情的默认语言选「中文（简体）– zh-CN」。
+下面的文字和图片都按这个版本写、按这个版本拍。应用界面有简体中文和英文，商品详情的默认语言是「英语（美国）– en-US」，
+这里是其中的「中文（简体）– zh-CN」；英文和其他语言的文字、哪些交给机器翻译，见 [listing-i18n.md](listing-i18n.md)。
 
 ## 文字
 
@@ -19,7 +20,7 @@
 截图发出去之前先打码：自动找出手机号、地址、人名、取件码、人脸和二维码，本机识别，不联网。
 ```
 
-### 完整说明（1369/4000）
+### 完整说明（1540/4000）
 
 ```text
 截图里的手机号、地址、人名、取件码、人脸和二维码，有码会自动找出来并打上码。识别、编辑、导出全在手机上完成：应用没有联网权限，也不会向你申请相机、存储、位置、通讯录等任何权限。
@@ -34,10 +35,10 @@
 【怎么用】
 1. 选一张图，或者在相册里把图分享给「有码」，一次可以分享多张。
 2. 等一两秒识别完，认出来的盖上天蓝色块。点一下码就取消，点一下没打码的字就打上。漏掉的地方，用一根手指拖出一个框补上。
-3. 点「导出」。
+3. 点「导出」存进相册，或者点分享按钮直接发出去，不存进相册。
 
 【识别范围】
-默认打码：电话、邮箱、人名、地址、取件码、银行卡号、IBAN、证件号码、护照号、社保号、车架号、密钥（API key）、MAC 地址、人脸、能解码的二维码和条形码。
+默认打码：电话、邮箱、人名、地址、取件码、车牌、银行卡号（含安全码、有效期）、IBAN、证件号码、护照号、社保号、出生日期、车架号、密钥（API key）、MAC 地址、人脸、能解码的二维码和条形码。
 默认关闭：快递单号、订单号等长数字串、日期时间、网址、IP 地址。
 每一类都可以在设置里设为「打码」或「关闭」。
 
@@ -49,10 +50,13 @@
 
 【更多功能】
 • 手动补框：拖出的框可以拖四个角调大小、拖中间挪位置；双指缩放和平移图片。
-• 批量处理：在相册里一次分享多张，逐张看过后一起导出。
+• 大爆炸：长按图上的字，识别出的字一个个摆出来，只遮号码中间几位也好办。
+• 文本：在图上写一行字做标注，颜色、字号都能调。
+• 批量处理：在相册里一次分享多张，或在应用里一次选多张，逐张看过后一起导出。
 • 用途水印：在整张图上平铺一行字，例如「仅供办理签证使用」，被挪作他用时一眼就能认出来。颜色、角度、透明度、密度都能调。
 • AI 增强识别：在支持的机型上（如 Pixel 9 及以后），可以让手机本机的 Gemini Nano 把整页文字再读一遍，补上规则没认出的，比如话里提到的人名、聊天里 @ 的人、短信里的取件码。设置里开着的每一类它都找，找到的直接打码。
-• 主题色默认跟随系统壁纸（Android 12 及以上），也可以换成紫、蓝、青、绿、橙、红、粉中的一种。
+• 识别聊天记录（实验室）：遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确。
+• 深色模式默认跟随系统；主题色默认跟随系统壁纸（Android 12 及以上），也可以换成紫、蓝、青、绿、橙、红、粉中的一种。
 
 【关于付费】
 下载免费，全部功能都能用，隐私保护能力一项不缺。免费导出的图片右下角会带一个「有码 Yomark」小水印，自动避开打码区域；一次性买断即可去掉，永久有效，不是订阅。这是唯一的付费项。
@@ -70,8 +74,13 @@
 | 应用图标 | [`icon.png`](icon.png) | 512×512，32 位 PNG（带 alpha），17 KB |
 | 置顶大图 | [`feature-graphic.png`](feature-graphic.png) | 1024×500，24 位 PNG |
 | 手机截图 | [`screenshots/`](screenshots/) | 8 张，1080×1920（9:16），24 位 PNG，每张不到 600 KB |
+| 置顶大图（英文） | [`feature-graphic-en.png`](feature-graphic-en.png) | 同上 |
+| 手机截图（英文） | [`screenshots-en/`](screenshots-en/) | 4 张：01、02、04、06，英文界面、英文配文 |
 
 8 张截图都是每边 ≥ 1080 px 的 9:16 竖图，满足推荐位「至少 4 张、每边不低于 1080 像素」的要求。视频是选填项，这里没有做。
+
+Play 上简中商品详情放的是其中 4 张，顺序 01、02、06、04；英语（默认语言）放英文版的同样 4 张和英文置顶大图，
+其余语言都没单独传图，回落到英文的。两种语言用同一个图标。
 
 图标直接由母版 [`docs/icon/icon.svg`](../icon/icon.svg) 渲染：母版是满版方形，1024 对应自适应图标露出来的 72 dp，
 和启动器图标出自同一份几何（`docs/icon/src/icons.mjs`），Play 要求商店图标是启动器图标的高清版，正好对得上。
@@ -107,17 +116,25 @@ Play 要求每张图都填替代文字（不超过 140 字，不要以「……�
 界面或识别结果变了，按顺序重跑：
 
 ```sh
-# 1. 拍编辑器截图（中间产物，不进仓库）
+# 1. 拍编辑器截图（中间产物，不进仓库）。中英文分两次跑：PhoneRule 的地区一个 JVM 里只定一次
 YOMARK_PLAY_SHOTS_DIR=$PWD/docs/play/shots ./gradlew -Pyomark.freeEdition=false \
-    :app:testDebugUnitTest --tests '*PlayScreenshots*'
+    :app:testDebugUnitTest --tests '*.PlayScreenshots' --rerun
+YOMARK_PLAY_SHOTS_EN_DIR=$PWD/docs/play/shots-en ./gradlew -Pyomark.freeEdition=false \
+    :app:testDebugUnitTest --tests '*.PlayScreenshotsEn' --rerun
 
-# 2. 渲染图标、置顶大图和 8 张截图（需要 Playwright 和能访问 Google Fonts 的网络）
-NODE_PATH="$(npm root -g)" node docs/play/src/render.cjs all
+# 2. 渲染（需要 Playwright 和能访问 Google Fonts 的网络）：英文快递样图只在它的 HTML 改了时重渲
+NODE_PATH="$(npm root -g)" node docs/play/src/render.cjs order-page-en
+NODE_PATH="$(npm root -g)" node docs/play/src/render.cjs all      # 中文截图、图标、置顶大图
+NODE_PATH="$(npm root -g)" node docs/play/src/render.cjs all-en   # 英文截图、英文置顶大图
 
 # 3. 转成 Play 要的色彩模式，核对尺寸与体积
 python3 docs/play/src/finalize.py
 ```
 
-截图的标题、副标题和替代文字在 [`src/screenshots.json`](src/screenshots.json)；聊天记录样图的源文件是 [`src/chat-page.html`](src/chat-page.html)
-（`render.cjs chat-page` 渲染到 `app/src/test/resources/play/chat-page.png`），快递详情样图沿用 README 的 `order-page.png`。样图里的人名、地址、号码都是编的。
-首次引导在非中文环境下用的英文样图是 [`src/chat-page-en.html`](src/chat-page-en.html)（`render.cjs chat-page-en`），商店截图不用它。
+`--rerun` 不能省：开着构建缓存，环境变量又不算任务输入，不加的话测试会从缓存里出来、一张也不拍。finalize.py 会把每张 PNG 重新编码一遍，
+跑完和仓库里的逐像素比一下，没真变的还原回去。
+
+截图的标题、副标题和替代文字在 [`src/screenshots.json`](src/screenshots.json)，英文版在 [`src/screenshots-en.json`](src/screenshots-en.json)；
+聊天记录样图的源文件是 [`src/chat-page.html`](src/chat-page.html)（`render.cjs chat-page` 渲染到 `app/src/test/resources/play/chat-page.png`），
+快递详情样图沿用 README 的 `order-page.png`；英文截图用 [`src/chat-page-en.html`](src/chat-page-en.html)（首次引导也用它）和
+[`src/order-page-en.html`](src/order-page-en.html)。英文样图里没有取件码：取件码的规则只认中文字段名。样图里的人名、地址、号码都是编的。
