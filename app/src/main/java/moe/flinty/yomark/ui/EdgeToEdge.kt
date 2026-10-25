@@ -8,8 +8,9 @@ import androidx.core.view.WindowCompat
 /**
  * 每个 Activity 在 super.onCreate 之前调一次。
  *
- * 边到边，系统栏图标一律深色。界面只有浅色一套（主题色可换，见 YomarkTheme，但不跟随系统深色模式），
- * 所以图标颜色写死在主题里（windowLightStatusBar / windowLightNavigationBar），手机开着深色模式也不变白。
+ * 边到边。系统栏图标的深浅写在主题里（windowLightStatusBar / windowLightNavigationBar）：浅色界面深色图标，
+ * 深色界面（values-night 里的主题）白色图标。深浅跟着应用自己的深色模式走（见 AppThemeMode），Activity 建出来时就定了，
+ * 换深色模式时各页会重建，不用在代码里再改。
  * 各屏自己让开系统栏和挖孔（WindowInsets），不靠系统把内容往里挤。
  *
  * 不用 androidx 的 enableEdgeToEdge：它（以及 WindowCompat.enableEdgeToEdge）在各版本分支里都调了
@@ -22,7 +23,7 @@ import androidx.core.view.WindowCompat
  * - Android 11–14 挖孔区用 ALWAYS（横屏时挖孔在侧边也照样画进去，和 15 起的行为一致）；
  *   Android 10 没有 ALWAYS，只剩已弃用的 SHORT_EDGES，就保持默认，横屏时由系统让开挖孔。
  */
-fun ComponentActivity.enableLightEdgeToEdge() {
+fun ComponentActivity.layoutEdgeToEdge() {
     if (Build.VERSION.SDK_INT >= 35) return
     WindowCompat.setDecorFitsSystemWindows(window, false)
     if (Build.VERSION.SDK_INT >= 30) {

@@ -76,7 +76,7 @@ class IdNumberPageTest {
             .containsExactly(Triple(ID_NUMBER, "110105199003071108", true))
     }
 
-    /** 原先落在长数字串里只圈不遮；末位是 X 的连长数字串都不是。 */
+    /** 原先落在长数字串里只圈不遮。长数字串也认带大写字母的，末位是 X 的一样让给证件号码。 */
     @Test fun `long numbers give way to id numbers`() = runTest {
         val lines = page("330106199307180423", "11010519491231002X", "2026090323001114571431156787")
         assertThat(found(lines).filter { it.first in numberKinds }).containsExactly(
@@ -86,8 +86,8 @@ class IdNumberPageTest {
         )
     }
 
-    /** 字段名后面 15 位的一代身份证号：快递单号也是 15 位，同一处让给证件号码。 */
-    @Test fun `tracking gives way to a labeled old id`() = runTest {
+    /** 字段名后面 15 位的一代身份证号：也是一串长数字，同一处让给证件号码。 */
+    @Test fun `a long number gives way to a labeled old id`() = runTest {
         val lines = page("身份证号 110105900307123")
         assertThat(found(lines).map { it.first to it.second }).containsExactly(ID_NUMBER to "110105900307123")
     }

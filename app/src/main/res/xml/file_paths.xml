@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- FileProvider 只开放这一个目录：交给别的应用的图（见 export/FileProviderSink） -->
+<!-- FileProvider 只开放这两个目录：交回给来要图的应用的图，和分享出去的图（见 export/FileProviderSink） -->
 <paths>
     <cache-path name="handover" path="handover/" />
+    <cache-path name="share" path="share/" />
 </paths>

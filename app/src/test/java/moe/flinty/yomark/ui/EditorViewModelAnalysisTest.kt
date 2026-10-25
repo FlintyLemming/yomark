@@ -17,7 +17,6 @@ import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
-import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.data.isolatedSettingsStore
 import moe.flinty.yomark.engine.CandidateMerger
 import moe.flinty.yomark.engine.RedactionEngine
@@ -218,7 +217,7 @@ class EditorViewModelAnalysisTest {
     // ---------- AI 增强识别（端侧大模型，用户点了才跑） ----------
 
     private class Nano(
-        var available: Boolean = true,
+        private val available: Boolean = true,
         var boom: Boolean = false,
         private val out: List<Candidate> = listOf(
             Candidate("llm", Quad.fromRect(RectF(100f, 100f, 160f, 120f)),
@@ -237,11 +236,7 @@ class EditorViewModelAnalysisTest {
         }
     }
 
-    private fun vmWithNano(
-        nano: Nano,
-        rules: List<Candidate> = listOf(candidate("rule", true, 10f, 10f, 60f, 30f)),
-        settings: SettingsStore = isolatedSettingsStore(context),
-    ) =
+    private fun vmWithNano(nano: Nano, rules: List<Candidate> = listOf(candidate("rule", true, 10f, 10f, 60f, 30f))) =
         EditorViewModel(
             intake = ImageIntake(context),
             exporter = Exporter(RendererRegistry.default(), WatermarkDrawer(), NoSink()),
@@ -249,37 +244,10 @@ class EditorViewModelAnalysisTest {
                 RedactionEngine(DeadRecognizer(), emptyList(), listOf(StubClassifier(rules)),
                     CandidateMerger(), refiners = listOf(nano))
             },
-            settings = settings,
+            settings = isolatedSettingsStore(context),
             savedState = SavedStateHandle(),
             ioDispatcher = dispatcher,
         )
-
-    /**
-     * 识别跑完之后才在实验室里配好外部模型：不重跑识别，按钮重新看一次能不能用就出来。
-     * 跑过一遍的（Done）换了模型也重新可点；关掉了、又没有别的模型，按钮收起来。
-     */
-    @Test
-    fun `setting up the external model after analysis offers the review without rerunning it`() = runTest(dispatcher) {
-        val settings = isolatedSettingsStore(context)
-        val nano = Nano(available = false)
-        val vm = vmWithNano(nano, settings = settings)
-        vm.onImageChosen(sampleUri("external-later.jpg")); advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Hidden)
-
-        nano.available = true                                  // 外部模型配好了，后端变得可用
-        settings.updateExternalModel { it.copy(enabled = true) }; advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Ready)
-        assertThat(vm.state.value.analyzing).isFalse()         // 没有重跑识别
-
-        vm.runAiReview(); advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Done(found = 1))
-        settings.updateExternalModel { it.copy(model = "another") }; advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Ready)
-
-        nano.available = false
-        settings.updateExternalModel { it.copy(enabled = false) }; advanceUntilIdle()
-        assertThat(vm.state.value.aiReview).isEqualTo(AiReview.Hidden)
-    }
 
     @Test
     fun `the model does not run by itself after analysis`() = runTest(dispatcher) {

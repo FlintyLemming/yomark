@@ -32,6 +32,8 @@ package moe.flinty.yomark.rules
  * @param spacedValue [spaced] 里的字段名领着的值还要过的一道，收下视图上的整行和值的区间。
  * @param bareRow 字段名没带英文译名，也接同一排右边那一段（见 [findOnPage]）：值的形状够严的才这样（证件号码要五位以上数字），
  *   表头的下一格、「去设置 >」都对不上。英文字段名也这样接：卡面上字号小的「VALID THRU」另成一段，「12/28」在它右边。
+ * @param inSentence 字段名也写在一句话中间：短信里的「凭取件码36920471取件」「您的取件码为 6-2-3001」。前面紧挨着汉字也认，
+ *   和值之间可以隔着「为」「是」。字段名不会是别的词的一截才这样：「取件码」可以，「户名」是「用户名」的一截。
  */
 class LabeledField(
     labels: List<String>,
@@ -43,6 +45,7 @@ class LabeledField(
     private val valid: (String) -> Boolean = { true },
     private val spacedValue: (line: String, value: IntRange) -> Boolean = { _, _ -> true },
     private val bareRow: Boolean = false,
+    private val inSentence: Boolean = false,
 ) : PageFinder {
 
     /**
@@ -63,10 +66,10 @@ class LabeledField(
     /**
      * 前面紧挨着汉字的字段名一般不认（「用户名」「凭证 号」）。四个字以上的照认：户口簿上「户别家庭户户主姓名张三」
      * 整行连着读，「户主姓名」前面是上一个值；「公民」读丢了一个字的「民 身 份 号 码」。
-     * 也是常用词的（[spaced] 里的）不在此列，前面是「请输入」「修改」这类的是提示语。
+     * 也是常用词的（[spaced] 里的）不在此列，前面是「请输入」「修改」这类的是提示语。写在句子里的（[inSentence]）都认。
      */
     private fun standsAlone(text: String, l: MatchResult): Boolean {
-        if (text.getOrNull(l.range.first - 1)?.isHan() != true) return true
+        if (inSentence || text.getOrNull(l.range.first - 1)?.isHan() != true) return true
         if (isSpaced(l) || l.value.count { it.isHan() } < 4) return false
         return !PROMPT_BEFORE.containsMatchIn(text.substring(maxOf(0, l.range.first - 4), l.range.first))
     }
@@ -141,9 +144,11 @@ class LabeledField(
     /**
      * 斜杠、竖线后面的那个词自己又跟着冒号、斜杠、竖线，它也是字段名：「签收人/签收时间：」「收件人/Consignee：李四」
      * 「姓名 | 学号 | 成绩」。值在它的冒号后面；后面又是斜杠、竖线的是一排表头，没有值。
+     * 写在句子里的字段名（[inSentence]）后面先跳过「为」「是」：「取件码为 6-2-3001」。
      */
     private fun after(text: String, from: Int): After {
-        val (p, n) = Translations.skip(text, from)
+        val (skipped, n) = Translations.skip(text, from)
+        val p = COPULA.matchAt(text, skipped)?.takeIf { inSentence }?.let { it.range.last + 1 } ?: skipped
         val separator = SEPARATOR.matchAt(text, p)
         var end = separator?.range?.let { it.last + 1 } ?: p
         if (separator != null && separator.value.any { it in "/／|｜" }) {
@@ -383,6 +388,9 @@ class LabeledField(
         /** 字段名和值之间：冒号、等号，表格的竖线、斜杠，前后的空格。 */
         private val SEPARATOR = Regex("[ 　]*[：:＝=/／|｜]?[ 　]*")
 
+        /** 句子里字段名和值之间的「为」「是」（见 [after]）。 */
+        private val COPULA = Regex("[ 　]*[为是]")
+
         /** 斜杠、竖线后面的又一个字段名（见 [after]）：一个词（英文至多三个词），后面是冒号（第 1 组）或者又一道斜杠、竖线。 */
         private val SECOND_LABEL = Regex("""[^\s：:／/|｜]{1,12}(?: [A-Za-z]{1,12}){0,2}[ 　]*(?:([：:])[ 　]*|[／/|｜])""")
 
@@ -406,7 +414,7 @@ class LabeledField(
         }
 
         /** 汉字字段名的字与字之间允许空格（半角、全角都行）。 */
-        private fun alternatives(labels: List<String>): String =
+        internal fun alternatives(labels: List<String>): String =
             labels.sortedByDescending { it.length }.joinToString("|") { l ->
                 if (l.none { it.isHan() }) Regex.escape(l)
                 else l.map { Regex.escape(it.toString()) }.joinToString("[ 　]*")

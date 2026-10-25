@@ -34,6 +34,7 @@ import moe.flinty.yomark.export.brandWatermarkApplies
 import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
+import moe.flinty.yomark.export.FileProviderSink
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.batch.BatchItem
@@ -53,7 +54,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -92,17 +92,29 @@ class EditorViewModel(
      * 编辑器随之关掉。导出到哪儿由 Activity 给的 [exporter] 定。
      */
     val forCaller: Boolean = false,
+    /**
+     * 分享（顶栏导出左边那颗）写到哪儿：应用私有缓存里的一个目录，经 FileProvider 交给分享面板，不进相册。
+     * 每次分享先清掉上一次的（收到的应用什么时候读由它定，所以不随手删）。
+     * null 是没有分享，顶栏上也就没有这颗：别的应用来要图时，导出就是把图交回去。
+     */
+    private val shareSink: FileProviderSink? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
     val state: StateFlow<EditorUiState> = _state.asStateFlow()
 
+    /** 同一条导出管线，写到 [shareSink]。 */
+    private val shareExporter: Exporter? = shareSink?.let(exporter::writingTo)
+
+    /** 顶栏上有没有分享。 */
+    val canShare: Boolean get() = shareExporter != null
+
     /**
      * 识别动效的样式（设置里选的）。只影响画布上的过渡，所以不进 EditorUiState——那里每换一张图就整个重建，
-     * 购买态、水印外观都得一路手动带着；这个直接跟着设置走。设置还没读到时按出厂的扫光算。
+     * 购买态、水印外观都得一路手动带着；这个直接跟着设置走。设置还没读到时按出厂的磨砂算。
      */
     val scanStyle: StateFlow<ScanStyle> =
-        settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.SWEEP)
+        settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.FROST)
 
     /**
      * 调试信息开着没有（设置 → 关于，连点版本号）。开着时顶栏多一个按钮，每次识别都在 [traceLog] 里记一份。
@@ -233,8 +245,6 @@ class EditorViewModel(
         brushRestored = restoreBrush()
         restorePurposeStyle()
         observeRecognitionConfig()
-        // 外部模型的设置不在 config 里，变了不重跑识别，只重新看一下「AI 增强识别」能不能用
-        viewModelScope.launch { settings.externalModel.drop(1).collect { reprobeAiReview() } }
         viewModelScope.launch { settings.restyleAllMasks.collect { restyleAll = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
         viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
@@ -329,7 +339,7 @@ class EditorViewModel(
         val savedLines = savedState.get<FloatArray>(KEY_LINES)?.let(::unpackQuads).orEmpty()
         viewModelScope.launch {
             val image = runCatching {
-                SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher)
+                loadForAnalysis(file, mime)
             }.getOrElse {
                 clearSavedState()
                 uiState = uiState.copy(restoring = false)
@@ -345,6 +355,10 @@ class EditorViewModel(
         }
         return true
     }
+
+    /** 每次载入时读一遍「按原分辨率识别」：改了从下一张图起生效。 */
+    private suspend fun loadForAnalysis(file: java.io.File, mime: String) =
+        SourceImageLoader.loadForAnalysis(file, mime, ioDispatcher, settings.fullResolutionOcr.first())
 
     private fun clearSavedState() {
         savedState.remove<String>(KEY_FILE)
@@ -366,7 +380,7 @@ class EditorViewModel(
             intakeResult = null
             runCatching {
                 val result = intake.copyToPrivate(uri, ioDispatcher)
-                val image = SourceImageLoader.loadForAnalysis(result.file, result.mimeType, ioDispatcher)
+                val image = loadForAnalysis(result.file, result.mimeType)
                 result to image
             }.onSuccess { (result, image) ->
                 intakeResult = result
@@ -500,7 +514,7 @@ class EditorViewModel(
                             uiState = _state.value.copy(batch = b.withFile(index, copied.file, copied.mimeType))
                         }
                     }
-                taken to SourceImageLoader.loadForAnalysis(taken.file, taken.mimeType, ioDispatcher)
+                taken to loadForAnalysis(taken.file, taken.mimeType)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -592,6 +606,7 @@ class EditorViewModel(
         takeLines(result?.lines)
         rebaseOpenEdits { it.copy(items = detected + keep(it.items)) }
         uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged, bigBang = null)
+            .let { if (ranOn.canRefine) it else it.copy(aiOffered = false) }
         if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
     }
 
@@ -646,6 +661,8 @@ class EditorViewModel(
             aiReview = AiReview.Hidden,
             plan = current.plan.copy(items = detected + keep(current.plan.items)),
             bigBang = null,
+            // 换成了用不了 AI 的方案（文字各类全关了，聊天记录也关着）：宽屏不再给它留那一块
+            aiOffered = current.aiOffered && ranOn.canRefine,
         )
         if (result != null && ranOn.canRefine) offerAiReview(image, ranWith, ranOn, trace)
     }
@@ -718,38 +735,20 @@ class EditorViewModel(
     ) {
         aiReviewJob = viewModelScope.launch(trace ?: EmptyCoroutineContext) {
             // 头一回探测要建 Nano 的客户端、连 AICore，放在主线程上画布会卡住，正赶上开始落码
-            if (!withContext(ioDispatcher) { ranOn.refineReady() }) return@launch
+            val ready = withContext(ioDispatcher) { ranOn.refineReady() }
+            if (!ready) {
+                if (_state.value.aiOffered) uiState = _state.value.copy(aiOffered = false)
+                return@launch
+            }
             val current = _state.value
             if (current.image !== image || analyzedWith != ranWith || current.analyzing) return@launch
             if (current.aiReview != AiReview.Hidden) return@launch
-            uiState = current.copy(aiReview = AiReview.Ready)
+            uiState = current.copy(aiReview = AiReview.Ready, aiOffered = true)
         }
     }
 
     /**
-     * 实验室里的外部模型开了、关了、改了接口：这张图识别早就跑完了，按钮出不出现要重新看一次。
-     * 变得能用就摆出来——跑过的（Done、Failed）也重新可点，换了模型结果可能不一样；变得不能用就收起来。
-     * 正在跑的那一次不动。
-     */
-    private fun reprobeAiReview() {
-        val current = _state.value
-        val image = current.image ?: return
-        val ranWith = analyzedWith ?: return
-        if (current.analyzing || reviewLines == null || current.aiReview == AiReview.Running) return
-        val ranOn = engine
-        if (!ranOn.canRefine) return
-        aiReviewJob?.cancel()
-        aiReviewJob = viewModelScope.launch {
-            val ready = withContext(ioDispatcher) { ranOn.refineReady() }
-            val now = _state.value
-            if (now.image !== image || analyzedWith != ranWith || now.analyzing || now.aiReview == AiReview.Running) return@launch
-            val next = if (ready) AiReview.Ready else AiReview.Hidden
-            if (now.aiReview != next) uiState = now.copy(aiReview = next)
-        }
-    }
-
-    /**
-     * 用户点了「AI 增强识别」：大模型（本机的 Gemini Nano，或实验室里的外部模型）把整页文字再看一遍，
+     * 用户点了「AI 增强识别」：端侧大模型（Gemini Nano）把整页文字再看一遍，
      * 新发现的直接打上码追加进 plan（宽屏列表上标「AI」），用「打码」里眼下的样式。
      *
      * 是用户点出来的，所以进撤销栈——不想要这批框，撤销一下就整批拿掉。
@@ -809,7 +808,8 @@ class EditorViewModel(
      * 吸管在等着取色时，这一下只取颜色。
      *
      * 文本（2026-10-15）：选中的文本再点一下是改它的字（[editSelectedText]）。手里拿着文本时，点的不是哪一块码——
-     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字。
+     * 空白、没打码的字、点掉过的码——就是在这儿写字（[placeText]），不打码：拿起文本就是要往图上写字
+     * （手机上只在「编辑」展开着时拿着它，见 [backToRedact]）。
      * 这时选中着什么的话，这一下只是取消选中，和别的时候点空白一样：写完一块点一下别处，不会又开始写一块。
      *
      * 大爆炸开着时，点的是字：选上或取消那一个字（[toggleBigBangGlyph]），不打码、不写字。
@@ -860,8 +860,12 @@ class EditorViewModel(
     /**
      * 宽屏的列表上点了一行：和在画布上点那一块一样，识别出的、点上的拿掉，手动框选中。
      * 吸管在等着取色时点的是列表不是图，先收起吸管，这一下照常算数。
+     *
+     * 大爆炸开着时不算数，和点画布一样（见 [onTap]）。宽屏上它的面板盖满列表那一块，列表点不着（见 WideEditorPanel），
+     * 这里再挡一道：从列表上拿掉大爆炸刚打的码，面板上那几个字还是选中的，再点一个字那一块又盖回去。
      */
     fun onListItemClick(id: String) {
+        if (_state.value.bigBang != null) return
         val item = _state.value.plan.find(id) ?: return
         cancelColorPick()
         tapItem(item)
@@ -1216,6 +1220,20 @@ class EditorViewModel(
     }
 
     /**
+     * 放下「编辑」里的马克笔、画笔、文本：画笔换回「打码」里上次用的样式，各样式调好的参数照旧（2026-10-16）。
+     * 手机上它们只在「编辑」展开着时拿在手里，收起「编辑」就放下（见 EditorScreen）：收着的底栏点图、拖框总是打码。
+     * 宽屏上所有功能平铺着，没有收起这一说，拿着就一直拿着。
+     * 原先收起后还拿着文本，点图哪儿都是写字，要回去打码得展开「打码」重新挑一种样式。
+     * 只换画笔，不像 [setStyle] 那样连选中的框、已经打好的码一起换；还没写字的那一处作罢。
+     */
+    fun backToRedact() {
+        val s = _state.value
+        if (s.brush.style.redacts) return
+        setBrush(s.maskLook)
+        if (_state.value.textPlacement != null) _state.value = _state.value.copy(textPlacement = null)
+    }
+
+    /**
      * 面板上改了样式或参数。
      *
      * 改的是画笔：从之后画的起生效。
@@ -1468,33 +1486,39 @@ class EditorViewModel(
 
     /**
      * 导出。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
+     *
+     * @param share 分享（顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册。没有分享时（见 [canShare]）什么也不做
      */
-    fun requestExport() {
-        runExport(_state.value.plan)
+    fun requestExport(share: Boolean = false) {
+        runExport(_state.value.plan, share)
     }
 
     /**
      * 批量导出：看过的一次性全部导出（spec §7.6）。
      *
      * 先等还没跑完的识别：切走的那几张可能还在后台识别，这时导出，本该直接打码的东西就原样出去了——
-     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」。
+     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」（分享时是分享那颗转圈）。
      *
      * 还有没打开过的图时先问一句（[reviewUnopened] / [exportOpenedOnly]）：没打开过的图没识别、也没人看过，不能替用户导出。
+     *
+     * @param share 同 [requestExport]：看过的一起交给分享面板
      */
-    fun exportBatch() {
+    fun exportBatch(share: Boolean = false) {
         if (_state.value.batch == null || _state.value.exporting) return
+        if (share && shareExporter == null) return
         finishLookEdit()
-        uiState = _state.value.copy(exporting = true)
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
             awaitBatchScans()
             val batch = _state.value.liveBatch
             if (batch == null) {
-                uiState = _state.value.copy(exporting = false)
+                uiState = _state.value.copy(exporting = false, sharing = false)
                 return@launch
             }
             uiState = _state.value.copy(batch = batch, exporting = false)
+            // 问的时候还记着是哪一种（sharing），按钮上照它写，选了「只……看过的」照它导出
             if (batch.unopened > 0) uiState = _state.value.copy(unopenedDialogVisible = true)
-            else runBatchExport(batch)
+            else runBatchExport(batch, share)
         }
     }
 
@@ -1510,15 +1534,16 @@ class EditorViewModel(
 
     /** 「还有几张没看过」里的「去看看」：跳到第一张没打开过的，它这时开始识别。 */
     fun reviewUnopened() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
         val first = _state.value.batch?.firstUnopened ?: return
         selectImage(first)
     }
 
-    /** 「还有几张没看过」里的「只导出看过的」：没打开过的不导出，看过的照常导出。 */
+    /** 「还有几张没看过」里的「只导出看过的」（分享时是「只分享看过的」）：没打开过的不导出，看过的照常导出、分享。 */
     fun exportOpenedOnly() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
-        runBatchExport(_state.value.liveBatch ?: return)
+        val share = _state.value.sharing
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
+        runBatchExport(_state.value.liveBatch ?: return, share)
     }
 
     /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
@@ -1535,10 +1560,10 @@ class EditorViewModel(
 
     /**
      * 打开调节面板，水印不跟着加上：文字框是空的就先填上上次的文字或默认措辞，加不加由面板上的「应用」开关定。
-     * 它和样式的调节面板是同一块地方（手机上都是底栏的胶囊长出来的），一次只开一个：样式面板开着就换成它。
+     * 它和样式的调节面板是同一块地方（手机上是底栏的胶囊长出来的，宽屏上是从方块长出来的），一次只开一个：样式面板开着就换成它。
      */
     fun showPurposeSheet() {
-        // 大爆炸开着时面板的位置归它，开出来也看不见（顶栏的按钮这时也收起来了）
+        // 大爆炸开着时面板的位置归它，开出来也看不见（手机上底栏那一行归它，宽屏上它盖住了水印那一块）
         if (_state.value.bigBang != null) return
         finishLookEdit()
         val s = _state.value
@@ -1552,7 +1577,7 @@ class EditorViewModel(
         )
     }
 
-    /** 点了水印（手机底栏「编辑」里的那一项，宽屏顶栏上的按钮）：收着就打开，开着就收起，和再点一下当前的样式一样。 */
+    /** 点了水印（手机底栏「编辑」里的那一项，宽屏的水印那一块）：收着就打开，开着就收起，和再点一下当前的样式一样。 */
     fun togglePurposeSheet() {
         if (_state.value.purposeSheetVisible) dismissPurposeSheet() else showPurposeSheet()
     }
@@ -1592,7 +1617,7 @@ class EditorViewModel(
     fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
-        uiState = _state.value.copy(unopenedDialogVisible = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
     }
 
     fun consumeMessage() {
@@ -1605,12 +1630,17 @@ class EditorViewModel(
      */
     private fun applyWatermark(): Boolean = brandWatermarkApplies(_state.value.isPro, watermarkOff)
 
-    private fun runExport(plan: MaskPlan) {
+    /** @param share 写进缓存交给分享面板，不进相册（见 [requestExport]） */
+    private fun runExport(plan: MaskPlan, share: Boolean = false) {
         val image = _state.value.image ?: return
         val source = intakeResult ?: return
-        uiState = _state.value.copy(exporting = true)
+        val out = (if (share) shareExporter else exporter) ?: return
+        // 导出、分享两颗挨着：一颗还在跑时点了另一颗，不再起一份
+        if (_state.value.exporting) return
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
-            val outcome = exporter.export(
+            if (share) clearShared()
+            val outcome = out.export(
                 ExportRequest(
                     file = source.file,
                     mimeType = source.mimeType,
@@ -1624,32 +1654,45 @@ class EditorViewModel(
                 dispatcher = ioDispatcher,
             )
             uiState = when (outcome) {
-                // 交回去编辑器就关了，按钮不再放开，免得又导出一张
-                is ExportOutcome.Success -> if (forCaller) {
-                    _state.value.copy(message = EditorMessage.HandedOver(listOf(outcome.uri)))
-                } else {
-                    _state.value.copy(
+                is ExportOutcome.Success -> when {
+                    share -> _state.value.copy(
+                        exporting = false,
+                        sharing = false,
+                        message = EditorMessage.Shared(listOf(outcome.uri), outcome.mimeType),
+                    )
+                    // 交回去编辑器就关了，按钮不再放开，免得又导出一张
+                    forCaller -> _state.value.copy(message = EditorMessage.HandedOver(listOf(outcome.uri)))
+                    else -> _state.value.copy(
                         exporting = false,
                         message = EditorMessage.Exported(outcome.uri, outcome.downscaled, outcome.width, outcome.height),
                     )
                 }
                 is ExportOutcome.Failure -> _state.value.copy(
                     exporting = false,
-                    message = EditorMessage.Error(R.string.error_export),
+                    sharing = false,
+                    message = EditorMessage.Error(if (share) R.string.error_share else R.string.error_export),
                 )
             }
         }
     }
 
-    private fun runBatchExport(batch: BatchSession) {
-        uiState = _state.value.copy(exporting = true)
+    /** 上一次分享出去的图：收到的应用早就读走了。 */
+    private suspend fun clearShared() {
+        withContext(ioDispatcher) { shareSink?.clear() }
+    }
+
+    private fun runBatchExport(batch: BatchSession, share: Boolean = false) {
+        val out = (if (share) shareExporter else exporter) ?: return
+        uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
+            if (share) clearShared()
             val written = ArrayList<Uri>()
+            val types = LinkedHashSet<String>()
             var failed = 0
             batch.items.forEach { item ->
                 val file = item.file ?: return@forEach     // 还没走到的图没有副本，也没有编辑
                 val plan = item.plan ?: return@forEach
-                val outcome = exporter.export(
+                val outcome = out.export(
                     ExportRequest(
                         file = file,
                         mimeType = item.mimeType,
@@ -1662,9 +1705,20 @@ class EditorViewModel(
                     ),
                     dispatcher = ioDispatcher,
                 )
-                if (outcome is ExportOutcome.Success) written += outcome.uri else failed++
+                if (outcome is ExportOutcome.Success) {
+                    written += outcome.uri
+                    types += outcome.mimeType
+                } else failed++
             }
             uiState = when {
+                // 都是 JPEG（或者都是 PNG）就照实说，混着的说是图片
+                share && failed == 0 && written.isNotEmpty() -> _state.value.copy(
+                    exporting = false,
+                    sharing = false,
+                    message = EditorMessage.Shared(written, types.singleOrNull() ?: "image/*"),
+                )
+                // 分享面板上看不出少了几张：这次一张都不分享，再试一次
+                share -> _state.value.copy(exporting = false, sharing = false, message = EditorMessage.Error(R.string.error_share))
                 !forCaller -> _state.value.copy(
                     exporting = false,
                     message = if (failed == 0) EditorMessage.BatchExported(written.size)

@@ -144,7 +144,7 @@ private fun EmptyHint() {
 }
 
 /**
- * 一行：缩略图、类型，手动框再写一句它的状态，整行都是点击区。
+ * 一行：缩略图、类型，整行都是点击区。
  * 识别出的、点上的一行，点了就拿掉（读屏念的动作是「取消打码」）；手动框点了是选中。
  */
 @Composable
@@ -169,22 +169,13 @@ private fun MaskItemRow(image: SourceImage?, item: MaskItem, selected: Boolean, 
     ) {
         ItemThumbnail(image, item.quad, Modifier.weight(1f).height(THUMB_HEIGHT))
         Spacer(Modifier.width(12.dp))
-        Column(Modifier.widthIn(min = 56.dp, max = 112.dp)) {
-            Text(
-                SensitiveKindLabels.display(LocalContext.current.resources, item),
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (manual) {
-                Text(
-                    stringResource(if (selected) R.string.item_selected else R.string.item_manual),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = colors.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-        }
+        Text(
+            SensitiveKindLabels.display(LocalContext.current.resources, item),
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(min = 56.dp, max = 112.dp),
+        )
     }
 }
 

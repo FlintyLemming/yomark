@@ -15,10 +15,31 @@
     <string name="list_separator">、</string>
 
     <!-- onboarding / home -->
-    <string name="onboarding_tagline">自动找出截图里的手机号、地址、人脸并打码。</string>
-    <string name="onboarding_no_permissions">不需要任何权限</string>
-    <string name="onboarding_offline">默认不联网，图片不离开手机</string>
+    <string name="onboarding_skip">跳过</string>
+    <string name="onboarding_next">下一步</string>
+    <string name="onboarding_open_settings">打开设置</string>
+    <string name="onboarding_welcome_title">欢迎</string>
+    <string name="onboarding_tagline">自动找出截图里的手机号、地址、人脸并打码</string>
+    <string name="onboarding_offline">不联网，图片不离开手机</string>
     <string name="onboarding_metadata">导出时去掉位置、机型等隐藏信息</string>
+    <string name="onboarding_auto_title">自动打码</string>
+    <string name="onboarding_auto_body">打开图片就会遮住地址、电话等隐私信息</string>
+    <string name="onboarding_tap_title">点文字打码</string>
+    <string name="onboarding_tap_body">漏掉的字点一下就遮住，再点一下取消</string>
+    <string name="onboarding_tap_try">点一下框出的链接试试</string>
+    <string name="onboarding_engine_measuring">正在测这台手机跑 PP-OCR 有多快</string>
+    <string name="onboarding_engine_fast">PP-OCR 识别这张图用了 %1$s 秒，默认用效果更好的 PP-OCR；觉得慢可以换成 ML Kit</string>
+    <string name="onboarding_engine_slow">PP-OCR 识别这张图用了 %1$s 秒，建议用更快的 ML Kit；效果不好可以在「设置 › AI」里换回</string>
+    <string name="onboarding_engine_over">PP-OCR 识别这张图超过了 %1$d 秒，建议用更快的 ML Kit；效果不好可以在「设置 › AI」里换回</string>
+    <string name="onboarding_engine_failed">PP-OCR 在这台手机上跑不起来，建议用 ML Kit</string>
+    <string name="onboarding_more_title">设置里还有更多</string>
+    <string name="onboarding_more_body">要遮住哪些信息，在首页右上角的设置里选</string>
+    <string name="onboarding_step">第 %1$d 步，共 %2$d 步：%3$s</string>
+    <string name="onboarding_sample">示例聊天截图</string>
+    <string name="onboarding_sample_masked">遮住了 %1$d 处</string>
+    <string name="onboarding_mask_link">遮住链接</string>
+    <!-- 不给人看：引导的样图 tour_chat.webp 是哪一张，和图跟着同一个语言限定符换（见 TourSample.of） -->
+    <string name="tour_sample">zh</string>
     <string name="pick_image">选择图片</string>
     <string name="home_share_hint">也可以在相册里分享图片到「有码」，支持多张</string>
     <string name="free_edition">全功能免费版</string>
@@ -28,12 +49,12 @@
     <string name="undo">撤销</string>
     <string name="redo">重做</string>
     <string name="purpose_watermark">用途水印</string>
-    <string name="purpose_watermark_on">用途水印（已开启）</string>
     <string name="compare_original">按住对比原图</string>
     <string name="compare_hold">按住对比</string>
     <string name="debug_info">调试信息</string>
     <string name="export">导出</string>
     <string name="exporting">导出中…</string>
+    <string name="sharing">分享中…</string>
     <string name="ai_review">AI 增强识别</string>
     <string name="ai_reviewing">增强识别中…</string>
     <string name="ai_review_none">没有新发现</string>
@@ -50,6 +71,7 @@
     <string name="saved_batch">已保存 %1$d 张到相册</string>
     <string name="error_open_image">打不开这张图片</string>
     <string name="error_export">导出失败，请重试</string>
+    <string name="error_share">分享失败，请重试</string>
     <string name="error_batch_partial">%1$d 张已保存，%2$d 张失败</string>
     <string name="purpose_default">仅供办理 XX 使用</string>
     <string name="filmstrip_item">第 %1$d 张，共 %2$d 张</string>
@@ -63,8 +85,6 @@
     <string name="list_count">框出 %1$d 处</string>
     <string name="list_empty">没有识别到敏感信息</string>
     <string name="list_empty_hint">有漏掉的地方，在图上用一根手指拖出一个框</string>
-    <string name="item_selected">已选中</string>
-    <string name="item_manual">手动画的框</string>
     <string name="item_unmask">取消打码</string>
 
     <!-- kinds -->
@@ -74,7 +94,6 @@
     <string name="kind_iban">IBAN</string>
     <string name="kind_ssn">社保号</string>
     <string name="kind_passport">护照</string>
-    <string name="kind_tracking">快递单号</string>
     <string name="kind_ip">IP 地址</string>
     <string name="kind_mac">MAC 地址</string>
     <string name="kind_url">网址</string>
@@ -104,6 +123,7 @@
     <string name="tool_group_expand">展开</string>
     <string name="tool_group_collapse">收起</string>
     <string name="tool_watermark">水印</string>
+    <string name="tool_compare">对比</string>
     <string name="tool_on">已开启</string>
 
     <!-- styles -->
@@ -169,9 +189,10 @@
 
     <!-- dialogs -->
     <string name="unopened_title">还有 %1$d 张没看过</string>
-    <string name="unopened_text">没打开过的图片还没识别，导出时会跳过。</string>
+    <string name="unopened_text">没打开过的图片还没识别，会被跳过。</string>
     <string name="review">去看看</string>
     <string name="export_opened">只导出看过的 %1$d 张</string>
+    <string name="share_opened">只分享看过的 %1$d 张</string>
     <string name="paywall_one_time">一次付费，永久有效，不是订阅。</string>
     <string name="paywall_what">付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。</string>
     <string name="paywall_restore_hint">以前买过？点「恢复购买」，不会再次扣费。</string>
@@ -203,13 +224,15 @@
     <string name="settings_developer">开发者</string>
     <string name="settings_language">语言</string>
     <string name="settings_language_system">跟随系统</string>
+    <string name="settings_help">帮助</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
-    <string name="settings_general_summary">编辑、水印样式</string>
-    <string name="settings_appearance_summary">主题色、识别动效</string>
-    <string name="settings_labs_summary">识别聊天记录、外部模型</string>
+    <string name="settings_general_summary">编辑、识别、水印样式</string>
+    <string name="settings_appearance_summary">深色模式、主题色、识别动效</string>
+    <string name="settings_labs_summary">识别聊天记录</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
-    <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 恢复默认设置</string>
+    <string name="settings_help_summary">重新观看引导</string>
+    <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 反馈 · 恢复默认设置</string>
     <string name="count_kinds">%2$s %1$d 类</string>
     <string name="summary_masked">打码</string>
     <string name="summary_off">关闭</string>
@@ -221,13 +244,9 @@
     <string name="engine">识别引擎</string>
     <string name="sensitive_info">敏感信息</string>
     <string name="engine_paddle">PP-OCR</string>
-    <string name="engine_latin">ML Kit 英文</string>
-    <string name="engine_chinese">ML Kit 中文</string>
-    <string name="engine_both">ML Kit 中英</string>
-    <string name="engine_paddle_summary">中文最准，速度稍慢</string>
-    <string name="engine_latin_summary">不支持中文</string>
-    <string name="engine_chinese_summary">中英文都能认</string>
-    <string name="engine_both_summary">两个模型一起跑，最慢</string>
+    <string name="engine_mlkit">ML Kit</string>
+    <string name="engine_paddle_summary">识别更准，速度稍慢</string>
+    <string name="engine_mlkit_summary">中英文都能认</string>
     <string name="when_found">识别到%1$s时</string>
     <string name="guessed_names">从字面猜出的人名</string>
     <string name="mask_unanchored">没有旁证的也打码</string>
@@ -247,7 +266,7 @@
     <string name="anchor_field">「收货人」「乘车人」这类字段</string>
     <string name="anchor_ticket">票种</string>
     <string name="anchor_english_field">「Passenger」「Ship to」这类英文字段</string>
-    <string name="rule_desc_card">13 到 19 位、通过 Luhn 校验的卡号，以及卡上「CVV」后面的安全码、「VALID THRU」后面的月/年</string>
+    <string name="rule_desc_card">13 到 19 位、通过 Luhn 校验的卡号，卡上「CVV」后面和背面签名条旁的安全码，「VALID THRU」后面的月/年</string>
     <string name="rule_desc_iban">国际银行账号，按国家核对长度和校验位</string>
     <string name="rule_desc_ssn">美国社会安全号，形如 123-45-6789，不会发放的号段不算</string>
     <string name="rule_desc_mac">网卡地址，形如 AA:BB:CC:DD:EE:FF</string>
@@ -259,12 +278,11 @@
     <string name="rule_desc_apikey">以 sk-、ghp_、AKIA、eyJ 等开头、足够随机的长串</string>
     <string name="rule_desc_name">「收货人」「姓名/Name」「Surname」「Ship to」这类字段后面或下面的名字，电话前面的名字，「Hi David,」「Mr. Patel」这类写法，通行证上名字下面的拼音，身份证、香港身份证、毕业证上没有字段名的名字；没有字段名时从字面猜，要有旁证才算</string>
     <string name="rule_desc_address">「收货地址」「住址」「送至」这类字段后面的内容和它折到下面的几行，带路名门牌、楼栋、房号的地址，英文的街道、城市、邮编，证件上的出生地，身份证上字段名没读出来的住址</string>
-    <string name="rule_desc_pickup">「取件码」「取货码」这类字段后面的码</string>
+    <string name="rule_desc_pickup">「取件码」「取货码」这类字段后面或下面的码，以及短信里「凭 3-2-1234 取件」的码</string>
     <string name="rule_desc_plate">写法独特的车牌（中国大陆、日本、英国、法国、意大利、俄罗斯、印度、巴西等）和「车牌号」「License plate」这类字段后面的车牌，上下两行的也认；德国、西班牙等其他写法的只认字段名后面的</string>
     <string name="rule_desc_url">只遮路径和参数，域名保留</string>
     <string name="rule_desc_ip">IPv4 和 IPv6 地址，前面写着 v 或 version 的版本号不算</string>
-    <string name="rule_desc_tracking">UPS 单号要核对校验位；其余是 12、15、20、22 位的纯数字，没有校验位，可能误圈</string>
-    <string name="rule_desc_longnum">16 位以上、不属于其他任何一类的数字，比如交易号、订单号；没有校验位，可能误圈</string>
+    <string name="rule_desc_longnum">8 位以上的数字串，可以带连字符和大写字母，比如快递单号、订单号；没有校验位，可能误圈</string>
     <string name="rule_desc_datetime">日期、时间，英文的「Feb 5, 1965」「05 FEB 1965」也认；出生日期另算一类</string>
     <string name="rule_desc_birthdate">「出生日期」「出生年月」「Date of birth」「DOB」这类字段后面或下面的日期，只写到月的、民国、日本年号也认；和护照机读码、身份证号里的生日相同的日期；毕业证上「……日生」的日期</string>
 
@@ -301,31 +319,18 @@
     <string name="mlkit_summary">文字 %1$s · 人脸 %2$s · 条码 %3$s</string>
     <string name="mlkit_text_versions">%1$s（英文）/ %2$s（中文）</string>
 
-    <!-- settings: external model (Labs) -->
-    <string name="external_model">外部模型</string>
-    <string name="external_model_footer">AI 增强识别改用 OpenAI 兼容接口，识别出的文字会发给它，在「AI」里配置</string>
-    <string name="external_base_url">接口地址</string>
-    <string name="external_api_key">API Key</string>
-    <string name="external_model_name">模型</string>
-    <string name="external_not_set">未填写</string>
-    <string name="external_key_set">已填写</string>
-    <string name="external_test">测试连接</string>
-    <string name="external_testing">测试中…</string>
-    <string name="external_test_ok">可用 · %1$s 秒</string>
-    <string name="external_test_failed">失败：%1$s</string>
-    <string name="external_err_https">接口地址要以 https:// 开头</string>
-    <string name="external_err_timeout">超时</string>
-    <string name="external_err_network">连不上</string>
-    <string name="external_err_reply">回答格式不对</string>
-    <string name="external_ai_footer">代替 Gemini Nano，接口地址写到 /v1 为止</string>
-    <string name="save">保存</string>
-
     <!-- settings: export / appearance -->
     <string name="restyle_all">换样式时一起换掉已有的打码</string>
     <string name="restyle_all_summary">色块、马赛克、模糊</string>
+    <string name="settings_recognize">识别</string>
+    <string name="full_resolution_ocr">按原分辨率识别</string>
+    <string name="full_resolution_ocr_summary">开启后扫描速度会降低约一半以上</string>
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>
+    <string name="theme_mode">深色模式</string>
+    <string name="theme_mode_light">浅色</string>
+    <string name="theme_mode_dark">深色</string>
     <string name="theme_color">主题色</string>
     <string name="follow_system">跟随系统</string>
     <string name="dynamic_color">随壁纸取色</string>
@@ -346,6 +351,12 @@
     <string name="version">版本</string>
     <string name="play_edition">Play 版</string>
     <string name="privacy_policy">隐私权政策</string>
+    <string name="feedback">反馈</string>
+    <string name="feedback_email">发邮件</string>
+    <string name="feedback_email_subject">有码反馈</string>
+    <string name="no_email_app">没有邮件应用，已复制邮箱地址</string>
+    <string name="github_issues">GitHub Issues</string>
+    <string name="github_issues_summary">公开，需要 GitHub 账号</string>
     <string name="reset_settings">恢复默认设置</string>
     <string name="reset_settings_summary">除外观外，全部恢复出厂值</string>
     <string name="reset_confirm_title">恢复默认设置？</string>

@@ -1759,7 +1759,7 @@
     "text": "漕溪北路595弄7号1802"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "SF1427836590214"
    }
   ],
@@ -2792,7 +2792,7 @@
     "text": "张杨路1288弄4号601室"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "SF1438275590126"
    }
   ],
@@ -3744,7 +3744,7 @@
     "text": "沪AD72915"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "SF1428830917265"
    },
    {
@@ -4008,7 +4008,7 @@
     "text": "8-5-2001"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "SF1398025517740"
    },
    {
@@ -4028,7 +4028,7 @@
     "text": "王丽娟"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "JDVA28816037452"
    },
    {
@@ -4375,7 +4375,7 @@
     "text": "17723094651"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "78329160554281"
    },
    {
@@ -5196,7 +5196,7 @@
   ],
   "find": [
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "JDVA28471630592"
    },
    {
@@ -5389,7 +5389,7 @@
   ],
   "find": [
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "SF1428830917625"
    },
    {
@@ -5641,7 +5641,7 @@
     "text": "139****1176"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "78294103652817"
    }
   ],
@@ -9396,7 +9396,7 @@
     "text": "1450 Fulton St"
    },
    {
-    "kind": "TRACKING_NO",
+    "kind": "LONG_NUMBER",
     "text": "9400 1118 9922 3851 6403 77"
    },
    {

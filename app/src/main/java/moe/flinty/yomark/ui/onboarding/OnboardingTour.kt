@@ -1,0 +1,1000 @@
+package moe.flinty.yomark.ui.onboarding
+
+import android.animation.ValueAnimator
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameMillis
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEvent
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputScope
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.PointerInputModifierNode
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.text
+import androidx.compose.ui.semantics.traversalIndex
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.toPath
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import moe.flinty.yomark.R
+import moe.flinty.yomark.core.image.SourceImage
+import moe.flinty.yomark.engine.TextEngineOption
+import moe.flinty.yomark.export.BrandGlyph
+import moe.flinty.yomark.ui.canvas.ExpressiveShapes
+import moe.flinty.yomark.ui.canvas.ScanStyle
+import moe.flinty.yomark.ui.components.contentFoldSpec
+import moe.flinty.yomark.ui.components.contentFoldTween
+import moe.flinty.yomark.ui.components.foldTween
+import moe.flinty.yomark.ui.settings.FooterText
+import moe.flinty.yomark.ui.settings.RadioRow
+import moe.flinty.yomark.ui.settings.SectionHeader
+import moe.flinty.yomark.ui.settings.SettingsGroup
+import moe.flinty.yomark.ui.settings.SwitchRow
+import moe.flinty.yomark.ui.settings.textEngineLabel
+import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
+/**
+ * 第一次打开时的引导（见 [TourPage]），随时可以跳过：
+ * 1. 欢迎：图标摆在几块慢慢转的 Material 形状上、一句话说清是干什么的、两条承诺；
+ * 2. 自动打码：样图上演一遍编辑器的识别动效，码落下来（码是现成的，不现场识别，见 [TourSample]）；
+ * 3. 点文字打码：框出一段没遮住的链接，点一下就抹上码；
+ * 4. 识别引擎：按后台给 PP-OCR 测的速度（见 [EngineProbeModel]）推荐一个、替人选好，说为什么，可以改；
+ * 5. 设置里还有更多：实验室里「识别聊天记录」的真开关，打开了图上的标题、头像跟着遮住。
+ * 设置里「帮助」重放的没有第 4 页（[engineAdvice] 为 null）。
+ *
+ * 各页左右排开，点「下一步」、左右划都是平移。欢迎页以外共用一张样图，翻页时它不动，只有说明在滑：
+ * 说明从上到下一层比一层走得快（视差），翻页时拉开、停下时对齐。竖排时说明高的那一页把图往上顶，
+ * 翻到哪儿顶到哪儿。图跟着「自动打码」从欢迎页后面滑进来；前一页点上的、点掉的码，翻过去还在。
+ * 返回键回上一页，第一页时交给系统。
+ *
+ * @param sample 样图（TourSample.load）
+ * @param boxes 这张样图上量好的框（TourSample.of），和图出自同一套资源
+ * @param chatOn 实验室里的「识别聊天记录」眼下开着没有（设置里存的那一份）
+ * @param onChatChange 最后一页的开关拨了：写进设置
+ * @param engineAdvice 测速走到哪儿了；null 时没有「识别引擎」那一页
+ * @param engine 设置里眼下用的识别引擎
+ * @param onEngineChange 「识别引擎」那一页选了一个（替人选好的，或者点的）：写进设置
+ * @param interactive false 时正在退场淡出：不接触摸、读屏看不见它、返回键不归它
+ * @param animate false 时（系统关了动画）不演识别动效，一进来码就在图上；欢迎页的形状也不转
+ */
+@Composable
+internal fun OnboardingTour(
+    sample: SourceImage,
+    boxes: TourSample,
+    scanStyle: ScanStyle,
+    chatOn: Boolean,
+    onChatChange: (Boolean) -> Unit,
+    onSkip: () -> Unit,
+    onPickImage: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+    engineAdvice: EngineAdvice? = null,
+    engine: TextEngineOption = TextEngineOption.PADDLE,
+    onEngineChange: (TextEngineOption) -> Unit = {},
+    interactive: Boolean = true,
+    animate: Boolean = remember { ValueAnimator.areAnimatorsEnabled() },
+) {
+    val state = rememberTourState(boxes, chatOn, animate, if (engineAdvice != null) TourState.ALL_PAGES else TourState.WITHOUT_ENGINE)
+    val pages = state.pages
+    val pager = rememberPagerState(initialPage = state.progress.step) { pages.size }
+    val scope = rememberCoroutineScope()
+    // 翻到哪一页记进进度（转屏、进程被杀后接着来）
+    LaunchedEffect(pager) { snapshotFlow { pager.currentPage }.collect { state.goTo(it) } }
+    // 停在「自动打码」上以后一动（点了「下一步」、返回，或手指划开）识别动效就收尾、码当场落下：下一页的图上不再从头演一遍
+    LaunchedEffect(pager) {
+        snapshotFlow { state.progress.revealed || pager.settledPage == state.autoStep }.first { it }
+        snapshotFlow {
+            state.progress.revealed || pager.currentPage != state.autoStep || pager.currentPageOffsetFraction != 0f
+        }.first { it }
+        state.reveal()
+    }
+    // 翻到一半转了屏：页码和翻过的那一截都存着，回来时停在两页中间，接着翻完
+    LaunchedEffect(pager) {
+        if (!pager.isScrollInProgress && pager.currentPageOffsetFraction != 0f) {
+            pager.animateScrollToPage(pager.currentPage, animationSpec = tween(PAGE_MS, easing = PAGE_EASING))
+        }
+    }
+    val target = pager.targetPage
+    val last = target == state.lastStep
+    val turn = { page: Int ->
+        if (page != target) {
+            if (page > state.autoStep) state.reveal()
+            scope.launch { pager.animateScrollToPage(page, animationSpec = tween(PAGE_MS, easing = PAGE_EASING)) }
+        }
+    }
+    // 最后一页的按钮要等这一页停稳才算数：快点两下「下一步」，第二下落在正滑进来的最后一页上，不能当成「选择图片」走掉
+    val landed = { pager.settledPage == state.lastStep && !pager.isScrollInProgress }
+
+    // 入场：欢迎页的图淡入、从略小长到原大，说明和按钮慢一拍往上浮出来。只演一回，转屏回来不再演
+    var entered by rememberSaveable { mutableStateOf(false) }
+    val entering = remember { animate && !entered }
+    val stageIn = remember { Animatable(if (entering) 0f else 1f) }
+    val panelIn = remember { Animatable(if (entering) 0f else 1f) }
+    LaunchedEffect(Unit) {
+        if (!entering) return@LaunchedEffect
+        entered = true
+        launch { stageIn.animateTo(1f, foldTween(true)) }
+        panelIn.animateTo(1f, foldTween(true, delayMillis = PANEL_DELAY_MS))
+    }
+
+    // 识别动效：和编辑器打开一张图一样，「自动打码」一露出来就在识别（码已经备好、藏在磨砂底下），到点落下来，
+    // 落码那一遍演完才点得动。翻页翻得早，码当场落下。和那一页的画布同时起头：扫光收尾要多久，看它演了多久（见 settleMs）
+    LaunchedEffect(state) {
+        if (state.settled) return@LaunchedEffect
+        snapshotFlow { state.progress.revealed || abs(pageOffset(pager, state.autoStep)) < 1f }.first { it }
+        var scanned = 0L
+        if (!state.progress.revealed) {
+            val start = withFrameMillis { it }
+            while (!state.progress.revealed && scanned < SCAN_MS) scanned = withFrameMillis { it } - start
+            state.reveal()
+        }
+        awaitMillis(settleMs(scanStyle, scanned) + SETTLE_MARGIN_MS)
+        state.settled = true
+    }
+
+    // 聊天的码等这一页停稳再一处处抹上：翻页途中抹，抹到一半就滑走了
+    LaunchedEffect(chatOn) { state.syncChat(chatOn, animate) { !pager.isScrollInProgress } }
+
+    // 「识别引擎」那一页停稳了、测速也有了结论，就替人选上推荐的那个（写进设置），页上同时说为什么。
+    // 没停在这一页上（跳过了、没等结论就翻走了）不替人改；选过一次（自己点的也算）就不再改
+    val enginePage = pages.indexOf(TourPage.ENGINE)
+    val recommended = engineAdvice?.recommended
+    val onEnginePage = enginePage >= 0 && pager.settledPage == enginePage && interactive
+    val engineChange by rememberUpdatedState(onEngineChange)
+    LaunchedEffect(recommended, onEnginePage) {
+        if (recommended != null && onEnginePage && !state.progress.engineChosen) {
+            state.chooseEngine()
+            engineChange(recommended)
+        }
+    }
+    val chooseEngine = { option: TextEngineOption ->
+        state.chooseEngine()
+        onEngineChange(option)
+    }
+
+    BackHandler(enabled = interactive && target > 0) { turn(target - 1) }
+
+    val titles = pages.map { it.title() }
+    val risen = Modifier.graphicsLayer {
+        alpha = panelIn.value
+        translationY = (1f - panelIn.value) * ENTER_RISE.toPx()
+    }
+
+    BoxWithConstraints(
+        modifier
+            .fillMaxSize()
+            // 不透明：退场淡出时是溶进底下的首页，不是两屏叠在一起
+            .background(MaterialTheme.colorScheme.surface)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .then(if (interactive) Modifier else Modifier.clearAndSetSemantics {}),
+    ) {
+        val side = sideBySide(maxWidth, maxHeight)
+        val geometry = if (side) SideGeometry.of(maxWidth, maxHeight) else null
+        // 说明最高多高：图至少留 [stage] 那么高（欢迎页的图缩得小，留得少）；屏幕很矮（分屏、小外屏）时说明至少留 MIN_PANEL，图再小也让它
+        val panelCap = { stage: Dp ->
+            max((maxHeight - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - stage - STAGE_PAD_V * 2).value, MIN_PANEL.value).dp
+        }
+        val pageWidth = constraints.maxWidth.toFloat()
+        // 从右往左排的语言里下一页在左边：多走的那一截也要反过来
+        val direction = if (LocalLayoutDirection.current == LayoutDirection.Rtl) -1f else 1f
+        // 欢迎页以外共用的那块样图停在后面几页时不动，只在欢迎页和「自动打码」之间跟着「自动打码」滑：这一截多远（px）
+        val stageShift = { direction * max(0f, pageOffset(pager, state.autoStep)) * pageWidth }
+        // 竖排时共用样图的那几页，说明量出来各多高（px）：图的下边让到说明的上边（见 panelHeightAt）
+        val panelHeights = remember { mutableStateMapOf<Int, Int>() }
+
+        HorizontalPager(
+            state = pager,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = interactive,
+            key = { it },
+        ) { index ->
+            val page = pages[index]
+            // 欢迎页摆自己的图标；后面几页的图不在页里，是叠在翻页上面共用的那一块，页里只空出它的位置
+            val welcome = page == TourPage.WELCOME
+            // 这一层比整页多走多少（见 PARALLAX）：离开时往外多走，进来时落在后面，停下时为 0
+            val layer = { depth: Int ->
+                Modifier.graphicsLayer { translationX = direction * pageOffset(pager, index) * pageWidth * PARALLAX[depth] }
+            }
+            val panel = @Composable { m: Modifier ->
+                Box(m.then(if (index == 0) risen else Modifier)) {
+                    when (page) {
+                        TourPage.WELCOME -> Panel(
+                            stringResource(R.string.app_name),
+                            stringResource(R.string.onboarding_tagline),
+                            layer,
+                            titleStyle = MaterialTheme.typography.displaySmall,
+                        ) {
+                            Promise(stringResource(R.string.onboarding_offline), Modifier.padding(top = 24.dp))
+                            Promise(stringResource(R.string.onboarding_metadata), Modifier.padding(top = 12.dp))
+                        }
+                        TourPage.AUTO, TourPage.TAP -> {
+                            // 这两页的说明占一样高（垫一份看不见的另一页）：在这两页之间翻，图一点不动
+                            val other = if (page == TourPage.AUTO) TourPage.TAP else TourPage.AUTO
+                            Panel(other.title(), other.body(), { Modifier }, Modifier.graphicsLayer { alpha = 0f }.clearAndSetSemantics {}) {
+                                if (other == TourPage.TAP) TapHint(tapped = false)
+                            }
+                            Panel(page.title(), page.body(), layer) {
+                                if (page == TourPage.TAP) TapHint(state.progress.tapped)
+                            }
+                        }
+                        TourPage.ENGINE -> Panel(
+                            page.title(),
+                            engineBody(engineAdvice),
+                            layer,
+                            // 测出结论前后字数不一样：按最长的一句占住高度，换字时图不跳
+                            reserve = engineBodies(),
+                        ) {
+                            EngineCard(engine, chooseEngine)
+                        }
+                        TourPage.MORE -> Panel(page.title(), page.body(), layer) {
+                            LabsCard(chatOn, onChatChange)
+                        }
+                    }
+                }
+            }
+            if (geometry != null) {
+                // 横屏、平板横着、折叠屏展开：图在左，说明在右；顶上一行、底下按钮叠在说明那一栏上下，不跟着翻。
+                // 说明往图那边滑走是钻到图底下：过了图靠说明的那条边就不画，不从图另一边的空白里露出来
+                Row(
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (welcome) {
+                                Modifier
+                            } else {
+                                Modifier.drawWithContent {
+                                    // 图不动、这一页在滑：那条边换算到这一页上
+                                    val slide = stageShift() - direction * pageOffset(pager, index) * pageWidth
+                                    val stageEnd = (geometry.start + geometry.stage).toPx()
+                                    if (direction > 0) {
+                                        clipRect(left = stageEnd + slide) { this@drawWithContent.drawContent() }
+                                    } else {
+                                        clipRect(right = size.width - stageEnd + slide) { this@drawWithContent.drawContent() }
+                                    }
+                                }
+                            },
+                        )
+                        .padding(start = geometry.start),
+                ) {
+                    Box(Modifier.width(geometry.stage).fillMaxHeight().padding(vertical = SIDE_PAD), Alignment.Center) {
+                        if (welcome) WelcomeMark(enter = { stageIn.value }, spin = animate)
+                    }
+                    Spacer(Modifier.width(SIDE_GAP))
+                    Column(Modifier.width(geometry.text).fillMaxHeight()) {
+                        Spacer(Modifier.height(TOP_BAR_HEIGHT))
+                        Box(Modifier.weight(1f).fillMaxWidth(), Alignment.CenterStart) {
+                            panel(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 24.dp, vertical = 8.dp))
+                        }
+                        Spacer(Modifier.height(BOTTOM_BAR_HEIGHT))
+                    }
+                }
+            } else {
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .then(
+                            if (welcome) {
+                                Modifier
+                            } else {
+                                // 说明跟在图底下压下去的那一截（见下面）不伸进底下按钮那一行
+                                Modifier.drawWithContent {
+                                    clipRect(bottom = size.height - BOTTOM_BAR_HEIGHT.toPx()) { this@drawWithContent.drawContent() }
+                                }
+                            },
+                        ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Spacer(Modifier.height(TOP_BAR_HEIGHT))
+                    Box(
+                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = STAGE_PAD_H, vertical = STAGE_PAD_V),
+                        Alignment.Center,
+                    ) {
+                        if (welcome) WelcomeMark(enter = { stageIn.value }, spin = animate)
+                    }
+                    // 字放得很大、屏幕又矮时，图至少留这么高，说明自己滚
+                    panel(
+                        Modifier
+                            .then(
+                                if (welcome) {
+                                    Modifier
+                                } else {
+                                    Modifier
+                                        .layout { measurable, constraints ->
+                                            val placeable = measurable.measure(constraints)
+                                            if (panelHeights[index] != placeable.height) panelHeights[index] = placeable.height
+                                            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                                        }
+                                        .graphicsLayer {
+                                            // 翻进说明更高的一页，图还没让够：这一页的说明贴着图的下边，把图往上顶，图让开了才落到位
+                                            val room = panelHeightAt(panelHeights, pager, state) ?: return@graphicsLayer
+                                            translationY = max(0f, (panelHeights[index] ?: 0) - room)
+                                        }
+                                },
+                            )
+                            .widthIn(max = COLUMN_TEXT_MAX)
+                            .fillMaxWidth()
+                            .heightIn(max = panelCap(if (welcome) WELCOME_STAGE else MIN_STAGE))
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                    )
+                    Spacer(Modifier.height(BOTTOM_BAR_HEIGHT))
+                }
+            }
+        }
+
+        // 欢迎页以外共用的那块样图：叠在翻页上面，翻页时不动，只有底下的说明在滑。「自动打码」那一页露出来才有，
+        // 跟着它从欢迎页后面滑进来；手指落在图上，底下的翻页也收得到，左右划照样翻页
+        val stageShown by remember(pager, state) { derivedStateOf { pageOffset(pager, state.autoStep) < 1f } }
+        if (stageShown) {
+            val place = if (geometry != null) {
+                Modifier.padding(start = geometry.start).width(geometry.stage).fillMaxHeight().padding(vertical = SIDE_PAD)
+            } else {
+                Modifier
+                    .padding(top = TOP_BAR_HEIGHT)
+                    .fillMaxWidth()
+                    // 竖排：底下给说明让出地方，说明高的那一页把图往上顶
+                    .layout { measurable, constraints ->
+                        val panel = panelHeightAt(panelHeights, pager, state) ?: PANEL_ESTIMATE.toPx()
+                        val height = (constraints.maxHeight - BOTTOM_BAR_HEIGHT.toPx() - panel).roundToInt()
+                            .coerceIn(0, constraints.maxHeight)
+                        val placeable = measurable.measure(constraints.copy(minHeight = height, maxHeight = height))
+                        layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                    }
+                    .padding(horizontal = STAGE_PAD_H, vertical = STAGE_PAD_V)
+            }
+            Box(
+                Modifier
+                    .shareTouchesBelow()
+                    // 读屏念完第几步先念图，再念页里的说明：图画在翻页上面，不排的话会落到说明后头
+                    .semantics { isTraversalGroup = true; traversalIndex = -0.5f }
+                    .then(place)
+                    .graphicsLayer { translationX = stageShift() },
+                Alignment.Center,
+            ) {
+                TourStage(
+                    state, sample, scanStyle,
+                    linkAction = pager.currentPage > state.autoStep,
+                    // 一翻就淡掉：图不跟着页走，不淡的话框会留在图上，带到翻去的那一页
+                    showRing = pager.settledPage == pages.indexOf(TourPage.TAP) && !pager.isScrollInProgress &&
+                        state.settled && !state.progress.tapped,
+                    animate = animate,
+                )
+            }
+        }
+
+        // 并排时叠在说明那一栏上，竖排时占满一行（按钮那一行和说明一样最宽 COLUMN_TEXT_MAX、居中）
+        val textColumn = geometry?.let { Modifier.offset(x = it.start + it.stage + SIDE_GAP).width(it.text) }
+        TopBar(
+            step = target,
+            steps = pages.size,
+            title = titles[target],
+            onSkip = onSkip,
+            modifier = (textColumn?.let { Modifier.align(Alignment.TopStart).then(it) } ?: Modifier.align(Alignment.TopCenter).fillMaxWidth())
+                .padding(start = 24.dp),
+        )
+        BottomBar(
+            last,
+            onNext = { turn(target + 1) },
+            onPickImage = { if (landed()) onPickImage() },
+            onOpenSettings = { if (landed()) onOpenSettings() },
+            modifier = (textColumn?.let { Modifier.align(Alignment.BottomStart).then(it) }
+                ?: Modifier.align(Alignment.BottomCenter).widthIn(max = COLUMN_TEXT_MAX).fillMaxWidth())
+                .then(risen),
+        )
+        if (!interactive) Box(Modifier.matchParentSize().pointerInput(Unit) { swallowTouches() })
+    }
+}
+
+/** 第 [page] 页离停着的位置几页远：右边为正。正停在这一页时是 0。 */
+private fun pageOffset(pager: PagerState, page: Int): Float =
+    (page - pager.currentPage) - pager.currentPageOffsetFraction
+
+/**
+ * 竖排时共用的样图底下要让给说明多高（px）：停着的那一页的说明多高；翻页途中按翻过的那一截在两页之间取，
+ * 说明高的那一页翻进来，图跟着一点点往上让。欢迎页上没有这块图，和「自动打码」之间按「自动打码」的算。
+ * 两页都还没量到时为 null。
+ */
+private fun panelHeightAt(heights: Map<Int, Int>, pager: PagerState, state: TourState): Float? {
+    val position = (pager.currentPage + pager.currentPageOffsetFraction)
+        .coerceIn(state.autoStep.toFloat(), state.lastStep.toFloat())
+    val from = position.toInt()
+    val a = heights[from]?.toFloat()
+    val b = heights[min(from + 1, state.lastStep)]?.toFloat()
+    return when {
+        a == null -> b
+        b == null -> a
+        else -> lerp(a, b, position - from)
+    }
+}
+
+/**
+ * 叠在翻页上面的图让底下的翻页也收到手指：在图上左右划照样翻页，点一下还是图自己接（TourStage 里只认点一下的那层）。
+ * 划开以后点一下就作废，和图在页里时一样。
+ */
+private fun Modifier.shareTouchesBelow(): Modifier = this then ShareTouchesElement
+
+private data object ShareTouchesElement : ModifierNodeElement<ShareTouchesNode>() {
+    override fun create() = ShareTouchesNode()
+    override fun update(node: ShareTouchesNode) = Unit
+}
+
+private class ShareTouchesNode : Modifier.Node(), PointerInputModifierNode {
+    override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) = Unit
+    override fun onCancelPointerInput() = Unit
+    override fun sharePointerInputWithSiblings() = true
+}
+
+@Composable
+private fun TourPage.title(): String = stringResource(
+    when (this) {
+        TourPage.WELCOME -> R.string.onboarding_welcome_title
+        TourPage.AUTO -> R.string.onboarding_auto_title
+        TourPage.TAP -> R.string.onboarding_tap_title
+        TourPage.ENGINE -> R.string.engine
+        TourPage.MORE -> R.string.onboarding_more_title
+    },
+)
+
+/** 说明正文。欢迎页和「识别引擎」的另有写法（见 [engineBody]），不走这里。 */
+@Composable
+private fun TourPage.body(): String = stringResource(
+    when (this) {
+        TourPage.AUTO -> R.string.onboarding_auto_body
+        TourPage.TAP -> R.string.onboarding_tap_body
+        TourPage.MORE -> R.string.onboarding_more_body
+        TourPage.WELCOME, TourPage.ENGINE -> error("$this 的正文另有写法")
+    },
+)
+
+/** 「识别引擎」那一页的正文：测着的时候说在测；有了结论说测出多久、选了哪个、为什么，不合适去哪儿改。 */
+@Composable
+private fun engineBody(advice: EngineAdvice?): String = when (advice) {
+    null, EngineAdvice.Measuring -> stringResource(R.string.onboarding_engine_measuring)
+    is EngineAdvice.Fast -> stringResource(R.string.onboarding_engine_fast, seconds(advice.ms, up = false))
+    is EngineAdvice.Slow -> advice.ms?.let { stringResource(R.string.onboarding_engine_slow, seconds(it, up = true)) }
+        ?: stringResource(R.string.onboarding_engine_over, (EngineProbeModel.LIMIT_MS / 1000).toInt())
+    EngineAdvice.Failed -> stringResource(R.string.onboarding_engine_failed)
+}
+
+/** [engineBody] 可能说的每一句（秒数取最宽的），按最高的那句占住高度。 */
+@Composable
+private fun engineBodies(): List<String> =
+    listOf(EngineAdvice.Measuring, EngineAdvice.Fast(2_900), EngineAdvice.Slow(10_000), EngineAdvice.Slow(null), EngineAdvice.Failed)
+        .map { engineBody(it) }
+
+/**
+ * 毫秒写成秒，一位小数，至少 0.1。[up] 往上进：慢的不会写成刚好 3.0；不然往下舍：快的不会写成 3.0 以上。
+ */
+@Composable
+private fun seconds(ms: Long, up: Boolean): String {
+    val tenths = (if (up) (ms + 99) / 100 else ms / 100).coerceAtLeast(1)
+    return String.format(LocalConfiguration.current.locales[0], "%.1f", tenths / 10.0)
+}
+
+/**
+ * 图并排放（横着）还是上下放：哪样图大用哪样。图的比例是定的，要比的只有它能多高。
+ * 近乎方的折叠屏展开时按宽高比判断会摆错，按图能多大判断就不会。
+ */
+private fun sideBySide(width: Dp, height: Dp): Boolean {
+    val column = min(
+        (height - TOP_BAR_HEIGHT - BOTTOM_BAR_HEIGHT - PANEL_ESTIMATE - STAGE_PAD_V * 2).value,
+        (width - STAGE_PAD_H * 2).value / RATIO,
+    )
+    val room = (width - SIDE_PAD * 2 - SIDE_GAP - SIDE_TEXT_MIN).value
+    if (room <= 0f) return false
+    val side = min((height - SIDE_PAD * 2).value, room / RATIO)
+    return side > column
+}
+
+/** 并排时各块多宽、整体从哪儿起（居中）。顶上一行、底下按钮按它叠到说明那一栏上。 */
+private class SideGeometry(val start: Dp, val stage: Dp, val text: Dp) {
+    companion object {
+        fun of(width: Dp, height: Dp): SideGeometry {
+            val stage = min(((height - SIDE_PAD * 2).value * RATIO), (width - SIDE_PAD * 2 - SIDE_GAP - SIDE_TEXT_MIN).value)
+                .coerceAtLeast(0f).dp
+            val text = min(SIDE_TEXT_MAX.value, (width - SIDE_PAD * 2 - SIDE_GAP - stage).value).dp
+            return SideGeometry(start = (width - stage - SIDE_GAP - text) / 2, stage = stage, text = text)
+        }
+    }
+}
+
+/** 顶上一行：几步走到哪儿了，右边是「跳过」。读屏念「第 3 步，共 5 步：点文字打码」，换步时也念。 */
+@Composable
+private fun TopBar(step: Int, steps: Int, title: String, onSkip: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .height(TOP_BAR_HEIGHT)
+            .padding(end = 12.dp)
+            // 画在翻页的上面，读屏却会按左边先排到页里的内容：让它先念第几步、「跳过」
+            .semantics { isTraversalGroup = true; traversalIndex = -1f },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val label = stringResource(R.string.onboarding_step, step + 1, steps, title)
+        Row(
+            Modifier.clearAndSetSemantics {
+                contentDescription = label
+                liveRegion = LiveRegionMode.Polite
+            },
+            horizontalArrangement = Arrangement.spacedBy(DOT),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            repeat(steps) { i ->
+                val on = i == step
+                val width by animateDpAsState(if (on) DOT_ACTIVE else DOT, foldTween(on), label = "dotWidth")
+                val color by animateColorAsState(
+                    if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    foldTween(on),
+                    label = "dotColor",
+                )
+                Box(Modifier.size(width, DOT).background(color, CircleShape))
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        TextButton(onClick = onSkip) { Text(stringResource(R.string.onboarding_skip)) }
+    }
+}
+
+/** 底下一行：前几步是「下一步」；最后一步换成「选择图片」，左边多一个「打开设置」。 */
+@Composable
+private fun BottomBar(
+    last: Boolean,
+    onNext: () -> Unit,
+    onPickImage: () -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier.height(BOTTOM_BAR_HEIGHT).padding(horizontal = 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedVisibility(
+            visible = last,
+            enter = fadeIn(foldTween(true)),
+            exit = fadeOut(contentFoldTween(false)),
+            modifier = Modifier.weight(1f, fill = false),
+        ) {
+            TextButton(onClick = onOpenSettings) {
+                Text(stringResource(R.string.onboarding_open_settings), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        Button(onClick = if (last) onPickImage else onNext) {
+            AnimatedContent(
+                targetState = last,
+                // 两个字宽不一样：从中间换，换的途中不被按钮的圆边切掉
+                contentAlignment = Alignment.Center,
+                transitionSpec = {
+                    fadeIn(foldTween(targetState)) togetherWith fadeOut(contentFoldTween(false)) using
+                        SizeTransform(clip = false) { _, _ -> foldTween(targetState) }
+                },
+                label = "primaryLabel",
+            ) { isLast ->
+                Text(stringResource(if (isLast) R.string.pick_image else R.string.onboarding_next), maxLines = 1)
+            }
+        }
+    }
+}
+
+/**
+ * 一页的说明：标题一行，下面一两句；[extra] 是这一页另外要摆的（提示、承诺、设置里那几行）。
+ * 标题、正文、另外那块各是视差里的一层（[layer] 0、1、2）。
+ *
+ * @param reserve 正文还可能换成的那几句：按最高的占住高度，换的时候淡入淡出、上面的图不跳
+ */
+@Composable
+private fun Panel(
+    title: String,
+    body: String,
+    layer: (Int) -> Modifier,
+    modifier: Modifier = Modifier,
+    titleStyle: TextStyle = MaterialTheme.typography.headlineSmall,
+    reserve: List<String> = emptyList(),
+    extra: @Composable ColumnScope.() -> Unit,
+) {
+    Column(modifier) {
+        Text(
+            title,
+            style = titleStyle,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = layer(0).semantics { heading() },
+        )
+        val bodyStyle = MaterialTheme.typography.bodyLarge
+        val bodyColor = MaterialTheme.colorScheme.onSurfaceVariant
+        if (reserve.isEmpty()) {
+            Text(body, style = bodyStyle, color = bodyColor, modifier = layer(1).padding(top = 8.dp))
+        } else {
+            // 读屏念的是眼下这一句，换了也念
+            Box(
+                layer(1).padding(top = 8.dp).clearAndSetSemantics {
+                    text = AnnotatedString(body)
+                    liveRegion = LiveRegionMode.Polite
+                },
+            ) {
+                reserve.forEach { Text(it, style = bodyStyle, modifier = Modifier.graphicsLayer { alpha = 0f }) }
+                Crossfade(body, label = "panelBody") { Text(it, style = bodyStyle, color = bodyColor) }
+            }
+        }
+        Column(layer(2)) { extra() }
+    }
+}
+
+/** 「点文字打码」指着图上框出的链接；点上过一段字就淡掉（位置留着，图不跳）。 */
+@Composable
+private fun TapHint(tapped: Boolean) {
+    val alpha by animateFloatAsState(if (tapped) 0f else 1f, contentFoldSpec(false), label = "tapHint")
+    Row(
+        Modifier
+            .padding(top = 16.dp)
+            .graphicsLayer { this.alpha = alpha }
+            .then(if (tapped) Modifier.clearAndSetSemantics {} else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Outlined.TouchApp, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(
+            stringResource(R.string.onboarding_tap_try),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(start = 8.dp),
+        )
+    }
+}
+
+/**
+ * 欢迎页上的图：图标里的截图和胶带（不带墨色底板）摆在几块 Material 3 Expressive 的形状上（[ExpressiveShapes]，
+ * 摆法见 [WELCOME_PIECES]）：主题色的九瓣曲奇，底下垫一块 secondaryContainer 色的柔星，右下两颗小的点缀。各块慢慢转，
+ * 系统关了动画（[spin] 为 false）时不转。入场时整块淡入、从略小长到原大（[enter] 0 到 1）。
+ */
+@Composable
+private fun WelcomeMark(enter: () -> Float, spin: Boolean, modifier: Modifier = Modifier) {
+    val glyph = painterResource(R.drawable.brand_glyph)
+    val colors = MaterialTheme.colorScheme
+    val spinners = remember { WELCOME_PIECES.map { Spinner(it.shape()) } }
+    val turns = if (spin) rememberInfiniteTransition(label = "welcomeTurn") else null
+    val angles = WELCOME_PIECES.map { piece ->
+        turns?.animateFloat(
+            0f, if (piece.turnMs > 0) 360f else -360f,
+            infiniteRepeatable(tween(abs(piece.turnMs), easing = LinearEasing)), label = "welcomeTurn",
+        )
+    }
+    Box(modifier.fillMaxSize(), Alignment.Center) {
+        Spacer(
+            Modifier
+                // 屏幕矮得放不下时跟着缩小
+                .heightIn(max = WELCOME_ART)
+                .aspectRatio(ART.width / ART.height, matchHeightConstraintsFirst = true)
+                .graphicsLayer {
+                    val t = enter()
+                    alpha = t
+                    scaleX = ENTER_SCALE + (1f - ENTER_SCALE) * t
+                    scaleY = scaleX
+                }
+                .drawWithCache {
+                    // 以曲奇的半径为单位摆（见 Piece）；转的时候只转，路径按这个大小备好
+                    val r = size.height / ART.height
+                    val origin = Offset(-ART.left * r, -ART.top * r)
+                    val paths = spinners.mapIndexed { i, spinner -> spinner.path(WELCOME_PIECES[i].radius * r) }
+                    val side = GLYPH * r
+                    onDrawBehind {
+                        WELCOME_PIECES.forEachIndexed { i, piece ->
+                            drawTurned(paths[i], origin + piece.at * r, angles[i]?.value ?: 0f, piece.color(colors))
+                        }
+                        translate(origin.x - side / 2, origin.y - side / 2) { with(glyph) { draw(Size(side, side)) } }
+                    }
+                },
+        )
+    }
+}
+
+/**
+ * 欢迎页图里的一块形状：摆在哪儿、多大（以曲奇的半径为单位、曲奇中心为原点，按转到哪个角度最远到哪儿算），
+ * 转一圈多久（负的逆时针转），取主题里的哪个颜色。
+ */
+private class Piece(
+    val shape: () -> RoundedPolygon,
+    val at: Offset,
+    val radius: Float,
+    val turnMs: Int,
+    val color: (ColorScheme) -> Color,
+)
+
+/**
+ * 绕自己中心转的形状：挪到原点，按它转到哪个角度都够得着的最远处算半径。按这个半径摆，转起来不会出界。
+ */
+private class Spinner(polygon: RoundedPolygon) {
+    private val unit = polygon.toPath().apply {
+        val reach = polygon.calculateMaxBounds()
+        val radius = (reach[2] - reach[0]) / 2
+        transform(
+            android.graphics.Matrix().apply {
+                setTranslate(-polygon.centerX, -polygon.centerY)
+                postScale(1 / radius, 1 / radius)
+            },
+        )
+    }
+
+    /** 半径 [radius]（像素）的路径，中心在原点。 */
+    fun path(radius: Float): Path =
+        android.graphics.Path(unit).apply { transform(android.graphics.Matrix().apply { setScale(radius, radius) }) }.asComposePath()
+}
+
+/** 在 [at] 画顺时针转了 [degrees] 度的 [path]（中心在原点，见 [Spinner.path]）。 */
+private fun DrawScope.drawTurned(path: Path, at: Offset, degrees: Float, color: Color) =
+    withTransform({
+        translate(at.x, at.y)
+        rotate(degrees, Offset.Zero)
+    }) { drawPath(path, color) }
+
+/** 欢迎页的一条承诺：前面一个对勾，对着第一行的中间（折成两行时不跑到两行中间，字放大了也对得上）。 */
+@Composable
+private fun Promise(text: String, modifier: Modifier = Modifier) {
+    val style = MaterialTheme.typography.bodyLarge
+    val iconTop = with(LocalDensity.current) { ((style.lineHeight.toDp() - PROMISE_ICON) / 2).coerceAtLeast(0.dp) }
+    Row(modifier) {
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(top = iconTop).size(PROMISE_ICON),
+        )
+        Text(text, style = style, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(start = 12.dp))
+    }
+}
+
+/**
+ * 设置里的一段原样搬过来：上面一行写着它在设置里的哪儿（[path]），点了、拨了就写进设置，和在设置里改一样。
+ * 设置页的行画在 surfaceBright 上，要放在 surfaceContainer 的底子上才看得出来，和设置页一样。
+ */
+@Composable
+private fun SettingsExcerpt(path: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .padding(top = 16.dp)
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(SETTINGS_CARD_RADIUS))
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .padding(vertical = 8.dp),
+    ) {
+        SectionHeader(path, first = true)
+        content()
+    }
+}
+
+/** 「识别引擎」那一页：设置里「AI › 识别引擎」的那两项。 */
+@Composable
+private fun EngineCard(selected: TextEngineOption, onSelect: (TextEngineOption) -> Unit) {
+    SettingsExcerpt(
+        "${stringResource(R.string.settings)} › ${stringResource(R.string.settings_ai)} › ${stringResource(R.string.engine)}",
+    ) {
+        SettingsGroup(Modifier.selectableGroup()) {
+            TextEngineOption.entries.forEach { option ->
+                RadioRow(
+                    title = stringResource(textEngineLabel(option)),
+                    summary = stringResource(
+                        when (option) {
+                            TextEngineOption.PADDLE -> R.string.engine_paddle_summary
+                            TextEngineOption.MLKIT -> R.string.engine_mlkit_summary
+                        },
+                    ),
+                    selected = selected == option,
+                    onClick = { onSelect(option) },
+                )
+            }
+        }
+    }
+}
+
+/** 最后一页：实验室页上的那一项，开关是真的；底下的说明也是实验室页上那句。 */
+@Composable
+private fun LabsCard(chatOn: Boolean, onChatChange: (Boolean) -> Unit) {
+    SettingsExcerpt("${stringResource(R.string.settings)} › ${stringResource(R.string.settings_labs)}") {
+        SettingsGroup {
+            SwitchRow(
+                title = stringResource(R.string.settings_chat),
+                checked = chatOn,
+                onCheckedChange = onChatChange,
+                icon = Icons.Outlined.Forum,
+            )
+        }
+        FooterText(stringResource(R.string.chat_footer))
+    }
+}
+
+/** 退场淡出时盖在最上面：这一下手指落在哪儿都不算。 */
+private suspend fun PointerInputScope.swallowTouches() = awaitEachGesture {
+    awaitFirstDown(requireUnconsumed = false).consume()
+    do {
+        val event = awaitPointerEvent()
+        event.changes.forEach { it.consume() }
+    } while (event.changes.any { it.pressed })
+}
+
+/** 样图的宽高比。 */
+private const val RATIO = TourSample.WIDTH / TourSample.HEIGHT.toFloat()
+
+/**
+ * 视差：说明里从上到下各层比整页多走几成（标题、正文、另外那块）。离开时往外多走、进来时落在后面，
+ * 越往下拉得越开，停下时一齐对齐。图不在里头：欢迎页的图标和整页一起走，后面几页共用的样图不动。
+ */
+private val PARALLAX = floatArrayOf(0.18f, 0.34f, 0.5f)
+
+/** 点「下一步」、返回键翻一页：整页宽的一段路，比面板展开（350 ms）长一点，同一条 Material 3 标准曲线。 */
+private const val PAGE_MS = 450
+private val PAGE_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
+
+private val TOP_BAR_HEIGHT = 56.dp
+
+/** 底下按钮那一行（按钮 40 dp，上下各留 16）。每页底下空出这么高给它。 */
+private val BOTTOM_BAR_HEIGHT = 72.dp
+
+/** 「自动打码」「点文字打码」的说明大约多高：挑横竖排时用（还没量到时图也先按它让），真摆的时候按量出来的高。 */
+private val PANEL_ESTIMATE = 160.dp
+
+/** 竖排时图至少留这么高。 */
+private val MIN_STAGE = 200.dp
+
+/** 屏幕再矮，说明也至少留这么高（标题一行、正文两行），超出的自己滚。 */
+private val MIN_PANEL = 120.dp
+
+private val STAGE_PAD_H = 24.dp
+private val STAGE_PAD_V = 8.dp
+
+/** 竖排（手机竖着、平板竖着）时说明最宽多少，再宽就居中。 */
+private val COLUMN_TEXT_MAX = 560.dp
+
+/** 并排时说明那一栏的宽。 */
+private val SIDE_TEXT_MIN = 360.dp
+private val SIDE_TEXT_MAX = 440.dp
+private val SIDE_PAD = 16.dp
+private val SIDE_GAP = 32.dp
+
+private val DOT = 6.dp
+private val DOT_ACTIVE = 18.dp
+
+private val SETTINGS_CARD_RADIUS = 28.dp
+
+/** 欢迎页上的图（方的）最大多大；竖排时那一块至少留 [WELCOME_STAGE] 这么高，屏幕矮时图跟着缩小。 */
+private val WELCOME_ART = 260.dp
+private val WELCOME_STAGE = 120.dp
+private val PROMISE_ICON = 20.dp
+
+/**
+ * 欢迎页的图从下往上画哪几块：secondaryContainer 色的柔星垫底，比曲奇大一圈，尖角从瓣之间探出来；主题色的九瓣曲奇；
+ * 右下压着曲奇边的一块小四瓣、再往下一颗更小的柔星。转一圈多久：慢得不抢字的眼，又看得出在转；
+ * 柔星和曲奇反着转，尖角在瓣之间慢慢错开，小的转得快些。图标画在它们上面，不转。
+ */
+private val WELCOME_PIECES = with(ExpressiveShapes) {
+    listOf(
+        Piece(::sunny, Offset.Zero, 1.24f, -60_000) { it.secondaryContainer },
+        Piece(::cookie9, Offset.Zero, 1f, 40_000) { it.primary },
+        Piece(::cookie4, Offset(1f, 0.74f), 0.24f, 24_000) { it.tertiary },
+        Piece(::sunny, Offset(0.62f, 1.12f), 0.13f, 16_000) { it.tertiary },
+    )
+}
+
+/** 整块图转起来也出不去的框：各块的外接圆合起来。 */
+private val ART = WELCOME_PIECES.fold(Rect(-1f, -1f, 1f, 1f)) { b, p ->
+    Rect(
+        left = min(b.left, p.at.x - p.radius),
+        top = min(b.top, p.at.y - p.radius),
+        right = max(b.right, p.at.x + p.radius),
+        bottom = max(b.bottom, p.at.y + p.radius),
+    )
+}
+
+/** 图标那块（1024 见方的母版）画多大，以曲奇的半径为单位：截图比曲奇的半径稍高，四角离曲奇的凹处还有富余。 */
+private val GLYPH = 1.08f * 1024f / BrandGlyph.PAPER.height()
+
+/** 入场时图从这么大长到原大；说明从下面浮上来 [ENTER_RISE] 这么远，比图慢 [PANEL_DELAY_MS] 这么一拍。 */
+private const val ENTER_SCALE = 0.9f
+private val ENTER_RISE = 24.dp
+private const val PANEL_DELAY_MS = 60

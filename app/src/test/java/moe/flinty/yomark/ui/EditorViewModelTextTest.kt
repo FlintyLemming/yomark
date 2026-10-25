@@ -236,6 +236,32 @@ class EditorViewModelTextTest {
         assertThat(vm.state.value.barLook.style).isEqualTo(MaskStyle.TEXT)
     }
 
+    /**
+     * 放下文本（手机上收起「编辑」，见 EditorScreen）：画笔换回「打码」里上次用的样式，文本调好的字号留着下次用；
+     * 写好的字、选中的它都不动，之后点图不再写字。拿着的本来就是打码的样式时什么也不变。
+     */
+    @Test fun `putting the text tool down goes back to the last redact style`() = runTest(dispatcher) {
+        val vm = opened()
+        vm.setStyle(MaskStyle.PIXELATE)
+        vm.write("Hi")
+        vm.editLook(vm.text.look.copy(options = vm.text.look.options.copy(textSize = 0.1f)))
+        val plan = vm.state.value.plan
+        vm.dismissStylePanel()
+        vm.backToRedact()
+        val brush = vm.state.value.brush
+        assertThat(brush.style).isEqualTo(MaskStyle.PIXELATE)
+        assertThat(brush.options.textSize).isEqualTo(0.1f)
+        assertThat(vm.state.value.plan).isEqualTo(plan)
+        assertThat(vm.state.value.selectedText).isNotNull()
+        vm.onTap(PointF(300f, 330f))                    // 取消选中
+        vm.onTap(PointF(300f, 330f))
+        assertThat(vm.state.value.textPlacement).isNull()
+        assertThat(vm.state.value.stylePanelOpen).isFalse()
+
+        vm.backToRedact()
+        assertThat(vm.state.value.brush).isEqualTo(brush)
+    }
+
     /** 拿着文本点到识别出的码上：照旧拿掉它，不在码上写字。 */
     @Test fun `with the text tool a tap on a detected mask still removes it`() = runTest(dispatcher) {
         val vm = opened()

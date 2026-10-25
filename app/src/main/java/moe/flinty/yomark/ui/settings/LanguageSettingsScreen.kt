@@ -15,7 +15,7 @@ import moe.flinty.yomark.ui.AppLanguage
 fun LanguageSettingsScreen(
     language: AppLanguage,
     onLanguageChange: (AppLanguage) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_language), onNavigateUp = onNavigateUp, modifier = modifier) {

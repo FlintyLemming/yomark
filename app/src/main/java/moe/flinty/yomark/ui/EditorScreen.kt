@@ -81,11 +81,8 @@ import moe.flinty.yomark.ui.canvas.ScanEffect
 import moe.flinty.yomark.ui.components.AiReviewResultPill
 import moe.flinty.yomark.ui.components.BatchFilmstrip
 import moe.flinty.yomark.ui.components.BigBangActions
-import moe.flinty.yomark.ui.components.BigBangPanel
 import moe.flinty.yomark.ui.components.BigBangPanelModel
-import moe.flinty.yomark.ui.components.BigBangPlacement
 import moe.flinty.yomark.ui.components.DebugTraceSheet
-import moe.flinty.yomark.ui.components.EditorActionRow
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.EditorTopBar
 import moe.flinty.yomark.ui.components.FoldOnTouch
@@ -114,6 +111,8 @@ fun EditorScreen(
     onUnlockFree: () -> Unit = {},
     /** 别的应用来要图（vm.forCaller），图导出好了：交回给它。 */
     onHandOver: (List<Uri>) -> Unit = {},
+    /** 点了顶栏的分享，图写进缓存了：交给系统的分享面板（图、MIME 类型）。 */
+    onShareImages: (List<Uri>, String) -> Unit = { _, _ -> },
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
@@ -131,7 +130,7 @@ fun EditorScreen(
     val context = LocalContext.current
     val thumbnailPx = with(LocalDensity.current) { THUMBNAIL_EDGE.roundToPx() }
     val thumbnails = remember(context, thumbnailPx) { BatchThumbnails(context.contentResolver, thumbnailPx) }
-    // 顶栏的「对比」按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
+    // 「按住对比」（手机在底栏、宽屏在功能方块里）按住时，画布换成打码前的原图。只是看一眼，不进 ViewModel：松手、转屏都回到打码后
     val compare = remember { MutableInteractionSource() }
     val comparing by compare.collectIsPressedAsState()
     // 手机底栏展开着的那一组（打码、编辑、工具）。只是界面上的事，不进 ViewModel
@@ -141,6 +140,9 @@ fun EditorScreen(
     val bigBangUp = state.bigBang?.holding == false
     var bigBangHoldsRow by rememberSaveable { mutableStateOf(false) }
     var rowBeforeBigBang by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
+    // 调节面板（样式的、用途水印的）开着：手机上它从所在的那一组长出来，收起时底栏回到打开它之前那样（见下面的 LaunchedEffect）
+    var panelHoldsRow by rememberSaveable { mutableStateOf(false) }
+    var rowBeforePanel by rememberSaveable { mutableStateOf<ToolGroup?>(null) }
 
     LaunchedEffect(state.message) {
         when (val m = state.message) {
@@ -153,6 +155,11 @@ fun EditorScreen(
             is EditorMessage.BatchPartial -> snackbar.showMessage(context.getString(R.string.error_batch_partial, m.ok, m.failed), vm)
             is EditorMessage.Error -> snackbar.showMessage(context.getString(m.text), vm)
             is EditorMessage.HandedOver -> onHandOver(m.uris)
+            // 马上收掉：转个屏不再弹一次分享面板
+            is EditorMessage.Shared -> {
+                vm.consumeMessage()
+                onShareImages(m.uris, m.mimeType)
+            }
             null -> Unit
         }
     }
@@ -165,6 +172,7 @@ fun EditorScreen(
                 onReview = vm::reviewUnopened,
                 onExportOpened = vm::exportOpenedOnly,
                 onDismiss = vm::dismissDialog,
+                share = state.sharing,
             )
         }
     }
@@ -192,7 +200,7 @@ fun EditorScreen(
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
-        // 边到边（见 enableLightEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
+        // 边到边（见 layoutEdgeToEdge）。默认只让开系统栏；横屏时挖孔在侧边，会压住顶栏和底栏的按钮。
         // 输入法不在这里：只有用途水印面板里有输入框，开着它时画布和面板那一块自己让开（见下方 imePadding）。
         contentWindowInsets = WindowInsets.systemBars.union(WindowInsets.displayCutout),
     ) { padding ->
@@ -201,6 +209,8 @@ fun EditorScreen(
             val batch = state.batch
             val phone = layout == EditorLayout.PHONE
             val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+            // 分享：图不进相册，写进缓存交给分享面板。别的应用来要图时没有它（见 vm.canShare）
+            val onShare = if (vm.canShare) ({ if (batch != null) vm.exportBatch(share = true) else vm.requestExport(share = true) }) else null
             // 别的应用来要图时，导出就是把图交回去
             val exportLabel = if (vm.forCaller) R.string.done else R.string.export
             val canCompare = state.image != null &&
@@ -216,42 +226,55 @@ fun EditorScreen(
                 toolGroup = it
             }
             val panelOpen = state.stylePanelOpen || state.purposeSheetVisible
-            // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点底栏左下角的返回一样（见 FoldOnTouch）。
+            // 手机的调节面板开着（不在等吸管取色）时，点它外面的哪儿都和点面板右上角的箭头一样，只收面板（见 FoldOnTouch）。
             // 画布那一块由底栏铺（见 EditorBottomBar），顶栏这一截铺在这里：这一下只收起，不撤销、不导出
             val panelUp = phone && toolGroup != null && panelOpen && state.colorPick == null
+            val foldPanel = { if (state.purposeSheetVisible) vm.dismissPurposeSheet() else vm.dismissStylePanel() }
             Box {
                 EditorTopBar(
                     canUndo = state.canUndo, canRedo = state.canRedo,
                     onUndo = vm::undo, onRedo = vm::redo,
-                    // 手机竖着拿时用途水印在底栏的「编辑」里，对比在底栏，导出挪到右上角。
-                    // 大爆炸开着时水印收起来：面板的位置归它，水印面板开出来看不见
-                    onPurpose = if (phone || state.bigBang != null) null else vm::togglePurposeSheet,
-                    purposeOn = state.purposeText != null,
+                    // 导出在右上角，手机、宽屏都是（2026-10-16）。用途水印、对比手机上在底栏，宽屏上在功能方块里
                     // 设置是单独的 Activity，改动写进 DataStore，回到这里时 ViewModel 已经按新方案重跑
                     onSettings = onSettings,
                     // 已购用户不该再看见购买入口；开源版留着它，点开是免费版说明与打赏
                     onRemoveWatermark = if (state.isPro && !Edition.isFree) null else vm::showPaywall,
                     onNavigateUp = onNavigateUp,
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
-                    compare = if (phone) null else compare,
-                    canCompare = canCompare,
-                    onExport = if (phone) onExport else null,
+                    onExport = onExport,
+                    onShare = onShare,
                     exportLabel = exportLabel,
                     exporting = state.exporting,
+                    sharing = state.sharing,
                 )
-                if (panelUp) FoldOnTouch({ onToolGroup(null) }, Modifier.matchParentSize())
+                if (panelUp) FoldOnTouch(foldPanel, Modifier.matchParentSize())
             }
             // 手机上调节面板是从展开的那一组长出来的。宽屏开着面板转成手机时，展开它所在的那一组接着显示它：
             // 用途水印在「编辑」里，样式在它自己那一组。展开着另一组时也换过去：
-            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来
+            // 展开着「打码」点了两下选中的文本，文本的面板该从「编辑」里长出来。
+            // 收起面板（箭头、返回键、点它外面）时底栏回到打开它之前那样（2026-10-16）：展开着「编辑」写完一处字点一下图，
+            // 还在「编辑」里；从收着的底栏点两下图上的字打开的，这一组跟着收回去。开着面板换了一样工具，这一组就是自己挑的，留着
             LaunchedEffect(phone, state.stylePanelOpen, state.purposeSheetVisible, state.barLook.style) {
                 if (!phone) return@LaunchedEffect
                 val own = when {
                     state.purposeSheetVisible -> ToolGroup.EDIT
                     state.stylePanelOpen -> ToolGroup.of(state.barLook.style)
-                    else -> return@LaunchedEffect
+                    else -> null
                 }
+                if (own == null) {
+                    // 点底栏的返回收起这一组时已经收了，不再展开回去；大爆炸借着这一行时由它收回去
+                    if (panelHoldsRow && toolGroup != null && !bigBangHoldsRow) toolGroup = rowBeforePanel
+                    panelHoldsRow = false
+                    return@LaunchedEffect
+                }
+                rowBeforePanel = if (panelHoldsRow) own else toolGroup
+                panelHoldsRow = true
                 if (toolGroup != own) toolGroup = own
+            }
+            // 「编辑」里的马克笔、画笔、文本只在「编辑」展开着时拿在手里（2026-10-16）：收起「编辑」（或者展开着别的组）就放下，
+            // 换回「打码」里上次用的样式（见 EditorViewModel.backToRedact），收着的底栏点图、拖框总是打码。大爆炸借走这一行时不算
+            LaunchedEffect(phone, toolGroup, bigBangHoldsRow, state.brush.style) {
+                if (phone && toolGroup != ToolGroup.EDIT && !bigBangHoldsRow) vm.backToRedact()
             }
             // 大爆炸的面板也是从胶囊长出来的（见 EditorBottomBar）。用得了 AI 时从「工具」那一行长出来：开着时展开「工具」，
             // 从收着的那一行打开的（长按图上的字）胶囊从「工具」那颗圆钮撑开。用不了 AI 时「工具」里只有它，
@@ -324,7 +347,7 @@ fun EditorScreen(
                         ) {
                             OriginalPill(visible = comparing)
                             AnalyzingPill(visible = state.analyzing && state.image != null)
-                            // 宽屏的 AI 按钮上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
+                            // 宽屏的 AI 那一块上写着结果；手机上它收在底栏的「工具」里，跑完在这儿说一声
                             if (phone) AiReviewResultPill(state.aiReview, state.aiReviewsFinished)
                             ColorPickHint(visible = state.colorPick != null, onCancel = vm::cancelColorPick)
                         }
@@ -374,20 +397,15 @@ fun EditorScreen(
                             filmstrip = filmstrip,
                             pushCanvas = writingText(state),
                         )
-                        // 宽屏上大爆炸开着时顶替样式、列表那一块，画布让到它上面（左边）
-                        bang != null -> BigBangPanel(
-                            bang = bang,
-                            covered = covered,
-                            actions = bigBangActions,
-                            placement = if (atSide) BigBangPlacement.SIDE else BigBangPlacement.BOTTOM,
-                        )
+                        // 宽屏上所有功能平铺成方块（2026-10-16），面板从点的那一块长出来；大爆炸的面板盖满这一块，
+                        // 画布让到它上面（左边）
                         else -> WideEditorPanel(
                             atSide = atSide,
                             styleBar = styleBarModel(state),
                             styleActions = styleActions,
                             purpose = purpose,
                             purposeActions = purposeActions,
-                            // 手机横着拿没有列表，右边那一栏只放样式和导出
+                            // 手机横着拿没有列表，右边那一栏只放功能方块
                             list = if (layout.listed) ({ modifier ->
                                 MaskItemList(
                                     image = state.image,
@@ -399,17 +417,18 @@ fun EditorScreen(
                                     modifier = modifier,
                                 )
                             }) else null,
-                            actionRow = { modifier ->
-                                EditorActionRow(
-                                    onExport = onExport,
-                                    exportLabel = exportLabel,
-                                    exporting = state.exporting,
-                                    aiReview = state.aiReview,
-                                    onAiReview = vm::runAiReview,
-                                    filmstrip = filmstrip,
-                                    modifier = modifier,
-                                )
-                            },
+                            aiReview = state.aiReview,
+                            aiOffered = state.aiOffered,
+                            onAiReview = vm::runAiReview,
+                            // 宽屏上吸管等着取色时面板不收、方块都还点得着；大爆炸这时打不开（见 EditorViewModel.openBigBang），灰着
+                            bigBangReady = hasText && state.image != null && !state.loading && !state.analyzing && state.colorPick == null,
+                            // 和水印一样，再点一下收起
+                            onBigBang = { if (state.bigBang != null) vm.closeBigBang() else vm.openBigBang() },
+                            bigBang = bang?.let { BigBangPanelModel(it, covered) },
+                            bigBangActions = bigBangActions,
+                            compare = compare,
+                            canCompare = canCompare,
+                            filmstrip = filmstrip,
                         )
                     }
                 },
@@ -583,16 +602,17 @@ private fun OriginalPill(visible: Boolean) {
 }
 
 /**
- * 识别中的提示条，与画布上的扫光一起出现（PP-OCR 一张图约 2 秒）。
+ * 识别中的提示条，与画布上的识别动效一起出现（PP-OCR 一张图约 2 秒）。
  *
  * 不再放转圈的进度圈：一道与画布上同色的光从字面上掠过，告诉用户还在读，
  * 和图上那束光是一回事。光的位置只在绘制里读，走起来只重绘、不重组。
  *
  * 用 Box 画底色而不是 Surface：Material3 的 Surface 会吃掉触摸，
  * 识别期间画布仍可交互（spec §7.1），提示条底下那一块也不该点不动。
+ * 首次引导的样图上也是它（见 ui/onboarding）。
  */
 @Composable
-private fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
+internal fun AnalyzingPill(visible: Boolean, modifier: Modifier = Modifier) {
     AnimatedVisibility(visible = visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         val sheen = rememberInfiniteTransition(label = "analyzingSheen").animateFloat(
             initialValue = 0f,

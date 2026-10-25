@@ -11,7 +11,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import moe.flinty.yomark.ui.YomarkActivity
 import moe.flinty.yomark.billing.BillingRepository
 import moe.flinty.yomark.data.SettingsStore
-import moe.flinty.yomark.ui.enableLightEdgeToEdge
+import moe.flinty.yomark.ui.layoutEdgeToEdge
 import moe.flinty.yomark.ui.theme.YomarkTheme
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 class ThanksActivity : YomarkActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableLightEdgeToEdge()
+        layoutEdgeToEdge()
         super.onCreate(savedInstanceState)
         val settings = SettingsStore(applicationContext)
         setContent {

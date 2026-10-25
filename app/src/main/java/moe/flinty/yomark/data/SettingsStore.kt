@@ -2,6 +2,7 @@ package moe.flinty.yomark.data
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import androidx.datastore.core.DataMigration
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -19,22 +20,41 @@ import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
-import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.theme.ThemeColor
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
-private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+private val Context.settingsDataStore: DataStore<Preferences> by preferencesDataStore(
+    name = "settings",
+    produceMigrations = { listOf(DropExternalModel) },
+)
+
+/**
+ * 实验室里的外部模型 2026-10-18 删掉了，应用不再有联网权限。0.18.0 起在它那里填过的开关、接口地址、API Key、模型，
+ * 头一回读设置时一并删掉：key 是凭据，功能没了就不该还留在手机上。
+ */
+internal object DropExternalModel : DataMigration<Preferences> {
+    private val ON = booleanPreferencesKey("external_model_enabled")
+    private val FIELDS = listOf("external_model_base_url", "external_model_api_key", "external_model_name").map(::stringPreferencesKey)
+
+    override suspend fun shouldMigrate(currentData: Preferences) = ON in currentData || FIELDS.any { it in currentData }
+
+    override suspend fun migrate(currentData: Preferences): Preferences = currentData.toMutablePreferences().apply {
+        remove(ON)
+        FIELDS.forEach { remove(it) }
+    }.toPreferences()
+
+    override suspend fun cleanUp() = Unit
+}
 
 /**
  * 本地设置（spec §12 M5 的「记住上次样式」）。
  *
- * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。唯一的凭据是用户自己填的外部模型 API Key。
+ * 全部是无隐私含义的偏好项——这里不存任何图像内容、识别结果或用途水印文案。
  * 用途水印只存外观（颜色、角度、透明度、密度），文案照旧只活在当次会话里。
  * 编辑器里「打码」上次选的样式存枚举名，画笔里各样式（连马克笔、画笔）的参数逐项存；每块码自己的样式只活在 MaskPlan 里。
  */
@@ -166,6 +186,18 @@ class SettingsStore internal constructor(
     }
 
     /**
+     * 截图按原分辨率识别（见 SourceImageLoader.sampleSizeForAnalysis）：小字认得全，识别慢一倍多。
+     * 关掉就和照片一样缩到长边 2048 再认。出厂关着，快的机器也一样：原先没选过时按机器快不快定，2026-10-16 改成一律关。
+     *
+     * 不放进 RecognitionConfig：它管的是怎么解码识别图，改了从下一张图起生效，不让编辑器重跑。
+     */
+    val fullResolutionOcr: Flow<Boolean> = store.data.map { it[KEY_FULL_RESOLUTION] ?: false }
+
+    suspend fun setFullResolutionOcr(on: Boolean) {
+        store.edit { it[KEY_FULL_RESOLUTION] = on }
+    }
+
+    /**
      * 品牌水印的字样（见 BrandWatermarkStyle）。没选过就按**读的时候**的系统语言定，不在第一次读时写下：
      * 用户换了系统语言，没选过的人跟着换；选过一次之后就一直是那一版。
      * 认不出的值同没选过，理由与 lastStyle 一致。
@@ -196,12 +228,12 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 识别动效：扫光或磨砂（见 ScanStyle）。出厂是扫光。
+     * 识别动效：磨砂或扫光（见 ScanStyle）。出厂是磨砂。
      *
      * 同样不放进 RecognitionConfig：它只是识别时画面上的过渡，放进去的话一换样式编辑器就会重跑识别。
-     * 认不出的值退回扫光，理由与 lastStyle 一致。
+     * 认不出的值退回磨砂，理由与 lastStyle 一致。
      */
-    val scanStyle: Flow<ScanStyle> = store.data.map { it[KEY_SCAN_STYLE].toEnum(ScanStyle.SWEEP) }
+    val scanStyle: Flow<ScanStyle> = store.data.map { it[KEY_SCAN_STYLE].toEnum(ScanStyle.FROST) }
 
     suspend fun setScanStyle(style: ScanStyle) {
         store.edit { it[KEY_SCAN_STYLE] = style.name }
@@ -246,33 +278,6 @@ class SettingsStore internal constructor(
         store.edit { it[KEY_SHOW_TEXT_BOXES] = on }
     }
 
-    /**
-     * 实验室里的外部模型：开关，和 AI 页上填的接口地址、API Key、模型（见 ExternalModelSettings）。
-     * 不进 [recognitionConfig]：改一个字编辑器不用重跑识别，它每次用时现读。
-     * 只在这几项变了时才发出新值：编辑器收到要重新探测一次「AI 增强识别」能不能用。
-     *
-     * key 和别的设置一样存在应用私有目录里；manifest 里 allowBackup="false"，不进备份。
-     */
-    val externalModel: Flow<ExternalModelSettings> = store.data.map(::readExternalModel).distinctUntilChanged()
-
-    /** 改外部模型的设置。读、改、写在一次 edit 里，两处同时改不会互相盖掉。 */
-    suspend fun updateExternalModel(change: (ExternalModelSettings) -> ExternalModelSettings) {
-        store.edit {
-            val next = change(readExternalModel(it))
-            it[KEY_EXTERNAL_ON] = next.enabled
-            it[KEY_EXTERNAL_URL] = next.baseUrl.trim()
-            it[KEY_EXTERNAL_KEY] = next.apiKey.trim()
-            it[KEY_EXTERNAL_MODEL] = next.model.trim()
-        }
-    }
-
-    private fun readExternalModel(prefs: Preferences) = ExternalModelSettings(
-        enabled = prefs[KEY_EXTERNAL_ON] ?: false,
-        baseUrl = prefs[KEY_EXTERNAL_URL].orEmpty(),
-        apiKey = prefs[KEY_EXTERNAL_KEY].orEmpty(),
-        model = prefs[KEY_EXTERNAL_MODEL].orEmpty(),
-    )
-
     // ---------- 识别方案（2026-09-04 增补设计 §4）----------
 
     /**
@@ -283,11 +288,12 @@ class SettingsStore internal constructor(
      * 现在挪到了各自的处理方式。老安装里存着 OFF、还没有处理方式这一项的，读成「关」，
      * 识别模式退回出厂值——不迁的话，关掉过人脸的用户升级后会突然又被打码。
      * 处理方式里存着已经去掉的「仅圈出」的，同样读成「关」（见 RuleState.fromName），不落回出厂的打码。
+     * 识别引擎存着并掉了的 ML Kit 英文、中文、中英的，读成 ML Kit（见 TextEngineOption.fromName），不落回出厂的 PP-OCR。
      */
     val recognitionConfig: Flow<RecognitionConfig> = store.data.map { prefs ->
         val fallback = RecognitionConfig()
         RecognitionConfig(
-            textEngine = prefs[KEY_TEXT_ENGINE].toEnum(fallback.textEngine),
+            textEngine = prefs[KEY_TEXT_ENGINE]?.let { TextEngineOption.fromName(it) } ?: fallback.textEngine,
             barcode = prefs[KEY_BARCODE].toEnum(fallback.barcode),
             barcodeState = prefs[KEY_BARCODE_STATE].toRuleState(
                 if (prefs[KEY_BARCODE] == LEGACY_OFF) RuleState.OFF else fallback.barcodeState,
@@ -316,10 +322,10 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
-     * 调试信息的开关在「开发者」里自己关。实验室里的外部模型关掉，填过的接口地址、key、模型留着，再打开不用重填。
+     * 调试信息的开关在「开发者」里自己关。
      *
      * 做法是删掉这些键，而不是写一份当下的出厂值：读的时候缺省就是出厂值，和新装一样，
      * 出厂值以后再改也不会被这一下冻住（与 RecognitionConfig.ruleOverrides 只存差异同一条理由）。
@@ -335,9 +341,9 @@ class SettingsStore internal constructor(
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
+            it.remove(KEY_FULL_RESOLUTION)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
-            it.remove(KEY_EXTERNAL_ON)
         }
     }
 
@@ -424,6 +430,7 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_OPACITY = floatPreferencesKey("purpose_watermark_opacity")
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_RESTYLE_ALL = booleanPreferencesKey("restyle_all_masks")
+        val KEY_FULL_RESOLUTION = booleanPreferencesKey("full_resolution_ocr")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")
@@ -446,10 +453,6 @@ class SettingsStore internal constructor(
         val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state_v2")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
-        val KEY_EXTERNAL_ON = booleanPreferencesKey("external_model_enabled")
-        val KEY_EXTERNAL_URL = stringPreferencesKey("external_model_base_url")
-        val KEY_EXTERNAL_KEY = stringPreferencesKey("external_model_api_key")
-        val KEY_EXTERNAL_MODEL = stringPreferencesKey("external_model_name")
 
         /** 人脸、条码的识别模式里原先那个「关」。只在读老安装时认它，见 recognitionConfig。 */
         const val LEGACY_OFF = "OFF"

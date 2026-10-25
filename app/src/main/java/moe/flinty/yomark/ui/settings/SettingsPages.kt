@@ -19,7 +19,6 @@ import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.CarRepair
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.CreditCard
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
@@ -29,11 +28,11 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Face
 import androidx.compose.material.icons.outlined.FlightTakeoff
 import androidx.compose.material.icons.outlined.Forum
+import androidx.compose.material.icons.outlined.HighQuality
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lan
 import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Numbers
 import androidx.compose.material.icons.outlined.Person
@@ -43,6 +42,7 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material.icons.outlined.Router
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -63,7 +63,6 @@ import moe.flinty.yomark.engine.FaceOption
 import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
-import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.engine.ppocr.PpOcrModels
@@ -71,38 +70,38 @@ import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import moe.flinty.yomark.ui.components.ColorSwatch
 import moe.flinty.yomark.ui.theme.ThemeColor
+import moe.flinty.yomark.ui.theme.ThemeMode
 import moe.flinty.yomark.ui.theme.colorScheme
+import moe.flinty.yomark.ui.theme.isDark
 import moe.flinty.yomark.ui.theme.systemDynamicColorAvailable
 
 /*
- * 设置一级页下面的各页：文字（下面还有识别引擎和各类文字自己的页）、人脸、条码、AI、通用、外观、实验室。
+ * 设置一级页下面的各页：文字（下面还有各类文字自己的页）、人脸、条码、AI（下面还有识别引擎）、通用、外观、实验室。
  * 每根轴下面写清楚它的代价，但**不写「推荐」**：哪个好正是用户要自己看的。
  * 逐项开关，不给命名预设——预设会把变量重新绑回一起，出了问题定位不到是哪一项。
  *
  * 改动即时生效，没有「应用」按钮：写进 DataStore，编辑器的 ViewModel 收到就重跑当前这张图。
- * 通用和外观两页不影响识别，换它们不重跑。AI 页显示本机的 Gemini Nano 和随包的 PP-OCR；实验室里打开了外部模型，它的接口也在 AI 页上填，改它不重跑。
+ * 通用和外观两页不影响识别，换它们不重跑。AI 页上选识别引擎，下面显示本机的 Gemini Nano 和随包的 PP-OCR、ML Kit。
  *
  * 行下的小字、页尾说明都不带句号（2026-10-15 起），几句话并成一句，中间用逗号、分号隔开。
  */
 
 /**
- * 文字：上面一组是「怎么认字」（识别引擎），下面一组是认出来的各类敏感信息，
- * 每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
+ * 文字：认出来的各类敏感信息，每类一行、小字写着眼下怎么处理，点进去是这一类自己的页（[TextRuleSettingsScreen]）。
  *
  * 各类原先在行尾直接摆一排「关 / 圈出 / 打码」；人名多了一个只属于它的开关之后，行尾放不下，
  * 一类一页又和人脸、条码的页是同一个样子：先是「识别到时怎么办」，再是这一类自己的选项和认法。
- * 原先单独一页的「文字识别」并进来：认字和认出来怎么处理都是「文字」的事，分在两处找不到。
- * 「文字识别」一组里原先还有 AI 增强识别的开关，2026-10-15 去掉了，它总是开着（见 refinersFor）。
+ * 上面原先还有「文字识别」一组（2026-10-09 由单独一页并进来）：识别引擎，和 AI 增强识别的开关（2026-10-15 去掉了，
+ * 它总是开着，见 refinersFor）。识别引擎 2026-10-16 挪去了「AI」页，和它选的 PP-OCR、ML Kit 两个模型放在一起。
  *
- * 右上角的「恢复默认」只管这一页和它下面的各页：识别引擎、各类的处理方式和人名的开关。
+ * 右上角的「恢复默认」只管这一页和它下面的各页：各类的处理方式和人名的开关。
  */
 @Composable
 fun TextSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onOpenEngine: () -> Unit,
     onOpenRule: (ruleId: String) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(
@@ -114,18 +113,7 @@ fun TextSettingsScreen(
             TextButton(onClick = { onChange(reset) }, enabled = config != reset) { Text(stringResource(R.string.reset_defaults)) }
         },
     ) {
-        item {
-            SectionHeader(stringResource(R.string.text_recognition), first = true)
-            SettingsGroup {
-                LinkRow(
-                    title = stringResource(R.string.engine),
-                    summary = stringResource(textEngineLabel(config.textEngine)),
-                    icon = Icons.Outlined.DocumentScanner,
-                    onClick = onOpenEngine,
-                )
-            }
-            SectionHeader(stringResource(R.string.sensitive_info))
-        }
+        item { SectionHeader(stringResource(R.string.sensitive_info), first = true) }
         val rules = RuleCatalog.inSettingsOrder
         itemsIndexed(rules, key = { _, rule -> rule.id }) { i, rule ->
             LinkRow(
@@ -141,12 +129,12 @@ fun TextSettingsScreen(
     }
 }
 
-/** 识别引擎：OCR 用哪一家。从「文字」页点进来。 */
+/** 识别引擎：OCR 用 PP-OCR 还是 ML Kit。从「AI」页点进来。 */
 @Composable
 fun TextEngineSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.engine), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -159,9 +147,7 @@ fun TextEngineSettingsScreen(
                         summary = stringResource(
                             when (option) {
                                 TextEngineOption.PADDLE -> R.string.engine_paddle_summary
-                                TextEngineOption.LATIN -> R.string.engine_latin_summary
-                                TextEngineOption.CHINESE -> R.string.engine_chinese_summary
-                                TextEngineOption.BOTH -> R.string.engine_both_summary
+                                TextEngineOption.MLKIT -> R.string.engine_mlkit_summary
                             },
                         ),
                         selected = config.textEngine == option,
@@ -182,7 +168,7 @@ fun TextRuleSettingsScreen(
     ruleId: String,
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val rule = RuleCatalog.all.first { it.id == ruleId }
@@ -221,7 +207,7 @@ fun TextRuleSettingsScreen(
 fun FaceSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_face), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -250,7 +236,7 @@ fun FaceSettingsScreen(
 fun BarcodeSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_barcode), onNavigateUp = onNavigateUp, modifier = modifier) {
@@ -288,17 +274,14 @@ fun BarcodeSettingsScreen(
  * 三类共用一个开关：用户要遮的是「这段对话是谁和谁」，分开设没有意义。开着就是打码。
  * 页脚只说遮什么和一句局限（认不全、可能认错），怎么认的、适用哪些应用不写。
  *
- * 外部模型（2026-10-15）：AI 增强识别改用用户自己配置的大模型。接口在「AI」页上填，这里只是开关。
- * 它不在识别方案里（见 SettingsStore.externalModel），所以单独传。
+ * 原先还有一项「外部模型」（2026-10-15）：AI 增强识别改用用户自己配置的大模型。2026-10-18 删掉了，应用要能声明没有联网权限。
  */
 @Composable
 fun LabsSettingsScreen(
     config: RecognitionConfig,
     onChange: (RecognitionConfig) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    externalModel: Boolean = false,
-    onExternalModelChange: (Boolean) -> Unit = {},
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_labs), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
@@ -313,50 +296,42 @@ fun LabsSettingsScreen(
             }
             FooterText(stringResource(R.string.chat_footer))
         }
-        item {
-            GroupSpacer()
-            SettingsGroup {
-                SwitchRow(
-                    title = stringResource(R.string.external_model),
-                    icon = Icons.Outlined.Cloud,
-                    checked = externalModel,
-                    onCheckedChange = onExternalModelChange,
-                    modifier = Modifier.testTag("labs-external-model"),
-                )
-            }
-            FooterText(stringResource(R.string.external_model_footer))
-        }
     }
 }
 
 /**
- * AI：本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
- * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。这几样只显示，没有可设的项。
- * 识别引擎在「文字」页里选；AI 增强识别没有开关，总是开着。
+ * AI：最上面是识别引擎（2026-10-16 从「文字」页挪来），点进去选 PP-OCR 还是 ML Kit（[TextEngineSettingsScreen]）。
+ * 下面是本机用到的模型——端侧大模型 Gemini Nano（有没有、是哪一版、下好了没有），
+ * 随包的 PP-OCR 和 ML Kit（版本都是打包时定的；ML Kit 几个模型并成一行）。这几样只显示。
+ * AI 增强识别没有开关，总是开着。
  *
  * Gemini Nano 卡片下面是一段话：先说它是什么，再接着说本机这边要知道的（[nanoNote]），不换行。
  *
- * 实验室里打开了外部模型时，最上面多一组「外部模型」：接口地址、API Key、模型，点一行弹框改；再加一行测试连接。
- *
  * @param nano 由 Activity 进页时问一次 AICore 得来；null 是还没问完。
- * @param external 实验室里的外部模型；没打开时为 null，不显示那一组。
- * @param onTestExternal 测试连接：问一句最短的话，回答所用的毫秒数；没答上来抛 [ExternalModelException]。
  */
 @Composable
 fun AiSettingsScreen(
     nano: NanoStatus?,
-    onNavigateUp: () -> Unit,
+    textEngine: TextEngineOption,
+    onOpenEngine: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    external: ExternalModelSettings? = null,
-    onExternalChange: ((ExternalModelSettings) -> ExternalModelSettings) -> Unit = {},
-    onTestExternal: suspend () -> Long = { 0L },
 ) {
     SettingsScaffold(title = stringResource(R.string.settings_ai), onNavigateUp = onNavigateUp, modifier = modifier) {
-        if (external != null) {
-            item { ExternalModelGroup(external, onExternalChange, onTestExternal) }
+        item {
+            SectionHeader(stringResource(R.string.text_recognition), first = true)
+            SettingsGroup {
+                LinkRow(
+                    title = stringResource(R.string.engine),
+                    summary = stringResource(textEngineLabel(textEngine)),
+                    icon = Icons.Outlined.DocumentScanner,
+                    onClick = onOpenEngine,
+                    modifier = Modifier.testTag("engine"),
+                )
+            }
         }
         item {
-            SectionHeader(stringResource(R.string.ai_model), first = external == null)
+            SectionHeader(stringResource(R.string.ai_model))
             SettingsGroup {
                 SettingsRow(
                     title = "Gemini Nano",
@@ -409,6 +384,8 @@ fun AiSettingsScreen(
  *
  * 编辑：「换样式时一起换」，出厂开着（见 SettingsStore.restyleAllMasks）。
  *
+ * 识别：「按原分辨率识别」，出厂关着（见 SettingsStore.fullResolutionOcr）。不在识别页：它管的是快慢，不是认什么。
+ *
  * 导出：品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
  * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
  * 原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
@@ -417,6 +394,8 @@ fun AiSettingsScreen(
 fun GeneralSettingsScreen(
     restyleAll: Boolean,
     onRestyleAllChange: (Boolean) -> Unit,
+    fullResolution: Boolean,
+    onFullResolutionChange: (Boolean) -> Unit,
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     /** 能不能去水印。false 时没有「无水印」这一项。 */
@@ -424,7 +403,7 @@ fun GeneralSettingsScreen(
     /** 导出不加品牌水印。只在 [watermarkUnlocked] 时有意义。 */
     watermarkOff: Boolean,
     onWatermarkOff: () -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val none = watermarkUnlocked && watermarkOff
@@ -438,6 +417,18 @@ fun GeneralSettingsScreen(
                     icon = Icons.Outlined.DoneAll,
                     checked = restyleAll,
                     onCheckedChange = onRestyleAllChange,
+                )
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.settings_recognize))
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.full_resolution_ocr),
+                    summary = stringResource(R.string.full_resolution_ocr_summary),
+                    icon = Icons.Outlined.HighQuality,
+                    checked = fullResolution,
+                    onCheckedChange = onFullResolutionChange,
                 )
             }
         }
@@ -460,28 +451,45 @@ fun GeneralSettingsScreen(
 }
 
 /**
- * 外观：主题色与识别动效，都只是样子。
+ * 外观：深色模式、主题色与识别动效，都只是样子。
+ *
+ * 深色模式不在 SettingsStore 里，由调用方从 AppThemeMode 读、交给它改。
  *
  * 主题色：「跟随系统」（莫奈取色）是一个单选项，下面一排是预设色。
- * 色块画的是选它之后的主色，不是种子色——按钮、选中态最后就是这个颜色。
+ * 色块画的是选它之后的主色，不是种子色——按钮、选中态最后就是这个颜色，深色界面里就是深色那套的主色。
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AppearanceSettingsScreen(
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit,
     themeColor: ThemeColor,
     onThemeColorChange: (ThemeColor) -> Unit,
     scanStyle: ScanStyle,
     onScanStyleChange: (ScanStyle) -> Unit,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val presets = remember(context) {
-        ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context).primary }
+    val dark = MaterialTheme.colorScheme.isDark
+    val presets = remember(context, dark) {
+        ThemeColor.entries.filter { it != ThemeColor.SYSTEM }.associateWith { it.colorScheme(context, dark).primary }
     }
     SettingsScaffold(title = stringResource(R.string.settings_appearance), onNavigateUp = onNavigateUp, modifier = modifier) {
         item {
-            SectionHeader(stringResource(R.string.theme_color), first = true)
+            SectionHeader(stringResource(R.string.theme_mode), first = true)
+            SettingsGroup(Modifier.selectableGroup()) {
+                ThemeMode.entries.forEach { mode ->
+                    RadioRow(
+                        title = stringResource(themeModeLabel(mode)),
+                        selected = themeMode == mode,
+                        onClick = { onThemeModeChange(mode) },
+                    )
+                }
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.theme_color))
             SettingsGroup {
                 RadioRow(
                     title = stringResource(themeColorLabel(ThemeColor.SYSTEM)),
@@ -547,7 +555,6 @@ internal fun SensitiveKind.settingsIcon(): ImageVector = when (this) {
     SensitiveKind.IBAN -> Icons.Outlined.AccountBalance
     SensitiveKind.SSN -> Icons.Outlined.Badge
     SensitiveKind.PASSPORT -> Icons.Outlined.FlightTakeoff
-    SensitiveKind.TRACKING_NO -> Icons.Outlined.LocalShipping
     SensitiveKind.IP_ADDR -> Icons.Outlined.Lan
     SensitiveKind.MAC_ADDR -> Icons.Outlined.Router
     SensitiveKind.URL -> Icons.Outlined.Link
@@ -586,13 +593,12 @@ internal fun ruleSummary(config: RecognitionConfig, ruleId: String): String {
 }
 
 /**
- * 「文字」页右上角的「恢复默认」：这一页和它下面各页的项回到出厂值，人脸、条码不动。
- * 出厂值取自 [RecognitionConfig] 的缺省值，不另抄一份。
+ * 「文字」页右上角的「恢复默认」：这一页和它下面各页的项回到出厂值，人脸、条码不动，
+ * 识别引擎（2026-10-16 挪去了「AI」页）也不动。出厂值取自 [RecognitionConfig] 的缺省值，不另抄一份。
  */
 internal fun RecognitionConfig.withTextDefaults(): RecognitionConfig {
     val factory = RecognitionConfig()
     return copy(
-        textEngine = factory.textEngine,
         maskUnanchoredNames = factory.maskUnanchoredNames,
         ruleOverrides = emptyMap(),
     )
@@ -665,9 +671,7 @@ internal fun mlKitSummary(res: Resources, text: String, textChinese: String, fac
 @StringRes
 internal fun textEngineLabel(option: TextEngineOption): Int = when (option) {
     TextEngineOption.PADDLE -> R.string.engine_paddle
-    TextEngineOption.LATIN -> R.string.engine_latin
-    TextEngineOption.CHINESE -> R.string.engine_chinese
-    TextEngineOption.BOTH -> R.string.engine_both
+    TextEngineOption.MLKIT -> R.string.engine_mlkit
 }
 
 @StringRes
@@ -684,8 +688,15 @@ internal fun barcodeModeLabel(option: BarcodeOption): Int = when (option) {
 
 @StringRes
 internal fun scanStyleLabel(style: ScanStyle): Int = when (style) {
-    ScanStyle.SWEEP -> R.string.scan_sweep
     ScanStyle.FROST -> R.string.scan_frost
+    ScanStyle.SWEEP -> R.string.scan_sweep
+}
+
+@StringRes
+internal fun themeModeLabel(mode: ThemeMode): Int = when (mode) {
+    ThemeMode.SYSTEM -> R.string.follow_system
+    ThemeMode.LIGHT -> R.string.theme_mode_light
+    ThemeMode.DARK -> R.string.theme_mode_dark
 }
 
 @StringRes

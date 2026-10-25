@@ -227,8 +227,7 @@ private class FilmstripState(initial: Int, val count: Int, val pitchPx: Float) {
         private set
 
     /**
-     * 条带有多宽，量的时候记下来，画视差时用。旁边的「AI 增强识别」出现、消失时条带会变宽变窄，
-     * 格子不一定跟着重新量，靠读它重画。
+     * 条带有多宽，量的时候记下来，画视差时用。窗口变宽变窄（转屏、分屏）时格子不一定跟着重新量，靠读它重画。
      */
     var viewportPx by mutableFloatStateOf(0f)
 

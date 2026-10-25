@@ -88,7 +88,6 @@ fun DebugTraceSheet(
         // 和样式面板一样：比屏幕还高时顶到状态栏下面为止，多出来的在里面滚动
         modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top)),
     ) {
-        DarkSystemBarIcons()
         DebugTraceContent(
             runs = runs,
             onRerun = onRerun,

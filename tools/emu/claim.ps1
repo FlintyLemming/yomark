@@ -3,15 +3,17 @@
 
 多个 Claude Code 窗口并行时，各自用 -read-only 起一个同 AVD 的实例，互不覆盖 APK、不抢前台。
 端口靠 $env:TEMP\yomark-emu\<port> 目录加锁（New-Item 建目录是原子的）。
+每台配一个私有 adb 服务（端口 = 模拟器端口 + 1000，见 common.ps1 的 Use-Adb），共用的 5037 卡死或没起都不影响；
+跑完这个脚本，同一个 PowerShell 进程里的 adb 都走它。开机后也往 5037 注册一下，Android Studio 照样看得到。
 
 冷启动（-no-snapshot）：从 default_boot 快照恢复的只读实例，写 /metadata（encryptionkey.img）会一直挂着，
 am instrument 之类碰到它的命令跟着卡死、杀不掉。冷启动多花一两分钟，没有这个问题；也不往共用的 AVD 存快照。
-同一个 worktree 重复调用会直接返回已领到的 serial，所以每次需要 serial 时再跑一遍即可。
+同一个 worktree 重复调用会直接返回已领到的 serial（私有服务被杀过就重起），所以每次需要 serial 时再跑一遍即可。
 AVD 被 Android Studio 之类不带 -read-only 的实例锁着时，自动换用它的克隆 <AVD>_yomark（见 Get-Clone）。
 
 用法：
   $s = .\tools\emu\claim.ps1            # 默认 Pixel_10_Pro
-  adb -s $s install -r app\build\outputs\apk\debug\app-x86_64-debug.apk
+  .\tools\emu\adb.ps1 install -r app\build\outputs\apk\debug\app-x86_64-debug.apk
   .\tools\emu\release.ps1               # 用完释放
 #>
 param(
@@ -26,7 +28,8 @@ $ports = 5560..5574 | Where-Object { $_ % 2 -eq 0 }
 
 $avdLocked = 'AVD 被不带 -read-only 的实例锁着'
 
-function Wait-Boot($serial, $proc, $log) {
+function Wait-Boot([int]$port, $proc, $log) {
+    $serial = "emulator-$port"
     $deadline = (Get-Date).AddSeconds($BootTimeoutSec)
     while ((Get-Date) -lt $deadline) {
         if ($proc -and $proc.HasExited) {
@@ -35,7 +38,9 @@ function Wait-Boot($serial, $proc, $log) {
         }
         $booted = & $adb -s $serial shell getprop sys.boot_completed 2>$null
         if ("$booted".Trim() -eq '1') { return }
-        Start-Sleep -Seconds 3
+        # 模拟器起来时自己会向私有服务注册；服务中途重起过的话就不认得这台了，补一次
+        Register-Emu $port (Get-AdbPort $port)
+        Start-Sleep -Seconds 1
     }
     throw "$serial 在 $BootTimeoutSec 秒内没启动完"
 }
@@ -71,28 +76,37 @@ function Get-Clone($name) {
 
 New-Item -ItemType Directory -Force $lockRoot | Out-Null
 
-# 先回收崩掉的窗口留下的锁
+# 自己已经领过的那台：私有服务被杀过就重起，等它开机，输出 serial 后结束脚本
+function Resume-Own([int]$port) {
+    Use-Adb $port
+    Start-AdbServer
+    Wait-Boot $port $null $null
+    Write-Output "emulator-$port"
+    exit 0
+}
+
+# adb.ps1 每条命令都过这里，所以先看自己那台还开着没有：回收锁要按命令行查进程，一把锁一秒多
+$own = Get-OwnPort
+if ($own -and (Test-Listening $own)) { Resume-Own $own }
+
+# 回收崩掉的窗口留下的锁，连同它的 adb 服务
 foreach ($dir in Get-Locks) {
     if (-not (Test-LockAlive $dir)) {
         Write-Host "回收失效的锁 $($dir.Name)"
+        Stop-AdbServer ([int]$dir.Name)
         Remove-Item -Recurse -Force $dir.FullName
     }
 }
 
-# 自己已经领过就直接返回
-foreach ($dir in Get-Locks) {
-    $ownerFile = Join-Path $dir.FullName 'owner'
-    if ((Test-Path $ownerFile) -and (Get-Content $ownerFile) -eq $owner) {
-        $serial = "emulator-$($dir.Name)"
-        Wait-Boot $serial $null $null
-        Write-Output $serial
-        exit 0
-    }
-}
+# 自己的锁还在、模拟器还没开始听端口（刚起）就等它开机
+$own = Get-OwnPort
+if ($own) { Resume-Own $own }
 
 $port = $null
 foreach ($p in $ports) {
-    if (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue) { continue }
+    if (Test-Listening $p) { continue }
+    # 对应的 adb 端口被别的程序占着就跳过；占着的是 adb 的话，是崩掉的窗口留下的私有服务，领到后关掉
+    if (Get-Listener (Get-AdbPort $p) | Where-Object ProcessName -ne 'adb') { continue }
     try {
         New-Item -ItemType Directory (Join-Path $lockRoot $p) -ErrorAction Stop | Out-Null
         $port = $p
@@ -108,36 +122,45 @@ Set-Content (Join-Path $dir 'avd') $Avd
 
 # 日志放锁目录外面、每次一个新文件：模拟器派生的 watchdog / crashpad 会继承句柄，
 # 关机后还要占一会儿，放锁目录里会删不掉锁
-$logDir = Join-Path $lockRoot 'logs'
 New-Item -ItemType Directory -Force $logDir | Out-Null
 Get-ChildItem $logDir -File | Where-Object LastWriteTime -lt (Get-Date).AddDays(-3) |
     Remove-Item -Force -ErrorAction SilentlyContinue
-$log = Join-Path $logDir "$port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 
 function Start-Avd($name) {
     $log = Join-Path $logDir "$port-$(Get-Date -Format yyyyMMdd-HHmmss).log"
     Set-Content (Join-Path $dir 'avd') $name
     Write-Host "启动 $name -> $serial（$owner）"
-    $proc = Start-Process $emulator -PassThru `
+    # 模拟器继承 Use-Adb 设的变量，开机时只向私有服务注册。工作目录的道理同 Start-AdbServer
+    $proc = Start-Process $emulator -PassThru -WorkingDirectory $logDir `
         -ArgumentList '-avd', $name, '-read-only', '-port', $port, '-no-boot-anim', '-no-snapshot' `
         -RedirectStandardOutput $log -RedirectStandardError "$log.err"
     try {
-        Wait-Boot $serial $proc $log
+        Wait-Boot $port $proc $log
         return $true
     } catch {
         Stop-Emu $port
         if ("$_" -eq $avdLocked) { return $false }
-        Remove-Item -Recurse -Force $dir
         throw
     }
 }
 
-if (-not (Start-Avd $Avd)) {
-    $clone = Get-Clone $Avd
-    Write-Host "$Avd 被一个不带 -read-only 的实例锁着（多半是 Android Studio 开的），换用 $clone"
-    if (-not (Start-Avd $clone)) {
-        Remove-Item -Recurse -Force $dir
-        throw "$clone 也被一个不带 -read-only 的实例锁着，关掉那台（adb -s <serial> emu kill）再领"
+try {
+    Stop-AdbServer $port
+    Use-Adb $port
+    Start-AdbServer
+    if (-not (Start-Avd $Avd)) {
+        $clone = Get-Clone $Avd
+        Write-Host "$Avd 被一个不带 -read-only 的实例锁着（多半是 Android Studio 开的），换用 $clone"
+        if (-not (Start-Avd $clone)) {
+            throw "$clone 也被一个不带 -read-only 的实例锁着，关掉那台（adb -s <serial> emu kill）再领"
+        }
     }
+} catch {
+    Stop-AdbServer $port
+    Remove-Item -Recurse -Force $dir
+    throw
 }
+
+# 也往 5037 注册一下，Android Studio 的设备列表和 Logcat 才看得到（5037 重启时也会自己扫到）
+Register-Emu $port 5037
 Write-Output $serial

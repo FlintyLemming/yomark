@@ -34,7 +34,7 @@ object SyntheticSamples {
         Entry("key sk-aB3xQ9zL2mR7tK1vP0wY8n", SensitiveKind.API_KEY),
         Entry("host 192.168.1.10", SensitiveKind.IP_ADDR),
         Entry("open https://app.com/r/AbCdEf123", SensitiveKind.URL),
-        Entry("ship 1Z12345E0205271688", SensitiveKind.TRACKING_NO),
+        Entry("ship 1Z12345E0205271688", SensitiveKind.LONG_NUMBER),
         // spec §15 第 5 条实测到的两处真实漏检，longnum 兜底规则的回归样本
         Entry("txn 2026090323001114571431156787", SensitiveKind.LONG_NUMBER),
         Entry("order 5127402746064028833", SensitiveKind.LONG_NUMBER),

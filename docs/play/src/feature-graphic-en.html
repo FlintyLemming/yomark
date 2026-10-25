@@ -1,0 +1,102 @@
+<!doctype html>
+<!-- Play 置顶大图的英文版，1024×500，英文商品详情用。node docs/play/src/render.cjs feature-graphic-en 渲染成 docs/play/feature-graphic-en.png
+     版式、配色和光都照 feature-graphic.html。右边的卡片换成英文截图用的那张样图（order-page-en.html）：
+     打码的只有应用在英文里也会打的几类——电话、地址、人名、邮箱；中文那张最上面的取件码换成电话，
+     英文里取件码不打码（规则只认中文字段名）。日期、快递单号、订单号出厂不打码，原样留着。 -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700;900&family=Inter:wght@600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101014;
+    --text: #1f2329;
+    --mute: #8a8f99;
+    --sky: #87ceeb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1024px; height: 500px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: 'Noto Sans', sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(520px 360px at 12% 8%, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0) 70%),
+      radial-gradient(480px 420px at 78% 92%, rgba(165, 180, 252, 0.45), rgba(165, 180, 252, 0) 70%),
+      linear-gradient(135deg, #a8ddf4 0%, #7cc6ec 48%, #5aaee3 100%);
+  }
+
+  /* ---------- 左：一句话 ---------- */
+  .copy { position: absolute; left: 72px; top: 0; bottom: 0; width: 430px; display: flex; flex-direction: column; justify-content: center; }
+  .eyebrow { font-family: 'Inter', 'Noto Sans', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 4px; color: rgba(16, 16, 20, 0.62); }
+  h1 { margin-top: 16px; font-size: 40px; font-weight: 900; line-height: 1.3; letter-spacing: 0; white-space: nowrap; }
+  .pills { display: flex; gap: 10px; margin-top: 30px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.9);
+    font-size: 17px; font-weight: 500; color: var(--text); white-space: nowrap;
+    box-shadow: 0 2px 8px rgba(16, 60, 110, 0.12);
+  }
+  .pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+
+  /* ---------- 右：识别中的那一下 ---------- */
+  .card {
+    position: absolute; left: 536px; top: 50px; width: 420px; height: 400px; overflow: hidden;
+    background: #fff; border-radius: 26px;
+    padding: 26px 28px 0;
+    box-shadow: 0 6px 16px rgba(16, 60, 110, 0.14), 0 30px 60px rgba(16, 60, 110, 0.22);
+    font-size: 18px; color: var(--text);
+  }
+  .state { display: flex; align-items: baseline; gap: 14px; padding-bottom: 14px; white-space: nowrap; }
+  .state b { color: #ff6a00; font-size: 23px; font-weight: 700; }
+  .state span { color: #ff6a00; font-size: 16px; }
+  .row { display: flex; align-items: center; gap: 14px; height: 56px; border-top: 1px solid #f0f1f3; }
+  .k { color: var(--mute); font-size: 15px; width: 92px; flex: none; white-space: nowrap; }
+  .v { letter-spacing: 0.2px; white-space: nowrap; }
+  .v.big { font-size: 23px; font-weight: 500; letter-spacing: 0.5px; }
+
+  .mask { color: transparent; background: var(--sky); box-shadow: 0 0 0 3px var(--sky); }
+
+  /* 光正走到的那一块码：从半透明慢慢盖实，底下的字还看得见一点 */
+  .mask.half { background: rgba(135, 206, 235, 0.55); box-shadow: 0 0 0 3px rgba(135, 206, 235, 0.55); color: rgba(31, 35, 41, 0.35); }
+
+  /* 光还没走到的地方压一层暗幕，光走过的地方揭开，和编辑器里识别时一样 */
+  .scrim {
+    position: absolute; left: 0; right: 0; top: 312px; bottom: 0;
+    background: linear-gradient(180deg, rgba(16, 16, 20, 0) 0, rgba(16, 16, 20, 0.5) 46px, rgba(16, 16, 20, 0.5) 100%);
+  }
+  /* 光：中心往上拖一条长尾、往下只有一小段前沿，颜色天蓝到长春花蓝到淡紫（ScanEffect.HUES） */
+  .light {
+    position: absolute; left: 0; right: 0; top: 236px; height: 136px; pointer-events: none;
+    background: linear-gradient(90deg, #87ceeb, #a5b4fc 55%, #c4b5fd);
+    -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.7) 76%, #000 82%, rgba(0,0,0,0) 100%);
+            mask-image: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 45%, rgba(0,0,0,0.7) 76%, #000 82%, rgba(0,0,0,0) 100%);
+    opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="eyebrow">YOMARK</div>
+    <h1>Redact screenshots<br>before you share.</h1>
+    <div class="pills">
+      <span class="pill">On-device</span>
+      <span class="pill">Offline</span>
+      <span class="pill">No permissions</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="state"><b>Ready for pickup</b><span>Sep 29, 12:30 PM</span></div>
+    <div class="row"><span class="k">Phone</span><span class="v big mask">+1 (217) 555-0136</span></div>
+    <div class="row"><span class="k">Speedy Post</span><span class="v">773512046683217</span></div>
+    <div class="row"><span class="k">Ship to</span><span class="v mask">1428 Maple Ave, Apt 3B</span></div>
+    <div class="row"><span class="k">Recipient</span><span class="v mask">Emily Carter</span></div>
+    <div class="row"><span class="k">Email</span><span class="v mask half">emily.carter@example.com</span></div>
+    <div class="row"><span class="k">Order no.</span><span class="v">20260929123045188392</span></div>
+    <div class="scrim"></div>
+    <div class="light"></div>
+  </div>
+</body>
+</html>

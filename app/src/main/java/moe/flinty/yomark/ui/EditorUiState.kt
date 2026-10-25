@@ -20,6 +20,8 @@ sealed interface EditorMessage {
     data class BatchPartial(val ok: Int, val failed: Int) : EditorMessage
     /** 别的应用来要图，打好码的图导出好了，交回给它。编辑器随之关掉，不弹提示。 */
     data class HandedOver(val uris: List<Uri>) : EditorMessage
+    /** 分享：打好码的图写进缓存了（不进相册），交给系统的分享面板。编辑器留着，不弹提示。 */
+    data class Shared(val uris: List<Uri>, val mimeType: String) : EditorMessage
     data class Error(@StringRes val text: Int) : EditorMessage
 }
 
@@ -28,10 +30,11 @@ sealed interface EditorMessage {
  *
  * 它不再自动跑：PP-OCR 加规则的结果已经够用，自动再跑一遍要多等好几秒，
  * 还会在画面上冒出一批码。现在是用户点了才跑，找到的直接打码。
- * 跑的结果就写在按钮上，不另弹提示。手机底栏的圆钮上写不下字，跑完那一下在画布顶上说一声（见 [EditorUiState.aiReviewsFinished]）。
+ * 宽屏上跑的结果就写在 AI 那一块方块上，不另弹提示。手机底栏的圆钮上写不下字，跑完那一下在画布顶上说一声
+ * （见 [EditorUiState.aiReviewsFinished]）。
  */
 sealed interface AiReview {
-    /** 不出现：机型不支持（也没配外部模型）、文字各类全关了、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
+    /** 不出现：机型不支持、文字各类全关了、这张图还没识别完，或识别结果是从重建里恢复的（没有 OCR 文本可送）。 */
     data object Hidden : AiReview
     data object Ready : AiReview
     data object Running : AiReview
@@ -82,7 +85,18 @@ data class EditorUiState(
      * 一下子就失败时界面也可能来不及看到 Running。
      */
     val aiReviewsFinished: Int = 0,
+    /**
+     * 这台设备上 AI 增强识别用得了：最近一次探测说能用（见 EditorViewModel.offerAiReview）。不像 [aiReview] 那样每换一张图、
+     * 每识别一次就先回到 Hidden：宽屏给 AI 留着那一块方块，这张图还没识别完时那一块灰着，方块的行数不跟着一会儿多一会儿少（2026-10-16）。
+     */
+    val aiOffered: Boolean = false,
+    /** 在导出（分享也是先导出）：顶栏的导出、分享都点不动，在跑的那一颗转圈（见 [sharing]）。 */
     val exporting: Boolean = false,
+    /**
+     * 这一次导出是为了分享（顶栏导出左边那颗）：写进缓存交给分享面板，不进相册。
+     * 导出中时转圈的是分享那颗；批量问还有没看过的时，按钮上写「只分享看过的」。
+     */
+    val sharing: Boolean = false,
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
     /**
@@ -105,7 +119,7 @@ data class EditorUiState(
     val colorPick: ColorTarget? = null,
     /** 大爆炸开着：面板顶替底栏，画布上点字、划字是选字（见 [BigBangState]）。不开着是 null。 */
     val bigBang: BigBangState? = null,
-    /** 批量导出时还有没打开过的图：先问是去看看，还是只导出看过的。 */
+    /** 批量导出、分享时还有没打开过的图：先问是去看看，还是只导出（分享）看过的。 */
     val unopenedDialogVisible: Boolean = false,
     /** 用途水印面板里的文字（「仅供办理 XX 使用」）。打开面板只填上它，开关打开才画到图上（见 [purposeText]）。 */
     val purposeDraft: String = "",

@@ -53,9 +53,8 @@ object SemanticPrompt {
         Category("MAC", SensitiveKind.MAC_ADDR, "MAC 地址（如 3c:22:fb:01:9a:7e）"),
         Category("IP", SensitiveKind.IP_ADDR, "IP 地址"),
         Category("网址", SensitiveKind.URL, "带个人信息或口令的链接"),
-        Category("快递单号", SensitiveKind.TRACKING_NO, "快递运单号"),
         Category("日期", SensitiveKind.DATETIME, "日期、时间"),
-        Category("长数字串", SensitiveKind.LONG_NUMBER, "其他能对应到个人的长串编号"),
+        Category("长数字串", SensitiveKind.LONG_NUMBER, "快递单号、订单号，和其他能对应到个人的长串编号"),
     )
 
     /** 提示词能问的全部类型。 */
@@ -101,11 +100,8 @@ object SemanticPrompt {
     /**
      * 这几类的提示词（不含页上的文字）。用 Google 给 Nano 的写法：## 分段，说明、反例、格式、例子各一段。
      * 一类都不问时为空串，调用方不该再发请求。
-     *
-     * [masked]：页上的文字里，规则认出的号码已经换成了〔电话〕这样的占位符（见 [mask]），提示词多一句说明。
-     * 换掉的不用它再报，但还是线索：〔电话〕前面常是人名。
      */
-    fun instructions(kinds: Set<SensitiveKind>, masked: Boolean = false): String {
+    fun instructions(kinds: Set<SensitiveKind>): String {
         val asked = CATEGORIES.filter { it.kind in kinds }
         if (asked.isEmpty()) return ""
         val labels = asked.distinctBy { it.kind }.associate { it.kind to it.label }
@@ -114,7 +110,6 @@ object SemanticPrompt {
         val notPrivate = NOT_PRIVATE.filter { (_, kind) -> kind == null || kind !in kinds }.joinToString("、") { it.first }
         return buildString {
             append("你在帮用户给手机截图打码。截图里识别出的文字一行一条，每行以「行号: 」开头。找出能指向具体某个人的隐私信息。\n")
-            if (masked) append("文字里的〔电话〕〔证件号〕这类标记是已经打过码的号码，不用再报，但可以当线索（比如〔电话〕前面常是人名）。\n")
             append("## 类型\n")
             asked.forEach { append(it.label).append('：').append(it.hint).append('\n') }
             append("## 不算隐私\n").append(notPrivate).append("。\n")
@@ -132,15 +127,9 @@ object SemanticPrompt {
      * 连同提示词本身和回答，在 nano-v2 那一档约 4000 token 的上限以内。
      *
      * @param texts null 表示这一行不送（置信度太低、没有文字内容）。
-     * @param masked 见 [instructions]。
      */
-    fun chunks(
-        texts: List<String?>,
-        kinds: Set<SensitiveKind> = KINDS,
-        budget: Int = CHUNK_CHARS,
-        masked: Boolean = false,
-    ): List<Chunk> {
-        val instructions = instructions(kinds, masked)
+    fun chunks(texts: List<String?>, kinds: Set<SensitiveKind> = KINDS, budget: Int = CHUNK_CHARS): List<Chunk> {
+        val instructions = instructions(kinds)
         if (instructions.isEmpty()) return emptyList()
         val out = ArrayList<Chunk>()
         var body = StringBuilder()
@@ -220,26 +209,6 @@ object SemanticPrompt {
         while (last >= first && this[last].isWhitespace()) last--
         return if (first <= last) first..last else null
     }
-
-    /**
-     * 发出去之前，把 [find] 认出的几段换成「〔类型〕」（[placeholder]）：规则已经打上码的号码不必离开手机，
-     * 留个占位符模型照样知道那里有个电话。重叠的几段只换先开始、更长的那一段。
-     *
-     * @param texts null 的行原样留着（不送的行）
-     * @param find 一行里要换掉的几段和它们的类型
-     */
-    fun mask(texts: List<String?>, find: (String) -> List<Pair<IntRange, SensitiveKind>>): List<String?> = texts.map { text ->
-        if (text == null) return@map null
-        val spans = find(text).filter { !it.first.isEmpty() && it.first.last < text.length }
-            .sortedWith(compareBy<Pair<IntRange, SensitiveKind>> { it.first.first }.thenByDescending { it.first.last })
-        val kept = ArrayList<Pair<IntRange, SensitiveKind>>()
-        spans.forEach { s -> if (kept.none { it.first.last >= s.first.first }) kept += s }
-        kept.asReversed().fold(text) { acc, (range, kind) -> acc.replaceRange(range, placeholder(kind)) }
-    }
-
-    /** 「〔电话〕」：提示词里这一类的名字，没有的（提示词里不问的类型）写「号码」。 */
-    fun placeholder(kind: SensitiveKind): String =
-        "〔" + (CATEGORIES.firstOrNull { it.kind == kind }?.label ?: "号码") + "〕"
 
     /**
      * 同一处报成了几类时只留一类：聊天里的名字算昵称、标题，其余照提示词里的顺序。
@@ -336,7 +305,7 @@ object SemanticPrompt {
 
     private val NUMBERS = setOf(
         SensitiveKind.ID_NUMBER, SensitiveKind.PAYMENT_CARD, SensitiveKind.PICKUP_CODE, SensitiveKind.PASSPORT,
-        SensitiveKind.SSN, SensitiveKind.IBAN, SensitiveKind.VIN, SensitiveKind.LICENSE_PLATE, SensitiveKind.TRACKING_NO,
+        SensitiveKind.SSN, SensitiveKind.IBAN, SensitiveKind.VIN, SensitiveKind.LICENSE_PLATE,
         SensitiveKind.IP_ADDR, SensitiveKind.MAC_ADDR, SensitiveKind.LONG_NUMBER,
     )
 

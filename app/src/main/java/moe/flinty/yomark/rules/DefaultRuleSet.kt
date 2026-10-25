@@ -7,7 +7,7 @@ import moe.flinty.yomark.R
 import java.time.LocalDate
 
 /**
- * 全部规则（spec §6 + 2026-09-04 增补 §3）。20 条：15 条出厂打码、5 条出厂关着（误报率高，原先只圈出，2026-10-14 起没有这一档）。
+ * 全部规则（spec §6 + 2026-09-04 增补 §3）。19 条：15 条出厂打码、4 条出厂关着（误报率高，原先只圈出，2026-10-14 起没有这一档）。
  * 一种类型一条规则，设置页上一类一行；同一类型的几种认法合成一条（CompositeRule）。
  *
  * 「默认」按**误报率**划线，不按危害划线：高误报类型自动打码会让用户
@@ -23,16 +23,23 @@ object DefaultRuleSet {
     /** 卡面上的「月/年」：「12/28」「09/2031」「12 / 28」。 */
     private const val CARD_MONTH_YEAR = """(?:0[1-9]|1[0-2]) ?/ ?(?:20)?\d{2}"""
 
+    /** 安全码的字段名。 */
+    private val CVV_LABELS = listOf("CVV2", "CVC2", "CVN2", "CVV", "CVC", "安全码", "卡验证码", "卡片验证码")
+
     /**
-     * 银行卡 = Luhn 校验过的卡号 + 字段名后面的安全码和有效期。
+     * 银行卡 = Luhn 校验过的卡号 + 字段名后面的安全码和有效期 + 卡背面签名条旁边的安全码。
      *
      * 卡背面的「CVV2 123」、正面的「VALID THRU 12/28」单凭形状什么都不是，跟在字段名后面才认。
+     * 字段名自己成一段、码在它右边或者下面另成一段的（竖版卡上「CVV2」下面一行的「123」）也认，见 LoneLabel。
      * 字段名照卡面上印的认，英文的只认大写：网址里的「?cid=1234」、一句话里的「Offer valid thru 12/31」、
      * 游戏里的「EXP 08/20」都不是卡。「CID」「CSC」大写的也常是别的意思（客户号、来电号码），不认。
      * 中文的「有效期」「有效期至」不认：优惠券上的「有效期至 06/30」是月/日，和卡的月/年分不开，到处都是。
      * 有效期只认「月/年」，年份在去年到十二年后之间，后面不接连字符（「10/12-10/19」是一段日期）：
      * 身份证背面的「有效期限 2015.08.20-2035.08.20」不是卡。「VALID FROM/THRU」后面是起止两个，一起遮。
      * 优惠券上也印「VALID THRU 12/26」：有效期还要页上有卡（Luhn 对得上的卡号、打了星的卡号，或者 VISA、银联、信用卡这类字）。
+     *
+     * 卡背面签名条右头、旁边白框里没有字段名的那个码（斜体的「357」，常带着卡号末四位「8810 357」）
+     * 靠挨着它的「持卡人签名」「AUTHORIZED SIGNATURE」认，页上也要有卡，见 CardBackCode。
      *
      * 机读码第二行里一长串数字，十回里有一回碰巧过得了 Luhn；身份证号也是，十个里有一个，
      * 同一处让给护照和证件号码，不在身份证号上标「银行卡号」。
@@ -45,13 +52,11 @@ object DefaultRuleSet {
             CARD_NUMBER.findAll(text).filter { Checksums.luhn(it.value.filter(Char::isDigit)) }
                 .map { RuleMatch(it.range, 0.95f) }.toList()
         },
-        LabeledField(
-            labels = listOf("CVV2", "CVC2", "CVN2", "CVV", "CVC", "安全码", "卡验证码", "卡片验证码"),
-            value = Regex("""\d{3,4}(?!\d)"""),
-            confidence = 0.8f,
-        ),
+        LabeledField(labels = CVV_LABELS, value = Regex("""\d{3,4}(?!\d)"""), confidence = 0.8f),
+        LoneLabel(CVV_LABELS, Regex("""\d{3,4}"""), confidence = 0.8f),
         cardExpiry(listOf("VALID THRU", "VALIDTHRU", "GOOD THRU", "EXPIRES END", "EXP DATE"), CARD_MONTH_YEAR),
         cardExpiry(listOf("VALID FROM/THRU"), "(?:$CARD_MONTH_YEAR ?[-–] ?)?$CARD_MONTH_YEAR"),
+        CardBackCode(onCard = { text -> CARD_BACK_WORDS.containsMatchIn(text) || hasCardNumber(text) }, confidence = 0.8f),
         yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER),
     )
 
@@ -62,14 +67,25 @@ object DefaultRuleSet {
             val now = LocalDate.now().year
             r.takeIf { year in now - 1..now + 12 }
         },
-        cue = { text -> CARD_WORDS.containsMatchIn(text) || CARD_NUMBER.findAll(text).any { Checksums.luhn(it.value.filter(Char::isDigit)) } },
+        cue = { text -> CARD_WORDS.containsMatchIn(text) || hasCardNumber(text) },
     )
+
+    private fun hasCardNumber(text: String) = CARD_NUMBER.findAll(text).any { Checksums.luhn(it.value.filter(Char::isDigit)) }
 
     /** 卡上、刷卡小票上的字，和打了星的卡号「6222 **** 1234」。 */
     private val CARD_WORDS = Regex(
         cue("VISA", "Visa", "MASTERCARD", "Mastercard", "UnionPay", "AMERICAN EXPRESS", "AMEX", "JCB", "DISCOVER", "CARD NO",
             "CARDHOLDER", "DEBIT", "CREDIT", "银联", "信用卡", "借记卡", "储蓄卡", "银行卡", "卡号").pattern +
             """|\d{4} ?[*＊•●]{4}|[*＊•●]{4} ?\d{4}"""
+    )
+
+    /**
+     * 卡背面的字：背面常常只有银行名、章程和客服热线，卡组织的标多在正面。
+     * CARD_WORDS 之外再认「银行」「本卡」「持卡人」和英文的「card」「bank」（「This card is issued by Example Bank」）。
+     */
+    private val CARD_BACK_WORDS = Regex(
+        CARD_WORDS.pattern + "|" + cue("持卡人", "本卡", "此卡", "银行", "銀行").pattern +
+            """|(?i:(?<![A-Za-z])(?:card|bank)(?![A-Za-z]))"""
     )
 
     private val IBAN = RegexRule(
@@ -221,10 +237,11 @@ object DefaultRuleSet {
     /**
      * 名字后面紧跟着的下一个字段名（证件上一行几个字段、逐字切分拼回来时连在一起）：名字到它为止。
      * 表头里跟在「姓名」后面的「学号 姓名 班级 备注」也是它们，不是名字。OCR 连成一串的「姓名张三车牌苏A12345」到「车牌」为止。
+     * 卡背面、快递单上的「持卡人签名」「收件人签名」：「签名」是签名栏，不是持卡人、收件人叫「签名」。
      */
     private const val NEXT_FIELD =
         "电话|手机|性别|性別|民族|出生|年龄|地址|住址|身份|证件|联系|国籍|國籍|籍贯|户主|曾用名|学号|工号|班级|部门|职位|职务|备注|成绩|" +
-            "车牌|号牌|車牌"
+            "车牌|号牌|車牌|签名|簽名|签字"
 
     /** 名字里的一个字：不是下一个字段名、也不是「驿站」「门卫」这类非人名的开头。 */
     private const val NAME_CHAR = """(?:(?!$NEXT_FIELD|$NOT_A_NAME_VALUE)[\u4e00-\u9fa5])"""
@@ -544,22 +561,55 @@ object DefaultRuleSet {
             """(?:add )?(?:delivery )?instructions|edit|change|copy)\b|(?:home|work|personal|office|other|main|primary|default)$)"""
     )
 
+    /** 取件码的字段名。 */
+    private val PICKUP_LABELS = listOf("取件码", "取货码", "提货码", "取件号", "自提码", "取餐码")
+
+    /** 取件码的样子：至多三个字母打头，有数字，可用连字符分段（「1-58908」「A12-3-4567」「B3-1107」「36920471」）。 */
+    private const val PICKUP_VALUE = """[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""
+
+    /**
+     * 短信里不写字段名的取件码：「请凭8-5-2001于21:00前取件」「请凭3-2-1234到东门驿站领取」。码紧跟在「凭」后面，
+     * 接着说怎么取（「于」「到」「及时」「取件」……），这一句里要说到取、领、提货，码至少四位数字（[collectWithCode]）：
+     * 「凭2024年发票领取」「凭1000积分领取」「凭8888到店享八折」都不是。
+     */
+    private val COLLECT_WITH_CODE = Regex(
+        """凭 ?($PICKUP_VALUE)(?![A-Za-z0-9])(?= ?(?:于|到|至|在|前往|前来|及时|尽快|尽早|速|来|去|开|取|领|提货))""" +
+            """(?=[^。；;！!？?\n]*?(?:取(?!消)|领|提货))"""
+    )
+
+    /** [COLLECT_WITH_CODE] 里的码，逐字切开的行也认。 */
+    private fun collectWithCode(confidence: Float) = Finder { text ->
+        val view = HanView.of(text)
+        COLLECT_WITH_CODE.findAll(view.text).map { it.groups[1]!! }
+            .filter { code -> code.value.count(Char::isDigit) >= 4 }
+            .map { RuleMatch(view.toSource(it.range), confidence) }.toList()
+    }
+
     /**
      * 取件码（真机漏检补的）。驿站、快递柜凭它取件，截图里露出来，
      * 看到的人就能去把包裹拿走——危害比快递单号直接得多。
      *
-     * 只认字段名后面的值，误报率低，所以默认打码。值至少含一位数字，
+     * 认字段名后面的值和短信里「凭」后面的码，误报率低，所以默认打码。值至少含一位数字，
      * 「请凭取货码及时领取」这种说明文字不会被当成值。
+     *
+     * 短信、聊天里字段名写在句子中间（测评页上漏的）：「凭取件码36920471取件」「柜子取餐码 5-0318」前面紧挨着汉字，
+     * 「您的取件码为 6-2-3001」隔着「为」，照认（LabeledField 的 inSentence）。
+     *
+     * 字段名自己成一段、码在它下面或者同一排右边另成一段的（测评页上漏的：短信卡片上「取件码」下面一行大字的「8-5-2001」），
+     * 见 [LoneLabel]。只认整段就是字段名的：「复制取件码」「出示取件码」这些按钮下面的不算。
      */
     private val PICKUP_CODE = CompositeRule(
         id = "pickup",
         kind = SensitiveKind.PICKUP_CODE,
         enabledByDefault = true,
         LabeledField(
-            labels = listOf("取件码", "取货码", "提货码", "取件号", "自提码"),
-            value = Regex("""[A-Za-z]{0,3}\d[A-Za-z0-9]*(?:\s?[-－]\s?[A-Za-z0-9]+)*"""),
+            labels = PICKUP_LABELS,
+            value = Regex(PICKUP_VALUE),
             confidence = 0.8f,
+            inSentence = true,
         ),
+        collectWithCode(confidence = 0.7f),
+        LoneLabel(PICKUP_LABELS, Regex(PICKUP_VALUE), confidence = 0.8f),
     )
 
     private val BIRTH_DATE_LABELS = listOf(
@@ -712,74 +762,56 @@ object DefaultRuleSet {
         return true
     }
 
-    private val TRACKING = object : Rule {
-        override val id = "tracking"
-        override val kind = SensitiveKind.TRACKING_NO
-        override val enabledByDefault = false
-        // 15 位的一代身份证号、字段名后面 12 位的档案编号也是这个长度
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
-
-        private val ups = Regex("""(?<![A-Za-z0-9])1Z[0-9A-Za-z]{16}(?![A-Za-z0-9])""")
-        // FedEx 12/15 位、USPS 20/22 位：无校验位，置信度调低
-        private val plainDigits = Regex("""(?<![\d-])(?:\d{12}|\d{15}|\d{20}|\d{22})(?![\d-])""")
-
-        override fun findIn(text: String): List<RuleMatch> {
-            val out = ArrayList<RuleMatch>()
-            ups.findAll(text)
-                .filter { Checksums.upsCheckDigit(it.value) }
-                .forEach { out += RuleMatch(it.range, 0.85f) }
-            plainDigits.findAll(text)
-                .filter { d -> out.none { it.range.first <= d.range.last && d.range.first <= it.range.last } }
-                .forEach { out += RuleMatch(it.range, 0.5f) }   // 无校验位 → 低置信度
-            return out
-        }
-    }
+    /** 长数字串拿它认出日期，所以单独拎出来、与规则表共用同一个实例（同 PHONE）。 */
+    private val DATE_TIME = DateTimeRule()
 
     /**
-     * 长数字串兜底（spec §15 第 5 条的实测漏检）。
+     * 长数字串兜底：至少 8 位数字连成的一串，中间可以夹着连字符和大写字母。快递单号（「SF1234567890123」
+     * 「1Z12345E0205271688」）、订单号（「231016-091234567890123」「123-4567890-1234567」）、交易号都归这一类。
      *
-     * 实测：真实淘宝订单页上的 28 位支付宝交易号不被任何规则命中——
-     * CARD 限 13–19 位、TRACKING 限 12/15/20/22 位，28 位落在所有窗口之外。
-     * 漏检是事故，所以补一条不看语义、只看长度的兜底。
+     * 起初（spec §15 第 5 条的实测漏检：淘宝订单页上 28 位的支付宝交易号没有一条规则认）只认 16 位以上的纯数字，
+     * 快递单号另成一类，只认 UPS 和几种固定长度。2026-10-16 起快递单号并进来，下限降到 8 位：
+     * 单号、订单号的写法太多，按快递公司、按长度认总有漏的。
      *
-     * 三条边界，都是为了不跟已有规则抢同一串数字（合并只在同 kind 之间做，
-     * 抢起来会在同一处叠出两个候选）：
-     * - 下限 16 位：E.164 电话最长 15 位，兜底与 PhoneRule 完全不重叠；
-     * - 排除 20/22 位：那是 TRACKING 的 USPS 窗口；
-     * - 排除 13–19 位里 Luhn 通过的：那是 CARD 的地盘。
-     *   只在 CARD 的窗口内让位——别处 Luhn 碰巧通过（约十分之一）不该让兜底失灵。
+     * 它是兜底，同一处别的类型认出了东西就让开（yieldsTo 是其余各类）：电话、证件号码、银行卡号……
+     * 让开只在那一类开着时做得到（引擎里只有开着的规则），所以有两样不管那一类开没开都不算：
+     * - 日期时间：「2026-10-16」也是 8 位数字夹着连字符，日期时间出厂关着，不能从这里遮上；
+     * - 13–19 位、过得了 Luhn 的：那是银行卡号的地盘。只在卡号的长度里让——别处碰巧过得了 Luhn（约十分之一）不该让兜底失灵。
      *
-     * 没有任何校验位，误报天然多（时间戳拼接、纯序号都会撞上），
+     * 没有任何校验位，误报天然多（时间戳、序号、金额都会撞上），
      * 因此按 §6「默认按误报率划线」出厂关着。
      */
     private val LONG_NUMBER = object : Rule {
         override val id = "longnum"
         override val kind = SensitiveKind.LONG_NUMBER
         override val enabledByDefault = false
-        // 18 位的身份证号原先就落在这里，那时只圈不遮
-        override val yieldsTo = setOf(SensitiveKind.PASSPORT, SensitiveKind.ID_NUMBER)
+        override val yieldsTo = SensitiveKind.entries.toSet() - SensitiveKind.LONG_NUMBER
 
-        private val run = Regex("""(?<![A-Za-z0-9])\d{16,}(?![A-Za-z0-9])""")
-        private val trackingLengths = setOf(20, 22)
+        /**
+         * 数字、大写字母、连字符连成的一段：头尾不是连字符，前后不挨着字母数字和下划线
+         * （「abc2026…」是哈希、变量名，「IMG_20260312_100512.jpg」是文件名）。
+         */
+        private val run = Regex("""(?<![A-Za-z0-9_])[0-9A-Z](?:[0-9A-Z－-]*[0-9A-Z])?(?![A-Za-z0-9_])""")
+        private val minDigits = 8
 
-        override fun findIn(text: String): List<RuleMatch> =
-            run.findAll(text)
-                .filter { m ->
-                    val v = m.value
-                    when {
-                        v.length in trackingLengths -> false
-                        v.length in 13..19 && Checksums.luhn(v) -> false
-                        else -> true
-                    }
+        override fun findIn(text: String): List<RuleMatch> {
+            val runs = run.findAll(text).filter { m -> m.value.count(Char::isDigit) >= minDigits }.toList()
+            if (runs.isEmpty()) return emptyList()
+            val dates = DATE_TIME.findIn(text).map { it.range }
+            return runs
+                .filterNot { m -> dates.any { m.range.first >= it.first && m.range.last <= it.last } }
+                .filterNot { m ->
+                    val digits = m.value.filter(Char::isDigit)
+                    m.value.none(Char::isLetter) && digits.length in 13..19 && Checksums.luhn(digits)
                 }
                 .map { RuleMatch(it.range, 0.4f) }      // 无校验位 → 低置信度
-                .toList()
+        }
     }
 
     val rules: List<Rule> = listOf(
         CARD, IBAN, SSN, MAC, EMAIL, PHONE, PASSPORT, ID_NUMBER, VIN, API_KEY,
         NAME, ADDRESS, PICKUP_CODE, BIRTH_DATE, PLATE,
-        URL, IP, TRACKING, LONG_NUMBER, DateTimeRule(),
+        URL, IP, LONG_NUMBER, DATE_TIME,
     )
 
     // ---------- 人名的旁证 ----------

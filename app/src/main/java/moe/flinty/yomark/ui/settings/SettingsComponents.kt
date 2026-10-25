@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui.settings
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -43,6 +44,7 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -66,18 +68,24 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
+import moe.flinty.yomark.ui.theme.isDark
 
 /*
  * 设置各页共用的部件，照 Android 16 的系统设置排：
  *
- * - 页面底色是 surfaceContainer，行是一张张浅色卡片（surfaceBright）。同一组的行之间只留一道 2 dp 的缝，
+ * - 页面底色是 surfaceContainer，行是一张张比底色亮一档的卡片（surfaceBright），深色界面也是这样配的。同一组的行之间只留一道 2 dp 的缝，
  *   组的外侧是大圆角、组内相邻处是小圆角，看上去是一整块被切开的卡片；
  * - 大标题栏，列表往上滚时收成普通标题栏；
  * - 一级页每一项前面一个彩色圆底图标（SettingsIconColors），二级页的分组标题用主题色。
  */
 
-/** 设置一级页图标的一对颜色：圆底与图标。配色表见 [SettingsIconColors]。 */
-internal class SettingsIconColor(val container: Color, val content: Color)
+/** 设置一级页图标的颜色：圆底与图标，浅色、深色界面各一对。配色表见 [SettingsIconColors]。 */
+internal class SettingsIconColor(
+    val container: Color,
+    val content: Color,
+    val darkContainer: Color,
+    val darkContent: Color,
+)
 
 private val OuterCorner = 20.dp
 private val InnerCorner = 4.dp
@@ -107,17 +115,20 @@ internal fun RowGapSpacer() {
 }
 
 /**
- * 每一页的骨架。应用是边到边的（见 enableLightEdgeToEdge），系统栏让不让开由各屏自己管：
+ * 每一页的骨架。应用是边到边的（见 layoutEdgeToEdge），系统栏让不让开由各屏自己管：
  * 标题栏垫在状态栏下面、固定在顶上，列表滚上去时从它底下穿过；列表一直画到屏幕底边，
  * 最后一行下面留出导航条的高度。横屏时左右再让开挖孔与三键导航。
  *
  * 各页都是自己的 Activity，这里不拦系统返回：返回由 Activity 自己 finish，预见式返回的跨 Activity 动画才放得出来。
+ * 宽屏上分两栏时（见 SettingsHost）各栏各让各的：左栏不管右边的系统栏、挖孔，右栏不管左边的。
+ *
+ * [onNavigateUp] 为 null 时标题栏左边不放返回：分栏时右栏最底下那一页，它的上一层就是左栏。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun SettingsScaffold(
     title: String,
-    onNavigateUp: () -> Unit,
+    onNavigateUp: (() -> Unit)?,
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
     content: LazyListScope.() -> Unit,
@@ -131,7 +142,9 @@ internal fun SettingsScaffold(
             LargeTopAppBar(
                 title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    if (onNavigateUp != null) {
+                        IconButton(onClick = onNavigateUp) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back)) }
+                    }
                 },
                 actions = actions,
                 windowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Top),
@@ -226,7 +239,7 @@ internal fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable C
  * 这样点哪里都算，读屏也把标题、说明和开关读成一个整体。
  *
  * 放在 [SettingsGroup] 里时不用传 [shape]；懒加载列表里逐行排的组，用 [groupItemShape] 按位置给，
- * 再在 [modifier] 上加 [lazyGroupInset]。
+ * 再在 [modifier] 上加 [lazyGroupInset]。[container] 是卡片的底色，只有分栏时左栏里选中的那一行换（见 [NavigationRow]）。
  */
 @Composable
 internal fun SettingsRow(
@@ -236,6 +249,7 @@ internal fun SettingsRow(
     summary: String? = null,
     shape: Shape = RoundedCornerShape(InnerCorner),
     enabled: Boolean = true,
+    container: Color = MaterialTheme.colorScheme.surfaceBright,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     below: (@Composable () -> Unit)? = null,
@@ -244,7 +258,7 @@ internal fun SettingsRow(
         modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(MaterialTheme.colorScheme.surfaceBright)
+            .background(container)
             .then(interaction)
             .heightIn(min = 64.dp)
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -280,14 +294,15 @@ internal fun SettingsRow(
 
 private const val DisabledAlpha = 0.38f
 
-/** 一级页的彩色图标：浅色圆底上一个同色相的深色图标。 */
+/** 一级页的彩色图标：浅色界面是浅色圆底上一个同色相的深色图标，深色界面反过来。 */
 @Composable
 internal fun SettingsIcon(icon: ImageVector, colors: SettingsIconColor, modifier: Modifier = Modifier) {
+    val dark = MaterialTheme.colorScheme.isDark
     Box(
-        modifier.size(40.dp).background(colors.container, CircleShape),
+        modifier.size(40.dp).background(if (dark) colors.darkContainer else colors.container, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = colors.content, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = null, tint = if (dark) colors.darkContent else colors.content, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -302,7 +317,12 @@ internal fun RowIcon(icon: ImageVector, modifier: Modifier = Modifier) {
     )
 }
 
-/** 点进下一页（或弹出对话框）的一行。Android 的设置首页不画右箭头，这里也不画。 */
+/**
+ * 点进下一页（或弹出对话框）的一行。Android 的设置首页不画右箭头，这里也不画。
+ *
+ * 分栏时一级页在左栏（见 SettingsHost），[selected] 不为 null：右栏正开着的那一项底色换成 secondaryContainer，
+ * 和编辑器宽屏列表里选中的那一行一个颜色，读屏也读出选中了哪一项。不打开页的行（帮助）照旧传 null。
+ */
 @Composable
 internal fun NavigationRow(
     title: String,
@@ -311,12 +331,23 @@ internal fun NavigationRow(
     iconColors: SettingsIconColor,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean? = null,
 ) {
+    val colors = MaterialTheme.colorScheme
+    val container by animateColorAsState(
+        if (selected == true) colors.secondaryContainer else colors.surfaceBright,
+        label = "row container",
+    )
     SettingsRow(
         title = title,
         summary = summary,
         modifier = modifier,
-        interaction = Modifier.clickable(onClick = onClick),
+        container = container,
+        interaction = if (selected == null) {
+            Modifier.clickable(onClick = onClick)
+        } else {
+            Modifier.selectable(selected = selected, role = Role.Tab, onClick = onClick)
+        },
         leading = { SettingsIcon(icon, iconColors) },
     )
 }

@@ -15,7 +15,7 @@ class AiKindsTest {
         )
         // 出厂关着的几类不找，聊天记录（在实验室里）也出厂关着
         assertThat(kinds).containsNoneOf(
-            SensitiveKind.DATETIME, SensitiveKind.URL, SensitiveKind.IP_ADDR, SensitiveKind.TRACKING_NO, SensitiveKind.LONG_NUMBER,
+            SensitiveKind.DATETIME, SensitiveKind.URL, SensitiveKind.IP_ADDR, SensitiveKind.LONG_NUMBER,
             SensitiveKind.CHAT_NAME, SensitiveKind.CHAT_TITLE,
         )
     }

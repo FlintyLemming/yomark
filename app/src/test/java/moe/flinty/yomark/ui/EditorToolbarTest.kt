@@ -1,5 +1,7 @@
 package moe.flinty.yomark.ui
 
+import android.view.HapticFeedbackConstants
+import android.view.View
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.foundation.layout.width
@@ -10,9 +12,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -52,6 +56,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
@@ -92,6 +97,9 @@ class EditorToolbarTest {
     private var pillLeft = 0
     private var pillRight = 0
 
+    /** 这一行所在的 View：轻震是让它震的，Robolectric 记着它最后震的是哪一下。 */
+    private lateinit var view: View
+
     private fun show(
         actions: StyleBarActions = Recorder(),
         purposeOn: Boolean = false,
@@ -99,6 +107,7 @@ class EditorToolbarTest {
     ) {
         open = initial
         compose.setContent {
+            view = LocalView.current
             MaterialTheme {
                 Surface {
                     // 包一层，量胶囊眼下的左右沿（这一行交给底栏画胶囊的两条线，见 PillLeft）
@@ -604,5 +613,58 @@ class EditorToolbarTest {
         show(initial = ToolGroup.EDIT)
         val name = compose.onNodeWithText("Watermark", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertThat(name.right).isLessThan(compose.onNodeWithText("Watermark").getUnclippedBoundsInRoot().right)
+    }
+
+    // ---------- 轻震 ----------
+
+    /** [act] 之后 View 最后震的是哪一下，没震是 NO_HAPTICS。Robolectric 只记最后一下，先清掉。 */
+    private fun hapticAfter(act: () -> Unit): Int {
+        view.performHapticFeedback(HapticFeedbackConstants.NO_HAPTICS)
+        act()
+        return shadowOf(view).lastHapticFeedbackPerformed()
+    }
+
+    private fun assertTicks(what: String, node: SemanticsNodeInteraction) =
+        assertWithMessage("点$what").that(hapticAfter { node.performClick() }).isEqualTo(HapticFeedbackConstants.CLOCK_TICK)
+
+    /** 点这一行上的哪一样都轻震一下（照 Bettbox 的底栏，CLOCK_TICK）：两组、返回、展开后的各项、两颗圆钮。 */
+    @Test fun everyTapOnTheRowTicks() {
+        ai = AiReview.Ready
+        show()
+        assertTicks("打码", compose.onNodeWithText("打码"))
+        assertTicks("一种样式", compose.onNodeWithText("马赛克"))
+        assertTicks("返回", backButton)
+        assertTicks("编辑", compose.onNodeWithText("编辑"))
+        assertTicks("水印", compose.onNodeWithText("水印"))
+        assertTicks("返回", backButton)
+        assertTicks("工具", toolboxButton)
+        assertTicks("AI 增强识别", compose.onNodeWithText("AI 增强识别"))
+        assertTicks("「工具」里的大爆炸", compose.onNodeWithText("大爆炸"))
+        assertTicks("返回", backButton)
+        assertTicks("按住对比", compareButton)
+        ai = AiReview.Hidden
+        assertTicks("大爆炸的圆钮", bigBangButton)
+    }
+
+    /** 点不动的不震：大爆炸还没认出字，没有可比的。 */
+    @Test fun whatCannotBeTappedDoesNotTick() {
+        bigBangReady = false
+        canCompare = false
+        show()
+        assertThat(hapticAfter { bigBangButton.performClick() }).isEqualTo(HapticFeedbackConstants.NO_HAPTICS)
+        assertThat(hapticAfter { compareButton.performClick() }).isEqualTo(HapticFeedbackConstants.NO_HAPTICS)
+    }
+
+    /** 按住对比是在比：按着、松手都不震，只有点一下才震。 */
+    @Test fun holdingCompareDoesNotTick() {
+        show()
+        compose.mainClock.autoAdvance = false
+        val held = hapticAfter {
+            compareButton.performTouchInput { down(center) }
+            compose.mainClock.advanceTimeBy(1_000)
+            compareButton.performTouchInput { up() }
+            compose.mainClock.advanceTimeBy(100)
+        }
+        assertThat(held).isEqualTo(HapticFeedbackConstants.NO_HAPTICS)
     }
 }

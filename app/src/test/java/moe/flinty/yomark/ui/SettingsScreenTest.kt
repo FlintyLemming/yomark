@@ -3,6 +3,7 @@ package moe.flinty.yomark.ui
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsNotSelected
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasScrollToKeyAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isSelectable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -25,8 +27,6 @@ import moe.flinty.yomark.engine.RecognitionConfig
 import moe.flinty.yomark.engine.RuleState
 import moe.flinty.yomark.engine.TextEngineOption
 import moe.flinty.yomark.BuildConfig
-import moe.flinty.yomark.engine.genai.ExternalModelException
-import moe.flinty.yomark.engine.genai.ExternalModelSettings
 import moe.flinty.yomark.engine.genai.NanoStatus
 import moe.flinty.yomark.export.BrandWatermarkStyle
 import moe.flinty.yomark.rules.RuleCatalog
@@ -36,11 +36,12 @@ import moe.flinty.yomark.ui.settings.AiSettingsScreen
 import moe.flinty.yomark.ui.settings.AppearanceSettingsScreen
 import moe.flinty.yomark.ui.settings.BarcodeSettingsScreen
 import moe.flinty.yomark.ui.settings.DeveloperSettingsScreen
-import moe.flinty.yomark.ui.settings.ExternalField
+import moe.flinty.yomark.ui.settings.FEEDBACK_EMAIL
 import moe.flinty.yomark.ui.settings.FaceSettingsScreen
 import moe.flinty.yomark.ui.settings.GeneralSettingsScreen
 import moe.flinty.yomark.ui.settings.LabsSettingsScreen
 import moe.flinty.yomark.ui.settings.LanguageSettingsScreen
+import moe.flinty.yomark.ui.settings.NEW_ISSUE_URL
 import moe.flinty.yomark.ui.settings.PRIVACY_POLICY_URL
 import moe.flinty.yomark.ui.settings.SettingsPage
 import moe.flinty.yomark.ui.settings.SettingsScreen
@@ -49,12 +50,17 @@ import moe.flinty.yomark.ui.settings.TextRuleSettingsScreen
 import moe.flinty.yomark.ui.settings.TextSettingsScreen
 import moe.flinty.yomark.ui.settings.mlKitSummary
 import moe.flinty.yomark.ui.theme.ThemeColor
+import moe.flinty.yomark.ui.theme.ThemeMode
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import android.content.ActivityNotFoundException
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 
 /**
@@ -84,7 +90,7 @@ class SettingsScreenTest {
 
     @Test fun everyTopicIsOnTheFirstPage() {
         home()
-        listOf("文字", "人脸", "条码", "AI", "通用", "外观", "实验室", "语言", "关于").forEach {
+        listOf("文字", "人脸", "条码", "AI", "通用", "外观", "实验室", "语言", "帮助", "关于").forEach {
             compose.onNodeWithText(it).assertIsDisplayed()
         }
     }
@@ -101,10 +107,10 @@ class SettingsScreenTest {
         compose.onNode(hasText("文字识别")).assertDoesNotExist()
     }
 
-    /** 隐私权政策、恢复默认都挪进了「关于」：一级页上那一行写着版本号，也提一句这两样在里面。 */
+    /** 隐私权政策、恢复默认都挪进了「关于」，反馈也在里面：一级页上那一行写着版本号，也提一句这几样在里面。 */
     @Test fun theAboutRowSaysTheVersionAndWhatMovedIn() {
         home()
-        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 恢复默认设置").assertIsDisplayed()
+        compose.onNodeWithText("版本 ${BuildConfig.VERSION_NAME} · 隐私权政策 · 反馈 · 恢复默认设置").assertIsDisplayed()
         compose.onNode(hasText("yomark.flinty.moe", substring = true)).assertDoesNotExist()
     }
 
@@ -126,10 +132,10 @@ class SettingsScreenTest {
         )
         compose.onNodeWithText("打码 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("编辑、水印样式").assertIsDisplayed()
+        compose.onNodeWithText("编辑、识别、水印样式").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
         val off = RuleCatalog.all.size - masked
-        compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类 · PP-OCR").assertIsDisplayed()
+        compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类").assertIsDisplayed()
     }
 
     @Test fun tappingATopicOpensItsPage() {
@@ -155,11 +161,11 @@ class SettingsScreenTest {
         assertThat(opened).containsExactly(SettingsPage.GENERAL)
     }
 
-    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它（和外部模型）。 */
+    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它。 */
     @Test fun chatScreenshotsLiveInLabs() {
         val opened = mutableListOf<SettingsPage>()
         home(onOpen = { opened += it })
-        compose.onNodeWithText("识别聊天记录、外部模型").assertIsDisplayed()
+        compose.onNodeWithText("识别聊天记录").assertIsDisplayed()
         compose.onNodeWithText("实验室").performClick()
         assertThat(opened).containsExactly(SettingsPage.LABS)
     }
@@ -223,6 +229,24 @@ class SettingsScreenTest {
         assertThat(language.bottom).isAtMost(about.top)
         compose.onNodeWithText("语言").performClick()
         assertThat(opened).containsExactly(SettingsPage.LANGUAGE)
+    }
+
+    // ---------- 帮助 ----------
+
+    /** 帮助在语言和关于之间，点了重新放一遍引导，不进设置的哪一页。 */
+    @Test fun helpReplaysTheTour() {
+        val opened = mutableListOf<SettingsPage>()
+        var replays = 0
+        show { SettingsScreen(RecognitionConfig(), { opened += it }, onNavigateUp = {}, onReplayTour = { replays++ }) }
+        compose.onNodeWithText("重新观看引导").assertIsDisplayed()
+        val language = compose.onNodeWithText("语言").fetchSemanticsNode().boundsInRoot
+        val help = compose.onNodeWithText("帮助").fetchSemanticsNode().boundsInRoot
+        val about = compose.onNodeWithText("关于").fetchSemanticsNode().boundsInRoot
+        assertThat(language.bottom).isAtMost(help.top)
+        assertThat(help.bottom).isAtMost(about.top)
+        compose.onNodeWithText("帮助").performClick()
+        assertThat(replays).isEqualTo(1)
+        assertThat(opened).isEmpty()
     }
 
     @Test fun theLanguageRowSaysSystemDefaultWhenNothingWasPicked() {
@@ -303,14 +327,17 @@ class SettingsScreenTest {
     private fun textPage(
         config: RecognitionConfig = RecognitionConfig(),
         onChange: (RecognitionConfig) -> Unit = {},
-        onOpenEngine: () -> Unit = {},
         onOpenRule: (String) -> Unit = {},
-    ) = show { TextSettingsScreen(config, onChange, onOpenEngine, onOpenRule, onNavigateUp = {}) }
+    ) = show { TextSettingsScreen(config, onChange, onOpenRule, onNavigateUp = {}) }
 
-    /** 识别引擎在上面，下面是各类；每类一行，小字是它眼下怎么处理。AI 增强识别没有开关了，总是开着。 */
-    @Test fun theTextPageReadsTextAndListsEveryKind() {
+    /**
+     * 每类一行，小字是它眼下怎么处理。识别引擎挪去了「AI」页，AI 增强识别没有开关了（总是开着），
+     * 上面原先的「文字识别」一组都不在了。
+     */
+    @Test fun theTextPageListsEveryKind() {
         textPage()
-        compose.onNodeWithText("识别引擎").assertIsDisplayed()
+        compose.onNodeWithText("识别引擎").assertDoesNotExist()
+        compose.onNodeWithText("文字识别").assertDoesNotExist()
         compose.onNodeWithText("AI 增强识别").assertDoesNotExist()
         compose.onNode(hasScrollToKeyAction()).performScrollToKey("phone")
         compose.onNode(hasTestTag("rule-phone") and hasText("打码")).assertExists()
@@ -332,13 +359,6 @@ class SettingsScreenTest {
         compose.onNode(hasTestTag("rule-name") and hasText("打码 · 没有旁证的不打码")).assertExists()
     }
 
-    @Test fun tappingTheEngineOpensItsPage() {
-        var opened = false
-        textPage(onOpenEngine = { opened = true })
-        compose.onNodeWithText("识别引擎").performClick()
-        assertThat(opened).isTrue()
-    }
-
     @Test fun tappingAKindOpensItsPage() {
         var opened: String? = null
         textPage(onOpenRule = { opened = it })
@@ -347,18 +367,26 @@ class SettingsScreenTest {
         assertThat(opened).isEqualTo("url")
     }
 
-    /** 恢复默认管这一页和它下面的各页：引擎、各类、人名的开关。人脸、条码不动。 */
-    @Test fun resettingTheTextPageKeepsFacesAndBarcodes() {
+    /** 恢复默认管这一页和它下面的各页：各类、人名的开关。人脸、条码不动，挪去了「AI」页的识别引擎也不动。 */
+    @Test fun resettingTheTextPageKeepsFacesBarcodesAndTheEngine() {
         var latest: RecognitionConfig? = null
         val config = RecognitionConfig(
-            textEngine = TextEngineOption.LATIN,
+            textEngine = TextEngineOption.MLKIT,
             faceState = RuleState.OFF,
             barcodeState = RuleState.OFF,
             maskUnanchoredNames = true,
         ).withRule("phone", RuleState.OFF, RuleCatalog.factoryState("phone"))
         textPage(config, onChange = { latest = it })
         compose.onNodeWithText("恢复默认").performClick()
-        assertThat(latest).isEqualTo(RecognitionConfig(faceState = RuleState.OFF, barcodeState = RuleState.OFF))
+        assertThat(latest).isEqualTo(
+            RecognitionConfig(textEngine = TextEngineOption.MLKIT, faceState = RuleState.OFF, barcodeState = RuleState.OFF),
+        )
+    }
+
+    /** 只改了识别引擎，「文字」页就是出厂的样子：恢复默认点不了。 */
+    @Test fun theEngineAloneLeavesTheTextPageAtFactory() {
+        textPage(RecognitionConfig(textEngine = TextEngineOption.MLKIT))
+        compose.onNodeWithText("恢复默认").assertIsNotEnabled()
     }
 
     @Test fun resetIsDisabledWhenTheTextPageIsAtFactory() {
@@ -366,12 +394,15 @@ class SettingsScreenTest {
         compose.onNodeWithText("恢复默认").assertIsNotEnabled()
     }
 
+    /** 只有 PP-OCR 和 ML Kit 两项：ML Kit 原先分英文、中文、中英三档，并成了一档，中英文都认。 */
     @Test fun pickingAnEngineEmitsIt() {
         var latest: RecognitionConfig? = null
         show { TextEngineSettingsScreen(RecognitionConfig(), onChange = { latest = it }, onNavigateUp = {}) }
-        compose.onNodeWithText("PP-OCR").assertIsSelected()
-        compose.onNodeWithText("ML Kit 英文").performClick()
-        assertThat(latest?.textEngine).isEqualTo(TextEngineOption.LATIN)
+        compose.onNode(hasText("PP-OCR") and hasText("识别更准，速度稍慢")).assertIsSelected()
+        compose.onAllNodes(isSelectable()).assertCountEquals(2)
+        listOf("ML Kit 英文", "ML Kit 中文", "ML Kit 中英").forEach { compose.onNodeWithText(it).assertDoesNotExist() }
+        compose.onNode(hasText("ML Kit") and hasText("中英文都能认")).performClick()
+        assertThat(latest?.textEngine).isEqualTo(TextEngineOption.MLKIT)
     }
 
     // ---------- 文字里的一类 ----------
@@ -422,74 +453,22 @@ class SettingsScreenTest {
         compose.onNodeWithTag("unanchored-names").assertIsNotEnabled()
     }
 
-    // ---------- 外部模型（实验室） ----------
-
-    private val filled = ExternalModelSettings(enabled = true, baseUrl = "https://api.example.com/v1", apiKey = "sk-secret", model = "glm")
-
-    /** 出厂关着，开关在实验室里。 */
-    @Test fun theExternalModelIsOffInLabsAndCanBeTurnedOn() {
-        var on: Boolean? = null
-        show {
-            LabsSettingsScreen(RecognitionConfig(), onChange = {}, onNavigateUp = {}, externalModel = false, onExternalModelChange = { on = it })
-        }
-        compose.onNodeWithTag("labs-external-model").assertIsOff().performClick()
-        assertThat(on).isTrue()
-    }
-
-    /** 实验室里没打开，AI 页上就没有这一组。 */
-    @Test fun theAiPageHasNoExternalGroupUntilLabsTurnsItOn() {
-        ai(nano = null)
-        compose.onNodeWithText("外部模型").assertDoesNotExist()
-    }
-
-    /** 填了什么一看就知道，key 只说填没填；没填完不能测。 */
-    @Test fun theExternalGroupSaysWhatIsFilledInWithoutShowingTheKey() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(model = "")) }
-        compose.onNodeWithText("外部模型").assertIsDisplayed()
-        compose.onNodeWithText("https://api.example.com/v1").assertIsDisplayed()
-        compose.onNodeWithText("已填写").assertIsDisplayed()
-        compose.onNodeWithText("sk-secret", substring = true).assertDoesNotExist()
-        compose.onNodeWithText("未填写").assertIsDisplayed()
-        compose.onNodeWithTag("external-test").assertIsNotEnabled()
-    }
-
-    /**
-     * 弹框保存时只换掉这一项，别的几项用存着的那份。
-     * 弹框本身不在这里点开：Robolectric 下弹框里的输入框会一直重新排版、耗尽内存，弹框在模拟器上验。
-     */
-    @Test fun savingAFieldReplacesOnlyThatField() {
-        assertThat(ExternalField.MODEL.of(filled)).isEqualTo("glm")
-        assertThat(ExternalField.URL.set(filled, "https://other.example.com/v1"))
-            .isEqualTo(filled.copy(baseUrl = "https://other.example.com/v1"))
-        assertThat(ExternalField.KEY.set(ExternalModelSettings(), "sk-2")).isEqualTo(ExternalModelSettings(apiKey = "sk-2"))
-    }
-
-    @Test fun anHttpAddressIsTurnedDownBeforeTesting() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled.copy(baseUrl = "http://192.168.1.2/v1")) }
-        compose.onNodeWithText("接口地址要以 https:// 开头").assertIsDisplayed()
-        compose.onNodeWithTag("external-test").assertIsNotEnabled()
-    }
-
-    @Test fun testingTheConnectionSaysHowLongItTook() {
-        show { AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = { 1400L }) }
-        compose.onNodeWithTag("external-test").performClick()
-        compose.onNodeWithText("可用 · 1.4 秒").assertIsDisplayed()
-    }
-
-    /** 401、404 带着接口自己说的那句：一看就知道是 key 还是地址填错了。 */
-    @Test fun aFailedTestSaysWhy() {
-        show {
-            AiSettingsScreen(null, onNavigateUp = {}, external = filled, onTestExternal = {
-                throw ExternalModelException(ExternalModelException.Reason.HTTP, 401, "Invalid API key")
-            })
-        }
-        compose.onNodeWithTag("external-test").performClick()
-        compose.onNodeWithText("失败：HTTP 401 · Invalid API key").assertIsDisplayed()
-    }
-
     // ---------- AI ----------
 
-    private fun ai(nano: NanoStatus?) = show { AiSettingsScreen(nano, onNavigateUp = {}) }
+    private fun ai(
+        nano: NanoStatus?,
+        textEngine: TextEngineOption = RecognitionConfig().textEngine,
+        onOpenEngine: () -> Unit = {},
+    ) = show { AiSettingsScreen(nano, textEngine, onOpenEngine, onNavigateUp = {}) }
+
+    /** 识别引擎从「文字」挪到了这里，在最上面：小字是眼下用的那个，点了进识别引擎页。 */
+    @Test fun theAiPageSaysWhichEngineIsInUseAndOpensIt() {
+        var opened = false
+        ai(nano = null, textEngine = TextEngineOption.MLKIT, onOpenEngine = { opened = true })
+        compose.onNode(hasTestTag("engine") and hasText("识别引擎") and hasText("ML Kit")).assertIsDisplayed()
+        compose.onNodeWithTag("engine").performClick()
+        assertThat(opened).isTrue()
+    }
 
     /** 进页时先问 AICore，问完之前不能空着，也不能先说「没有」。 */
     @Test fun theAiPageSaysItIsStillChecking() {
@@ -533,7 +512,6 @@ class SettingsScreenTest {
     /** 随包的 PP-OCR 不用问谁：版本是打包时定的，进页就写出来。 */
     @Test fun theAiPageShowsTheBundledPpOcrVersion() {
         ai(nano = null)
-        compose.onNodeWithText("PP-OCR").assertIsDisplayed()
         compose.onNodeWithText("PP-OCRv6 small · 随安装包内置").assertIsDisplayed()
     }
 
@@ -559,6 +537,7 @@ class SettingsScreenTest {
         onDebugTraceChange: (Boolean) -> Unit = {},
         onReset: () -> Unit = {},
         openUrl: (String) -> Unit = {},
+        sendEmail: (Intent) -> Unit = {},
         notify: (String) -> Unit = {},
         play: Boolean = false,
     ) = show {
@@ -569,10 +548,14 @@ class SettingsScreenTest {
             onNavigateUp = {},
             version = "0.11.1 (19)",
             play = play,
+            device = pixel,
             openUrl = openUrl,
+            sendEmail = sendEmail,
             notify = notify,
         )
     }
+
+    private val pixel = "Google Pixel 10 Pro · Android 17 (API 37)"
 
     @Test fun theAboutPageShowsTheVersion() {
         about()
@@ -600,6 +583,47 @@ class SettingsScreenTest {
         about(openUrl = { throw IllegalStateException("no browser") })
         compose.onNodeWithText("隐私权政策").performClick()
         compose.onNodeWithText("隐私权政策").assertIsDisplayed()
+    }
+
+    /** 反馈一组：发邮件那一行写着地址，点了交给邮件应用，主题填好，正文最后是版本（带 Play 版）和机型。 */
+    @Test fun feedbackEmailGoesToTheMailAppWithVersionAndDevice() {
+        var sent: Intent? = null
+        about(play = true, sendEmail = { sent = it })
+        compose.onNodeWithText("反馈").assertIsDisplayed()
+        compose.onNodeWithText(FEEDBACK_EMAIL).assertIsDisplayed()
+        compose.onNodeWithText("发邮件").performClick()
+        val mail = sent!!
+        assertThat(mail.dataString).startsWith("mailto:$FEEDBACK_EMAIL?")
+        assertThat(mail.getStringExtra(Intent.EXTRA_SUBJECT)).isEqualTo("有码反馈")
+        assertThat(mail.getStringExtra(Intent.EXTRA_TEXT)).endsWith("\n有码 0.11.1 (19) · Play 版\n$pixel")
+    }
+
+    /** 手机上没有邮件应用：地址进剪贴板，说一句。 */
+    @Test fun feedbackEmailWithoutAMailAppCopiesTheAddress() {
+        val notes = mutableListOf<String>()
+        about(sendEmail = { throw ActivityNotFoundException() }, notify = { notes += it })
+        compose.onNodeWithText("发邮件").performClick()
+        assertThat(notes).containsExactly("没有邮件应用，已复制邮箱地址")
+        val clip = context.getSystemService(ClipboardManager::class.java).primaryClip!!
+        assertThat(clip.getItemAt(0).text.toString()).isEqualTo(FEEDBACK_EMAIL)
+    }
+
+    /** GitHub Issues 交给浏览器，先到选模板那页，版本和机型带过去预填；小字说清是公开的。 */
+    @Test fun githubIssuesOpenWithVersionAndDeviceFilledIn() {
+        var opened: String? = null
+        about(openUrl = { opened = it })
+        compose.onNodeWithText("公开，需要 GitHub 账号").assertIsDisplayed()
+        compose.onNodeWithText("GitHub Issues").performClick()
+        val url = Uri.parse(opened)
+        assertThat(url.buildUpon().clearQuery().build().toString()).isEqualTo(NEW_ISSUE_URL)
+        assertThat(url.getQueryParameter("version")).isEqualTo("0.11.1 (19)")
+        assertThat(url.getQueryParameter("device")).isEqualTo(pixel)
+    }
+
+    @Test fun githubIssuesSurviveHavingNoBrowser() {
+        about(openUrl = { throw IllegalStateException("no browser") })
+        compose.onNodeWithText("GitHub Issues").performClick()
+        compose.onNodeWithText("GitHub Issues").assertIsDisplayed()
     }
 
     /** 恢复默认在「关于」里也是普通的一行，误点一下不能就把设置全清了。 */
@@ -715,6 +739,8 @@ class SettingsScreenTest {
     private fun general(
         restyleAll: Boolean = true,
         onRestyleAllChange: (Boolean) -> Unit = {},
+        fullResolution: Boolean = false,
+        onFullResolutionChange: (Boolean) -> Unit = {},
         watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
         onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
         watermarkUnlocked: Boolean = false,
@@ -723,6 +749,7 @@ class SettingsScreenTest {
     ) = show {
         GeneralSettingsScreen(
             restyleAll = restyleAll, onRestyleAllChange = onRestyleAllChange,
+            fullResolution = fullResolution, onFullResolutionChange = onFullResolutionChange,
             watermarkStyle = watermarkStyle, onWatermarkStyleChange = onWatermarkStyleChange,
             watermarkUnlocked = watermarkUnlocked, watermarkOff = watermarkOff, onWatermarkOff = onWatermarkOff,
             onNavigateUp = {},
@@ -732,11 +759,18 @@ class SettingsScreenTest {
     /** 原先「编辑」「导出」两页的项，一项一组；导出前提醒和「圈出」一起去掉了。 */
     @Test fun theGeneralPageHoldsWhatEditAndExportHad() {
         general()
-        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "水印样式", "图标 + 有码 Yomark").map {
+        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "识别", "按原分辨率识别", "水印样式", "图标 + 有码 Yomark").map {
             compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
         }
         assertThat(tops).isInOrder()
         compose.onNodeWithText("导出前提醒").assertDoesNotExist()
+    }
+
+    @Test fun theFullResolutionSwitchTurnsItOn() {
+        var latest: Boolean? = null
+        general(fullResolution = false, onFullResolutionChange = { latest = it })
+        compose.onNodeWithText("按原分辨率识别").performClick()
+        assertThat(latest).isTrue()
     }
 
     @Test fun theRestyleAllSwitchTurnsItOff() {
@@ -778,16 +812,17 @@ class SettingsScreenTest {
         assertThat(off).isTrue()
     }
 
-    @Test fun pickingTheFrostedScanEffectEmitsIt() {
+    @Test fun pickingTheSweepScanEffectEmitsIt() {
         var latest: ScanStyle? = null
         show {
             AppearanceSettingsScreen(
+                themeMode = ThemeMode.SYSTEM, onThemeModeChange = {},
                 themeColor = ThemeColor.SYSTEM, onThemeColorChange = {},
-                scanStyle = ScanStyle.SWEEP, onScanStyleChange = { latest = it },
+                scanStyle = ScanStyle.FROST, onScanStyleChange = { latest = it },
                 onNavigateUp = {},
             )
         }
-        compose.onNodeWithText("磨砂").performClick()
-        assertThat(latest).isEqualTo(ScanStyle.FROST)
+        compose.onNodeWithText("扫光").performClick()
+        assertThat(latest).isEqualTo(ScanStyle.SWEEP)
     }
 }

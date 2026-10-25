@@ -666,14 +666,14 @@ class EditorViewModelTest {
     fun `the canvas follows the scan effect chosen in settings, across image changes`() = runTest(dispatcher) {
         val vm = vm()
         advanceUntilIdle()
-        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.SWEEP)
-
-        settings.setScanStyle(ScanStyle.FROST); advanceUntilIdle()
         assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.FROST)
+
+        settings.setScanStyle(ScanStyle.SWEEP); advanceUntilIdle()
+        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.SWEEP)
 
         // 换图会整个重建 EditorUiState，样式不在那里面，不会被换回出厂值
         vm.onImageChosen(sampleUri()); advanceUntilIdle()
-        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.FROST)
+        assertThat(vm.scanStyle.value).isEqualTo(ScanStyle.SWEEP)
     }
 
     @Test

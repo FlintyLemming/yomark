@@ -180,25 +180,6 @@ object Checksums {
         return h
     }
 
-    // ---------- UPS 快递单号校验位 ----------
-    fun upsCheckDigit(tracking: String): Boolean {
-        val s = tracking.uppercase()
-        if (s.length != 18 || !s.startsWith("1Z")) return false
-        val body = s.substring(2, 17)
-        val check = s[17]
-        if (!check.isDigit()) return false
-        var sum = 0
-        body.forEachIndexed { i, c ->
-            // 字母取 (ASCII - 63) mod 10，即 A=2 … Z=7（'A' - 'A' + 2 == 'A'.code - 63）
-            val v = if (c.isDigit()) c - '0' else ((c - 'A') + 2) % 10
-            // 加倍落在**偶数下标**上。计划里写的是奇数下标加倍，那会把公开标准样例
-            // 1Z12345E0205271688 的校验位算成 6（实际是 8）。用该样例反推确认了这个方向。
-            sum += if (i % 2 == 0) v * 2 else v
-        }
-        val expected = (10 - sum % 10) % 10
-        return expected == check - '0'
-    }
-
     // ---------- MAC：分隔符一致性 ----------
     fun macSeparatorConsistent(raw: String): Boolean {
         val seps = raw.filter { it == ':' || it == '-' }

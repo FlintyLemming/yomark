@@ -1,10 +1,12 @@
 package moe.flinty.yomark.ui.components
 
+import android.view.HapticFeedbackConstants
 import androidx.annotation.StringRes
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.TweenSpec
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
@@ -49,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -79,6 +82,7 @@ import androidx.compose.ui.layout.HorizontalAlignmentLine
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -106,10 +110,15 @@ import moe.flinty.yomark.core.model.MaskLook
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.render.MaskStyleInfo
 import moe.flinty.yomark.ui.AiReview
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.roundToInt
+import kotlin.math.sin
+import kotlin.math.sqrt
 
 /** 手机底栏上点开的几组工具，和大爆炸占住这一行的那一种（[BIG_BANG]）。 */
 enum class ToolGroup(@StringRes val label: Int) {
@@ -151,13 +160,17 @@ enum class ToolGroup(@StringRes val label: Int) {
  *
  * 样式照旧是画笔（见 EditorUiState.brush）：点一种换样式，再点当前那一种，胶囊往上长成调节面板（见 EditorBottomBar）。
  * 「编辑」里的水印点一下就长出用途水印的面板，开着时选中的是它，再点一下收起。
- * 收着时每一组画的是它眼下的样子（见 GroupButton）：马克笔盖不住，用着它的时候「编辑」换成马克笔的样子，看得出来。
+ * 马克笔、画笔、文本只在「编辑」展开着时拿在手里，收回来就放下，换回「打码」里上次用的样式（2026-10-16，见 EditorScreen）：
+ * 收着时点图、拖框总是打码。原先收起后还拿着文本，点图哪儿都是写字，只有「编辑」上的小样子换成了 T。
+ * 收着时每一组画的是它眼下的样子（见 GroupButton）：选中了马克笔画的一道，「编辑」换成马克笔的样子。
  *
  * 胶囊的底子不在这里画，底栏画：面板就是它往上长出来的，长出来、缩回去都得是同一块，一圈边、一层投影。
  * 原先这一行自己画一条胶囊、面板在底下另垫一块，半路上两块的边和投影一起露出来，工具上面多一道线、面板里多一层影子。
  * 这一行只摆胶囊里的东西，胶囊眼下左右到哪儿用 [PillLeft]、[PillRight] 告诉底栏。
  *
  * 圆钮上没有字。AI 跑完那一下画布顶上说一声结果（见 AiReviewResultPill）；对比点一下没有比上，弹个提示说要按住。
+ *
+ * 点这一行上的哪一样都轻震一下，照 Bettbox 的底栏（见 [withTick]）。
  *
  * @param open 展开着的那一组，收着时为 null
  * @param onOpen 点了一组（展开它）或点了返回（null）
@@ -188,6 +201,9 @@ fun EditorToolbar(
     canCompare: Boolean = false,
 ) {
     val progress = animateFloatAsState(if (open != null) 1f else 0f, foldSpec(open != null), label = "toolGroup")
+    // 展开的工具淡进淡出走这一条：展开时和胶囊同一条曲线；收回去时先走（见 contentFoldSpec），
+    // 胶囊缩回去的后半程上已经没有它们，不和淡回来的两组叠成一片
+    val toolsIn = animateFloatAsState(if (open != null) 1f else 0f, contentFoldSpec(open != null), label = "toolGroupTools")
     // 收回去的半路上 open 已经是 null，那一组的工具还要接着画完
     val last = remember { LastOpen() }
     if (open != null) last.group = open
@@ -380,12 +396,13 @@ fun EditorToolbar(
                 }
                 val shift = backAt - backX
                 divider?.let { it.placeWithLayer(backAt + backWidth + dividerGap, it.centerY()) { alpha = span(p, 0.45f, 0.8f) } }
-                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走。
+                // 工具跟着返回箭头一起走，从左往右一个个淡入，各自从左边一点滑到位；收回去时倒过来，右边的先走，比胶囊快（见 toolsIn）。
                 // 胶囊还没撑到的地方不露出来：最右边那几个跟着胶囊的右沿一点点现出来
                 val stagger = if (tools.size > 1) (1f - TOOL_IN_START - TOOL_IN) / (tools.size - 1) else 0f
+                val shownTools = toolsIn.value
                 tools.forEachIndexed { i, tool ->
                     val start = TOOL_IN_START + i * stagger
-                    val t = span(p, start, start + TOOL_IN)
+                    val t = span(shownTools, start, start + TOOL_IN)
                     val x = toolX[i] + shift - ((1f - t) * slide).roundToInt()
                     tool.placeWithLayer(x, tool.centerY()) {
                         alpha = t
@@ -565,7 +582,7 @@ private fun editTools(
  * 工具：点了就干活的两样，都不是样式。
  * - AI 增强识别：用不了时没有这一项（这时也没有「工具」，见 ToolboxCircle）。没有选中态。点了不收回去，跑的样子就在这儿看：
  *   星星转着、名字是「增强识别中…」；跑完名字换成结果、星星换成对勾。这两样时点不动，也不灰掉，结果要看得清
- *   （和宽屏的按钮一样，见 AiReviewButton）。没跑成星星是红的，还能点。
+ *   （和宽屏的那一块一样，见 WideEditorPanel）。没跑成星星是红的，还能点。
  * - 大爆炸：和「编辑」里的水印一样，点一下胶囊长出它的面板（见 EditorBottomBar），面板从第一行字摆起
  *   （见 EditorViewModel.openBigBang）；开着时选中的是它，名字后面的小箭头朝下，再点一下收起。
  *   长按图上的字照旧也能打开。还没识别完、没认出字时灰掉。
@@ -629,9 +646,28 @@ private fun styleTool(style: MaskStyle, model: StyleBarModel, actions: StyleBarA
 // ---------- 按钮 ----------
 
 /**
+ * 点这一行上的哪一样，先轻震一下再干 [onClick] 的事（2026-10-17）。照 Bettbox 的底栏（它设置里的「底部导航栏切换震动反馈」）：
+ * Flutter 的 HapticFeedback.selectionClick()，在 Android 上是 CLOCK_TICK，很轻的一下。
+ * Compose 的 HapticFeedbackType 里没有它：相近的 SegmentFrequentTick 要 Android 14，之前的系统只有拖文字光标的那一下（见 DETENT），
+ * 那一下要机型开着才震，所以直接让 View 震。点不动时不震；系统设置里关了触摸反馈也不震。
+ */
+@Composable
+private fun withTick(onClick: () -> Unit): () -> Unit {
+    val view = LocalView.current
+    val latest by rememberUpdatedState(onClick)
+    return remember(view) {
+        {
+            view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+            latest()
+        }
+    }
+}
+
+/**
  * 收着时胶囊里的一组：左边是这一组眼下的样子，右边是名字，名字后面一个小箭头，说明点开里面还有东西。
- * 画笔在这一组时，样子就是画笔的样子（色块是当前的颜色，和图上的码一个颜色）；不在时是这一组自己的图标——
- * 用着马克笔时「编辑」换成马克笔的样子，看得出现在点框是在标记、不是在打码。
+ * 样式栏上那一份（画笔，或者选中的那一块的）在这一组时，样子就是它的样子（色块是当前的颜色，和图上的码一个颜色）；
+ * 不在时是这一组自己的图标。收着时画笔总在「打码」里（「编辑」收回来就放下了，见 EditorScreen），
+ * 「编辑」换成马克笔、文本的样子是选中了马克笔画的一道、写的一块字。
  * 不垫选中的底色：那是导航栏「已经在这儿了」的样子，看着像点了也没用。
  * 地方不够时（窄屏、字调大了）先不画小箭头，名字截断是最后一步（见 [LabelAndChevron]）。
  *
@@ -660,7 +696,7 @@ private fun GroupButton(
                 if (away) Modifier.clearAndSetSemantics {}
                 else Modifier.semantics { if (inUseName != null) stateDescription = inUseName },
             )
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = onClick)
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = withTick(onClick))
             .padding(start = GROUP_PAD_START, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -700,7 +736,7 @@ private fun BackButton(enabled: Boolean, onClick: () -> Unit, modifier: Modifier
         modifier
             .size(BACK_SIZE)
             .clip(CircleShape)
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_collapse), onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_collapse), onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -823,8 +859,12 @@ private fun Density.chevronRoom(open: Float) = (CHEVRON_ROOM.toPx() * open).roun
  * Android 的 elevation 投影调不了模糊和偏移，又浓又硬，这里自己画（minSdk 29，硬件加速下 setShadowLayer 什么形状都画得出）。
  * 两头是半圆，宽高一样时就是圆。投影画在自己的边界外面，外面的一层不能裁边、也不能离屏淡出（见摆圆钮的那一段）。
  */
-internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) = drawWithCache {
-    val radius = min(size.minDimension / 2, maxRadius.toPx())
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, maxRadius: Dp = Dp.Infinity) =
+    floatingSurface(fill, edge) { min(it.minDimension / 2, maxRadius.toPx()) }
+
+/** 同上，圆角由 [cornerOf] 按眼下的大小定，可以跟着动画变（宽屏从一块长成面板，见 WideEditorPanel）。 */
+internal fun Modifier.floatingSurface(fill: Color, edge: Color, cornerOf: Density.(Size) -> Float) = drawWithCache {
+    val radius = cornerOf(size)
     val shadows = SHADOWS.map { (blur, dy, alpha) ->
         android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
             color = fill.toArgb()
@@ -869,7 +909,7 @@ private fun ToolboxCircle(running: Boolean, enabled: Boolean, onClick: () -> Uni
                 contentDescription = label
                 if (running) stateDescription = runningText
             }
-            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = onClick),
+            .clickable(enabled = enabled, role = Role.Button, onClickLabel = stringResource(R.string.tool_group_expand), onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         if (running) {
@@ -894,7 +934,7 @@ private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit,
             .fillMaxSize()
             .clip(CircleShape)
             .semantics { contentDescription = label }
-            .clickable(enabled = ready && enabled, role = Role.Button, onClick = onClick),
+            .clickable(enabled = ready && enabled, role = Role.Button, onClick = withTick(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -906,7 +946,7 @@ private fun BigBangCircle(ready: Boolean, enabled: Boolean, onClick: () -> Unit,
     }
 }
 
-/** AI 增强识别眼下的状态，宽屏按钮上、手机「工具」里的那一句。 */
+/** AI 增强识别眼下的状态，宽屏的那一块上、手机「工具」里的那一句。 */
 @Composable
 internal fun aiReviewLabel(state: AiReview): String = when (state) {
     AiReview.Ready, AiReview.Hidden -> stringResource(R.string.ai_review)
@@ -917,7 +957,8 @@ internal fun aiReviewLabel(state: AiReview): String = when (state) {
 
 /**
  * 「按住对比」：按住时画布换成打码前的原图，松手回来（见 EditorScreen）。来回比的时候，手一松就该回到打码后的样子。
- * 圆钮上写不下「按住」：点一下（没比上）就在它上面弹个提示。长按是在比，不弹提示、也不震。没打码、也没设水印时没有可比的，灰掉。
+ * 圆钮上写不下「按住」：点一下（没比上）就在它上面弹个提示，和这一行上别的一样轻震一下（见 [withTick]）。
+ * 长按是在比，不弹提示、也不震。没打码、也没设水印时没有可比的，灰掉。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -946,7 +987,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
                         role = Role.Button,
                         onLongClick = {},
                         hapticFeedbackEnabled = false,
-                        onClick = { scope.launch { hint.show() } },
+                        onClick = withTick { scope.launch { hint.show() } },
                     ),
                 contentAlignment = Alignment.Center,
             ) {
@@ -963,7 +1004,7 @@ private fun CompareCircle(interaction: MutableInteractionSource, enabled: Boolea
 
 /** 提示在圆钮正上方，靠着屏幕边时往里收，不出屏。 */
 @Composable
-private fun rememberHintPosition(): PopupPositionProvider {
+internal fun rememberHintPosition(): PopupPositionProvider {
     val density = LocalDensity.current
     val space = with(density) { HINT_SPACING.roundToPx() }
     val edge = with(density) { MARGIN.roundToPx() }
@@ -1008,12 +1049,13 @@ private fun ToolItem(tool: Tool, room: Int) {
     val colors = MaterialTheme.colorScheme
     val selected = tool.selected
     val interaction = remember { MutableInteractionSource() }
+    val onClick = withTick(tool.onClick)
     val press = if (tool.role == Role.RadioButton) {
         Modifier.selectable(
-            selected = selected, interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = tool.onClick,
+            selected = selected, interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = onClick,
         )
     } else {
-        Modifier.clickable(interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = tool.onClick)
+        Modifier.clickable(interactionSource = interaction, indication = null, enabled = tool.enabled, role = tool.role, onClick = onClick)
     }
     // 一条匀速的进度推着几样东西，各按各的曲线走，和 GNav 一个 AnimationController 推着几样一样
     val pick by animateFloatAsState(if (selected) 1f else 0f, tween(PICK_MS, easing = LinearEasing), label = "pick")
@@ -1078,25 +1120,54 @@ private const val EXPAND_MS = 350
 private val EXPAND_EASING = CubicBezierEasing(0.2f, 0f, 0f, 1f)
 
 /**
- * 收回去比展开快一点，曲线是 ease-out cubic：起步快，尾巴不像标准曲线那样拖。
- * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）。
+ * 收回去是一根不回弹的弹簧（见 [SpringEasing]，照 FlClash 收起弹出菜单）：从静止起步，中段最快，落地缓，300 ms 停稳。
+ * 原先收回去和展开一样 350 ms、同一条曲线，看着拖、像匀速；换成 250 ms 的 emphasized decelerate 又太快（2026-10-15）；
+ * 300 ms 的 ease-out cubic 一下就是最快，头一帧就走掉一成半，还是生硬（2026-10-16）。
  */
 private const val COLLAPSE_MS = 300
-private val COLLAPSE_EASING = CubicBezierEasing(0.33f, 1f, 0.68f, 1f)
+private val COLLAPSE_EASING = SpringEasing(response = 0.27f, seconds = COLLAPSE_MS / 1000f)
 
-/** 展开、收回各走各的。工具那一行和样式面板（见 EditorBottomBar）都用它：两样一起收时胶囊的宽和高同步。 */
-internal fun foldSpec(opening: Boolean): AnimationSpec<Float> =
-    if (opening) tween(EXPAND_MS, easing = EXPAND_EASING) else tween(COLLAPSE_MS, easing = COLLAPSE_EASING)
+/** 展开、收回各走各的：工具那一行的宽。面板的高见 [panelFoldSpec]，胶囊上的东西淡进淡出见 [contentFoldSpec]。 */
+internal fun foldSpec(opening: Boolean): AnimationSpec<Float> = foldTween(opening)
+
+/** 同 [foldSpec]，给淡入淡出、尺寸、颜色这些要有限时长、不是 Float 的动画用（首次引导）。 */
+internal fun <T> foldTween(opening: Boolean, delayMillis: Int = 0): TweenSpec<T> =
+    if (opening) tween(EXPAND_MS, delayMillis, EXPAND_EASING) else tween(COLLAPSE_MS, delayMillis, COLLAPSE_EASING)
+
+/**
+ * 调节面板（胶囊往上长出来的那一截，见 EditorBottomBar）的高。展开和这一行的宽一起长；
+ * 收回去比这一行收窄快一点：先落回这一行，再跟着这一行缩回去，胶囊的角走一道弧，照 FlClash 收起弹出菜单横竖各走各的弹簧。
+ * 原先高和宽一条曲线，角斜着直线往回缩，像一块板整个缩小（2026-10-16）。
+ */
+internal fun panelFoldSpec(opening: Boolean): AnimationSpec<Float> =
+    if (opening) foldSpec(true) else tween(COLLAPSE_MS, easing = PANEL_COLLAPSE_EASING)
+
+private val PANEL_COLLAPSE_EASING = SpringEasing(response = 0.2f, seconds = COLLAPSE_MS / 1000f)
+
+/**
+ * 收回去时要走的东西（展开的工具、面板上的名字和参数）先淡掉，再缩胶囊，照 iOS 和 FlClash 收起菜单：
+ * 五十来 ms 面板上的就淡没了，工具右边的先走，最左边那个六十来 ms 也没了，「打码」「编辑」七十来 ms 才淡回来。
+ * 原先它们跟着胶囊的进度慢慢淡，半透明时就被往回收的胶囊边裁掉一截（「Medium」剩「Med」），又和淡回来的两组叠成一片（2026-10-16）。
+ * 展开时和胶囊一条曲线。
+ */
+internal fun contentFoldSpec(opening: Boolean): AnimationSpec<Float> = contentFoldTween(opening)
+
+/** 同 [contentFoldSpec]，给不是 Float 的动画用。 */
+internal fun <T> contentFoldTween(opening: Boolean): TweenSpec<T> =
+    if (opening) foldTween(true) else tween(CONTENT_OUT_MS, easing = CONTENT_OUT_EASING)
+
+private const val CONTENT_OUT_MS = 150
+private val CONTENT_OUT_EASING = SpringEasing(response = 0.14f, seconds = CONTENT_OUT_MS / 1000f)
 
 /** 收着的那一排（两组、圆钮）在前半程让开。 */
-private const val FADE_OUT = 0.5f
+internal const val FADE_OUT = 0.5f
 
 /** 返回箭头在这一段里显出来：两组淡到一半时开始。 */
 private const val BACK_IN_START = 0.25f
 private const val BACK_IN_END = 0.75f
 
 /** 工具从这儿起一个个淡入，每个走这么一段，最后一个刚好走到头。 */
-private const val TOOL_IN_START = 0.25f
+internal const val TOOL_IN_START = 0.25f
 private const val TOOL_IN = 0.5f
 
 /** 胶囊展开后离屏幕两边多远；收着时整组也不比这更靠边。调节面板也是这么宽（见 EditorBottomBar）。 */
@@ -1150,10 +1221,10 @@ private val TOOL_PAD_QUIET = 6.dp
 private val TOOL_GLYPH_GAP = 8.dp
 
 /** 选中的小胶囊是主题色叠这么浓。 */
-private const val SELECTED_TINT = 0.2f
+internal const val SELECTED_TINT = 0.2f
 
 /** 换选中的那一项走多久：Bettbox 1.19.4 给 GNav 设的 250 ms（见 ToolItem）。 */
-private const val PICK_MS = 250
+internal const val PICK_MS = 250
 
 /** 小箭头长出来时从右边多出这么远滑回来：GNav 的名字滑 8。 */
 private val CHEVRON_DRIFT = 8.dp
@@ -1163,14 +1234,35 @@ private val CHEVRON_DRIFT = 8.dp
  * Compose 里同名的 easeInCubic、easeOutSine、easeOutCirc、easeInExpo 控制点和 Flutter 的不一样，照 Flutter 的抄。
  */
 private val FLUTTER_EASE_IN = CubicBezierEasing(0.42f, 0f, 1f, 1f)
-private val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
+internal val FLUTTER_EASE_OUT = CubicBezierEasing(0f, 0f, 0.58f, 1f)
 private val FLUTTER_EASE_IN_CUBIC = CubicBezierEasing(0.55f, 0.055f, 0.675f, 0.19f)
 private val FLUTTER_EASE_OUT_SINE = CubicBezierEasing(0.39f, 0.575f, 0.565f, 1f)
-private val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
-private val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
+internal val FLUTTER_EASE_OUT_CIRC = CubicBezierEasing(0.075f, 0.82f, 0.165f, 1f)
+internal val FLUTTER_EASE_IN_EXPO = CubicBezierEasing(0.95f, 0.05f, 0.795f, 0.035f)
 
 /** Flutter 的 Curve.flipped：把曲线倒过来走。 */
 private fun Easing.flipped() = Easing { 1f - transform(1f - it) }
+
+/**
+ * 一根弹簧从 0 弹到 1 走成的曲线，照 FlClash 的 SpringCurve（Flutter 的 SpringDescription.withDurationAndBounce）：
+ * [response] 是弹簧的感知时长（秒），[bounce] 是回弹多少（0 不回弹）。整条在 [seconds] 里放完：
+ * 到点时弹簧还差的那一点从头匀着补上，正好停在 1，时长是定的。
+ * 和 ease-out 不一样，弹簧从静止起步，头几帧走得少，中段最快，再慢慢落地。
+ */
+internal class SpringEasing(response: Float, bounce: Float = 0f, private val seconds: Float) : Easing {
+    private val omega = 2 * PI / response
+    private val zeta = 1.0 - bounce
+    private val residual = 1 - at(seconds.toDouble())
+
+    /** 弹簧放了 [t] 秒走到哪儿。 */
+    private fun at(t: Double): Double {
+        if (zeta >= 1) return 1 - (1 + omega * t) * exp(-omega * t)
+        val damped = omega * sqrt(1 - zeta * zeta)
+        return 1 - exp(-zeta * omega * t) * (cos(damped * t) + zeta * omega / damped * sin(damped * t))
+    }
+
+    override fun transform(fraction: Float) = (at(fraction.toDouble() * seconds) + residual * fraction).toFloat()
+}
 
 /** 小胶囊撑开、收窄，和分到的宽一起走的那一条（见 ToolItem）。 */
 private val GROW_EASING = FLUTTER_EASE_IN_CUBIC.flipped()
@@ -1181,4 +1273,4 @@ private val HINT_SPACING = 8.dp
 /** 组名后面的小箭头，和它前面那一点空：地方不够时先去掉这一截。 */
 private val CHEVRON = 16.dp
 private val CHEVRON_ROOM = 18.dp
-private const val DISABLED_ALPHA = 0.38f
+internal const val DISABLED_ALPHA = 0.38f

@@ -2,16 +2,13 @@ package moe.flinty.yomark.ui.components
 
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,22 +16,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Compare
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,7 +39,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
@@ -83,29 +78,29 @@ fun EditorTopBar(
     canRedo: Boolean,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    /** 用途水印。手机竖着拿时它在底栏的「编辑」里，传 null，这里就不出现。 */
-    onPurpose: (() -> Unit)?,
     onSettings: () -> Unit,
     onNavigateUp: () -> Unit,
+    /**
+     * 导出，在最右上角：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，展开着一组工具时也一直在。
+     * 宽屏也在这儿（2026-10-16），原先在功能方块那一块最底下，和 AI 增强识别一行。
+     */
+    onExport: () -> Unit,
     modifier: Modifier = Modifier,
-    /** 已设用途水印时按钮着主题色，一眼看出它开着。 */
-    purposeOn: Boolean = false,
     /** 去水印的购买入口（开源版是免费版说明与打赏）。已购用户传 null，按钮就不出现。 */
     onRemoveWatermark: (() -> Unit)? = null,
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
-    /** 「对比」按钮的按压状态：按住时画布显示打码前的原图（见 EditorScreen）。传 null 时按钮不出现：手机竖着拿时它在底栏。 */
-    compare: MutableInteractionSource? = null,
-    /** 有前后可比：打了码，或者设了用途水印。没有时「对比」灰掉。 */
-    canCompare: Boolean = false,
     /**
-     * 导出，在最右上角。手机竖着拿时在这儿：底栏只放干活时反复用的工具，收尾这一下放在和返回相对的角上，
-     * 展开着一组工具时也一直在。传 null 时不出现：宽屏的导出在样式列表那一块的最底下（见 [EditorActionRow]）。
+     * 分享，挨在导出左边（2026-10-17）：图不进相册，写进缓存交给分享面板。和导出一样是收尾，一样一直在，不让出来。
+     * 别的应用来要图时（导出是「完成」）传 null，就没有这一颗。
      */
-    onExport: (() -> Unit)? = null,
-    /** 导出按钮上的字（见 [EditorActionRow]）。 */
+    onShare: (() -> Unit)? = null,
+    /** 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去。 */
     @StringRes exportLabel: Int = R.string.export,
+    /** 在导出（分享也是先导出）：导出、分享都点不动。 */
     exporting: Boolean = false,
+    /** 这一次导出是为了分享：转圈的是分享那颗，导出那颗不换字。 */
+    sharing: Boolean = false,
 ) {
     Layout(
         content = {
@@ -118,40 +113,36 @@ fun EditorTopBar(
                     Icon(Icons.Filled.WorkspacePremium, stringResource(if (Edition.isFree) R.string.free_edition else R.string.remove_watermark))
                 }
             }
-            if (onPurpose != null) {
-                IconButton(onClick = onPurpose, Modifier.layoutId(TopBarItem.PURPOSE)) {
-                    Icon(
-                        PurposeWatermarkIcon,
-                        stringResource(if (purposeOn) R.string.purpose_watermark_on else R.string.purpose_watermark),
-                        tint = if (purposeOn) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    )
-                }
-            }
-            if (compare != null) {
-                // 按住看原图、松手回来，点一下没有动作：来回比的时候，手一松就该回到打码后的样子
-                IconButton(onClick = {}, Modifier.layoutId(TopBarItem.COMPARE), enabled = canCompare, interactionSource = compare) {
-                    Icon(Icons.Filled.Compare, stringResource(R.string.compare_original))
-                }
-            }
             if (onDebug != null) {
                 IconButton(onClick = onDebug, Modifier.layoutId(TopBarItem.DEBUG)) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
             }
             IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-            if (onExport != null) {
-                val label = stringResource(if (exporting) R.string.exporting else exportLabel)
-                Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
-                    Text(label, maxLines = 1, softWrap = false)
-                }
-                // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
-                FilledIconButton(
-                    onClick = onExport,
-                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+            if (onShare != null) {
+                // 色调底（tonal）的圆钮，和实心的导出挨着成一对；分享中转圈，读屏念「分享中…」
+                val shareLabel = stringResource(if (exporting && sharing) R.string.sharing else R.string.share)
+                FilledTonalIconButton(
+                    onClick = onShare,
+                    modifier = Modifier.layoutId(TopBarItem.SHARE).semantics { contentDescription = shareLabel },
                     enabled = !exporting,
                 ) {
-                    if (exporting) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
-                    // 别的应用来要图时是「完成」：交回去
-                    else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
+                    if (exporting && sharing) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                    else Icon(Icons.Filled.Share, contentDescription = null)
                 }
+            }
+            val saving = exporting && !sharing
+            val label = stringResource(if (saving) R.string.exporting else exportLabel)
+            Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
+                Text(label, maxLines = 1, softWrap = false)
+            }
+            // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
+            FilledIconButton(
+                onClick = onExport,
+                modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+                enabled = !exporting,
+            ) {
+                if (saving) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                // 别的应用来要图时是「完成」：交回去
+                else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
             }
         },
         modifier = modifier.fillMaxWidth().padding(8.dp),
@@ -159,16 +150,19 @@ fun EditorTopBar(
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val part = { item: TopBarItem -> measurables.firstOrNull { it.layoutId == item } }
         val back = part(TopBarItem.BACK)!!.measure(loose)
+        // 分享挨在导出左边，和返回、导出一样不让出来
+        val share = part(TopBarItem.SHARE)?.measure(loose)
+        val shareWidth = share?.width ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
-        val gap = if (part(TopBarItem.EXPORT) != null) EXPORT_GAP.roundToPx() else 0
-        val label = part(TopBarItem.EXPORT)?.maxIntrinsicWidth(Constraints.Infinity) ?: 0
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + gap + label
+        val gap = EXPORT_GAP.roundToPx()
+        val label = part(TopBarItem.EXPORT)!!.maxIntrinsicWidth(Constraints.Infinity)
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + shareWidth + gap + label
         // 别的按钮都摆上，导出的字还整个放得下才写字
-        val withLabel = back.width + allIcons + gap + label <= width
-        val button = if (withLabel) part(TopBarItem.EXPORT)?.measure(loose.copy(maxWidth = width - back.width - allIcons - gap))
-        else part(TopBarItem.EXPORT_ICON)?.measure(loose)
-        var room = width - back.width - gap - (button?.width ?: 0)
+        val withLabel = back.width + allIcons + shareWidth + gap + label <= width
+        val button = if (withLabel) part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - shareWidth - gap))
+        else part(TopBarItem.EXPORT_ICON)!!.measure(loose)
+        var room = width - back.width - shareWidth - gap - button.width
         val kept = mutableSetOf<TopBarItem>()
         for ((item, icon) in icons.sortedBy { it.first }) {
             if (icon.width > room) break
@@ -177,35 +171,36 @@ fun EditorTopBar(
         }
         val shown = icons.filter { it.first in kept }.map { it.second }
         val iconsWidth = shown.sumOf { it.width }
-        val barHeight = (listOf(back) + shown + listOfNotNull(button)).maxOf { it.height }
+        val barHeight = (listOf(back) + shown + listOfNotNull(share) + button).maxOf { it.height }
             .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, barHeight) {
             val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
             centered(back, 0)
-            // 中间这几个靠在导出左边，和返回之间空着
-            var x = width - (button?.width ?: 0) - gap - iconsWidth
+            // 中间这几个靠在分享（没有分享时是导出）左边，和返回之间空着
+            var x = width - button.width - gap - shareWidth - iconsWidth
             shown.forEach { centered(it, x); x += it.width }
-            button?.let { centered(it, width - it.width) }
+            share?.let { centered(it, x) }
+            centered(button, width - button.width)
         }
     }
 }
 
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
- * 还放不下（再开着调试信息）时，中间那几个照要紧的先后从最后一个起不摆出来，返回和导出一直在。
- * 去水印、设置在首页也有；用途水印、对比只在宽屏的顶栏上，那儿放得下。
+ * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享和导出一直在。
+ * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
 private enum class TopBarItem {
-    BACK, EXPORT, EXPORT_ICON, UNDO, REDO, PURPOSE, COMPARE, SETTINGS, DEBUG, REMOVE_WATERMARK;
+    BACK, EXPORT, EXPORT_ICON, SHARE, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
 
     companion object {
         /** 两头的，不参与让出来。 */
-        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON)
+        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON, SHARE)
     }
 }
 
-/** 导出和它左边的按钮之间多空一点。 */
+/** 导出和它左边的按钮（分享，没有分享时是中间那几个）之间多空一点。 */
 private val EXPORT_GAP = 4.dp
 
 /**
@@ -226,7 +221,8 @@ val PanelTop = HorizontalAlignmentLine(::min)
  * 胶囊不收回去，面板换成另一个的，一点点变高变矮。
  * 面板盖在图上（批量时连胶片条一起盖住），画布不让地方，图不动（见 [PanelTop]）。
  * 收起：点面板右上角的箭头、按返回、或者点返回收起这一组。吸管在等取色时面板先缩回去，取完色再长出来。
- * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点左下角的返回一样：面板和这一组一起收起。
+ * 点面板外面的哪儿（图上、两边、顶栏，见 [FoldOnTouch]）都和点面板右上角的箭头一样，只收面板（2026-10-16，原先连这一组一起收）：
+ * 展开着「编辑」写完一处字点一下图，还在「编辑」里，文本还拿在手里。收了面板底栏回到打开它之前那样（见 EditorScreen）。
  *
  * 大爆炸的面板（2026-10-16）也是这样从胶囊长出来、缩回去，原先是一下顶替整个底栏。用得了 AI 时从「工具」那一行长出来，
  * 那一行还在面板最底下；用不了 AI 时「工具」里只有它，面板直接从它那颗圆钮长出来，占到胶囊最底下，没有工具那一行
@@ -235,7 +231,7 @@ val PanelTop = HorizontalAlignmentLine(::min)
  *
  * 胶囊就画在这里，只有这一块：上沿跟着面板长到哪儿，左右跟着工具那一行说的走（见 PillLeft），
  * 面板收着时它就是工具那一行的胶囊。长出来、缩回去的半路上也只有这一圈边、一层投影，看着是整个胶囊在变大变小；
- * 开着面板点返回收起这一组，胶囊一边往下缩一边往回收窄。
+ * 开着面板点返回收起这一组，面板上的东西先淡掉，胶囊一边往下缩一边往回收窄，往下比收窄快一点（见 panelFoldSpec）。
  *
  * @param toolGroup 展开着的那一组，收着时为 null
  * @param bigBangReady 大爆炸点得动（见 [EditorToolbar]）
@@ -271,7 +267,9 @@ fun EditorBottomBar(
     val bigBangRow = toolGroup == ToolGroup.TOOLS || toolGroup == ToolGroup.BIG_BANG
     val wanted = (bigBang != null && bigBangRow) ||
         ((styleBar.panelOpen || purpose.open) && styleBar.colorPick == null && toolGroup != null)
-    val grow = animateFloatAsState(if (wanted) 1f else 0f, foldSpec(wanted), label = "stylePanel")
+    val grow = animateFloatAsState(if (wanted) 1f else 0f, panelFoldSpec(wanted), label = "stylePanel")
+    // 面板上的东西淡进淡出走这一条：收回去时先淡没，胶囊再往回缩，不被它的边裁着走（见 contentFoldSpec）
+    val contentIn = animateFloatAsState(if (wanted) 1f else 0f, contentFoldSpec(wanted), label = "stylePanelContent")
     val shown by remember { derivedStateOf { grow.value > 0f } }
     val panelShown = wanted || shown
     // 收回去的半路上几样都已经关了，刚才开着的那一个还要接着画完
@@ -297,7 +295,9 @@ fun EditorBottomBar(
         content = {
             // 垫在最底下，铺满底栏这一整块（画布那一块都是它的）：落在胶囊外面的手指都归它。顶栏那一截见 EditorScreen。
             // 大爆炸开着时不垫：点图上是点字
-            if (wanted && bigBang == null) FoldOnTouch({ onToolGroup(null) }, Modifier.layoutId(BarPart.SCRIM))
+            if (wanted && bigBang == null) {
+                FoldOnTouch({ if (purpose.open) purposeActions.onCollapse() else styleActions.onCollapse() }, Modifier.layoutId(BarPart.SCRIM))
+            }
             filmstrip?.invoke(Modifier.layoutId(BarPart.FILM))
             // 面板上没有控件的地方也接住手指：落不到底下的画布上去画框。
             // 面板收着时不接：两组只有 40 dp 高，按在它们上下边外面一点也算按到，胶囊接了就按不着了
@@ -323,7 +323,8 @@ fun EditorBottomBar(
                 onOpen = onToolGroup,
                 styleBar = styleBar,
                 styleActions = styleActions,
-                purposeOn = purpose.text != null,
+                // 图上真有水印才算开着（同 EditorUiState.purposeText）：开了「应用」、写了字
+                purposeOn = purpose.on && purpose.text.isNotBlank(),
                 purposeOpen = purpose.open,
                 onPurpose = purposeActions::onToggle,
                 aiReview = aiReview,
@@ -379,7 +380,7 @@ fun EditorBottomBar(
             // （圆角和胶囊一样，见 floatingSurface：不超过它窄的那一边的一半）
             val radius = min(PANEL_RADIUS.toPx(), min(pill.width, pill.height) / 2f)
             content?.placeWithLayer(margin, pillTop) {
-                alpha = span(p, CONTENT_IN_START, 1f)
+                alpha = span(contentIn.value, CONTENT_IN_START, 1f)
                 clip = true
                 shape = AbovePill(
                     left = (pillLeft - margin).toFloat(),
@@ -434,7 +435,7 @@ private class AbovePill(
 }
 
 /**
- * 调节面板开着时铺在它外面的一层，看不见：手指一落下就等于点了底栏左下角的返回，面板和这一组一起收起（[onFold]）。
+ * 调节面板开着时铺在它外面的一层，看不见：手指一落下就等于点了面板右上角的箭头，收起面板（[onFold]）。
  * 这一下只收起，不往下传：不在画布上画框，顶栏的按钮也不响应。
  * 吸管等着取色时面板缩回去了，没有这一层，点的是图（见 EditorBottomBar 的 wanted）。
  */
@@ -445,7 +446,7 @@ internal fun FoldOnTouch(onFold: () -> Unit, modifier: Modifier = Modifier) {
 }
 
 /** 接住落在这儿的手指，落下时 [onDown]，别的什么也不做。 */
-private suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
+internal suspend fun PointerInputScope.swallowTouches(onDown: () -> Unit = {}) = awaitEachGesture {
     awaitFirstDown().consume()
     onDown()
     do {
@@ -466,7 +467,7 @@ private val FILM_GAP = 6.dp
 private val PANEL_RADIUS = TOOL_ROW_HEIGHT / 2
 
 /** 面板上的名字、参数从这儿起淡入：面板先长出一截再显出来，不和它一起挤在一条缝里。 */
-private const val CONTENT_IN_START = 0.35f
+internal const val CONTENT_IN_START = 0.35f
 
 /**
  * 手机竖着拿时，AI 增强识别跑完的那一下在画布顶上说一声结果，几秒后收起：它在底栏的「工具」里（见 [EditorToolbar]），
@@ -510,77 +511,3 @@ internal fun AiReviewResultPill(review: AiReview, finished: Int, modifier: Modif
 
 /** 跑完的结果在画布顶上停多久。 */
 private const val AI_RESULT_MS = 3_000L
-
-/**
- * 宽屏的样式列表那一块（WideEditorPanel）最底下那一行。手机上这两样都在工具那一行里（见 [EditorBottomBar]）。
- *
- * 单张时左边「AI 增强识别」，右边「导出」。批量时左边是胶片条，占掉导出左边剩下的地方，
- * 「AI 增强识别」挪到它和导出之间；按钮出现、消失时胶片条跟着一点点变宽变窄，停在中间的那张始终在中间。
- *
- * @param filmstrip 批量时的胶片条，传进来的 Modifier 定好了它的宽。单张时为 null
- * @param exportLabel 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去
- */
-@Composable
-fun EditorActionRow(
-    onExport: () -> Unit,
-    exporting: Boolean,
-    modifier: Modifier = Modifier,
-    @StringRes exportLabel: Int = R.string.export,
-    aiReview: AiReview = AiReview.Hidden,
-    onAiReview: () -> Unit = {},
-    filmstrip: (@Composable (Modifier) -> Unit)? = null,
-) {
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        if (filmstrip != null) {
-            filmstrip(Modifier.weight(1f))
-            Box(Modifier.animateContentSize()) { AiReviewButton(aiReview, onAiReview) }
-            Spacer(Modifier.width(8.dp))
-        } else {
-            AiReviewButton(aiReview, onAiReview)
-            Spacer(Modifier.weight(1f))
-        }
-        Button(onClick = onExport, enabled = !exporting) { Text(stringResource(if (exporting) R.string.exporting else exportLabel)) }
-    }
-}
-
-/**
- * 「AI 增强识别」：点了才让 Gemini Nano 把整页文字再看一遍。机型不支持（也没配外部模型）时整个不出现。
- * 跑的时候三颗星绕着一个圈转，代替转圈的进度条。
- * 结果就写在按钮上，不另弹提示：新发现几处、没有新发现，或者没跑成（还能点，再试一次）。
- * 跑成了就停住不可点——同一页再跑一遍结果一样，不该让人以为多点几次能多找出点什么。
- */
-@Composable
-internal fun AiReviewButton(state: AiReview, onClick: () -> Unit) {
-    when (state) {
-        AiReview.Hidden -> Unit
-        AiReview.Ready -> TextButton(onClick = onClick) {
-            SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_review))
-        }
-        AiReview.Running -> TextButton(onClick = {}, enabled = false) {
-            // 按钮灰掉了，星星仍着主题色，看得出它在干活
-            SparkleIcon(animating = true, modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_reviewing))
-        }
-        is AiReview.Done -> TextButton(
-            onClick = {},
-            enabled = false,
-            // 这是结果，要看得清，不能像别的不可点按钮那样灰下去
-            colors = ButtonDefaults.textButtonColors(disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant),
-        ) {
-            Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(if (state.found == 0) stringResource(R.string.ai_review_none) else stringResource(R.string.ai_review_found, state.found))
-        }
-        AiReview.Failed -> TextButton(
-            onClick = onClick,
-            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-        ) {
-            SparkleIcon(animating = false, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.ai_review_failed))
-        }
-    }
-}
