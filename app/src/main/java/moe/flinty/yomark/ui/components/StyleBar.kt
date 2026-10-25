@@ -277,7 +277,7 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
     fun emit(next: MaskOptions, inProgress: Boolean = false) = actions.onLookChange(look.copy(options = next), inProgress)
 
     @Composable
-    fun Colors(target: ColorTarget, palette: List<NamedColor>, label: String, near: NearChoice? = null) {
+    fun Colors(target: ColorTarget, palette: List<NamedColor>, label: String, widths: SliderWidths, near: NearChoice? = null) {
         PanelLabel(label)
         ColorPicker(
             color = target.colorOf(options),
@@ -286,27 +286,34 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
             onColor = { rgb, inProgress -> emit(target.withColor(options, rgb), inProgress) },
             onColorFinished = actions::onLookChangeFinished,
             onEyedropper = { actions.onPickColor(if (colorPick == target) null else target) },
+            sliderWidths = widths,
             near = near,
             onNear = { emit(options.copy(solidNear = true)) },
         )
     }
 
+    // 每一样的滑条（连自定义颜色的三条）左右两格一样宽，按这一样最长的名字、最宽的值留（见 rememberSliderWidths）
     when (look.style) {
         // 近似色排在色板最前面：原先的「抹除」，并进色块之后就是色块的一种取色方式
-        MaskStyle.SOLID -> Colors(ColorTarget.SOLID, SOLID_PALETTE, stringResource(R.string.color), NearChoice(options.solidNear, nearColors))
+        MaskStyle.SOLID -> Colors(
+            ColorTarget.SOLID, SOLID_PALETTE, stringResource(R.string.color),
+            rememberSliderWidths(hsvLabels(), values = emptyList()),
+            NearChoice(options.solidNear, nearColors),
+        )
 
         MaskStyle.PIXELATE -> {
             // 滑条往右是更粗：divisor 越小块越大
             val finest = MaskOptions.PIXEL_DIVISOR_RANGE.last
             val coarsest = MaskOptions.PIXEL_DIVISOR_RANGE.first
+            val label = stringResource(R.string.grain)
             val levels = PIXEL_LEVELS.map { stringResource(it) }
             SliderRow(
-                label = stringResource(R.string.grain),
+                label = label,
                 value = (finest - options.pixelBlockDivisor).toFloat(),
                 range = 0f..(finest - coarsest).toFloat(),
                 steps = finest - coarsest - 1,
                 valueText = levels.getOrNull(finest - options.pixelBlockDivisor).orEmpty(),
-                valueWidth = rememberValueWidth(levels),
+                widths = rememberSliderWidths(listOf(label), levels),
                 onChange = { emit(options.copy(pixelBlockDivisor = finest - it.roundToInt()), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -315,14 +322,15 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
 
         MaskStyle.BLUR -> {
             val range = MaskOptions.BLUR_RATIO_RANGE
+            val label = stringResource(R.string.strength)
             val levels = BLUR_LEVELS.map { stringResource(it) }
             SliderRow(
-                label = stringResource(R.string.strength),
+                label = label,
                 value = options.blurRadiusRatio,
                 range = range,
                 steps = BLUR_LEVELS.size - 2,
                 valueText = levels[blurLevel(options.blurRadiusRatio)],
-                valueWidth = rememberValueWidth(levels),
+                widths = rememberSliderWidths(listOf(label), levels),
                 onChange = { emit(options.copy(blurRadiusRatio = it), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -330,37 +338,51 @@ private fun StyleControls(look: MaskLook, colorPick: ColorTarget?, nearColors: L
         }
 
         MaskStyle.MARKER -> {
+            val label = stringResource(R.string.marker_opacity)
+            // 粗细拉框时没有，也算上：换成手绘时浓淡那一条不挪
+            val widths = rememberSliderWidths(
+                listOf(label, stringResource(R.string.stroke_width)) + hsvLabels(),
+                MaskOptions.MARKER_ALPHA_RANGE.endTexts(::percentText) + MaskOptions.MARKER_WIDTH_RANGE.endTexts(::pixelText),
+            )
             ShapeChoice(options.markerShape, MARKER_SHAPES) { emit(options.copy(markerShape = it)) }
-            Colors(ColorTarget.MARKER, MARKER_PALETTE, stringResource(R.string.color))
+            Colors(ColorTarget.MARKER, MARKER_PALETTE, stringResource(R.string.color), widths)
             SliderRow(
-                label = stringResource(R.string.marker_opacity),
+                label = label,
                 value = options.markerAlpha,
                 range = MaskOptions.MARKER_ALPHA_RANGE,
-                valueText = "${(options.markerAlpha * 100).roundToInt()}%",
+                valueText = percentText(options.markerAlpha),
+                widths = widths,
                 onChange = { emit(options.copy(markerColor = MaskOptions.withAlpha(options.markerColor, it)), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
             )
             // 拉框是涂一整块，没有笔宽
             if (options.markerShape == StrokeShape.FREEHAND) {
-                WidthSlider(options.markerWidth, MaskOptions.MARKER_WIDTH_RANGE, actions) { emit(options.copy(markerWidth = it), inProgress = true) }
+                WidthSlider(options.markerWidth, MaskOptions.MARKER_WIDTH_RANGE, widths, actions) { emit(options.copy(markerWidth = it), inProgress = true) }
             }
         }
 
         MaskStyle.PEN -> {
+            val widths = rememberSliderWidths(
+                listOf(stringResource(R.string.stroke_width)) + hsvLabels(),
+                MaskOptions.PEN_WIDTH_RANGE.endTexts(::pixelText),
+            )
             ShapeChoice(options.penShape, PEN_SHAPES) { emit(options.copy(penShape = it)) }
-            Colors(ColorTarget.PEN, PEN_PALETTE, stringResource(R.string.color))
-            WidthSlider(options.penWidth, MaskOptions.PEN_WIDTH_RANGE, actions) { emit(options.copy(penWidth = it), inProgress = true) }
+            Colors(ColorTarget.PEN, PEN_PALETTE, stringResource(R.string.color), widths)
+            WidthSlider(options.penWidth, MaskOptions.PEN_WIDTH_RANGE, widths, actions) { emit(options.copy(penWidth = it), inProgress = true) }
         }
 
         // 写的字在这一段上面（见 TextInput）。字号改了，选中的文本当场变大变小
         MaskStyle.TEXT -> {
-            Colors(ColorTarget.TEXT, PEN_PALETTE, stringResource(R.string.color))
+            val label = stringResource(R.string.text_size)
+            val widths = rememberSliderWidths(listOf(label) + hsvLabels(), MaskOptions.TEXT_SIZE_RANGE.endTexts(::pixelText))
+            Colors(ColorTarget.TEXT, PEN_PALETTE, stringResource(R.string.color), widths)
             SliderRow(
-                label = stringResource(R.string.text_size),
+                label = label,
                 value = options.textSize,
                 range = MaskOptions.TEXT_SIZE_RANGE,
-                valueText = "${(options.textSize * REFERENCE_SHORT_SIDE).roundToInt()} px",
+                valueText = pixelText(options.textSize),
+                widths = widths,
                 onChange = { emit(options.copy(textSize = it), inProgress = true) },
                 onValueChangeFinished = actions::onLookChangeFinished,
                 modifier = Modifier.padding(top = 4.dp),
@@ -501,6 +523,7 @@ private val PEN_SHAPES = listOf(StrokeShape.BOX, StrokeShape.FREEHAND, StrokeSha
 private fun WidthSlider(
     value: Float,
     range: ClosedFloatingPointRange<Float>,
+    widths: SliderWidths,
     actions: StyleBarActions,
     onChange: (Float) -> Unit,
 ) {
@@ -508,12 +531,16 @@ private fun WidthSlider(
         label = stringResource(R.string.stroke_width),
         value = value,
         range = range,
-        valueText = "${(value * REFERENCE_SHORT_SIDE).roundToInt()} px",
+        valueText = pixelText(value),
+        widths = widths,
         onChange = onChange,
         onValueChangeFinished = actions::onLookChangeFinished,
         modifier = Modifier.padding(top = 4.dp),
     )
 }
+
+/** 笔宽、字号旁边写的像素数：[fraction] 是占截图短边的比例。 */
+private fun pixelText(fraction: Float) = "${(fraction * REFERENCE_SHORT_SIDE).roundToInt()} px"
 
 /** 笔宽旁边写的像素数按这么宽的截图算：常见手机截图的短边。 */
 private const val REFERENCE_SHORT_SIDE = 1080

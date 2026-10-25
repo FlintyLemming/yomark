@@ -119,9 +119,17 @@ internal fun PurposePanelContent(
     // 收起来时面板一点点变矮（PanelColumn 跟着里面的东西变高变矮），输入法收起后再长回来
     if (compactWhileTyping && focused && imeVisible) return
 
+    val angleLabel = stringResource(R.string.angle)
+    val opacityLabel = stringResource(R.string.opacity)
+    val densityLabel = stringResource(R.string.density)
     val densityLevels = DENSITY_LEVELS.map { stringResource(it) }
-    // 三条滑条右边写值的那一格一样宽，按密度最长的那一档留：三条的右头对齐
-    val valueWidth = rememberValueWidth(densityLevels)
+    // 三条滑条和自定义颜色的三条，名字那一列按最长的名字留，写值那一格按最宽的值留（密度最长的那一档、角度和不透明度两头的数）：
+    // 头尾都对齐
+    val widths = rememberSliderWidths(
+        listOf(angleLabel, opacityLabel, densityLabel) + hsvLabels(),
+        densityLevels + PurposeWatermarkStyle.ANGLE_RANGE.endTexts(::angleText) +
+            PurposeWatermarkStyle.OPACITY_RANGE.endTexts(::percentText),
+    )
     Column(Modifier.padding(end = 12.dp)) {
         PanelLabel(stringResource(R.string.color))
         ColorPicker(
@@ -132,35 +140,36 @@ internal fun PurposePanelContent(
             // 水印的样子不进撤销栈，自定义颜色的滑条松手时没有要收尾的
             onColorFinished = {},
             onEyedropper = { actions.onPickColor(!model.picking) },
+            sliderWidths = widths,
         )
         SliderRow(
-            label = stringResource(R.string.angle),
+            label = angleLabel,
             value = style.angle,
             range = PurposeWatermarkStyle.ANGLE_RANGE,
             // 15° 一档：角度是凭眼睛对齐的，连续值反而难停在 0°、±45° 上；档再细刻度点就密成一条线
             steps = ((PurposeWatermarkStyle.ANGLE_RANGE.endInclusive -
                 PurposeWatermarkStyle.ANGLE_RANGE.start) / ANGLE_STEP).roundToInt() - 1,
-            valueText = "${style.angle.roundToInt()}°",
-            valueWidth = valueWidth,
+            valueText = angleText(style.angle),
+            widths = widths,
             onChange = { actions.onStyleChange(style.copy(angle = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
         SliderRow(
             // 叫「不透明度」：数字越大越显眼，和拖动方向、显示的百分比是一回事
-            label = stringResource(R.string.opacity),
+            label = opacityLabel,
             value = style.opacity,
             range = PurposeWatermarkStyle.OPACITY_RANGE,
-            valueText = "${(style.opacity * 100).roundToInt()}%",
-            valueWidth = valueWidth,
+            valueText = percentText(style.opacity),
+            widths = widths,
             onChange = { actions.onStyleChange(style.copy(opacity = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
         SliderRow(
-            label = stringResource(R.string.density),
+            label = densityLabel,
             value = style.density,
             range = PurposeWatermarkStyle.DENSITY_RANGE,
             valueText = densityLevels[densityLevel(style.density)],
-            valueWidth = valueWidth,
+            widths = widths,
             onChange = { actions.onStyleChange(style.copy(density = it)) },
             modifier = Modifier.padding(top = 4.dp),
         )
@@ -202,6 +211,8 @@ private fun densityLevel(density: Float): Int = when {
     density <= 1.25f -> 1
     else -> 2
 }
+
+private fun angleText(angle: Float) = "${angle.roundToInt()}°"
 
 private const val ANGLE_STEP = 15f
 

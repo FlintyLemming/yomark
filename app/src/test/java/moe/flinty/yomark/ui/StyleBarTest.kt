@@ -11,7 +11,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasSetTextAction
@@ -33,6 +36,7 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.DpRect
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.width
 import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.model.MaskLook
@@ -45,6 +49,7 @@ import moe.flinty.yomark.ui.components.StylePanelContent
 import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.MinSliderWidth
+import moe.flinty.yomark.ui.components.PanelColumn
 import moe.flinty.yomark.ui.components.ToolGroup
 import org.junit.Rule
 import org.junit.Test
@@ -555,6 +560,64 @@ class StyleBarTest {
         }
     }
 
+    // ---------- 滑条的名字 ----------
+
+    /**
+     * 滑条的名字在左边那一列一行写全。原先那一列固定 72 dp，字号调大后「Thickness」「Brightness」折成两行；
+     * 现在按这一样面板里最长的名字留，自定义颜色的三条也算上，滑条的头照样对齐。
+     */
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi") @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWhole() = everyPanelsNames(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi", fontScale = 1.3f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWholeAtALargerFont() = everyPanelsNames(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @Config(qualifiers = "en-w412dp-h915dp-xxhdpi", fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun englishSliderNamesStayWholeAtDoubleFontSize() = everyPanelsNames(ENGLISH_SLIDERS, "Custom color")
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWhole() = everyPanelsNames(CHINESE_SLIDERS, "自定义颜色")
+
+    @Test @Config(fontScale = 1.3f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWholeAtALargerFont() = everyPanelsNames(CHINESE_SLIDERS, "自定义颜色")
+
+    @Test @Config(fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun chineseSliderNamesStayWholeAtDoubleFontSize() = everyPanelsNames(CHINESE_SLIDERS, "自定义颜色")
+
+    /**
+     * 宽屏右边那一栏最窄（320 dp）、字号两倍：马克笔的滑条放了名字和值只剩一小截，换成上下两行，
+     * 自定义颜色的三条也跟着换，滑条的头还是对齐的。
+     */
+    @Test @Config(qualifiers = "en-w900dp-h600dp-xhdpi", fontScale = 2f) @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun aDoubledFontStacksEverySliderOfANarrowWidePanel() {
+        compose.setContent {
+            MaterialTheme {
+                Surface {
+                    Box(Modifier.width(320.dp)) {
+                        PanelColumn { StylePanelContent(open(MaskStyle.MARKER, MaskOptions(markerShape = StrokeShape.FREEHAND)), Recorder()) }
+                    }
+                }
+            }
+        }
+        compose.onNodeWithContentDescription("Custom color").performClick()
+        val marker = ENGLISH_SLIDERS.single { it.style == MaskStyle.MARKER }
+        assertThat(compose.assertSliderNamesFit(marker.names)).isFalse()
+    }
+
+    /** 一样面板里的滑条有哪几条（名字），[customColor] = 有自定义颜色那三条，要点开。 */
+    private class Sliders(val style: MaskStyle, val names: List<String>, val customColor: Boolean = true)
+
+    /** 挨个打开每一样的面板（马克笔是手绘的，有粗细），有颜色的点开自定义，看滑条的名字（见 assertSliderNamesFit）。 */
+    private fun everyPanelsNames(panels: List<Sliders>, customColor: String) {
+        var model by mutableStateOf(open(MaskStyle.SOLID))
+        compose.setContent { MaterialTheme { Surface { PhoneBar(model, Recorder()) } } }
+        panels.forEach { p ->
+            model = open(p.style, MaskOptions(markerShape = StrokeShape.FREEHAND))
+            if (p.customColor) compose.onNodeWithContentDescription(customColor).performClick()
+            compose.assertSliderNamesFit(p.names)
+        }
+    }
+
     private companion object {
         val ENGLISH_LEVELS = listOf(
             Levels(MaskStyle.PIXELATE, "Grain", listOf("Fine", "Fairly fine", "Medium", "Fairly coarse", "Coarse", "Very coarse")),
@@ -563,6 +626,25 @@ class StyleBarTest {
         val CHINESE_LEVELS = listOf(
             Levels(MaskStyle.PIXELATE, "颗粒", listOf("细", "较细", "适中", "较粗", "粗", "很粗")),
             Levels(MaskStyle.BLUR, "强度", listOf("轻", "较轻", "适中", "较重", "重")),
+        )
+
+        private val ENGLISH_HSV = listOf("Hue", "Saturation", "Brightness")
+        val ENGLISH_SLIDERS = listOf(
+            Sliders(MaskStyle.SOLID, ENGLISH_HSV),
+            Sliders(MaskStyle.PIXELATE, listOf("Grain"), customColor = false),
+            Sliders(MaskStyle.BLUR, listOf("Strength"), customColor = false),
+            Sliders(MaskStyle.MARKER, listOf("Opacity", "Thickness") + ENGLISH_HSV),
+            Sliders(MaskStyle.PEN, listOf("Thickness") + ENGLISH_HSV),
+            Sliders(MaskStyle.TEXT, listOf("Size") + ENGLISH_HSV),
+        )
+        private val CHINESE_HSV = listOf("色相", "饱和度", "亮度")
+        val CHINESE_SLIDERS = listOf(
+            Sliders(MaskStyle.SOLID, CHINESE_HSV),
+            Sliders(MaskStyle.PIXELATE, listOf("颗粒"), customColor = false),
+            Sliders(MaskStyle.BLUR, listOf("强度"), customColor = false),
+            Sliders(MaskStyle.MARKER, listOf("浓淡", "粗细") + CHINESE_HSV),
+            Sliders(MaskStyle.PEN, listOf("粗细") + CHINESE_HSV),
+            Sliders(MaskStyle.TEXT, listOf("字号") + CHINESE_HSV),
         )
     }
 }
