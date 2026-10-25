@@ -13,8 +13,9 @@ local.properties
 # README 截图的中间产物，由 ReadmeScreenshots 生成
 docs/readme/shots/
 
-# 商店截图的中间产物，由 PlayScreenshots 生成
+# 商店截图的中间产物，由 PlayScreenshots / PlayScreenshotsEn 生成
 docs/play/shots/
+docs/play/shots-en/
 
 # Claude Code 的 worktree 目录
 .claude/worktrees/
