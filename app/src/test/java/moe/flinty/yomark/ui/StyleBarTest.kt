@@ -49,6 +49,7 @@ import moe.flinty.yomark.ui.components.StylePanelContent
 import moe.flinty.yomark.ui.components.WideEditorPanel
 import moe.flinty.yomark.ui.components.EditorBottomBar
 import moe.flinty.yomark.ui.components.MinSliderWidth
+import moe.flinty.yomark.ui.components.PanelColumn
 import moe.flinty.yomark.ui.components.ToolGroup
 import org.junit.Rule
 import org.junit.Test
@@ -592,7 +593,9 @@ class StyleBarTest {
         compose.setContent {
             MaterialTheme {
                 Surface {
-                    Box(Modifier.width(320.dp)) { StylePanel(open(MaskStyle.MARKER, MaskOptions(markerShape = StrokeShape.FREEHAND)), Recorder()) }
+                    Box(Modifier.width(320.dp)) {
+                        PanelColumn { StylePanelContent(open(MaskStyle.MARKER, MaskOptions(markerShape = StrokeShape.FREEHAND)), Recorder()) }
+                    }
                 }
             }
         }
