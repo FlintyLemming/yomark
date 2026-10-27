@@ -209,7 +209,7 @@ class EditorTopBarTest {
 
     // ---------- 导出右边的小箭头（覆盖原图，2026-10-27） ----------
 
-    /** 箭头和导出连成一颗，贴在写着字的导出右边，在最右上角，比导出窄得多；点开是覆盖原图，点了菜单收起。 */
+    /** 箭头和导出连成一颗，在写着字的导出右边只隔一道 2dp 的缝，在最右上角，比导出窄得多；点开是覆盖原图，点了菜单收起。 */
     @Config(qualifiers = "en-rUS-w600dp-h915dp-xxhdpi")
     @Test fun theArrowBesideExportOffersOverwritingTheOriginal() {
         var chosen = 0
@@ -220,7 +220,7 @@ class EditorTopBarTest {
         )
         val export = compose.onNodeWithText("Export").bounds()
         val arrow = button("Export options").bounds()
-        assertThat(arrow.left).isEqualTo(export.right)
+        assertThat(arrow.left - export.right).isEqualTo(2.dp)
         assertThat(arrow.height).isEqualTo(export.height)
         assertThat(arrow.width).isAtMost(32.dp)
 

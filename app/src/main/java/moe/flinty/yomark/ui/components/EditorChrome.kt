@@ -10,17 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -53,7 +53,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.Dp
@@ -173,7 +172,7 @@ fun EditorTopBar(
                     else -> R.string.exporting
                 },
             )
-            // 菜单里有东西时导出和右边的小箭头连成一颗胶囊（split button），中间一道细线隔开
+            // 菜单里有东西时导出和右边的小箭头连成一颗（Material 3 的 split button）：挨着的那一边角收小，中间只隔一道缝
             val split = menuShare != null || otherExport != null
             Button(
                 onClick = onExport,
@@ -220,9 +219,9 @@ fun EditorTopBar(
         // 分享挨在导出左边，和返回、导出一样不让出来
         val share = part(TopBarItem.SHARE)?.measure(loose)
         val shareWidth = share?.width ?: 0
-        // 导出右边的小箭头，算在导出这一颗里
+        // 导出右边的小箭头，连同中间那道缝都算在导出这一颗里
         val menu = part(TopBarItem.EXPORT_MENU)?.measure(loose)
-        val menuWidth = menu?.width ?: 0
+        val menuWidth = menu?.let { it.width + SPLIT_GAP.roundToPx() } ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
         val gap = EXPORT_GAP.roundToPx()
@@ -278,16 +277,18 @@ private enum class TopBarItem {
 private val EXPORT_GAP = 4.dp
 
 /**
- * 导出和右边的小箭头连成一颗胶囊（split button）：两半挨着的那一边是直的，中间一道细线，上下留空。
- * 箭头那一截窄，里面是个小三角；字放不下时导出那一半是图标，比单独的图标钮宽一点，图标不贴着圆头。
+ * 导出和右边的小箭头连成一颗（Material 3 的 split button）：中间 2dp 的缝、外侧整个圆、挨着的那一边 4dp 的角照它的规格，
+ * 箭头那一半比规格（48dp）窄，顶栏挤。字放不下时导出那一半是图标，比单独的图标钮宽一点，图标不贴着圆头。
  * 菜单离按钮空一点，不贴着弹出来。
  */
-private val SPLIT_START = RoundedCornerShape(topStartPercent = 50, topEndPercent = 0, bottomEndPercent = 0, bottomStartPercent = 50)
-private val SPLIT_END = RoundedCornerShape(topStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 0)
+private val SPLIT_GAP = 2.dp
+private val SPLIT_OUTER = CornerSize(50)
+private val SPLIT_INNER = CornerSize(4.dp)
+private val SPLIT_START = RoundedCornerShape(topStart = SPLIT_OUTER, topEnd = SPLIT_INNER, bottomEnd = SPLIT_INNER, bottomStart = SPLIT_OUTER)
+private val SPLIT_END = RoundedCornerShape(topStart = SPLIT_INNER, topEnd = SPLIT_OUTER, bottomEnd = SPLIT_OUTER, bottomStart = SPLIT_INNER)
 private val SPLIT_START_PADDING = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
 private val SPLIT_ICON_WIDTH = 44.dp
 private val SPLIT_ARROW_WIDTH = 32.dp
-private val SPLIT_DIVIDER_HEIGHT = 20.dp
 private val SPLIT_MENU_GAP = 6.dp
 
 /**
@@ -318,7 +319,7 @@ private fun ExportMenu(
     val turn by animateFloatAsState(if (open) 180f else 0f, label = "exportMenuArrow")
     val description = stringResource(R.string.export_options)
     Box(modifier) {
-        // 只有箭头这一窄条：不往四周留触摸余量，和导出贴着（见 EditorTopBar 里导出的图标）
+        // 只有箭头这一窄条：不往四周留触摸余量，和导出之间只隔一道缝（见 EditorTopBar 里导出的图标）
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
             Button(
                 onClick = { open = true },
@@ -327,11 +328,7 @@ private fun ExportMenu(
                 shape = SPLIT_END,
                 contentPadding = PaddingValues(0.dp),
             ) {
-                val line = LocalContentColor.current.let { it.copy(alpha = it.alpha * 0.4f) }
-                Box(Modifier.width(1.dp).height(SPLIT_DIVIDER_HEIGHT).background(line))
-                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.rotate(turn))
-                }
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.size(20.dp).rotate(turn))
             }
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }, offset = DpOffset(0.dp, SPLIT_MENU_GAP)) {
