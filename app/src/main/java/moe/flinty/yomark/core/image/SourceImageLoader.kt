@@ -91,6 +91,9 @@ object SourceImageLoader {
         )
     }
 
+    /** 导出时要缩小的原图（超过 [EXPORT_MAX_PIXELS]，见 [loadForExport]）。覆盖原图就成了拿小图换掉原图，这样的不覆盖。 */
+    fun downscalesForExport(width: Int, height: Int): Boolean = width.toLong() * height > EXPORT_MAX_PIXELS
+
     private fun readSize(file: File): Pair<Int, Int> {
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, opts)

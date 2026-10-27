@@ -243,6 +243,8 @@ internal fun SettingsPageContent(
         SettingsPage.GENERAL -> {
             val restyleAll by store.restyleAllMasks.collectAsStateWithLifecycle(initialValue = null)
             val fullResolution by store.fullResolutionOcr.collectAsStateWithLifecycle(initialValue = null)
+            val overwriteByDefault by store.overwriteByDefault.collectAsStateWithLifecycle(initialValue = null)
+            val shareInExportMenu by store.shareInExportMenu.collectAsStateWithLifecycle(initialValue = null)
             // 水印的三项一起读到再画：「无水印」没选过是 null，单独收的话和「还没读到」分不开，会先闪一下
             val watermark by remember {
                 combine(
@@ -254,12 +256,18 @@ internal fun SettingsPageContent(
             val restyle = restyleAll
             val mark = watermark
             val fullRes = fullResolution
-            if (restyle != null && mark != null && fullRes != null) {
+            val overwrite = overwriteByDefault
+            val shareInMenu = shareInExportMenu
+            if (restyle != null && mark != null && fullRes != null && overwrite != null && shareInMenu != null) {
                 GeneralSettingsScreen(
                     restyleAll = restyle,
                     onRestyleAllChange = { next -> scope.launch { store.setRestyleAllMasks(next) } },
                     fullResolution = fullRes,
                     onFullResolutionChange = { next -> scope.launch { store.setFullResolutionOcr(next) } },
+                    overwriteByDefault = overwrite,
+                    onOverwriteByDefaultChange = { next -> scope.launch { store.setOverwriteByDefault(next) } },
+                    shareInExportMenu = shareInMenu,
+                    onShareInExportMenuChange = { next -> scope.launch { store.setShareInExportMenu(next) } },
                     watermarkStyle = mark.style,
                     onWatermarkStyleChange = { next ->
                         scope.launch { store.setBrandWatermarkStyle(next, mark.unlocked) }

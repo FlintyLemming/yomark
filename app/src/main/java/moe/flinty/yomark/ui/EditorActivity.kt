@@ -24,6 +24,7 @@ import moe.flinty.yomark.debug.sharedTraceLog
 import moe.flinty.yomark.engine.buildEngine
 import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.FileProviderSink
+import moe.flinty.yomark.export.MediaOriginals
 import moe.flinty.yomark.export.MediaStoreSink
 import moe.flinty.yomark.export.WatermarkDrawer
 import moe.flinty.yomark.render.RendererRegistry
@@ -75,6 +76,8 @@ class EditorActivity : YomarkActivity() {
                     forCaller = forCaller,
                     // 别的应用来要图时没有分享：导出就是把图交回去
                     shareSink = if (forCaller) null else FileProviderSink(app, FileProviderSink.SHARE),
+                    // 导出右边小箭头里的「覆盖原图」写回原图；别的应用来要图时导出就是交回去，没有这个箭头
+                    originals = if (forCaller) null else MediaOriginals(app),
                 )
             }
         }

@@ -15,6 +15,7 @@ import moe.flinty.yomark.R
  *
  * @param opened 看过的张数。一张都没看过时没有「只导出看过的」
  * @param share 点的是分享：按钮上写「只分享看过的」
+ * @param overwrite 点的是覆盖原图：按钮上写「只覆盖看过的」
  */
 @Composable
 fun UnopenedExportDialog(
@@ -24,6 +25,7 @@ fun UnopenedExportDialog(
     onExportOpened: () -> Unit,
     onDismiss: () -> Unit,
     share: Boolean = false,
+    overwrite: Boolean = false,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -31,7 +33,14 @@ fun UnopenedExportDialog(
         text = { Text(stringResource(R.string.unopened_text)) },
         confirmButton = { TextButton(onClick = onReview) { Text(stringResource(R.string.review)) } },
         dismissButton = if (opened > 0) {
-            { TextButton(onClick = onExportOpened) { Text(stringResource(if (share) R.string.share_opened else R.string.export_opened, opened)) } }
+            {
+                val label = when {
+                    share -> R.string.share_opened
+                    overwrite -> R.string.overwrite_opened
+                    else -> R.string.export_opened
+                }
+                TextButton(onClick = onExportOpened) { Text(stringResource(label, opened)) }
+            }
         } else null,
     )
 }

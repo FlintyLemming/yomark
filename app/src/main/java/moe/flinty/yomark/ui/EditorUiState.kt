@@ -1,5 +1,6 @@
 package moe.flinty.yomark.ui
 
+import android.content.IntentSender
 import android.graphics.PointF
 import android.net.Uri
 import moe.flinty.yomark.core.image.SourceImage
@@ -22,7 +23,27 @@ sealed interface EditorMessage {
     data class HandedOver(val uris: List<Uri>) : EditorMessage
     /** 分享：打好码的图写进缓存了（不进相册），交给系统的分享面板。编辑器留着，不弹提示。 */
     data class Shared(val uris: List<Uri>, val mimeType: String) : EditorMessage
+    /** 覆盖原图（导出右边小箭头里的那一项，见 [OverwriteOffer]）：打好码的图写回原图了。 */
+    data object Overwritten : EditorMessage
+    /** 要覆盖原图，原图却变了、没了，或者没给写的许可：原图没动，另存了一份进相册。 */
+    data object SavedCopyInstead : EditorMessage
+    /** 批量覆盖原图：[overwritten] 张写回了原图，[copies] 张覆盖不了，另存进了相册。 */
+    data class BatchOverwritten(val overwritten: Int, val copies: Int) : EditorMessage
     data class Error(@StringRes val text: Int) : EditorMessage
+}
+
+/**
+ * 覆盖原图（2026-10-27）：打好码的图写回原图，相册里不多一张。在顶栏导出右边的小箭头里，设置里默认导出选了它时就是导出本身。
+ * 点不点得动、底下写什么。
+ * 写不回去的图：别的应用自己的文件（聊天应用给的，认不出是相册里哪一张）、PNG 和 JPEG 以外的格式（导出只编这两种）、
+ * 大到导出要缩小的（那就成了拿小图换掉原图），见 EditorViewModel.originalOf。
+ */
+sealed interface OverwriteOffer {
+    /** 写得回去。批量时是看过的里至少有一张写得回去，[copies] 张写不回去的照常另存进相册。 */
+    data class Ready(val copies: Int = 0) : OverwriteOffer
+
+    /** 写不回去，那一项灰着；[reason] 是底下的小字，说为什么。还没有图时是 null。 */
+    data class Unavailable(@StringRes val reason: Int? = null) : OverwriteOffer
 }
 
 /**
@@ -93,10 +114,24 @@ data class EditorUiState(
     /** 在导出（分享也是先导出）：顶栏的导出、分享都点不动，在跑的那一颗转圈（见 [sharing]）。 */
     val exporting: Boolean = false,
     /**
-     * 这一次导出是为了分享（顶栏导出左边那颗）：写进缓存交给分享面板，不进相册。
-     * 导出中时转圈的是分享那颗；批量问还有没看过的时，按钮上写「只分享看过的」。
+     * 这一次导出是为了分享（导出右边小箭头里的一项，或者顶栏导出左边那颗）：写进缓存交给分享面板，不进相册。
+     * 导出中时单独那颗分享转圈，分享在导出菜单里时导出那颗写「分享中…」；批量问还有没看过的时，按钮上写「只分享看过的」。
      */
     val sharing: Boolean = false,
+    /** 覆盖原图点不点得动（见 [OverwriteOffer]）。别的应用来要图时没有覆盖原图。 */
+    val overwriteOffer: OverwriteOffer = OverwriteOffer.Unavailable(),
+    /**
+     * 导出就是覆盖原图：设置里默认导出选了覆盖原图，这张（批量时看过的里至少一张）也写得回去。
+     * 顶栏的导出这时写「覆盖」，小箭头里换成「另存到相册」；写不回去时导出照常是另存，箭头里还是灰着的「覆盖原图」。
+     */
+    val exportOverwrites: Boolean = false,
+    /**
+     * 这一次导出是覆盖原图：导出那颗转圈时念「覆盖中…」；批量问还有没看过的时，按钮上写「只覆盖看过的」。
+     * 和 [sharing] 不会同时是 true。
+     */
+    val overwriting: Boolean = false,
+    /** 覆盖原图要用户点头：界面弹出这个系统的确认框（见 EditorScreen），弹出去就清掉，结果交回 EditorViewModel.onWriteRequestResult。 */
+    val writeRequest: IntentSender? = null,
     /** 选中的手动框（刚画完，或点了它）：出现四角手柄与「删除」。只有手动框进得了选中态。 */
     val selectedManualId: String? = null,
     /**
