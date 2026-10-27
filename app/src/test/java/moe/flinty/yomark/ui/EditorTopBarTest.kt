@@ -231,6 +231,40 @@ class EditorTopBarTest {
         compose.onNodeWithText("Overwrite original").assertDoesNotExist()
     }
 
+    /**
+     * 两段落在同一排像素上。420dpi 时 48dp 的触摸区比 40dp 的按钮多出单数个像素（21），导出那一段要是还带着触摸区，
+     * 它在触摸区里居中和顶栏把箭头居中取整不一样，箭头就比导出高 1px（真机上看到的，2026-10-27）。
+     */
+    @Config(qualifiers = "zh-rCN-w412dp-h915dp-420dpi")
+    @Test fun bothHalvesSitOnTheSamePixelRows() {
+        show(share = true, shareInMenu = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        val export = compose.onNodeWithText("导出").bounds()
+        val arrow = button("导出选项").bounds()
+        assertThat(arrow.top).isEqualTo(export.top)
+        assertThat(arrow.bottom).isEqualTo(export.bottom)
+    }
+
+    /** 分享单独一颗时，它的圆和导出上下也对齐：它带着触摸区，导出不带，两边居中的取整一样。 */
+    @Config(qualifiers = "zh-rCN-w412dp-h915dp-420dpi")
+    @Test fun theSeparateShareButtonLinesUpWithExport() {
+        show(share = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        val share = button("分享").bounds()
+        val export = compose.onNodeWithText("导出").bounds()
+        assertThat(share.top).isEqualTo(export.top)
+        assertThat(share.bottom).isEqualTo(export.bottom)
+    }
+
+    /** 调大了字号，导出那一段跟着变高时，箭头那一段一样高，不是矮一截缩在中间。 */
+    @Config(qualifiers = "en-rUS-w600dp-h915dp-420dpi", fontScale = 2f)
+    @Test fun withLargeTextTheArrowIsAsTallAsExport() {
+        show(other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        val export = compose.onNodeWithText("Export").bounds()
+        val arrow = button("Export options").bounds()
+        assertThat(export.height).isGreaterThan(40.dp)
+        assertThat(arrow.top).isEqualTo(export.top)
+        assertThat(arrow.bottom).isEqualTo(export.bottom)
+    }
+
     /** 这张写不回去：那一项灰着，底下说为什么。 */
     @Test fun anImageThatCannotBeWrittenBackSaysWhy() {
         var chosen = 0

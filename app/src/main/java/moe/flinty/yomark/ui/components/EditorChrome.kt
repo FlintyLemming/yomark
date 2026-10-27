@@ -83,6 +83,7 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.util.lerp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
@@ -174,19 +175,20 @@ fun EditorTopBar(
             )
             // 菜单里有东西时导出和右边的小箭头连成一颗（Material 3 的 split button）：挨着的那一边角收小，中间只隔一道缝
             val split = menuShare != null || otherExport != null
-            Button(
-                onClick = onExport,
-                modifier = Modifier.layoutId(TopBarItem.EXPORT),
-                enabled = !exporting,
-                shape = if (split) SPLIT_START else ButtonDefaults.shape,
-                contentPadding = if (split) SPLIT_START_PADDING else ButtonDefaults.ContentPadding,
-            ) {
-                Text(label, maxLines = 1, softWrap = false)
-            }
-            // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字。
-            // 和箭头连着时不往四周留触摸余量，不然两半中间空出一大截；手指按偏一点 Compose 照样算按到
+            // 和箭头连着时导出（写字的、图标的都是）和箭头一样不往四周留触摸余量，Material 3 的 split button 也是这样：
+            // 不然两半中间空出一大截，导出在触摸区里居中的取整也和顶栏放箭头的对不上。手指按偏一点 Compose 照样算按到
             val touchMargin = if (split) Dp.Unspecified else LocalMinimumInteractiveComponentSize.current
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides touchMargin) {
+                Button(
+                    onClick = onExport,
+                    modifier = Modifier.layoutId(TopBarItem.EXPORT),
+                    enabled = !exporting,
+                    shape = if (split) SPLIT_START else ButtonDefaults.shape,
+                    contentPadding = if (split) SPLIT_START_PADDING else ButtonDefaults.ContentPadding,
+                ) {
+                    Text(label, maxLines = 1, softWrap = false)
+                }
+                // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字。
                 FilledIconButton(
                     onClick = onExport,
                     modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON)
@@ -219,9 +221,10 @@ fun EditorTopBar(
         // 分享挨在导出左边，和返回、导出一样不让出来
         val share = part(TopBarItem.SHARE)?.measure(loose)
         val shareWidth = share?.width ?: 0
-        // 导出右边的小箭头，连同中间那道缝都算在导出这一颗里
-        val menu = part(TopBarItem.EXPORT_MENU)?.measure(loose)
-        val menuWidth = menu?.let { it.width + SPLIT_GAP.roundToPx() } ?: 0
+        // 导出右边的小箭头，连同中间那道缝都算在导出这一颗里。这里先拿它多宽，量过导出再照导出的高量它：
+        // 调大了字号导出变高时，箭头一样高
+        val menuPart = part(TopBarItem.EXPORT_MENU)
+        val menuWidth = menuPart?.let { it.maxIntrinsicWidth(Constraints.Infinity) + SPLIT_GAP.roundToPx() } ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
         val gap = EXPORT_GAP.roundToPx()
@@ -234,6 +237,7 @@ fun EditorTopBar(
         } else {
             part(TopBarItem.EXPORT_ICON)!!.measure(loose)
         }
+        val menu = menuPart?.measure(loose.copy(minHeight = button.height, maxHeight = button.height))
         var room = width - back.width - shareWidth - gap - button.width - menuWidth
         val kept = mutableSetOf<TopBarItem>()
         for ((item, icon) in icons.sortedBy { it.first }) {
@@ -246,7 +250,8 @@ fun EditorTopBar(
         val barHeight = (listOf(back) + shown + listOfNotNull(share, menu) + button).maxOf { it.height }
             .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, barHeight) {
-            val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
+            // 竖着放正中，取整和 Material 3 的按钮在触摸区里居中一样（四舍五入），带触摸区的和不带的落在同一排像素上
+            val centered = { p: Placeable, x: Int -> p.place(x, ((barHeight - p.height) / 2f).roundToInt()) }
             centered(back, 0)
             // 中间这几个靠在分享（没有分享时是导出）左边，和返回之间空着
             var x = width - menuWidth - button.width - gap - shareWidth - iconsWidth
@@ -318,8 +323,9 @@ private fun ExportMenu(
     var open by remember { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 180f else 0f, label = "exportMenuArrow")
     val description = stringResource(R.string.export_options)
-    Box(modifier) {
-        // 只有箭头这一窄条：不往四周留触摸余量，和导出之间只隔一道缝（见 EditorTopBar 里导出的图标）
+    // 顶栏照导出的高量这一颗，propagateMinConstraints 把这个高传给箭头，两段一样高
+    Box(modifier, propagateMinConstraints = true) {
+        // 只有箭头这一窄条：不往四周留触摸余量，和导出之间只隔一道缝（见 EditorTopBar 里的导出）
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
             Button(
                 onClick = { open = true },
