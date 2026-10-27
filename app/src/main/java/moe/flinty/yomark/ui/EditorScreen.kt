@@ -1,6 +1,10 @@
 package moe.flinty.yomark.ui
 
+import android.app.Activity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
@@ -88,6 +92,7 @@ import moe.flinty.yomark.ui.components.EditorTopBar
 import moe.flinty.yomark.ui.components.FoldOnTouch
 import moe.flinty.yomark.ui.components.FreeEditionDialog
 import moe.flinty.yomark.ui.components.MaskItemList
+import moe.flinty.yomark.ui.components.OtherExport
 import moe.flinty.yomark.ui.components.PanelTop
 import moe.flinty.yomark.ui.components.PaywallDialog
 import moe.flinty.yomark.ui.components.PurposePanelActions
@@ -153,6 +158,13 @@ fun EditorScreen(
             )
             is EditorMessage.BatchExported -> snackbar.showMessage(context.getString(R.string.saved_batch, m.count), vm)
             is EditorMessage.BatchPartial -> snackbar.showMessage(context.getString(R.string.error_batch_partial, m.ok, m.failed), vm)
+            EditorMessage.Overwritten -> snackbar.showMessage(context.getString(R.string.overwritten), vm)
+            EditorMessage.SavedCopyInstead -> snackbar.showMessage(context.getString(R.string.overwrite_saved_copy), vm)
+            is EditorMessage.BatchOverwritten -> snackbar.showMessage(
+                if (m.copies == 0) context.getString(R.string.overwritten_batch, m.overwritten)
+                else context.getString(R.string.overwritten_batch_with_copies, m.overwritten, m.copies),
+                vm,
+            )
             is EditorMessage.Error -> snackbar.showMessage(context.getString(m.text), vm)
             is EditorMessage.HandedOver -> onHandOver(m.uris)
             // 马上收掉：转个屏不再弹一次分享面板
@@ -164,6 +176,16 @@ fun EditorScreen(
         }
     }
 
+    // 覆盖原图要用户点头：弹出系统的确认框，点了什么交回 ViewModel
+    val writeAccess = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        vm.onWriteRequestResult(it.resultCode == Activity.RESULT_OK)
+    }
+    LaunchedEffect(state.writeRequest) {
+        val request = state.writeRequest ?: return@LaunchedEffect
+        vm.writeRequestShown()
+        writeAccess.launch(IntentSenderRequest.Builder(request).build())
+    }
+
     if (state.unopenedDialogVisible) {
         state.batch?.let { batch ->
             UnopenedExportDialog(
@@ -173,6 +195,7 @@ fun EditorScreen(
                 onExportOpened = vm::exportOpenedOnly,
                 onDismiss = vm::dismissDialog,
                 share = state.sharing,
+                overwrite = state.overwriting,
             )
         }
     }
@@ -208,11 +231,18 @@ fun EditorScreen(
         Column(Modifier.fillMaxSize().padding(padding).consumeWindowInsets(padding)) {
             val batch = state.batch
             val phone = layout == EditorLayout.PHONE
-            val onExport = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+            // 导出两种：另存进相册，和覆盖原图（2026-10-27）。设置里默认导出选的那一种在导出按钮上，另一种在它右边的小箭头里
+            val saveCopy = { if (batch != null) vm.exportBatch() else vm.requestExport() }
+            val overwrite = { if (batch != null) vm.overwriteBatch() else vm.requestOverwrite() }
+            val onExport = if (state.exportOverwrites) overwrite else saveCopy
             // 分享：图不进相册，写进缓存交给分享面板。别的应用来要图时没有它（见 vm.canShare）
             val onShare = if (vm.canShare) ({ if (batch != null) vm.exportBatch(share = true) else vm.requestExport(share = true) }) else null
-            // 别的应用来要图时，导出就是把图交回去
-            val exportLabel = if (vm.forCaller) R.string.done else R.string.export
+            // 别的应用来要图时没有覆盖原图，也就没有小箭头（见 vm.canOverwrite）
+            val otherExport = when {
+                !vm.canOverwrite -> null
+                state.exportOverwrites -> OtherExport.SaveCopy
+                else -> OtherExport.Overwrite(state.overwriteOffer)
+            }
             val canCompare = state.image != null &&
                 (state.purposeText != null || state.plan.items.isNotEmpty())
             val onToolGroup: (ToolGroup?) -> Unit = {
@@ -243,9 +273,17 @@ fun EditorScreen(
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
                     onExport = onExport,
                     onShare = onShare,
-                    exportLabel = exportLabel,
+                    // 别的应用来要图时，导出就是把图交回去
+                    exportLabel = when {
+                        vm.forCaller -> R.string.done
+                        state.exportOverwrites -> R.string.overwrite
+                        else -> R.string.export
+                    },
+                    otherExport = otherExport,
+                    onOtherExport = if (state.exportOverwrites) saveCopy else overwrite,
                     exporting = state.exporting,
                     sharing = state.sharing,
+                    overwriting = state.overwriting,
                 )
                 if (panelUp) FoldOnTouch(foldPanel, Modifier.matchParentSize())
             }

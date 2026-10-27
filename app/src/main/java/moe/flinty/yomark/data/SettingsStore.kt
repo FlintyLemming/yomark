@@ -198,6 +198,16 @@ class SettingsStore internal constructor(
     }
 
     /**
+     * 默认导出（2026-10-27）：顶栏的导出是另存到相册（出厂），还是覆盖原图（见 export/Originals）。
+     * 另一种在导出右边的小箭头里。选了覆盖原图，写不回去的图导出照常另存。
+     */
+    val overwriteByDefault: Flow<Boolean> = store.data.map { it[KEY_OVERWRITE_BY_DEFAULT] ?: false }
+
+    suspend fun setOverwriteByDefault(on: Boolean) {
+        store.edit { it[KEY_OVERWRITE_BY_DEFAULT] = on }
+    }
+
+    /**
      * 品牌水印的字样（见 BrandWatermarkStyle）。没选过就按**读的时候**的系统语言定，不在第一次读时写下：
      * 用户换了系统语言，没选过的人跟着换；选过一次之后就一直是那一版。
      * 认不出的值同没选过，理由与 lastStyle 一致。
@@ -322,7 +332,7 @@ class SettingsStore internal constructor(
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）、默认导出和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。
@@ -342,6 +352,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
             it.remove(KEY_FULL_RESOLUTION)
+            it.remove(KEY_OVERWRITE_BY_DEFAULT)
             it.remove(KEY_BRAND_WATERMARK)
             it.remove(KEY_BRAND_WATERMARK_OFF)
         }
@@ -431,6 +442,7 @@ class SettingsStore internal constructor(
         val KEY_PURPOSE_DENSITY = floatPreferencesKey("purpose_watermark_density")
         val KEY_RESTYLE_ALL = booleanPreferencesKey("restyle_all_masks")
         val KEY_FULL_RESOLUTION = booleanPreferencesKey("full_resolution_ocr")
+        val KEY_OVERWRITE_BY_DEFAULT = booleanPreferencesKey("overwrite_by_default")
         val KEY_BRAND_WATERMARK = stringPreferencesKey("brand_watermark_style")
         val KEY_BRAND_WATERMARK_OFF = booleanPreferencesKey("brand_watermark_off")
         val KEY_SCAN_STYLE = stringPreferencesKey("scan_style")

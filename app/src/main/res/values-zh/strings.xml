@@ -74,6 +74,21 @@
     <string name="error_export">导出失败，请重试</string>
     <string name="error_share">分享失败，请重试</string>
     <string name="error_batch_partial">%1$d 张已保存，%2$d 张失败</string>
+    <string name="export_options">导出选项</string>
+    <string name="overwrite">覆盖</string>
+    <string name="save_copy">另存到相册</string>
+    <string name="overwrite_original">覆盖原图</string>
+    <string name="overwrite_not_found">找不到原图</string>
+    <string name="overwrite_format">只支持 JPG、PNG</string>
+    <string name="overwrite_too_large">超过 3200 万像素的图不支持</string>
+    <string name="overwrite_none_in_batch">看过的图都写不回原图</string>
+    <string name="overwrite_copies_in_batch">%1$d 张写不回去，会另存到相册</string>
+    <string name="overwriting">覆盖中…</string>
+    <string name="overwritten">已覆盖原图</string>
+    <string name="overwritten_batch">已覆盖 %1$d 张原图</string>
+    <string name="overwritten_batch_with_copies">已覆盖 %1$d 张原图，%2$d 张另存到相册</string>
+    <string name="overwrite_saved_copy">没能覆盖原图，已另存到相册</string>
+    <string name="error_overwrite">覆盖失败，请重试</string>
     <string name="purpose_default">仅供办理 XX 使用</string>
     <string name="filmstrip_item">第 %1$d 张，共 %2$d 张</string>
 
@@ -194,6 +209,7 @@
     <string name="review">去看看</string>
     <string name="export_opened">只导出看过的 %1$d 张</string>
     <string name="share_opened">只分享看过的 %1$d 张</string>
+    <string name="overwrite_opened">只覆盖看过的 %1$d 张</string>
     <string name="paywall_one_time">一次付费，永久有效，不是订阅。</string>
     <string name="paywall_what">付费只去掉导出图片右下角的「有码 Yomark」水印，其他功能免费版都有。</string>
     <string name="paywall_restore_hint">以前买过？点「恢复购买」，不会再次扣费。</string>
@@ -228,7 +244,7 @@
     <string name="settings_help">帮助</string>
     <string name="settings_about">关于</string>
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
-    <string name="settings_general_summary">编辑、识别、水印样式</string>
+    <string name="settings_general_summary">编辑、识别、导出、水印样式</string>
     <string name="settings_appearance_summary">深色模式、主题色、识别动效</string>
     <string name="settings_labs_summary">识别聊天记录</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
@@ -326,6 +342,8 @@
     <string name="settings_recognize">识别</string>
     <string name="full_resolution_ocr">按原分辨率识别</string>
     <string name="full_resolution_ocr_summary">开启后扫描速度会降低约一半以上</string>
+    <string name="settings_default_export">默认导出</string>
+    <string name="overwrite_by_default_summary">写不回原图的图照常另存</string>
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>

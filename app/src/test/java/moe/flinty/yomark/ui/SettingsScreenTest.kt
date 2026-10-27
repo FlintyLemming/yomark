@@ -132,7 +132,7 @@ class SettingsScreenTest {
         )
         compose.onNodeWithText("打码 · 精确").assertIsDisplayed()
         compose.onNodeWithText("关闭").assertIsDisplayed()
-        compose.onNodeWithText("编辑、识别、水印样式").assertIsDisplayed()
+        compose.onNodeWithText("编辑、识别、导出、水印样式").assertIsDisplayed()
         val masked = RuleCatalog.all.count { RuleCatalog.factoryState(it.id) == RuleState.MASKED } + 1
         val off = RuleCatalog.all.size - masked
         compose.onNodeWithText("打码 $masked 类 · 关闭 $off 类").assertIsDisplayed()
@@ -741,6 +741,8 @@ class SettingsScreenTest {
         onRestyleAllChange: (Boolean) -> Unit = {},
         fullResolution: Boolean = false,
         onFullResolutionChange: (Boolean) -> Unit = {},
+        overwriteByDefault: Boolean = false,
+        onOverwriteByDefaultChange: (Boolean) -> Unit = {},
         watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
         onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
         watermarkUnlocked: Boolean = false,
@@ -750,6 +752,7 @@ class SettingsScreenTest {
         GeneralSettingsScreen(
             restyleAll = restyleAll, onRestyleAllChange = onRestyleAllChange,
             fullResolution = fullResolution, onFullResolutionChange = onFullResolutionChange,
+            overwriteByDefault = overwriteByDefault, onOverwriteByDefaultChange = onOverwriteByDefaultChange,
             watermarkStyle = watermarkStyle, onWatermarkStyleChange = onWatermarkStyleChange,
             watermarkUnlocked = watermarkUnlocked, watermarkOff = watermarkOff, onWatermarkOff = onWatermarkOff,
             onNavigateUp = {},
@@ -759,7 +762,10 @@ class SettingsScreenTest {
     /** 原先「编辑」「导出」两页的项，一项一组；导出前提醒和「圈出」一起去掉了。 */
     @Test fun theGeneralPageHoldsWhatEditAndExportHad() {
         general()
-        val tops = listOf("编辑", "换样式时一起换掉已有的打码", "识别", "按原分辨率识别", "水印样式", "图标 + 有码 Yomark").map {
+        val tops = listOf(
+            "编辑", "换样式时一起换掉已有的打码", "识别", "按原分辨率识别",
+            "默认导出", "另存到相册", "覆盖原图", "水印样式", "图标 + 有码 Yomark",
+        ).map {
             compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
         }
         assertThat(tops).isInOrder()
@@ -770,6 +776,16 @@ class SettingsScreenTest {
         var latest: Boolean? = null
         general(fullResolution = false, onFullResolutionChange = { latest = it })
         compose.onNodeWithText("按原分辨率识别").performClick()
+        assertThat(latest).isTrue()
+    }
+
+    /** 默认导出出厂是另存；选了覆盖原图，顶栏的导出就是覆盖，另存在它右边的小箭头里。 */
+    @Test fun theDefaultExportCanBeOverwritingTheOriginal() {
+        var latest: Boolean? = null
+        general(overwriteByDefault = false, onOverwriteByDefaultChange = { latest = it })
+        compose.onNodeWithText("另存到相册").assertIsSelected()
+        compose.onNodeWithText("写不回原图的图照常另存").assertIsDisplayed()
+        compose.onNodeWithText("覆盖原图").performClick()
         assertThat(latest).isTrue()
     }
 

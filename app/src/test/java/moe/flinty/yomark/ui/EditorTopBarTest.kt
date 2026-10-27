@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getUnclippedBoundsInRoot
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.dp
@@ -26,6 +28,7 @@ import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.R
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.components.EditorTopBar
+import moe.flinty.yomark.ui.components.OtherExport
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -48,12 +51,19 @@ class EditorTopBarTest {
 
     private var exporting by mutableStateOf(false)
     private var sharing by mutableStateOf(false)
+    private var overwriting by mutableStateOf(false)
 
     /**
      * EditorScreen 在手机竖着拿时传的那几样；[debug] 是开发者选项里打开了调试信息，
-     * [share] 是有分享（别的应用来要图时没有）。
+     * [share] 是有分享（别的应用来要图时没有），[other] 是导出右边小箭头里的另一种导出（别的应用来要图时没有）。
      */
-    private fun show(debug: Boolean = false, exportLabel: Int = R.string.export, share: Boolean = false) {
+    private fun show(
+        debug: Boolean = false,
+        exportLabel: Int = R.string.export,
+        share: Boolean = false,
+        other: OtherExport? = null,
+        onOther: () -> Unit = {},
+    ) {
         compose.setContent {
             MaterialTheme {
                 Surface {
@@ -65,8 +75,11 @@ class EditorTopBarTest {
                         onExport = {},
                         onShare = if (share) ({}) else null,
                         exportLabel = exportLabel,
+                        otherExport = other,
+                        onOtherExport = onOther,
                         exporting = exporting,
                         sharing = sharing,
+                        overwriting = overwriting,
                     )
                 }
             }
@@ -187,5 +200,69 @@ class EditorTopBarTest {
                 compose.onNodeWithText("Export"),
         )
         assertThat(compose.onNodeWithText("Export").bounds().height).isAtMost(48.dp)
+    }
+
+    // ---------- 导出右边的小箭头（覆盖原图，2026-10-27） ----------
+
+    /** 箭头和导出连成一颗，紧挨在写着字的导出右边，在最右上角；点开是覆盖原图，点了菜单收起。 */
+    @Config(qualifiers = "en-rUS-w600dp-h915dp-xxhdpi")
+    @Test fun theArrowBesideExportOffersOverwritingTheOriginal() {
+        var chosen = 0
+        show(share = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()), onOther = { chosen++ })
+        assertInARow(
+            listOf("Back", "Undo", "Redo").map(::button) + premium + listOf("Settings", "Share").map(::button) +
+                compose.onNodeWithText("Export") + button("Export options"),
+        )
+        assertThat(button("Export options").bounds().left - compose.onNodeWithText("Export").bounds().right).isAtMost(2.dp)
+
+        button("Export options").performClick()
+        compose.onNodeWithText("Overwrite original").assertIsDisplayed().assertIsEnabled().performClick()
+
+        assertThat(chosen).isEqualTo(1)
+        compose.onNodeWithText("Overwrite original").assertDoesNotExist()
+    }
+
+    /** 这张写不回去：那一项灰着，底下说为什么。 */
+    @Test fun anImageThatCannotBeWrittenBackSaysWhy() {
+        var chosen = 0
+        show(other = OtherExport.Overwrite(OverwriteOffer.Unavailable(R.string.overwrite_format)), onOther = { chosen++ })
+        button("Export options").performClick()
+        compose.onNodeWithText("Overwrite original", substring = true).assertIsNotEnabled()
+        compose.onNodeWithText("JPG and PNG only").assertIsDisplayed()
+        assertThat(chosen).isEqualTo(0)
+    }
+
+    /** 批量里看过的有几张写不回去：点得动，底下说一声那几张会另存。 */
+    @Test fun inABatchTheArrowSaysHowManyWillBeCopies() {
+        show(other = OtherExport.Overwrite(OverwriteOffer.Ready(copies = 2)))
+        button("Export options").performClick()
+        compose.onNodeWithText("2 can't be overwritten, will be saved to gallery").assertIsDisplayed()
+    }
+
+    /** 设置里默认导出选了覆盖原图：导出写「覆盖」，箭头里是另存到相册。 */
+    @Config(qualifiers = "zh-rCN-w320dp-h640dp-xhdpi")
+    @Test fun whenOverwritingIsTheDefaultTheArrowSavesACopy() {
+        var chosen = 0
+        show(exportLabel = R.string.overwrite, share = true, other = OtherExport.SaveCopy, onOther = { chosen++ })
+        button("覆盖").assertIsDisplayed()
+        button("导出选项").performClick()
+        compose.onNodeWithText("另存到相册").performClick()
+        assertThat(chosen).isEqualTo(1)
+    }
+
+    /**
+     * 320 dp 上再加个箭头：导出换成图标，箭头、分享、导出都在，中间那几个照要紧的先后让出来（去水印、设置在首页也有）。
+     * 覆盖中转圈，读屏念「覆盖中…」。
+     */
+    @Test fun onA320dpScreenTheArrowStaysAndTheLeastNeededStepAside() {
+        show(share = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        compose.onNodeWithText("Export").assertIsNotDisplayed()
+        assertInARow(listOf("Back", "Undo", "Redo", "Share", "Export", "Export options").map(::button))
+
+        exporting = true
+        overwriting = true
+        compose.waitForIdle()
+        button("Overwriting…").assertIsDisplayed().assertIsNotEnabled()
+        button("Export options").assertIsNotEnabled()
     }
 }

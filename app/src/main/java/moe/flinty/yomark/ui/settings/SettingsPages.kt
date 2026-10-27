@@ -386,6 +386,8 @@ fun AiSettingsScreen(
  *
  * 识别：「按原分辨率识别」，出厂关着（见 SettingsStore.fullResolutionOcr）。不在识别页：它管的是快慢，不是认什么。
  *
+ * 默认导出（2026-10-27）：顶栏的导出是另存到相册（出厂）还是覆盖原图，另一种在导出右边的小箭头里（见 SettingsStore.overwriteByDefault）。
+ *
  * 导出：品牌水印用哪一版字样，没选过时跟着系统语言（见 BrandWatermarkStyle）。
  * 「无水印」只在解锁后出现（买过，或开源版点过去除水印）；解锁了没选过就是它，见 brandWatermarkApplies。
  * 原先还有一项「导出前提醒」，兜的是「圈出」这一态，2026-10-14 和圈出一起去掉了。
@@ -396,6 +398,9 @@ fun GeneralSettingsScreen(
     onRestyleAllChange: (Boolean) -> Unit,
     fullResolution: Boolean,
     onFullResolutionChange: (Boolean) -> Unit,
+    /** 默认导出选的是覆盖原图。 */
+    overwriteByDefault: Boolean,
+    onOverwriteByDefaultChange: (Boolean) -> Unit,
     watermarkStyle: BrandWatermarkStyle,
     onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit,
     /** 能不能去水印。false 时没有「无水印」这一项。 */
@@ -429,6 +434,22 @@ fun GeneralSettingsScreen(
                     icon = Icons.Outlined.HighQuality,
                     checked = fullResolution,
                     onCheckedChange = onFullResolutionChange,
+                )
+            }
+        }
+        item {
+            SectionHeader(stringResource(R.string.settings_default_export))
+            SettingsGroup(Modifier.selectableGroup()) {
+                RadioRow(
+                    title = stringResource(R.string.save_copy),
+                    selected = !overwriteByDefault,
+                    onClick = { onOverwriteByDefaultChange(false) },
+                )
+                RadioRow(
+                    title = stringResource(R.string.overwrite_original),
+                    summary = stringResource(R.string.overwrite_by_default_summary),
+                    selected = overwriteByDefault,
+                    onClick = { onOverwriteByDefaultChange(true) },
                 )
             }
         }

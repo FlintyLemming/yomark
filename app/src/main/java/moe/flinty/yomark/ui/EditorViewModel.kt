@@ -1,8 +1,10 @@
 package moe.flinty.yomark.ui
 
+import android.content.IntentSender
 import android.graphics.PointF
 import android.graphics.RectF
 import android.net.Uri
+import androidx.annotation.StringRes
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -35,6 +37,10 @@ import moe.flinty.yomark.export.ExportOutcome
 import moe.flinty.yomark.export.ExportRequest
 import moe.flinty.yomark.export.Exporter
 import moe.flinty.yomark.export.FileProviderSink
+import moe.flinty.yomark.export.Fingerprint
+import moe.flinty.yomark.export.OriginalUnavailable
+import moe.flinty.yomark.export.Originals
+import moe.flinty.yomark.export.OverwriteSink
 import moe.flinty.yomark.export.PurposeWatermarkStyle
 import moe.flinty.yomark.render.TextStamp
 import moe.flinty.yomark.ui.batch.BatchItem
@@ -44,6 +50,7 @@ import moe.flinty.yomark.ui.bigbang.BigBangSelection
 import moe.flinty.yomark.ui.canvas.GestureRules
 import moe.flinty.yomark.ui.canvas.ScanStyle
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -60,6 +67,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
 import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.EmptyCoroutineContext
@@ -98,6 +107,10 @@ class EditorViewModel(
      * null 是没有分享，顶栏上也就没有这颗：别的应用来要图时，导出就是把图交回去。
      */
     private val shareSink: FileProviderSink? = null,
+    /**
+     * 覆盖原图（见 [requestOverwrite]）写回到哪儿、怎么要许可。null 是没有覆盖原图：别的应用来要图时导出就是交回去。
+     */
+    private val originals: Originals? = null,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(EditorUiState())
@@ -108,6 +121,9 @@ class EditorViewModel(
 
     /** 顶栏上有没有分享。 */
     val canShare: Boolean get() = shareExporter != null
+
+    /** 有没有覆盖原图（见 [requestOverwrite]），也就是顶栏导出右边有没有小箭头。 */
+    val canOverwrite: Boolean get() = originals != null
 
     /**
      * 识别动效的样式（设置里选的）。只影响画布上的过渡，所以不进 EditorUiState——那里每换一张图就整个重建，
@@ -197,6 +213,7 @@ class EditorViewModel(
             field = value
             savedState[KEY_FILE] = value?.file?.absolutePath
             savedState[KEY_MIME] = value?.mimeType
+            savedState[KEY_SOURCE] = value?.source?.toString()
         }
 
     /** 一次拖动开始前的 plan 快照，抬手时才压进撤销栈。 */
@@ -240,6 +257,21 @@ class EditorViewModel(
     /** 设置里的「无水印」，没选过是 null（见 SettingsStore.brandWatermarkOff）。 */
     private var watermarkOff: Boolean? = null
 
+    /** 单张时画布上这张图覆盖原图写回到哪儿、写不回去为什么（见 [originalOf]）。还没有图是 null，批量时不用它。 */
+    private var original: Original? = null
+
+    /** 批量里打开过的那几张各自写回到哪儿（见 [originalOf]），按在批量里的第几张记。 */
+    private val batchOriginals = HashMap<Int, Original>()
+
+    /** 设置里的默认导出选了覆盖原图（见 [EditorUiState.exportOverwrites]）。还没读到时按出厂的另存算。 */
+    private var overwriteByDefault = false
+
+    /** 这次会话里覆盖过的原图，写进去的是哪一份：同一张再覆盖一次时拿它核对，原图已经不是打开时那一张了。 */
+    private val writtenBack = HashMap<Uri, Fingerprint>()
+
+    /** 系统的确认框弹着，等用户点（见 [askWriteAccess]）。 */
+    private var writeReply: CompletableDeferred<Boolean>? = null
+
     init {
         restore()
         brushRestored = restoreBrush()
@@ -248,6 +280,12 @@ class EditorViewModel(
         viewModelScope.launch { settings.restyleAllMasks.collect { restyleAll = it } }
         viewModelScope.launch { settings.brandWatermarkStyle.collect { watermarkStyle = it } }
         viewModelScope.launch { settings.brandWatermarkOff.collect { watermarkOff = it } }
+        viewModelScope.launch {
+            settings.overwriteByDefault.collect { on ->
+                overwriteByDefault = on
+                uiState = _state.value.withOverwrite()
+            }
+        }
     }
 
     /**
@@ -330,6 +368,7 @@ class EditorViewModel(
         val path = savedState.get<String>(KEY_FILE) ?: return false
         val mime = savedState.get<String>(KEY_MIME) ?: return false
         val plan = savedState.get<MaskPlan>(KEY_PLAN) ?: return false
+        val source = savedState.get<String>(KEY_SOURCE)?.let(Uri::parse)
         val file = java.io.File(path)
         if (!file.exists()) {
             clearSavedState()                          // 副本被清掉了，静默退回 Picker
@@ -345,13 +384,14 @@ class EditorViewModel(
                 uiState = uiState.copy(restoring = false)
                 return@launch
             }
-            intakeResult = IntakeResult(file, mime)
+            intakeResult = IntakeResult(file, mime, source)
+            original = originalOf(source, mime, image)
             lines = savedLines
             uiState = EditorUiState(
                 image = image, plan = plan,
                 isPro = _state.value.isPro, purposeStyle = _state.value.purposeStyle,
                 brush = _state.value.brush, maskStyle = _state.value.maskStyle,
-            )
+            ).withOverwrite()
         }
         return true
     }
@@ -363,6 +403,7 @@ class EditorViewModel(
     private fun clearSavedState() {
         savedState.remove<String>(KEY_FILE)
         savedState.remove<String>(KEY_MIME)
+        savedState.remove<String>(KEY_SOURCE)
         savedState.remove<MaskPlan>(KEY_PLAN)
         savedState.remove<FloatArray>(KEY_LINES)
     }
@@ -378,12 +419,14 @@ class EditorViewModel(
             // （spec §15 第 2 条）。
             intake.clear()
             intakeResult = null
+            original = null
             runCatching {
                 val result = intake.copyToPrivate(uri, ioDispatcher)
                 val image = loadForAnalysis(result.file, result.mimeType)
                 result to image
             }.onSuccess { (result, image) ->
                 intakeResult = result
+                original = originalOf(uri, result.mimeType, image)
                 undoStack.clear()                     // 换图时两个栈都清空
                 lookEditOrigin = null
                 takeLines(null)                       // 上一张图的行，点在这张图上不作数
@@ -398,13 +441,13 @@ class EditorViewModel(
                     brush = _state.value.brush,
                     maskStyle = _state.value.maskStyle,
                     stylePanelOpen = _state.value.stylePanelOpen,
-                )
+                ).withOverwrite()
                 analyze(image)
             }.onFailure {
                 uiState = _state.value.copy(
                     loading = false,
                     message = EditorMessage.Error(R.string.error_open_image),
-                )
+                ).withOverwrite()
             }
         }
     }
@@ -429,6 +472,7 @@ class EditorViewModel(
         // 像 onImageChosen 那样逐张 clear() 会把前面几张就地删掉，导出只剩最后看的那一张。
         intake.clear()
         intakeResult = null
+        original = null
         takeLines(null)
         dismissed = emptyList()
         undoStack = UndoStack()
@@ -507,14 +551,15 @@ class EditorViewModel(
         batchLoad = viewModelScope.launch {
             val item = _state.value.batch?.items?.getOrNull(index) ?: return@launch
             val loaded = try {
-                val taken = item.file?.let { IntakeResult(it, item.mimeType) }
+                val taken = item.file?.let { IntakeResult(it, item.mimeType, item.uri) }
                     ?: intake.copyToPrivate(item.uri, ioDispatcher).also { copied ->
                         ensureActive()
                         _state.value.batch?.let { b ->
                             uiState = _state.value.copy(batch = b.withFile(index, copied.file, copied.mimeType))
                         }
                     }
-                taken to loadForAnalysis(taken.file, taken.mimeType)
+                val image = loadForAnalysis(taken.file, taken.mimeType)
+                Triple(taken, image, originalOf(item.uri, taken.mimeType, image))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -531,13 +576,14 @@ class EditorViewModel(
                 )
                 return@launch
             }
-            val (taken, image) = loaded
+            val (taken, image, target) = loaded
             val stored = batch.items[index]
             val record = batchScans[index]
             val scanning = record?.job?.isActive == true
             // 打开过、也不在识别，却从没跑完过一遍识别：照第一次打开处理
             val needsScan = !scanning && record?.ranWith == null
             intakeResult = taken
+            batchOriginals[index] = target
             undoStack = batchUndo.remove(index) ?: UndoStack()
             lookEditOrigin = null
             dragOrigin = null
@@ -551,7 +597,7 @@ class EditorViewModel(
                 analyzing = needsScan || scanning,
                 aiReview = if (needsScan || scanning) AiReview.Hidden else record?.aiReview ?: AiReview.Hidden,
                 batch = batch.withLoaded(index, taken.file, taken.mimeType, image.scale),
-            ).withHistoryFlags()
+            ).withHistoryFlags().withOverwrite()
             val ranWith = record?.ranWith
             when {
                 needsScan -> scanBatchItem(index, image)
@@ -617,6 +663,7 @@ class EditorViewModel(
         batchScans.values.forEach { it.job?.cancel() }
         batchScans.clear()
         batchUndo.clear()
+        batchOriginals.clear()
     }
 
     /**
@@ -1485,12 +1532,23 @@ class EditorViewModel(
     // ---------- 导出 ----------
 
     /**
-     * 导出。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
+     * 导出：另存一份进相册，原图不动。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
+     * 设置里默认导出选了覆盖原图时，它在导出右边的小箭头里（「另存到相册」，见 [requestOverwrite]）。
      *
-     * @param share 分享（顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册。没有分享时（见 [canShare]）什么也不做
+     * @param share 分享（顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册，也不动原图。没有分享时（见 [canShare]）什么也不做
      */
     fun requestExport(share: Boolean = false) {
         runExport(_state.value.plan, share)
+    }
+
+    /**
+     * 覆盖原图（2026-10-27）：打好码的图写回原图，相册里不多一张（见 [runOverwrite]）。在导出右边的小箭头里；
+     * 设置里默认导出选了它时就是导出本身（[EditorUiState.exportOverwrites]），这时 [requestExport] 在小箭头里，是另存。
+     * 这张图写不回去时点不动（见 [OverwriteOffer]），这里也什么都不做。批量时界面走 [overwriteBatch]。
+     */
+    fun requestOverwrite() {
+        if (_state.value.batch != null || _state.value.overwriteOffer !is OverwriteOffer.Ready) return
+        runOverwrite(_state.value.plan)
     }
 
     /**
@@ -1504,22 +1562,39 @@ class EditorViewModel(
      * @param share 同 [requestExport]：看过的一起交给分享面板
      */
     fun exportBatch(share: Boolean = false) {
+        startBatchExport(share = share, overwrite = false)
+    }
+
+    /**
+     * 批量覆盖原图（同 [requestOverwrite]）：看过的一张张写回各自的原图，写不回去的照常另存进相册（见 [runBatchOverwrite]）。
+     * 等识别、问还有没看过的，都同 [exportBatch]。看过的一张都写不回去时那一项点不动，这里也什么都不做。
+     */
+    fun overwriteBatch() {
+        if (_state.value.overwriteOffer !is OverwriteOffer.Ready) return
+        startBatchExport(share = false, overwrite = true)
+    }
+
+    private fun startBatchExport(share: Boolean, overwrite: Boolean) {
         if (_state.value.batch == null || _state.value.exporting) return
         if (share && shareExporter == null) return
         finishLookEdit()
-        uiState = _state.value.copy(exporting = true, sharing = share)
+        uiState = _state.value.copy(exporting = true, sharing = share, overwriting = overwrite)
         viewModelScope.launch {
             awaitBatchScans()
             val batch = _state.value.liveBatch
             if (batch == null) {
-                uiState = _state.value.copy(exporting = false, sharing = false)
+                uiState = _state.value.copy(exporting = false, sharing = false, overwriting = false)
                 return@launch
             }
             uiState = _state.value.copy(batch = batch, exporting = false)
-            // 问的时候还记着是哪一种（sharing），按钮上照它写，选了「只……看过的」照它导出
+            // 问的时候还记着是哪一种（sharing、overwriting），按钮上照它写，选了「只……看过的」照它导出
             if (batch.unopened > 0) uiState = _state.value.copy(unopenedDialogVisible = true)
-            else runBatchExport(batch, share)
+            else runBatch(batch, share, overwrite)
         }
+    }
+
+    private fun runBatch(batch: BatchSession, share: Boolean, overwrite: Boolean) {
+        if (overwrite) runBatchOverwrite(batch) else runBatchExport(batch, share)
     }
 
     /** 等批量里还在跑的载入和识别都跑完。等的时候又切出去打开了新的一张，就接着等它。 */
@@ -1534,16 +1609,20 @@ class EditorViewModel(
 
     /** 「还有几张没看过」里的「去看看」：跳到第一张没打开过的，它这时开始识别。 */
     fun reviewUnopened() {
-        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false, overwriting = false)
         val first = _state.value.batch?.firstUnopened ?: return
         selectImage(first)
     }
 
-    /** 「还有几张没看过」里的「只导出看过的」（分享时是「只分享看过的」）：没打开过的不导出，看过的照常导出、分享。 */
+    /**
+     * 「还有几张没看过」里的「只导出看过的」（分享时是「只分享看过的」，覆盖原图时是「只覆盖看过的」）：
+     * 没打开过的不导出，看过的照常导出、分享、覆盖。
+     */
     fun exportOpenedOnly() {
         val share = _state.value.sharing
-        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
-        runBatchExport(_state.value.liveBatch ?: return, share)
+        val overwrite = _state.value.overwriting
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false, overwriting = false)
+        runBatch(_state.value.liveBatch ?: return, share, overwrite)
     }
 
     /** Activity 在 onCreate 里把 BillingRepository.isPro 接进来。 */
@@ -1617,7 +1696,7 @@ class EditorViewModel(
     fun resetPurposeStyle() = setPurposeStyle(PurposeWatermarkStyle())
 
     fun dismissDialog() {
-        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false)
+        uiState = _state.value.copy(unopenedDialogVisible = false, sharing = false, overwriting = false)
     }
 
     fun consumeMessage() {
@@ -1640,19 +1719,7 @@ class EditorViewModel(
         uiState = _state.value.copy(exporting = true, sharing = share)
         viewModelScope.launch {
             if (share) clearShared()
-            val outcome = out.export(
-                ExportRequest(
-                    file = source.file,
-                    mimeType = source.mimeType,
-                    plan = plan,
-                    analysisScale = image.scale,
-                    applyWatermark = applyWatermark(),
-                    watermarkStyle = watermarkStyle,
-                    purposeText = _state.value.purposeText,
-                    purposeStyle = _state.value.purposeStyle,
-                ),
-                dispatcher = ioDispatcher,
-            )
+            val outcome = out.export(exportRequest(source.file, source.mimeType, plan, image.scale), dispatcher = ioDispatcher)
             uiState = when (outcome) {
                 is ExportOutcome.Success -> when {
                     share -> _state.value.copy(
@@ -1692,19 +1759,7 @@ class EditorViewModel(
             batch.items.forEach { item ->
                 val file = item.file ?: return@forEach     // 还没走到的图没有副本，也没有编辑
                 val plan = item.plan ?: return@forEach
-                val outcome = out.export(
-                    ExportRequest(
-                        file = file,
-                        mimeType = item.mimeType,
-                        plan = plan,
-                        analysisScale = item.analysisScale,
-                        applyWatermark = applyWatermark(),
-                        watermarkStyle = watermarkStyle,
-                        purposeText = _state.value.purposeText,
-                        purposeStyle = _state.value.purposeStyle,
-                    ),
-                    dispatcher = ioDispatcher,
-                )
+                val outcome = out.export(exportRequest(file, item.mimeType, plan, item.analysisScale), dispatcher = ioDispatcher)
                 if (outcome is ExportOutcome.Success) {
                     written += outcome.uri
                     types += outcome.mimeType
@@ -1732,6 +1787,204 @@ class EditorViewModel(
         }
     }
 
+    /** 导出一张图：品牌水印、用途水印照眼下的。 */
+    private fun exportRequest(file: File, mimeType: String, plan: MaskPlan, analysisScale: Float) = ExportRequest(
+        file = file,
+        mimeType = mimeType,
+        plan = plan,
+        analysisScale = analysisScale,
+        applyWatermark = applyWatermark(),
+        watermarkStyle = watermarkStyle,
+        purposeText = _state.value.purposeText,
+        purposeStyle = _state.value.purposeStyle,
+    )
+
+    // ---------- 覆盖原图 ----------
+
+    /** 一张图覆盖原图时写回到哪儿（[target]）；写不回去时 [target] 是 null，[reason] 说为什么（见 [OverwriteOffer.Unavailable]）。 */
+    private data class Original(val target: Uri?, @StringRes val reason: Int? = null)
+
+    /**
+     * [uri] 这张图覆盖原图时写回到哪儿（见 Originals.locate）。写回去的格式得和原图一样（PNG、JPEG，见 Originals.keepsFormat），
+     * 原图也不能大到导出时要缩小（[shrinks]）：那就成了拿小图换掉原图。
+     */
+    private suspend fun originalOf(uri: Uri?, mimeType: String, shrinks: Boolean): Original {
+        val store = originals ?: return Original(null)
+        val target = try {
+            uri?.let { store.locate(it) }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+        return when {
+            target == null -> Original(null, R.string.overwrite_not_found)
+            !Originals.keepsFormat(mimeType) -> Original(null, R.string.overwrite_format)
+            shrinks -> Original(null, R.string.overwrite_too_large)
+            else -> Original(target)
+        }
+    }
+
+    private suspend fun originalOf(uri: Uri?, mimeType: String, image: SourceImage): Original =
+        originalOf(uri, mimeType, SourceImageLoader.downscalesForExport(image.originalWidth, image.originalHeight))
+
+    /**
+     * 覆盖原图点不点得动（见 [OverwriteOffer]）：单张看画布上这一张，批量看打开过的那几张。
+     * 设置里默认导出选了覆盖原图、也写得回去时，导出就是覆盖原图（[EditorUiState.exportOverwrites]）。
+     */
+    private fun EditorUiState.withOverwrite(): EditorUiState {
+        val batch = batch
+        val offer = if (batch == null) {
+            val o = original
+            when {
+                o == null -> OverwriteOffer.Unavailable()
+                o.target == null -> OverwriteOffer.Unavailable(o.reason)
+                else -> OverwriteOffer.Ready()
+            }
+        } else {
+            val opened = batch.items.indices.filter { batch.items[it].opened }.mapNotNull { batchOriginals[it] }
+            val ready = opened.count { it.target != null }
+            when {
+                ready > 0 -> OverwriteOffer.Ready(copies = opened.size - ready)
+                opened.isEmpty() -> OverwriteOffer.Unavailable()
+                else -> OverwriteOffer.Unavailable(R.string.overwrite_none_in_batch)
+            }
+        }
+        return copy(overwriteOffer = offer, exportOverwrites = overwriteByDefault && offer is OverwriteOffer.Ready)
+    }
+
+    /**
+     * 覆盖原图（[requestOverwrite]）：先要到写原图的许可（系统弹框问用户），再走一遍导出管线，写回原图。
+     * 用户点了拒绝就什么也不写；原图变了、没了就照常另存一份（[EditorMessage.SavedCopyInstead]）。
+     */
+    private fun runOverwrite(plan: MaskPlan) {
+        val image = _state.value.image ?: return
+        val source = intakeResult ?: return
+        val target = original?.target ?: return
+        if (_state.value.exporting) return
+        uiState = _state.value.copy(exporting = true, sharing = false, overwriting = true)
+        viewModelScope.launch {
+            if (!askWriteAccess(listOf(target))) {
+                uiState = _state.value.copy(exporting = false, overwriting = false)
+                return@launch
+            }
+            val result = overwriteOrSave(target, source.file, exportRequest(source.file, source.mimeType, plan, image.scale))
+            uiState = _state.value.copy(
+                exporting = false,
+                overwriting = false,
+                message = when (result) {
+                    Written.OVERWRITTEN -> EditorMessage.Overwritten
+                    Written.COPIED -> EditorMessage.SavedCopyInstead
+                    Written.FAILED -> EditorMessage.Error(R.string.error_overwrite)
+                },
+            )
+        }
+    }
+
+    /**
+     * 批量覆盖原图（[overwriteBatch]）：看过的一张张写回各自的原图（打开时就认好了，见 [batchOriginals]），写不回去的照常另存。
+     * 要写的几张一次要许可（Android 10 一张问一次），用户点了拒绝就一张都不写。
+     */
+    private fun runBatchOverwrite(batch: BatchSession) {
+        uiState = _state.value.copy(exporting = true, sharing = false, overwriting = true)
+        viewModelScope.launch {
+            val items = batch.items.mapIndexedNotNull { i, item ->
+                val file = item.file ?: return@mapIndexedNotNull null     // 还没走到的图没有副本，也没有编辑
+                val plan = item.plan ?: return@mapIndexedNotNull null
+                Triple(exportRequest(file, item.mimeType, plan, item.analysisScale), file, batchOriginals[i]?.target)
+            }
+            val targets = items.mapNotNull { it.third }
+            if (targets.isNotEmpty() && !askWriteAccess(targets)) {
+                uiState = _state.value.copy(exporting = false, overwriting = false)
+                return@launch
+            }
+            val results = items.map { (request, file, target) ->
+                if (target != null) overwriteOrSave(target, file, request) else save(request)
+            }
+            val overwritten = results.count { it == Written.OVERWRITTEN }
+            val copies = results.count { it == Written.COPIED }
+            val failed = results.count { it == Written.FAILED }
+            uiState = _state.value.copy(
+                exporting = false,
+                overwriting = false,
+                message = when {
+                    failed > 0 -> EditorMessage.BatchPartial(overwritten + copies, failed)
+                    overwritten == 0 -> EditorMessage.BatchExported(copies)
+                    else -> EditorMessage.BatchOverwritten(overwritten, copies)
+                },
+            )
+        }
+    }
+
+    private enum class Written { OVERWRITTEN, COPIED, FAILED }
+
+    /**
+     * 一张图写回原图 [target]；原图变了、没了、没给许可（[OriginalUnavailable]，原图一点没动）就照常另存一份进相册。
+     * 核对原图用的指纹：这次会话里覆盖过的用写进去的那一份，没覆盖过的用打开时复制下来的副本 [file]。
+     */
+    private suspend fun overwriteOrSave(target: Uri, file: File, request: ExportRequest): Written {
+        val store = originals ?: return save(request)
+        val expected = writtenBack[target] ?: try {
+            withContext(ioDispatcher) { Fingerprint.of(file) }
+        } catch (e: IOException) {
+            return Written.FAILED
+        }
+        val sink = OverwriteSink(store, target, expected)
+        return when (val outcome = exporter.writingTo(sink).export(request, ioDispatcher)) {
+            is ExportOutcome.Success -> {
+                sink.written?.let { writtenBack[target] = it }
+                Written.OVERWRITTEN
+            }
+            is ExportOutcome.Failure -> if (outcome.cause is OriginalUnavailable) save(request) else Written.FAILED
+        }
+    }
+
+    /** 照常另存一份进相册。 */
+    private suspend fun save(request: ExportRequest): Written =
+        if (exporter.export(request, ioDispatcher) is ExportOutcome.Success) Written.COPIED else Written.FAILED
+
+    /**
+     * 要到写这几张原图的许可：系统弹框问用户，Android 10 一张问一次。用户点了拒绝是 false。
+     * 问不了的（比如授权没了的）不问，写的时候另存（见 [overwriteOrSave]）。
+     */
+    private suspend fun askWriteAccess(targets: List<Uri>): Boolean {
+        val store = originals ?: return false
+        // 一张一张问的，问过一轮还要问就不再问：照样往下写，写不进去的另存
+        repeat(targets.size + 1) {
+            val request = try {
+                store.writeRequest(targets)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
+            } ?: return true
+            if (!ask(request)) return false
+        }
+        return true
+    }
+
+    /** 把系统的确认框交给界面弹出来（[EditorUiState.writeRequest]），等用户点。 */
+    private suspend fun ask(request: IntentSender): Boolean {
+        val reply = CompletableDeferred<Boolean>()
+        writeReply = reply
+        uiState = _state.value.copy(writeRequest = request)
+        return try {
+            reply.await()
+        } finally {
+            if (writeReply === reply) writeReply = null
+        }
+    }
+
+    /** 界面把系统的确认框弹出去了：不再挂在 state 上，界面重建时不再弹一次。 */
+    fun writeRequestShown() {
+        uiState = _state.value.copy(writeRequest = null)
+    }
+
+    /** 系统的确认框关了：[granted] 是用户点了允许。 */
+    fun onWriteRequestResult(granted: Boolean) {
+        writeReply?.complete(granted)
+    }
+
     // ---------- 内部 ----------
 
     /** 所有改动都先把当前 plan 压进撤销栈，再替换。还没收尾的一段面板调节先收尾，各占一步。 */
@@ -1750,6 +2003,7 @@ class EditorViewModel(
     private companion object {
         const val KEY_FILE = "intake.file"
         const val KEY_MIME = "intake.mime"
+        const val KEY_SOURCE = "intake.source"
         const val KEY_PLAN = "plan"
         const val KEY_LINES = "lines"
         const val DEFAULT_PURPOSE_TEXT = "仅供办理 XX 使用"

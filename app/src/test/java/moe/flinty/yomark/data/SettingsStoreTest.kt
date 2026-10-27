@@ -187,6 +187,17 @@ class SettingsStoreTest {
         assertThat(store.fullResolutionOcr.first()).isFalse()
     }
 
+    /** 默认导出出厂是另存进相册，原图不动；选了覆盖原图就记住，恢复默认设置后又是另存。 */
+    @Test
+    fun `the default export saves a copy until overwriting is chosen`() = runTest {
+        val store = store()
+        assertThat(store.overwriteByDefault.first()).isFalse()
+        store.setOverwriteByDefault(true)
+        assertThat(store.overwriteByDefault.first()).isTrue()
+        store.resetSettings()
+        assertThat(store.overwriteByDefault.first()).isFalse()
+    }
+
     @Test
     fun `debug info is off until turned on`() = runTest {
         val store = store()

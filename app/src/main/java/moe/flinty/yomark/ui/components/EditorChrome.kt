@@ -7,6 +7,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -17,21 +19,31 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -40,6 +52,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -69,6 +83,7 @@ import kotlin.math.min
 import kotlinx.coroutines.delay
 import moe.flinty.yomark.billing.Edition
 import moe.flinty.yomark.ui.AiReview
+import moe.flinty.yomark.ui.OverwriteOffer
 import androidx.compose.ui.res.stringResource
 import moe.flinty.yomark.R
 
@@ -95,12 +110,23 @@ fun EditorTopBar(
      * 别的应用来要图时（导出是「完成」）传 null，就没有这一颗。
      */
     onShare: (() -> Unit)? = null,
-    /** 导出按钮上的字。别的应用来要图时是「完成」：导出就是把图交回去。 */
+    /**
+     * 导出按钮上的字：「导出」；导出就是覆盖原图时（设置里默认导出选了覆盖原图）是「覆盖」；
+     * 别的应用来要图时是「完成」，导出就是把图交回去。
+     */
     @StringRes exportLabel: Int = R.string.export,
+    /**
+     * 导出右边的小箭头点开是另一种导出（见 [OtherExport]），箭头和导出连成一颗，一样不让出来。
+     * 别的应用来要图时（导出是「完成」）传 null，就没有这个箭头。
+     */
+    otherExport: OtherExport? = null,
+    onOtherExport: () -> Unit = {},
     /** 在导出（分享也是先导出）：导出、分享都点不动。 */
     exporting: Boolean = false,
     /** 这一次导出是为了分享：转圈的是分享那颗，导出那颗不换字。 */
     sharing: Boolean = false,
+    /** 这一次导出是覆盖原图：导出那颗转圈，读屏念「覆盖中…」。 */
+    overwriting: Boolean = false,
 ) {
     Layout(
         content = {
@@ -130,19 +156,48 @@ fun EditorTopBar(
                 }
             }
             val saving = exporting && !sharing
-            val label = stringResource(if (saving) R.string.exporting else exportLabel)
-            Button(onClick = onExport, Modifier.layoutId(TopBarItem.EXPORT), enabled = !exporting) {
+            val label = stringResource(
+                when {
+                    !saving -> exportLabel
+                    overwriting -> R.string.overwriting
+                    else -> R.string.exporting
+                },
+            )
+            // 有另一种导出时导出和右边的小箭头连成一颗（split button）：挨着的那一边角收小，中间只隔一道缝
+            val split = otherExport != null
+            Button(
+                onClick = onExport,
+                modifier = Modifier.layoutId(TopBarItem.EXPORT),
+                enabled = !exporting,
+                shape = if (split) SPLIT_START else ButtonDefaults.shape,
+                contentPadding = if (split) SPLIT_START_PADDING else ButtonDefaults.ContentPadding,
+            ) {
                 Text(label, maxLines = 1, softWrap = false)
             }
-            // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字
-            FilledIconButton(
-                onClick = onExport,
-                modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
-                enabled = !exporting,
-            ) {
-                if (saving) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
-                // 别的应用来要图时是「完成」：交回去
-                else Icon(if (exportLabel == R.string.done) Icons.Filled.Check else Icons.Filled.Download, contentDescription = null)
+            // 字放不下时换成它（见 TopBarItem）。导出中转圈，读屏念的还是按钮上的字。
+            // 和箭头连着时不往四周留触摸余量，不然两半中间空出一大截；手指按偏一点 Compose 照样算按到
+            val touchMargin = if (split) Dp.Unspecified else LocalMinimumInteractiveComponentSize.current
+            CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides touchMargin) {
+                FilledIconButton(
+                    onClick = onExport,
+                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+                    enabled = !exporting,
+                    shape = if (split) SPLIT_START else IconButtonDefaults.filledShape,
+                ) {
+                    if (saving) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
+                    // 别的应用来要图时是「完成」：交回去；覆盖原图是存回原处
+                    else Icon(
+                        when (exportLabel) {
+                            R.string.done -> Icons.Filled.Check
+                            R.string.overwrite -> Icons.Filled.Save
+                            else -> Icons.Filled.Download
+                        },
+                        contentDescription = null,
+                    )
+                }
+            }
+            if (otherExport != null) {
+                ExportMenu(otherExport, onOtherExport, enabled = !exporting, Modifier.layoutId(TopBarItem.EXPORT_MENU))
             }
         },
         modifier = modifier.fillMaxWidth().padding(8.dp),
@@ -153,16 +208,22 @@ fun EditorTopBar(
         // 分享挨在导出左边，和返回、导出一样不让出来
         val share = part(TopBarItem.SHARE)?.measure(loose)
         val shareWidth = share?.width ?: 0
+        // 导出右边的小箭头，连同中间那道缝都算在导出这一颗里
+        val menu = part(TopBarItem.EXPORT_MENU)?.measure(loose)
+        val menuWidth = menu?.let { it.width + SPLIT_GAP.roundToPx() } ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
         val gap = EXPORT_GAP.roundToPx()
         val label = part(TopBarItem.EXPORT)!!.maxIntrinsicWidth(Constraints.Infinity)
-        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + shareWidth + gap + label
+        val width = if (constraints.hasBoundedWidth) constraints.maxWidth else back.width + allIcons + shareWidth + gap + label + menuWidth
         // 别的按钮都摆上，导出的字还整个放得下才写字
-        val withLabel = back.width + allIcons + shareWidth + gap + label <= width
-        val button = if (withLabel) part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - shareWidth - gap))
-        else part(TopBarItem.EXPORT_ICON)!!.measure(loose)
-        var room = width - back.width - shareWidth - gap - button.width
+        val withLabel = back.width + allIcons + shareWidth + gap + label + menuWidth <= width
+        val button = if (withLabel) {
+            part(TopBarItem.EXPORT)!!.measure(loose.copy(maxWidth = width - back.width - allIcons - shareWidth - gap - menuWidth))
+        } else {
+            part(TopBarItem.EXPORT_ICON)!!.measure(loose)
+        }
+        var room = width - back.width - shareWidth - gap - button.width - menuWidth
         val kept = mutableSetOf<TopBarItem>()
         for ((item, icon) in icons.sortedBy { it.first }) {
             if (icon.width > room) break
@@ -171,37 +232,114 @@ fun EditorTopBar(
         }
         val shown = icons.filter { it.first in kept }.map { it.second }
         val iconsWidth = shown.sumOf { it.width }
-        val barHeight = (listOf(back) + shown + listOfNotNull(share) + button).maxOf { it.height }
+        val barHeight = (listOf(back) + shown + listOfNotNull(share, menu) + button).maxOf { it.height }
             .coerceIn(constraints.minHeight, constraints.maxHeight)
         layout(width, barHeight) {
             val centered = { p: Placeable, x: Int -> p.place(x, (barHeight - p.height) / 2) }
             centered(back, 0)
             // 中间这几个靠在分享（没有分享时是导出）左边，和返回之间空着
-            var x = width - button.width - gap - shareWidth - iconsWidth
+            var x = width - menuWidth - button.width - gap - shareWidth - iconsWidth
             shown.forEach { centered(it, x); x += it.width }
             share?.let { centered(it, x) }
-            centered(button, width - button.width)
+            centered(button, width - menuWidth - button.width)
+            menu?.let { centered(it, width - it.width) }
         }
     }
 }
 
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
- * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享和导出一直在。
+ * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享和导出（连着它右边的小箭头）一直在。
  * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
 private enum class TopBarItem {
-    BACK, EXPORT, EXPORT_ICON, SHARE, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
+    BACK, EXPORT, EXPORT_ICON, EXPORT_MENU, SHARE, UNDO, REDO, SETTINGS, DEBUG, REMOVE_WATERMARK;
 
     companion object {
         /** 两头的，不参与让出来。 */
-        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON, SHARE)
+        val ENDS = setOf(BACK, EXPORT, EXPORT_ICON, EXPORT_MENU, SHARE)
     }
 }
 
 /** 导出和它左边的按钮（分享，没有分享时是中间那几个）之间多空一点。 */
 private val EXPORT_GAP = 4.dp
+
+/** 导出和右边的小箭头连成一颗（Material 3 的 split button）：中间这道缝，两半挨着的那一边的角，箭头那一半多宽。 */
+private val SPLIT_GAP = 2.dp
+private val SPLIT_START = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)
+private val SPLIT_END = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp)
+private val SPLIT_START_PADDING = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+private val SPLIT_ARROW_WIDTH = 32.dp
+
+/**
+ * 顶栏导出右边小箭头里的那一项（2026-10-27）：和导出做的相反的那一种。设置里默认导出选了哪一种，导出就是哪一种。
+ */
+sealed interface OtherExport {
+    /** 导出是另存时：覆盖原图，打好码的图写回原图。点不点得动见 [offer]。 */
+    data class Overwrite(val offer: OverwriteOffer) : OtherExport
+
+    /** 导出就是覆盖原图时：另存到相册，原图不动。 */
+    data object SaveCopy : OtherExport
+}
+
+/**
+ * 导出右边的小箭头：点开是另一种导出（见 [OtherExport]），菜单从箭头底下弹出来。覆盖原图写不回去时那一项灰着，
+ * 底下的小字说为什么；批量里看过的有几张写不回去，底下说一声它们会另存。小字不跟着那一项变灰，灰着的时候也看得清。
+ */
+@Composable
+private fun ExportMenu(other: OtherExport, onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    val turn by animateFloatAsState(if (open) 180f else 0f, label = "exportMenuArrow")
+    val description = stringResource(R.string.export_options)
+    Box(modifier) {
+        // 只有箭头这一窄条：不往四周留触摸余量，和导出之间只隔一道缝（见 EditorTopBar 里导出的图标）
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            Button(
+                onClick = { open = true },
+                modifier = Modifier.width(SPLIT_ARROW_WIDTH).semantics { contentDescription = description },
+                enabled = enabled,
+                shape = SPLIT_END,
+                contentPadding = PaddingValues(0.dp),
+            ) {
+                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.size(20.dp).rotate(turn))
+            }
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            val choose = {
+                open = false
+                onClick()
+            }
+            when (other) {
+                OtherExport.SaveCopy -> DropdownMenuItem(
+                    text = { Text(stringResource(R.string.save_copy)) },
+                    onClick = choose,
+                    leadingIcon = { Icon(Icons.Outlined.Download, contentDescription = null) },
+                )
+                is OtherExport.Overwrite -> {
+                    val offer = other.offer
+                    val note = when (offer) {
+                        is OverwriteOffer.Ready -> offer.copies.takeIf { it > 0 }?.let { stringResource(R.string.overwrite_copies_in_batch, it) }
+                        is OverwriteOffer.Unavailable -> offer.reason?.let { stringResource(it) }
+                    }
+                    DropdownMenuItem(
+                        text = {
+                            Column {
+                                Text(stringResource(R.string.overwrite_original))
+                                if (note != null) {
+                                    Text(note, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                                }
+                            }
+                        },
+                        onClick = choose,
+                        leadingIcon = { Icon(Icons.Outlined.Save, contentDescription = null) },
+                        enabled = offer is OverwriteOffer.Ready,
+                    )
+                }
+            }
+        }
+    }
+}
 
 /**
  * 手机的底栏在画布那一块里从哪儿开始（见 EditorScreen 的 CanvasAndPanel）。

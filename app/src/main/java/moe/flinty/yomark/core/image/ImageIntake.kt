@@ -8,7 +8,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
-data class IntakeResult(val file: File, val mimeType: String)
+/** @param source 副本是从哪儿复制来的。覆盖原图时写回它（见 export/Originals）；恢复出来的老会话里没记过的是 null。 */
+data class IntakeResult(val file: File, val mimeType: String, val source: Uri? = null)
 
 /**
  * 把外来 URI 立即复制进应用私有目录（spec §7.1）。
@@ -42,7 +43,7 @@ class ImageIntake(private val context: Context, private val dirName: String = DI
             target.delete()
             throw IOException("来源 URI 读到 0 字节：$uri")
         }
-        IntakeResult(target, mime)
+        IntakeResult(target, mime, uri)
     }
 
     fun clear() {

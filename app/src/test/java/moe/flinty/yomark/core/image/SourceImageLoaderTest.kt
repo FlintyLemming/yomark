@@ -177,4 +177,11 @@ class SourceImageLoaderTest {
         assertThat(out.bitmap.width.toLong() * out.bitmap.height).isAtMost(SourceImageLoader.EXPORT_MAX_PIXELS.toLong())
         assertThat(out.downscaled).isTrue()
     }
+
+    /** 覆盖原图只认导出不缩小的原图（见 EditorViewModel.originalOf）：和 loadForExport 的上限是同一条线。 */
+    @Test
+    fun `downscalesForExport draws the line where export starts shrinking`() {
+        assertThat(SourceImageLoader.downscalesForExport(5656, 5656)).isFalse()     // 31,990,336 px
+        assertThat(SourceImageLoader.downscalesForExport(8000, 5000)).isTrue()
+    }
 }

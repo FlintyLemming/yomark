@@ -74,6 +74,21 @@
     <string name="error_export">Export failed, try again</string>
     <string name="error_share">Share failed, try again</string>
     <string name="error_batch_partial">%1$d saved, %2$d failed</string>
+    <string name="export_options">Export options</string>
+    <string name="overwrite">Overwrite</string>
+    <string name="save_copy">Save to gallery</string>
+    <string name="overwrite_original">Overwrite original</string>
+    <string name="overwrite_not_found">Can\'t find the original</string>
+    <string name="overwrite_format">JPG and PNG only</string>
+    <string name="overwrite_too_large">Not for images over 32 MP</string>
+    <string name="overwrite_none_in_batch">None of the opened images can be overwritten</string>
+    <string name="overwrite_copies_in_batch">%1$d can\'t be overwritten, will be saved to gallery</string>
+    <string name="overwriting">Overwriting…</string>
+    <string name="overwritten">Original overwritten</string>
+    <string name="overwritten_batch">Overwrote %1$d originals</string>
+    <string name="overwritten_batch_with_copies">Overwrote %1$d originals, saved %2$d copies to gallery</string>
+    <string name="overwrite_saved_copy">Couldn\'t overwrite the original, saved a copy to gallery</string>
+    <string name="error_overwrite">Overwrite failed, try again</string>
     <string name="purpose_default">For XX use only</string>
     <string name="filmstrip_item">Image %1$d of %2$d</string>
 
@@ -194,6 +209,7 @@
     <string name="review">Review</string>
     <string name="export_opened">Export the %1$d opened</string>
     <string name="share_opened">Share the %1$d opened</string>
+    <string name="overwrite_opened">Overwrite the %1$d opened</string>
     <string name="paywall_one_time">One-time purchase, not a subscription.</string>
     <string name="paywall_what">Only removes the “Yomark” watermark from exports. Everything else is free.</string>
     <string name="paywall_restore_hint">Bought before? Tap Restore purchase; you won\'t be charged again.</string>
@@ -228,7 +244,7 @@
     <string name="settings_help">Help</string>
     <string name="settings_about">About</string>
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
-    <string name="settings_general_summary">Editing, recognition, watermark style</string>
+    <string name="settings_general_summary">Editing, recognition, export, watermark style</string>
     <string name="settings_appearance_summary">Dark theme, theme color, scan effect</string>
     <string name="settings_labs_summary">Detect chat screenshots</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
@@ -326,6 +342,8 @@
     <string name="settings_recognize">Recognition</string>
     <string name="full_resolution_ocr">Recognize at full resolution</string>
     <string name="full_resolution_ocr_summary">When on, scanning slows down by about half or more</string>
+    <string name="settings_default_export">Default export</string>
+    <string name="overwrite_by_default_summary">Images that can\'t be overwritten are saved to gallery</string>
     <string name="watermark_style">Watermark style</string>
     <string name="watermark_style_option">Icon + %1$s</string>
     <string name="watermark_none">No watermark</string>
