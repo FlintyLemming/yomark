@@ -243,6 +243,15 @@ class EditorViewModelOverwriteTest {
         assertThat(vm.state.value.exportOverwrites).isFalse()
     }
 
+    /** 分享出厂在导出右边的小箭头里；设置里改成单独一个按钮，开着的编辑器马上跟着变。 */
+    @Test
+    fun `share placement follows the setting`() = runTest(dispatcher) {
+        val vm = vm()
+        assertThat(vm.shareInExportMenu.value).isTrue()
+        settings.setShareInExportMenu(false); advanceUntilIdle()
+        assertThat(vm.shareInExportMenu.value).isFalse()
+    }
+
     /** 比如聊天应用分享来的：它自己的文件，不知道是相册里哪一张。那一项灰着，点了也什么都不做。 */
     @Test
     fun `an image that cannot be traced back cannot be overwritten`() = runTest(dispatcher) {

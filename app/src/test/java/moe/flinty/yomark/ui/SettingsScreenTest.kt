@@ -743,6 +743,8 @@ class SettingsScreenTest {
         onFullResolutionChange: (Boolean) -> Unit = {},
         overwriteByDefault: Boolean = false,
         onOverwriteByDefaultChange: (Boolean) -> Unit = {},
+        shareInExportMenu: Boolean = true,
+        onShareInExportMenuChange: (Boolean) -> Unit = {},
         watermarkStyle: BrandWatermarkStyle = BrandWatermarkStyle.ICON_ZH_EN,
         onWatermarkStyleChange: (BrandWatermarkStyle) -> Unit = {},
         watermarkUnlocked: Boolean = false,
@@ -753,6 +755,7 @@ class SettingsScreenTest {
             restyleAll = restyleAll, onRestyleAllChange = onRestyleAllChange,
             fullResolution = fullResolution, onFullResolutionChange = onFullResolutionChange,
             overwriteByDefault = overwriteByDefault, onOverwriteByDefaultChange = onOverwriteByDefaultChange,
+            shareInExportMenu = shareInExportMenu, onShareInExportMenuChange = onShareInExportMenuChange,
             watermarkStyle = watermarkStyle, onWatermarkStyleChange = onWatermarkStyleChange,
             watermarkUnlocked = watermarkUnlocked, watermarkOff = watermarkOff, onWatermarkOff = onWatermarkOff,
             onNavigateUp = {},
@@ -764,7 +767,7 @@ class SettingsScreenTest {
         general()
         val tops = listOf(
             "编辑", "换样式时一起换掉已有的打码", "识别", "按原分辨率识别",
-            "默认导出", "另存到相册", "覆盖原图", "水印样式", "图标 + 有码 Yomark",
+            "默认导出", "另存到相册", "覆盖原图", "分享", "放在导出菜单里", "单独一个按钮", "水印样式", "图标 + 有码 Yomark",
         ).map {
             compose.onNodeWithText(it).assertIsDisplayed().fetchSemanticsNode().boundsInRoot.top
         }
@@ -779,14 +782,23 @@ class SettingsScreenTest {
         assertThat(latest).isTrue()
     }
 
-    /** 默认导出出厂是另存；选了覆盖原图，顶栏的导出就是覆盖，另存在它右边的小箭头里。 */
+    /** 默认导出出厂是另存；选了覆盖原图，顶栏的导出就是覆盖，另存在它右边的小箭头里。两项都不带小字。 */
     @Test fun theDefaultExportCanBeOverwritingTheOriginal() {
         var latest: Boolean? = null
         general(overwriteByDefault = false, onOverwriteByDefaultChange = { latest = it })
         compose.onNodeWithText("另存到相册").assertIsSelected()
-        compose.onNodeWithText("写不回原图的图照常另存").assertIsDisplayed()
+        compose.onNodeWithText("写不回原图", substring = true).assertDoesNotExist()
         compose.onNodeWithText("覆盖原图").performClick()
         assertThat(latest).isTrue()
+    }
+
+    /** 分享出厂在导出右边的小箭头里；选「单独一个按钮」，它回到顶栏上导出左边。 */
+    @Test fun shareCanGoBackToItsOwnButton() {
+        var latest: Boolean? = null
+        general(shareInExportMenu = true, onShareInExportMenuChange = { latest = it })
+        compose.onNodeWithText("放在导出菜单里").assertIsSelected()
+        compose.onNodeWithText("单独一个按钮").performClick()
+        assertThat(latest).isFalse()
     }
 
     @Test fun theRestyleAllSwitchTurnsItOff() {
@@ -824,6 +836,8 @@ class SettingsScreenTest {
         var off = false
         general(watermarkStyle = BrandWatermarkStyle.ICON_EN, watermarkUnlocked = true, onWatermarkOff = { off = true })
         compose.onNodeWithText("图标 + Yomark").assertIsSelected()
+        // 多了分享那一组，「无水印」在一屏以下
+        compose.onNode(hasScrollToKeyAction()).performScrollToNode(hasText("无水印"))
         compose.onNodeWithText("无水印").performClick()
         assertThat(off).isTrue()
     }

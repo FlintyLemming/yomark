@@ -198,6 +198,17 @@ class SettingsStoreTest {
         assertThat(store.overwriteByDefault.first()).isFalse()
     }
 
+    /** 分享出厂在导出菜单里；改成单独一个按钮就记住，恢复默认设置后又回到菜单里。 */
+    @Test
+    fun `share sits in the export menu until it gets its own button`() = runTest {
+        val store = store()
+        assertThat(store.shareInExportMenu.first()).isTrue()
+        store.setShareInExportMenu(false)
+        assertThat(store.shareInExportMenu.first()).isFalse()
+        store.resetSettings()
+        assertThat(store.shareInExportMenu.first()).isTrue()
+    }
+
     @Test
     fun `debug info is off until turned on`() = runTest {
         val store = store()

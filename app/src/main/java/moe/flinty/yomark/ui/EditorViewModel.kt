@@ -102,9 +102,9 @@ class EditorViewModel(
      */
     val forCaller: Boolean = false,
     /**
-     * 分享（顶栏导出左边那颗）写到哪儿：应用私有缓存里的一个目录，经 FileProvider 交给分享面板，不进相册。
+     * 分享（导出右边小箭头里的一项，或者顶栏导出左边那颗）写到哪儿：应用私有缓存里的一个目录，经 FileProvider 交给分享面板，不进相册。
      * 每次分享先清掉上一次的（收到的应用什么时候读由它定，所以不随手删）。
-     * null 是没有分享，顶栏上也就没有这颗：别的应用来要图时，导出就是把图交回去。
+     * null 是没有分享，顶栏上、导出菜单里也就都没有：别的应用来要图时，导出就是把图交回去。
      */
     private val shareSink: FileProviderSink? = null,
     /**
@@ -119,10 +119,10 @@ class EditorViewModel(
     /** 同一条导出管线，写到 [shareSink]。 */
     private val shareExporter: Exporter? = shareSink?.let(exporter::writingTo)
 
-    /** 顶栏上有没有分享。 */
+    /** 有没有分享（导出右边小箭头里的一项，或者顶栏上单独一颗，见 [shareInExportMenu]）。 */
     val canShare: Boolean get() = shareExporter != null
 
-    /** 有没有覆盖原图（见 [requestOverwrite]），也就是顶栏导出右边有没有小箭头。 */
+    /** 有没有覆盖原图（见 [requestOverwrite]），在导出右边的小箭头里。 */
     val canOverwrite: Boolean get() = originals != null
 
     /**
@@ -131,6 +131,13 @@ class EditorViewModel(
      */
     val scanStyle: StateFlow<ScanStyle> =
         settings.scanStyle.stateIn(viewModelScope, SharingStarted.Eagerly, ScanStyle.FROST)
+
+    /**
+     * 分享放在导出右边的小箭头里（设置里「分享」的出厂选项），顶栏上没有单独那一颗。
+     * 不进 EditorUiState，理由同 [scanStyle]。设置还没读到时按出厂的算。
+     */
+    val shareInExportMenu: StateFlow<Boolean> =
+        settings.shareInExportMenu.stateIn(viewModelScope, SharingStarted.Eagerly, true)
 
     /**
      * 调试信息开着没有（设置 → 关于，连点版本号）。开着时顶栏多一个按钮，每次识别都在 [traceLog] 里记一份。
@@ -1535,7 +1542,7 @@ class EditorViewModel(
      * 导出：另存一份进相册，原图不动。原先还有圈出没打码的内容时先拦一下（spec §7.4）；2026-10-14 起没有「圈出」，图上是什么样就导出什么样。
      * 设置里默认导出选了覆盖原图时，它在导出右边的小箭头里（「另存到相册」，见 [requestOverwrite]）。
      *
-     * @param share 分享（顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册，也不动原图。没有分享时（见 [canShare]）什么也不做
+     * @param share 分享（导出右边小箭头里的一项，或者顶栏导出左边那颗）：图写进缓存交给分享面板（[EditorMessage.Shared]），不进相册，也不动原图。没有分享时（见 [canShare]）什么也不做
      */
     fun requestExport(share: Boolean = false) {
         runExport(_state.value.plan, share)
@@ -1555,7 +1562,7 @@ class EditorViewModel(
      * 批量导出：看过的一次性全部导出（spec §7.6）。
      *
      * 先等还没跑完的识别：切走的那几张可能还在后台识别，这时导出，本该直接打码的东西就原样出去了——
-     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」（分享时是分享那颗转圈）。
+     * 而用户根本看不到它们还没识别完。等的这一会儿按钮显示「导出中…」（分享时单独那颗分享转圈，分享在导出菜单里时导出那颗写「分享中…」）。
      *
      * 还有没打开过的图时先问一句（[reviewUnopened] / [exportOpenedOnly]）：没打开过的图没识别、也没人看过，不能替用户导出。
      *

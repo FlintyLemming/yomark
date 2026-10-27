@@ -343,7 +343,8 @@
     <string name="full_resolution_ocr">Recognize at full resolution</string>
     <string name="full_resolution_ocr_summary">When on, scanning slows down by about half or more</string>
     <string name="settings_default_export">Default export</string>
-    <string name="overwrite_by_default_summary">Images that can\'t be overwritten are saved to gallery</string>
+    <string name="share_in_export_menu">In the export menu</string>
+    <string name="share_separate">As its own button</string>
     <string name="watermark_style">Watermark style</string>
     <string name="watermark_style_option">Icon + %1$s</string>
     <string name="watermark_none">No watermark</string>

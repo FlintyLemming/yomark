@@ -10,16 +10,17 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Redo
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Settings
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -51,9 +53,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -106,24 +110,27 @@ fun EditorTopBar(
     /** 调试信息（设置 → 关于，连点版本号打开）。没打开时传 null，按钮就不出现。 */
     onDebug: (() -> Unit)? = null,
     /**
-     * 分享，挨在导出左边（2026-10-17）：图不进相册，写进缓存交给分享面板。和导出一样是收尾，一样一直在，不让出来。
-     * 别的应用来要图时（导出是「完成」）传 null，就没有这一颗。
+     * 分享（2026-10-17）：图不进相册，写进缓存交给分享面板。和导出一样是收尾，一样一直在，不让出来。
+     * [shareInMenu] 时是导出右边小箭头里的一项（设置里的出厂选项，2026-10-27），不然是顶栏上单独一颗，挨在导出左边。
+     * 别的应用来要图时（导出是「完成」）传 null，哪儿都没有。
      */
     onShare: (() -> Unit)? = null,
+    /** 分享放在导出右边的小箭头里，顶栏上没有单独那一颗（见 SettingsStore.shareInExportMenu）。 */
+    shareInMenu: Boolean = false,
     /**
      * 导出按钮上的字：「导出」；导出就是覆盖原图时（设置里默认导出选了覆盖原图）是「覆盖」；
      * 别的应用来要图时是「完成」，导出就是把图交回去。
      */
     @StringRes exportLabel: Int = R.string.export,
     /**
-     * 导出右边的小箭头点开是另一种导出（见 [OtherExport]），箭头和导出连成一颗，一样不让出来。
-     * 别的应用来要图时（导出是「完成」）传 null，就没有这个箭头。
+     * 导出右边小箭头里的另一种导出（见 [OtherExport]）。箭头和导出连成一颗，一样不让出来；菜单里还有分享（[shareInMenu] 时）。
+     * 别的应用来要图时（导出是「完成」）传 null，菜单里什么都没有，也就没有这个箭头。
      */
     otherExport: OtherExport? = null,
     onOtherExport: () -> Unit = {},
     /** 在导出（分享也是先导出）：导出、分享都点不动。 */
     exporting: Boolean = false,
-    /** 这一次导出是为了分享：转圈的是分享那颗，导出那颗不换字。 */
+    /** 这一次导出是为了分享：单独那颗分享转圈，导出那颗不换字；分享在菜单里时导出那颗写「分享中…」。 */
     sharing: Boolean = false,
     /** 这一次导出是覆盖原图：导出那颗转圈，读屏念「覆盖中…」。 */
     overwriting: Boolean = false,
@@ -143,7 +150,8 @@ fun EditorTopBar(
                 IconButton(onClick = onDebug, Modifier.layoutId(TopBarItem.DEBUG)) { Icon(Icons.Filled.BugReport, stringResource(R.string.debug_info)) }
             }
             IconButton(onClick = onSettings, Modifier.layoutId(TopBarItem.SETTINGS)) { Icon(Icons.Filled.Settings, stringResource(R.string.settings)) }
-            if (onShare != null) {
+            val menuShare = onShare?.takeIf { shareInMenu }
+            if (onShare != null && !shareInMenu) {
                 // 色调底（tonal）的圆钮，和实心的导出挨着成一对；分享中转圈，读屏念「分享中…」
                 val shareLabel = stringResource(if (exporting && sharing) R.string.sharing else R.string.share)
                 FilledTonalIconButton(
@@ -155,16 +163,18 @@ fun EditorTopBar(
                     else Icon(Icons.Filled.Share, contentDescription = null)
                 }
             }
-            val saving = exporting && !sharing
+            // 在跑的是不是导出这一颗：分享有单独一颗时转圈的是那颗
+            val saving = exporting && (!sharing || menuShare != null)
             val label = stringResource(
                 when {
                     !saving -> exportLabel
+                    sharing -> R.string.sharing
                     overwriting -> R.string.overwriting
                     else -> R.string.exporting
                 },
             )
-            // 有另一种导出时导出和右边的小箭头连成一颗（split button）：挨着的那一边角收小，中间只隔一道缝
-            val split = otherExport != null
+            // 菜单里有东西时导出和右边的小箭头连成一颗胶囊（split button），中间一道细线隔开
+            val split = menuShare != null || otherExport != null
             Button(
                 onClick = onExport,
                 modifier = Modifier.layoutId(TopBarItem.EXPORT),
@@ -180,7 +190,9 @@ fun EditorTopBar(
             CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides touchMargin) {
                 FilledIconButton(
                     onClick = onExport,
-                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON).semantics { contentDescription = label },
+                    modifier = Modifier.layoutId(TopBarItem.EXPORT_ICON)
+                        .then(if (split) Modifier.width(SPLIT_ICON_WIDTH) else Modifier)
+                        .semantics { contentDescription = label },
                     enabled = !exporting,
                     shape = if (split) SPLIT_START else IconButtonDefaults.filledShape,
                 ) {
@@ -196,8 +208,8 @@ fun EditorTopBar(
                     )
                 }
             }
-            if (otherExport != null) {
-                ExportMenu(otherExport, onOtherExport, enabled = !exporting, Modifier.layoutId(TopBarItem.EXPORT_MENU))
+            if (split) {
+                ExportMenu(menuShare, otherExport, onOtherExport, enabled = !exporting, Modifier.layoutId(TopBarItem.EXPORT_MENU))
             }
         },
         modifier = modifier.fillMaxWidth().padding(8.dp),
@@ -208,9 +220,9 @@ fun EditorTopBar(
         // 分享挨在导出左边，和返回、导出一样不让出来
         val share = part(TopBarItem.SHARE)?.measure(loose)
         val shareWidth = share?.width ?: 0
-        // 导出右边的小箭头，连同中间那道缝都算在导出这一颗里
+        // 导出右边的小箭头，算在导出这一颗里
         val menu = part(TopBarItem.EXPORT_MENU)?.measure(loose)
-        val menuWidth = menu?.let { it.width + SPLIT_GAP.roundToPx() } ?: 0
+        val menuWidth = menu?.width ?: 0
         val icons = measurables.filter { it.layoutId !in TopBarItem.ENDS }.map { it.layoutId as TopBarItem to it.measure(loose) }
         val allIcons = icons.sumOf { it.second.width }
         val gap = EXPORT_GAP.roundToPx()
@@ -249,7 +261,7 @@ fun EditorTopBar(
 
 /**
  * 顶栏上的按钮。一行放不下时（窄屏，或者调大了显示大小、字号）导出先换成只有图标的那个，字不折行；
- * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享和导出（连着它右边的小箭头）一直在。
+ * 还放不下（再开着调试信息、有分享）时，中间那几个照要紧的先后从最后一个起不摆出来，返回、分享（单独一颗时）和导出（连着它右边的小箭头）一直在。
  * 去水印、设置在首页也有。用途水印、对比手机上在底栏，宽屏上在功能方块里（2026-10-16），顶栏上都没有。
  * 摆出来的还是照 [EditorTopBar] 里写的顺序从左往右。
  */
@@ -265,15 +277,21 @@ private enum class TopBarItem {
 /** 导出和它左边的按钮（分享，没有分享时是中间那几个）之间多空一点。 */
 private val EXPORT_GAP = 4.dp
 
-/** 导出和右边的小箭头连成一颗（Material 3 的 split button）：中间这道缝，两半挨着的那一边的角，箭头那一半多宽。 */
-private val SPLIT_GAP = 2.dp
-private val SPLIT_START = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 4.dp, bottomEnd = 4.dp)
-private val SPLIT_END = RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp, topEnd = 20.dp, bottomEnd = 20.dp)
+/**
+ * 导出和右边的小箭头连成一颗胶囊（split button）：两半挨着的那一边是直的，中间一道细线，上下留空。
+ * 箭头那一截窄，里面是个小三角；字放不下时导出那一半是图标，比单独的图标钮宽一点，图标不贴着圆头。
+ * 菜单离按钮空一点，不贴着弹出来。
+ */
+private val SPLIT_START = RoundedCornerShape(topStartPercent = 50, topEndPercent = 0, bottomEndPercent = 0, bottomStartPercent = 50)
+private val SPLIT_END = RoundedCornerShape(topStartPercent = 0, topEndPercent = 50, bottomEndPercent = 50, bottomStartPercent = 0)
 private val SPLIT_START_PADDING = PaddingValues(start = 16.dp, top = 8.dp, end = 12.dp, bottom = 8.dp)
+private val SPLIT_ICON_WIDTH = 44.dp
 private val SPLIT_ARROW_WIDTH = 32.dp
+private val SPLIT_DIVIDER_HEIGHT = 20.dp
+private val SPLIT_MENU_GAP = 6.dp
 
 /**
- * 顶栏导出右边小箭头里的那一项（2026-10-27）：和导出做的相反的那一种。设置里默认导出选了哪一种，导出就是哪一种。
+ * 顶栏导出右边小箭头里的另一种导出（2026-10-27）：和导出做的相反的那一种。设置里默认导出选了哪一种，导出就是哪一种。
  */
 sealed interface OtherExport {
     /** 导出是另存时：覆盖原图，打好码的图写回原图。点不点得动见 [offer]。 */
@@ -284,16 +302,23 @@ sealed interface OtherExport {
 }
 
 /**
- * 导出右边的小箭头：点开是另一种导出（见 [OtherExport]），菜单从箭头底下弹出来。覆盖原图写不回去时那一项灰着，
- * 底下的小字说为什么；批量里看过的有几张写不回去，底下说一声它们会另存。小字不跟着那一项变灰，灰着的时候也看得清。
+ * 导出右边的小箭头，菜单从它底下弹出来：分享（[share]，放在菜单里时）在上，另一种导出（见 [OtherExport]）在下。
+ * 覆盖原图写不回去时那一项灰着，底下的小字说为什么；批量里看过的有几张写不回去，底下说一声它们会另存。
+ * 小字不跟着那一项变灰，灰着的时候也看得清。
  */
 @Composable
-private fun ExportMenu(other: OtherExport, onClick: () -> Unit, enabled: Boolean, modifier: Modifier = Modifier) {
+private fun ExportMenu(
+    share: (() -> Unit)?,
+    other: OtherExport?,
+    onOther: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
     var open by remember { mutableStateOf(false) }
     val turn by animateFloatAsState(if (open) 180f else 0f, label = "exportMenuArrow")
     val description = stringResource(R.string.export_options)
     Box(modifier) {
-        // 只有箭头这一窄条：不往四周留触摸余量，和导出之间只隔一道缝（见 EditorTopBar 里导出的图标）
+        // 只有箭头这一窄条：不往四周留触摸余量，和导出贴着（见 EditorTopBar 里导出的图标）
         CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
             Button(
                 onClick = { open = true },
@@ -302,15 +327,30 @@ private fun ExportMenu(other: OtherExport, onClick: () -> Unit, enabled: Boolean
                 shape = SPLIT_END,
                 contentPadding = PaddingValues(0.dp),
             ) {
-                Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null, Modifier.size(20.dp).rotate(turn))
+                val line = LocalContentColor.current.let { it.copy(alpha = it.alpha * 0.4f) }
+                Box(Modifier.width(1.dp).height(SPLIT_DIVIDER_HEIGHT).background(line))
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Filled.ArrowDropDown, contentDescription = null, Modifier.rotate(turn))
+                }
             }
         }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }, offset = DpOffset(0.dp, SPLIT_MENU_GAP)) {
+            if (share != null) {
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.share)) },
+                    onClick = {
+                        open = false
+                        share()
+                    },
+                    leadingIcon = { Icon(Icons.Outlined.Share, contentDescription = null) },
+                )
+            }
             val choose = {
                 open = false
-                onClick()
+                onOther()
             }
             when (other) {
+                null -> Unit
                 OtherExport.SaveCopy -> DropdownMenuItem(
                     text = { Text(stringResource(R.string.save_copy)) },
                     onClick = choose,

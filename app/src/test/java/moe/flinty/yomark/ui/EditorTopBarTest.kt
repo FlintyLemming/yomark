@@ -39,6 +39,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * 手机竖着拿时的顶栏：返回、撤销、重做、去水印、设置、分享、导出。一行放不下「导出」两个字时（320 dp 宽，或者调大了显示大小），
  * 导出换成只有图标的按钮，别的都还在；再放不下才从最不要紧的起让出来，分享和导出一样不让。
+ * 分享出厂在导出右边的小箭头里（2026-10-27），顶栏上单独一颗是设置里改出来的。
  * 用真的 ViewModel 走一遍的见 EditorScreenLayoutTest。
  */
 @RunWith(RobolectricTestRunner::class)
@@ -55,12 +56,15 @@ class EditorTopBarTest {
 
     /**
      * EditorScreen 在手机竖着拿时传的那几样；[debug] 是开发者选项里打开了调试信息，
-     * [share] 是有分享（别的应用来要图时没有），[other] 是导出右边小箭头里的另一种导出（别的应用来要图时没有）。
+     * [share] 是有分享（别的应用来要图时没有），[shareInMenu] 是它放在导出右边的小箭头里，
+     * [other] 是小箭头里的另一种导出（别的应用来要图时没有）。
      */
     private fun show(
         debug: Boolean = false,
         exportLabel: Int = R.string.export,
         share: Boolean = false,
+        shareInMenu: Boolean = false,
+        onShare: () -> Unit = {},
         other: OtherExport? = null,
         onOther: () -> Unit = {},
     ) {
@@ -73,7 +77,8 @@ class EditorTopBarTest {
                         onRemoveWatermark = {},
                         onDebug = if (debug) ({}) else null,
                         onExport = {},
-                        onShare = if (share) ({}) else null,
+                        onShare = if (share) onShare else null,
+                        shareInMenu = shareInMenu,
                         exportLabel = exportLabel,
                         otherExport = other,
                         onOtherExport = onOther,
@@ -204,7 +209,7 @@ class EditorTopBarTest {
 
     // ---------- 导出右边的小箭头（覆盖原图，2026-10-27） ----------
 
-    /** 箭头和导出连成一颗，紧挨在写着字的导出右边，在最右上角；点开是覆盖原图，点了菜单收起。 */
+    /** 箭头和导出连成一颗，贴在写着字的导出右边，在最右上角，比导出窄得多；点开是覆盖原图，点了菜单收起。 */
     @Config(qualifiers = "en-rUS-w600dp-h915dp-xxhdpi")
     @Test fun theArrowBesideExportOffersOverwritingTheOriginal() {
         var chosen = 0
@@ -213,7 +218,11 @@ class EditorTopBarTest {
             listOf("Back", "Undo", "Redo").map(::button) + premium + listOf("Settings", "Share").map(::button) +
                 compose.onNodeWithText("Export") + button("Export options"),
         )
-        assertThat(button("Export options").bounds().left - compose.onNodeWithText("Export").bounds().right).isAtMost(2.dp)
+        val export = compose.onNodeWithText("Export").bounds()
+        val arrow = button("Export options").bounds()
+        assertThat(arrow.left).isEqualTo(export.right)
+        assertThat(arrow.height).isEqualTo(export.height)
+        assertThat(arrow.width).isAtMost(32.dp)
 
         button("Export options").performClick()
         compose.onNodeWithText("Overwrite original").assertIsDisplayed().assertIsEnabled().performClick()
@@ -264,5 +273,59 @@ class EditorTopBarTest {
         compose.waitForIdle()
         button("Overwriting…").assertIsDisplayed().assertIsNotEnabled()
         button("Export options").assertIsNotEnabled()
+    }
+
+    // ---------- 分享在导出菜单里（出厂，2026-10-27） ----------
+
+    /** 分享在小箭头里：顶栏上没有分享那一颗，320 dp 上省下的地方留给设置；菜单里分享在上，点了就分享。 */
+    @Test fun withShareInTheMenuItIsTheFirstItemThere() {
+        var shared = 0
+        var chosen = 0
+        show(share = true, shareInMenu = true, onShare = { shared++ }, other = OtherExport.Overwrite(OverwriteOffer.Ready()), onOther = { chosen++ })
+        button("Share").assertDoesNotExist()
+        assertInARow(listOf("Back", "Undo", "Redo", "Settings", "Export", "Export options").map(::button))
+
+        button("Export options").performClick()
+        val share = compose.onNodeWithText("Share").assertIsDisplayed().assertIsEnabled().bounds()
+        assertThat(share.bottom).isAtMost(compose.onNodeWithText("Overwrite original").assertIsDisplayed().bounds().top)
+        compose.onNodeWithText("Share").performClick()
+
+        assertThat(shared).isEqualTo(1)
+        assertThat(chosen).isEqualTo(0)
+        compose.onNodeWithText("Overwrite original").assertDoesNotExist()
+    }
+
+    /** 放得下时：分享不在顶栏上，导出照样写字，挨着它的去水印、设置都在。 */
+    @Config(qualifiers = "en-rUS-w412dp-h915dp-xxhdpi")
+    @Test fun withShareInTheMenuAndRoomExportKeepsItsLabel() {
+        show(share = true, shareInMenu = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        button("Share").assertDoesNotExist()
+        assertInARow(
+            listOf("Back", "Undo", "Redo").map(::button) + premium + button("Settings") +
+                compose.onNodeWithText("Export") + button("Export options"),
+        )
+    }
+
+    /** 从菜单里分享：导出那颗转圈、念「分享中…」，箭头也点不动。 */
+    @Test fun whileSharingFromTheMenuExportSaysSharing() {
+        show(share = true, shareInMenu = true, other = OtherExport.Overwrite(OverwriteOffer.Ready()))
+        exporting = true
+        sharing = true
+        compose.waitForIdle()
+        button("Sharing…").assertIsDisplayed().assertIsNotEnabled()
+        button("Export options").assertIsNotEnabled()
+        button("Exporting…").assertDoesNotExist()
+    }
+
+    /** 默认导出是覆盖原图、分享也在菜单里：菜单里是分享和另存到相册。 */
+    @Config(qualifiers = "zh-rCN-w320dp-h640dp-xhdpi")
+    @Test fun whenOverwritingIsTheDefaultTheMenuSharesOrSavesACopy() {
+        var chosen = 0
+        show(exportLabel = R.string.overwrite, share = true, shareInMenu = true, other = OtherExport.SaveCopy, onOther = { chosen++ })
+        button("覆盖").assertIsDisplayed()
+        button("导出选项").performClick()
+        compose.onNodeWithText("分享").assertIsDisplayed()
+        compose.onNodeWithText("另存到相册").performClick()
+        assertThat(chosen).isEqualTo(1)
     }
 }

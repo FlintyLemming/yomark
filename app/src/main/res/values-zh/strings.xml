@@ -343,7 +343,8 @@
     <string name="full_resolution_ocr">按原分辨率识别</string>
     <string name="full_resolution_ocr_summary">开启后扫描速度会降低约一半以上</string>
     <string name="settings_default_export">默认导出</string>
-    <string name="overwrite_by_default_summary">写不回原图的图照常另存</string>
+    <string name="share_in_export_menu">放在导出菜单里</string>
+    <string name="share_separate">单独一个按钮</string>
     <string name="watermark_style">水印样式</string>
     <string name="watermark_style_option">图标 + %1$s</string>
     <string name="watermark_none">无水印</string>

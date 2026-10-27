@@ -121,6 +121,7 @@ fun EditorScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val scanStyle by vm.scanStyle.collectAsStateWithLifecycle()
+    val shareInExportMenu by vm.shareInExportMenu.collectAsStateWithLifecycle()
     val debugTrace by vm.debugTrace.collectAsStateWithLifecycle()
     val showTextBoxes by vm.showTextBoxes.collectAsStateWithLifecycle()
     val textBoxes by vm.textBoxes.collectAsStateWithLifecycle()
@@ -235,7 +236,7 @@ fun EditorScreen(
             val saveCopy = { if (batch != null) vm.exportBatch() else vm.requestExport() }
             val overwrite = { if (batch != null) vm.overwriteBatch() else vm.requestOverwrite() }
             val onExport = if (state.exportOverwrites) overwrite else saveCopy
-            // 分享：图不进相册，写进缓存交给分享面板。别的应用来要图时没有它（见 vm.canShare）
+            // 分享：图不进相册，写进缓存交给分享面板。出厂在导出右边的小箭头里，设置里可以改成单独一颗。别的应用来要图时没有它（见 vm.canShare）
             val onShare = if (vm.canShare) ({ if (batch != null) vm.exportBatch(share = true) else vm.requestExport(share = true) }) else null
             // 别的应用来要图时没有覆盖原图，也就没有小箭头（见 vm.canOverwrite）
             val otherExport = when {
@@ -273,6 +274,7 @@ fun EditorScreen(
                     onDebug = if (debugTrace) ({ debugSheetOpen = true }) else null,
                     onExport = onExport,
                     onShare = onShare,
+                    shareInMenu = shareInExportMenu,
                     // 别的应用来要图时，导出就是把图交回去
                     exportLabel = when {
                         vm.forCaller -> R.string.done
