@@ -64,8 +64,8 @@ android {
         applicationId = "moe.flinty.yomark"
         minSdk = 29                 // Android 10：作用域存储，读写自己创建的媒体文件免权限
         targetSdk = 36
-        versionCode = 30
-        versionName = "1.0.0"
+        versionCode = 31
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 开源版：全功能免费，去水印按钮点开就能免费去水印，另有打赏入口（见 billing/Edition.kt）。
         // 上架 Play 的构建传 -Pyomark.freeEdition=false，就回到一次性买断去水印（见 play-bundle.yml）。
