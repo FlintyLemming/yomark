@@ -26,16 +26,7 @@ class ChatDetector : PageAnalyzer {
         val bmp = image.bitmap
         val argb = IntArray(bmp.width * bmp.height)
         bmp.getPixels(argb, 0, bmp.width, 0, 0, bmp.width, bmp.height)
-        val chatLines = lines.map { l ->
-            val r = l.quad.bounds()
-            val chars = arrayOfNulls<Box>(l.text.length)
-            l.elements.forEach { e ->
-                val c = e.quad.bounds()
-                e.range.forEach { i -> if (i in chars.indices) chars[i] = Box(c.left, c.top, c.right, c.bottom) }
-            }
-            ChatLine(Box(r.left, r.top, r.right, r.bottom), l.text, chars.toList())
-        }
-        val found = ChatLayout.analyze(chatLines, Pixels(bmp.width, bmp.height, argb))
+        val found = ChatLayout.analyze(lines.map { it.toChatLine() }, Pixels(bmp.width, bmp.height, argb))
         if (!found.isChat) return emptyList()
         return candidates(found)
     }
@@ -64,4 +55,18 @@ class ChatDetector : PageAnalyzer {
             confidence = CONFIDENCE,
         )
     }
+}
+
+/**
+ * OCR 的一行 → 外接框、原文和逐字的框。PP-OCR 的 element 就是一个字；ML Kit 的是一个词，词里的字都记成词的框。
+ * 裁切状态栏找时间（statusbar.StatusBarCropper）也用它。
+ */
+internal fun TextLine.toChatLine(): ChatLine {
+    val r = quad.bounds()
+    val chars = arrayOfNulls<Box>(text.length)
+    elements.forEach { e ->
+        val c = e.quad.bounds()
+        e.range.forEach { i -> if (i in chars.indices) chars[i] = Box(c.left, c.top, c.right, c.bottom) }
+    }
+    return ChatLine(Box(r.left, r.top, r.right, r.bottom), text, chars.toList())
 }

@@ -322,6 +322,7 @@ class SettingsStore internal constructor(
                 if (prefs[KEY_FACE] == LEGACY_OFF) RuleState.OFF else fallback.faceState,
             ),
             chatState = prefs[KEY_CHAT_STATE].toRuleState(fallback.chatState),
+            cropStatusBar = prefs[KEY_CROP_STATUS_BAR] ?: fallback.cropStatusBar,
             maskUnanchoredNames = prefs[KEY_UNANCHORED_NAMES] ?: fallback.maskUnanchoredNames,
             ruleOverrides = RecognitionConfig.parseOverrides(prefs[KEY_RULES].orEmpty()),
         )
@@ -335,13 +336,14 @@ class SettingsStore internal constructor(
             it[KEY_FACE] = config.face.name
             it[KEY_FACE_STATE] = config.faceState.name
             it[KEY_CHAT_STATE] = config.chatState.name
+            it[KEY_CROP_STATUS_BAR] = config.cropStatusBar
             it[KEY_UNANCHORED_NAMES] = config.maskUnanchoredNames
             it[KEY_RULES] = config.encodeOverrides()
         }
     }
 
     /**
-     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别）、默认导出、分享放在哪儿和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
+     * 设置 → 关于里的「恢复默认设置」：识别方案（文字、人脸、条码、文字识别、实验室）、默认导出、分享放在哪儿和导出的水印样式回到出厂值，「按原分辨率识别」关掉。
      * 水印样式回到出厂值，对解锁了的人就是无水印（见 [brandWatermarkOff]）。
      * 外观（主题色、识别动效）不动；编辑器里记住的样式、用途水印外观不是设置页上的项，也不动；
      * 调试信息的开关在「开发者」里自己关。
@@ -357,6 +359,7 @@ class SettingsStore internal constructor(
             it.remove(KEY_FACE)
             it.remove(KEY_FACE_STATE)
             it.remove(KEY_CHAT_STATE)
+            it.remove(KEY_CROP_STATUS_BAR)
             it.remove(KEY_UNANCHORED_NAMES)
             it.remove(KEY_RULES)
             it.remove(KEY_RESTYLE_ALL)
@@ -474,6 +477,7 @@ class SettingsStore internal constructor(
         val KEY_FACE_STATE = stringPreferencesKey("recognition_face_state")
         /** v2：出厂从打码改成关着（挪进实验室），换键的理由同 KEY_TEXT_ENGINE。 */
         val KEY_CHAT_STATE = stringPreferencesKey("recognition_chat_state_v2")
+        val KEY_CROP_STATUS_BAR = booleanPreferencesKey("recognition_crop_status_bar")
         val KEY_RULES = stringPreferencesKey("recognition_rules")
         val KEY_UNANCHORED_NAMES = booleanPreferencesKey("recognition_unanchored_names")
 

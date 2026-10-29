@@ -2,6 +2,7 @@ package moe.flinty.yomark.export
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.ColorSpace
 import android.graphics.RectF
 import android.net.Uri
 import moe.flinty.yomark.core.image.SourceImageLoader
@@ -15,6 +16,7 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 data class ExportRequest(
     val file: File,
@@ -39,7 +41,7 @@ sealed interface ExportOutcome {
 
 /**
  * 导出管线（spec §9.1）：
- *   原图全分辨率解码 + EXIF 转正 → 逐项渲染 MASKED → 品牌水印 → 重编码 → 写出
+ *   原图全分辨率解码 + EXIF 转正 → 逐项渲染 MASKED → 裁掉顶上的状态栏（实验室） → 用途水印、品牌水印 → 重编码 → 写出
  *
  * 不携带任何 EXIF 由「重编码」天然保证——Bitmap.compress 不写 EXIF。
  * 但这条由 ExporterTest 的断言守，不靠推断。
@@ -84,11 +86,18 @@ class Exporter(
                     maskedBounds += quad.bounds()
                 }
 
+            // 顶上那一条（实验室的「裁切状态栏」）在码画完以后裁：码和预览一样画在整张图上，模糊、近似色取的是裁之前四周的像素。
+            // 水印画在裁好的图上：用途水印铺满裁好的图，品牌水印落在它的角上，躲开的码跟着往上挪
+            val top = (request.plan.cropTop * factor).roundToInt().coerceIn(0, bitmap.height - 1)
+            val out = if (top == 0) bitmap else cropTop(bitmap, top)
+            val outCanvas = if (top == 0) canvas else Canvas(out)
+            if (top > 0) maskedBounds.forEach { it.offset(0f, -top.toFloat()) }
+
             // 顺序不能反：品牌水印必须画在最上层，否则用途水印的斜纹会压在它上面影响可读性。
             request.purposeText?.let {
-                purposeWatermark.draw(canvas, bitmap.width, bitmap.height, it, request.purposeStyle)
+                purposeWatermark.draw(outCanvas, out.width, out.height, it, request.purposeStyle)
             }
-            if (request.applyWatermark) watermark.draw(canvas, bitmap, maskedBounds, request.watermarkStyle)
+            if (request.applyWatermark) watermark.draw(outCanvas, out, maskedBounds, request.watermarkStyle)
 
             val png = request.mimeType.equals("image/png", ignoreCase = true)
             val format = if (png) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
@@ -96,9 +105,23 @@ class Exporter(
             val name = "YOMARK_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) +
                 if (png) ".png" else ".jpg"
 
-            val uri = sink.write(bitmap, format, if (png) 100 else JPEG_QUALITY, name, mime)
-            ExportOutcome.Success(uri, bitmap.width, bitmap.height, decoded.downscaled, mime)
+            val uri = sink.write(out, format, if (png) 100 else JPEG_QUALITY, name, mime)
+            ExportOutcome.Success(uri, out.width, out.height, decoded.downscaled, mime)
         }.getOrElse { ExportOutcome.Failure(it) }
+    }
+
+    /**
+     * [bitmap] 顶上 [top] 行裁掉：画进一张新的可变位图（还要往上画水印），颜色空间不变，原来那张随即释放。
+     * 不用 Bitmap.createBitmap(source, x, y, w, h)：它给的位图文档上说不可变。
+     */
+    private fun cropTop(bitmap: Bitmap, top: Int): Bitmap {
+        val out = Bitmap.createBitmap(
+            bitmap.width, bitmap.height - top, bitmap.config ?: Bitmap.Config.ARGB_8888, bitmap.hasAlpha(),
+            bitmap.colorSpace ?: ColorSpace.get(ColorSpace.Named.SRGB),
+        )
+        Canvas(out).drawBitmap(bitmap, 0f, -top.toFloat(), null)
+        bitmap.recycle()
+        return out
     }
 
     private companion object { const val JPEG_QUALITY = 95 }

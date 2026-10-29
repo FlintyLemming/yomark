@@ -26,6 +26,7 @@ import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.StrokeShape
 import moe.flinty.yomark.core.model.TextLine
+import moe.flinty.yomark.core.model.TopCrop
 import moe.flinty.yomark.data.SettingsStore
 import moe.flinty.yomark.debug.TraceLog
 import moe.flinty.yomark.debug.TraceRecorder
@@ -650,14 +651,14 @@ class EditorViewModel(
         // 直接打码的用结果到达这一刻「打码」里的样式，和单张一样；用户在识别期间画的手动框排在后面，不被覆盖
         val detected = MaskPlanFactory.itemsFrom(result?.candidates.orEmpty(), current.maskLook)
         val keep = { items: List<MaskItem> -> if (keepOnlyManual) items.filter { it.kind == SensitiveKind.MANUAL } else items }
-        val merged = base.copy(items = detected + keep(base.items))
+        val merged = base.copy(items = detected + keep(base.items), crop = cropFrom(result, base.crop))
         if (shown == null) {
             uiState = current.copy(batch = batch.withPlanAt(target.index, merged))
             return
         }
         analyzedWith = ranWith
         takeLines(result?.lines)
-        rebaseOpenEdits { it.copy(items = detected + keep(it.items)) }
+        rebaseOpenEdits { it.copy(items = detected + keep(it.items), crop = cropFrom(result, it.crop)) }
         uiState = current.copy(analyzing = false, aiReview = AiReview.Hidden, plan = merged, bigBang = null)
             .let { if (ranOn.canRefine) it else it.copy(aiOffered = false) }
         if (result != null && ranOn.canRefine) offerAiReview(shown, ranWith, ranOn, trace)
@@ -709,11 +710,11 @@ class EditorViewModel(
         val keep = { items: List<MaskItem> -> if (keepOnlyManual) items.filter { it.kind == SensitiveKind.MANUAL } else items }
         analyzedWith = ranWith
         takeLines(result?.lines)
-        rebaseOpenEdits { it.copy(items = detected + keep(it.items)) }
+        rebaseOpenEdits { it.copy(items = detected + keep(it.items), crop = cropFrom(result, it.crop)) }
         uiState = current.copy(
             analyzing = false,
             aiReview = AiReview.Hidden,
-            plan = current.plan.copy(items = detected + keep(current.plan.items)),
+            plan = current.plan.copy(items = detected + keep(current.plan.items), crop = cropFrom(result, current.plan.crop)),
             bigBang = null,
             // 换成了用不了 AI 的方案（文字各类全关了，聊天记录也关着）：宽屏不再给它留那一块
             aiOffered = current.aiOffered && ranOn.canRefine,
@@ -729,6 +730,14 @@ class EditorViewModel(
         lookEditOrigin = lookEditOrigin?.let(merge)
         dragOrigin = dragOrigin?.let(merge)
     }
+
+    /**
+     * 识别出的裁切线（实验室的「裁切状态栏」）落进 plan，和识别出的码一样是初始状态，不进撤销栈。
+     * 用户点掉过（要留着状态栏）的，换方案重跑以后还是不裁：一张图上只有这一条，用户的意思带得过去；
+     * 识别出的码重跑以后是另一批，点掉的没法往上对（见 [reanalyze]）。
+     */
+    private fun cropFrom(result: AnalysisResult?, before: TopCrop?): TopCrop? =
+        result?.crop?.let { TopCrop(it, on = before?.on ?: true) }
 
     /**
      * 调试信息里的「重新识别」：当前这张图按眼下的方案再跑一遍，好把这一次记下来——
@@ -857,7 +866,8 @@ class EditorViewModel(
      * - 没打码的字：它所在的那一段打上码（见 [lines]），用「打码」里眼下的样式（[EditorUiState.maskLook]）。
      *   手里拿着马克笔、画笔时也一样，它们只做标记，不拿来打码；
      * - 手动框：不拿掉，而是选中它，调出手柄与删除。手动框是用户自己画的，画它就是要打码，不想要就删掉——
-     *   点它要是把码去掉了，「点一下再调一调」就成了「点一下码没了」。
+     *   点它要是把码去掉了，「点一下再调一调」就成了「点一下码没了」；
+     * - 顶上压暗的那一条（实验室的「裁切状态栏」，2026-10-29）：不裁了，留着状态栏。原地再点一下又裁上，和点掉的码一样。
      *
      * 吸管在等着取色时，这一下只取颜色。
      *
@@ -882,7 +892,7 @@ class EditorViewModel(
         val s = _state.value
         val plan = s.plan
         val gone = dismissed.filter { plan.find(it.candidateId) == null }
-        val target = GestureRules.tapTarget(plan.items, lines, imagePoint, reach, gone)
+        val target = GestureRules.tapTarget(plan.items, lines, imagePoint, reach, gone, plan.crop, s.image?.width ?: 0)
         if (target is GestureRules.TapTarget.Item && target.item.candidateId == s.selectedManualId &&
             target.item.look.style == MaskStyle.TEXT
         ) {
@@ -903,6 +913,10 @@ class EditorViewModel(
                 uiState = _state.value.copy(selectedManualId = null)
             }
             is GestureRules.TapTarget.Line -> maskLine(target.quad)
+            GestureRules.TapTarget.Crop -> {
+                mutate { it.toggleCrop() }
+                uiState = _state.value.copy(selectedManualId = null)
+            }
             null -> {
                 // 点空白算点了别处：选中态收起
                 finishLookEdit()

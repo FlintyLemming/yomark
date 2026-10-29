@@ -7,6 +7,7 @@ import com.google.common.truth.Truth.assertThat
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.CropFinding
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextElement
@@ -120,5 +121,26 @@ class TracedTest {
         val text = log.runs.value.single().sections.first { it.stage == TraceStage.TEXT }
         assertThat(text.summary).contains("出错：IllegalStateException：onnx session gone")
         assertThat(text.blocks.single().text).contains("onnx session gone")
+    }
+
+    /** 裁切状态栏：找到了写裁掉多高，没找到写「不裁」；一步步怎么定的、卡在哪一步列在下面。 */
+    @Test fun theCropIsRecordedWithHowItWasFound() = runTest {
+        fun finder(top: Float?, notes: List<String>) = object : CropFinder {
+            override val id = "status-bar"
+            override suspend fun find(image: SourceImage, lines: List<TextLine>) = CropFinding(top, notes)
+        }
+        val log = TraceLog()
+        val recorder = log.start("识别")
+        val result = withContext(recorder) {
+            RedactionEngine(
+                Recognizer { listOf(line) }.traced(), emptyList(), emptyList(), CandidateMerger(),
+                cropFinders = listOf(finder(62.4f, listOf("时间「14:30」", "裁掉顶上 62 行")).traced(), finder(null, listOf("没在图顶上读到时间")).traced()),
+            ).analyze(image)
+        }
+        assertThat(result.crop).isEqualTo(62.4f)
+        val crops = log.runs.value.single().sections.filter { it.title == "裁切 · status-bar" }
+        assertThat(crops.map { it.stage }.distinct()).containsExactly(TraceStage.CLASSIFY)
+        assertThat(crops.map { it.summary.substringAfter(" · ") }).containsExactly("裁掉顶上 62 像素", "不裁")
+        assertThat(crops.flatMap { it.lines }).containsExactly("时间「14:30」", "裁掉顶上 62 行", "没在图顶上读到时间")
     }
 }

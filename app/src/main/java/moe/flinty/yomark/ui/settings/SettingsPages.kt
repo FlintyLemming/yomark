@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Cake
 import androidx.compose.material.icons.outlined.CarRepair
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Crop
 import androidx.compose.material.icons.outlined.DirectionsCar
 import androidx.compose.material.icons.outlined.DocumentScanner
 import androidx.compose.material.icons.outlined.DoneAll
@@ -274,6 +275,9 @@ fun BarcodeSettingsScreen(
  * 三类共用一个开关：用户要遮的是「这段对话是谁和谁」，分开设没有意义。开着就是打码。
  * 页脚只说遮什么和一句局限（认不全、可能认错），怎么认的、适用哪些应用不写。
  *
+ * 裁切状态栏（2026-10-29）：认出截图顶上的状态栏（连同挖孔屏的胶囊），导出时裁掉；编辑器里压暗那一条，点它留着状态栏。
+ * 页脚说它做什么、怎么留着，和一句局限。怎么认的不写。
+ *
  * 原先还有一项「外部模型」（2026-10-15）：AI 增强识别改用用户自己配置的大模型。2026-10-18 删掉了，应用要能声明没有联网权限。
  */
 @Composable
@@ -295,6 +299,18 @@ fun LabsSettingsScreen(
                 )
             }
             FooterText(stringResource(R.string.chat_footer))
+        }
+        item {
+            GroupSpacer()
+            SettingsGroup {
+                SwitchRow(
+                    title = stringResource(R.string.settings_crop_status_bar),
+                    icon = Icons.Outlined.Crop,
+                    checked = config.cropStatusBar,
+                    onCheckedChange = { on -> onChange(config.copy(cropStatusBar = on)) },
+                )
+            }
+            FooterText(stringResource(R.string.crop_status_bar_footer))
         }
     }
 }

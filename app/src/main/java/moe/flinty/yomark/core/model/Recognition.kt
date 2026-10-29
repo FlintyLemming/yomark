@@ -48,4 +48,13 @@ data class Candidate(
     val readingDegrees: Float? = null,
 )
 
-data class AnalysisResult(val lines: List<TextLine>, val candidates: List<Candidate>)
+/**
+ * @param crop 导出时从图顶上裁掉多高（分析图的像素，和框同一个坐标系），不裁是 null：实验室的「裁切状态栏」（见 CropFinder）
+ */
+data class AnalysisResult(val lines: List<TextLine>, val candidates: List<Candidate>, val crop: Float? = null)
+
+/**
+ * 找裁切线的结果（见 CropFinder）：图顶上 [top] 像素以上裁掉，分析图的坐标；没找到是 null。
+ * [notes] 一步步是怎么定的、没找到的话卡在了哪一步，调试信息里列出来。
+ */
+data class CropFinding(val top: Float?, val notes: List<String> = emptyList())

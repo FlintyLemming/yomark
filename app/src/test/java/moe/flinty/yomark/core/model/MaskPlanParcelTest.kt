@@ -69,4 +69,12 @@ class MaskPlanParcelTest {
         assertThat(manual.look.style).isEqualTo(MaskStyle.MARKER)
         assertThat(manual.look.options.markerColor).isEqualTo(MaskOptions.withAlpha(0xFF448AFF.toInt(), 0.4f))
     }
+
+    /** 顶上要裁掉的那一条也跟着 plan 存下来，点掉了（留着状态栏）的也是。 */
+    @Test
+    fun `the crop survives, on or off`() {
+        listOf(TopCrop(61.5f), TopCrop(61.5f, on = false)).forEach { crop ->
+            assertThat(roundTrip(plan().copy(crop = crop))).isEqualTo(plan().copy(crop = crop))
+        }
+    }
 }

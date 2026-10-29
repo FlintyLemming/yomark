@@ -11,6 +11,7 @@ import android.graphics.PointF
 import android.graphics.PorterDuff
 import android.graphics.Shader
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
@@ -236,6 +237,12 @@ fun ImageCanvas(
         animationMasks = composed
     }
     val purposeWatermark = remember { PurposeWatermarkDrawer() }
+
+    // 顶上要裁掉的那一条（实验室的「裁切状态栏」）：压暗它。点它留着状态栏、再点一下又裁上，压暗跟着淡入淡出；
+    // 识别中不画，和识别出的码一样等结果出来。淡出那几帧它可能已经不在 plan 里了（换方案重跑），按它最后的高度画
+    val lastCrop = remember(image) { CropHolder() }
+    state.plan.crop?.let { lastCrop.height = it.height }
+    val cropFade by animateFloatAsState(if (state.plan.cropTop > 0f && !scanning) 1f else 0f, label = "crop")
 
     // 点一下打码、取消打码的那一下（见 MaskToggles）。plan 一变就在重组里比一比，这样新码在它上屏的第一帧之前就登记好了；
     // 时钟只在绘制里读，走起来只重画
@@ -544,10 +551,16 @@ fun ImageCanvas(
                 )
                 // 用途水印与导出用同一个 drawer，尺寸按短边比例算，画在分析图上与导出图上观感一致。
                 // 不预览的话，设好文案后画面毫无变化，看起来就像这个功能没生效。
+                // 顶上要裁掉一条时，和导出一样铺在裁剩的那部分上
                 state.purposeText?.let {
-                    purposeWatermark.draw(canvas, image.width, image.height, it, state.purposeStyle)
+                    val top = state.plan.cropTop
+                    val shifted = canvas.save()
+                    canvas.translate(0f, top)
+                    purposeWatermark.draw(canvas, image.width, (image.height - top).roundToInt(), it, state.purposeStyle)
+                    canvas.restoreToCount(shifted)
                 }
                 val dp = density.density / viewport.scale
+                if (cropFade > 0f) drawCropBand(canvas, image.width.toFloat(), lastCrop.height, cropFade, selectionColors, dp)
                 if (textBoxes.isNotEmpty()) drawTextBoxes(canvas, textBoxes, dp)
                 bigBangRuns.forEach { drawBigBangRun(canvas, it, selectionColors, dp) }
                 state.selectedManualId?.let { id ->
@@ -637,6 +650,9 @@ private class QuadHolder {
     var quad: Quad? = null
     var text = false
 }
+
+/** 记住顶上那一条最后的高度，供淡出时用。普通字段，改它不触发重组。 */
+private class CropHolder { var height = 0f }
 
 /** 正在手画的一笔。普通字段，改它不触发重组（重画靠 ImageCanvas 的 inkTick）。 */
 private class InkDraft { var points: ArrayList<PointF>? = null }
@@ -787,6 +803,29 @@ private fun drawBigBangRun(canvas: android.graphics.Canvas, quad: Quad, colors: 
     canvas.drawPath(path, haloPaint(colors, dp))
     canvas.drawPath(path, linePaint(colors, dp))
 }
+
+/**
+ * 顶上要裁掉的那一条（实验室的「裁切状态栏」）：压暗，和系统相册裁剪时框外压暗一个意思，导出时没有这一条；
+ * 底边一道主题色的线，垫着 surface 色的边，和选中框一样哪里都看得见。[fade] 是淡入淡出到了哪儿（0～1）。
+ */
+private fun drawCropBand(
+    canvas: android.graphics.Canvas,
+    width: Float,
+    height: Float,
+    fade: Float,
+    colors: SelectionColors,
+    dp: Float,
+) {
+    val scrim = Paint().apply { color = AndroidColor.argb((CROP_SCRIM_ALPHA * fade).roundToInt(), 0, 0, 0) }
+    canvas.drawRect(0f, 0f, width, height, scrim)
+    listOf(haloPaint(colors, dp), linePaint(colors, dp)).forEach { paint ->
+        paint.alpha = (paint.alpha * fade).roundToInt()
+        canvas.drawLine(0f, height, width, height, paint)
+    }
+}
+
+/** 要裁掉的那一条压暗多少：黑色 60% 不透明，底下的状态栏、胶囊还看得出来，好对一对裁得够不够。 */
+private const val CROP_SCRIM_ALPHA = 153
 
 /** 草稿框：主题色虚线，框内铺一层很淡的主题色，拖的时候一眼看出圈住了哪一块。 */
 private fun drawDraft(canvas: android.graphics.Canvas, quad: Quad, colors: SelectionColors, dp: Float) {

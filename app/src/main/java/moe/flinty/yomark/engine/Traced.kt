@@ -2,6 +2,7 @@ package moe.flinty.yomark.engine
 
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.CropFinding
 import moe.flinty.yomark.core.model.SensitiveKindLabels
 import moe.flinty.yomark.core.model.TextLine
 import moe.flinty.yomark.debug.TraceStage
@@ -10,6 +11,7 @@ import moe.flinty.yomark.debug.describeCandidate
 import moe.flinty.yomark.debug.describeLine
 import moe.flinty.yomark.debug.formatDuration
 import moe.flinty.yomark.debug.step
+import kotlin.math.roundToInt
 
 /*
  * 调试信息（见 debug/Trace.kt）落在识别各环节上的那一层：buildEngine 给每个识别器、检测器、判定器都套一层。
@@ -26,6 +28,8 @@ fun RegionDetector.traced(): RegionDetector = TracedRegionDetector(this)
 fun SensitivityClassifier.traced(): SensitivityClassifier = TracedClassifier(this)
 
 fun PageAnalyzer.traced(): PageAnalyzer = TracedPageAnalyzer(this)
+
+fun CropFinder.traced(): CropFinder = TracedCropFinder(this)
 
 private class TracedTextRecognizer(private val inner: TextRecognizer) : TextRecognizer by inner {
     override suspend fun recognize(image: SourceImage): List<TextLine> {
@@ -68,6 +72,16 @@ private class TracedPageAnalyzer(private val inner: PageAnalyzer) : PageAnalyzer
         val trace = currentTrace() ?: return inner.analyze(image, lines)
         return trace.step(TraceStage.CLASSIFY, "整页 · ${inner.id}", { inner.analyze(image, lines) }) { found, ms ->
             "${formatDuration(ms)} · ${found.size} 处（合并之前）" to found.map { describeCandidate(it, lines) }
+        }
+    }
+}
+
+private class TracedCropFinder(private val inner: CropFinder) : CropFinder by inner {
+    override suspend fun find(image: SourceImage, lines: List<TextLine>): CropFinding {
+        val trace = currentTrace() ?: return inner.find(image, lines)
+        return trace.step(TraceStage.CLASSIFY, "裁切 · ${inner.id}", { inner.find(image, lines) }) { found, ms ->
+            val what = found.top?.let { "裁掉顶上 ${it.roundToInt()} 像素" } ?: "不裁"
+            "${formatDuration(ms)} · $what" to found.notes
         }
     }
 }
