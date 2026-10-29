@@ -123,7 +123,8 @@ internal class TourState(
                 if (id in toggled) return
                 progress.copy(toggled = toggled + id, tapped = true)
             }
-            null -> return
+            // 样图上没有要裁的一条（没传给 tapTarget），点不出它
+            GestureRules.TapTarget.Crop, null -> return
         }
     }
 

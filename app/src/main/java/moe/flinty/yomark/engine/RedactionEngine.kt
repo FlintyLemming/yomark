@@ -28,6 +28,8 @@ class RedactionEngine(
     private val refiners: List<SensitivityClassifier> = emptyList(),
     /** 文字出来之后、拿文字和像素一起看整页的分析（聊天截图）。和判定器一样，失败降级为空。 */
     private val pageAnalyzers: List<PageAnalyzer> = emptyList(),
+    /** 找图顶上要裁掉的一条（状态栏），也在文字出来之后跑。失败了就是不裁。 */
+    private val cropFinders: List<CropFinder> = emptyList(),
 ) {
     val canRefine: Boolean get() = refiners.isNotEmpty()
 
@@ -61,10 +63,13 @@ class RedactionEngine(
             .filter { it.isAvailable() }                    // 不可用的直接跳过
             .flatMap { c -> runCatching { c.classify(lines) }.getOrElse { emptyList() } }
         val fromPage = pageAnalyzers.flatMap { a -> runCatching { a.analyze(image, lines) }.getOrElse { emptyList() } }
+        // 几个都找到了取裁得多的：宁可多裁一点，不留半截状态栏
+        val crop = cropFinders.mapNotNull { f -> runCatching { f.find(image, lines).top }.getOrNull() }.maxOrNull()
 
         AnalysisResult(
             lines = lines,
             candidates = merger.merge(fromText + fromPage + regionJobs.awaitAll().flatten() + uprightJobs.awaitAll().flatten(), frame),
+            crop = crop,
         )
     }
 

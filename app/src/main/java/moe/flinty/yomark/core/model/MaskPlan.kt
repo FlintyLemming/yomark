@@ -242,10 +242,27 @@ data class MaskItem(
     val byUser: Boolean get() = source == DetectorSource.MANUAL || source == DetectorSource.LINE
 }
 
+/**
+ * 导出时从图顶上裁掉的一条：实验室的「裁切状态栏」认出来的状态栏（见 StatusBarCropper）。
+ * [height] 是分析图上的像素，和码的框同一个坐标系。编辑器上只压暗这一条，导出时才真裁。
+ *
+ * [on] 关着是用户点了这一条、要留着状态栏：高度还记着，原地再点一下又裁上（见 GestureRules.tapTarget）。
+ */
+@Parcelize
+data class TopCrop(val height: Float, val on: Boolean = true) : Parcelable
+
 @Parcelize
 data class MaskPlan(
     val items: List<MaskItem>,
+    /** 导出时从顶上裁掉的一条。没认出状态栏、没开「裁切状态栏」是 null。跟着 plan 进撤销栈：点掉、点回都撤销得了。 */
+    val crop: TopCrop? = null,
 ) : Parcelable {
+    /** 导出时真要裁掉多高（分析图的像素）：认出来了、没被点掉。不裁是 0。 */
+    val cropTop: Float get() = crop?.takeIf { it.on }?.height ?: 0f
+
+    /** 裁或不裁顶上那一条（点了它）。没有可裁的就原样。 */
+    fun toggleCrop(): MaskPlan = crop?.let { copy(crop = it.copy(on = !it.on)) } ?: this
+
     /**
      * 拿掉一块码：点一下识别出的码、点上的一行，手动框选中后点「删除」。
      * 识别出的拿掉了也找得回来：撤销，或者原地再点一下（见 GestureRules.tapTarget）。

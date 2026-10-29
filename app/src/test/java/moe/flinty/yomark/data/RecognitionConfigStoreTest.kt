@@ -34,6 +34,7 @@ class RecognitionConfigStoreTest {
             face = FaceOption.ACCURATE,
             faceState = RuleState.OFF,
             chatState = RuleState.MASKED,
+            cropStatusBar = true,
             maskUnanchoredNames = true,
             ruleOverrides = mapOf("url" to RuleState.MASKED, "longnum" to RuleState.OFF),
         )
@@ -131,6 +132,8 @@ class RecognitionConfigStoreTest {
                 textEngine = TextEngineOption.MLKIT,
                 faceState = RuleState.OFF,
                 barcodeState = RuleState.OFF,
+                chatState = RuleState.MASKED,
+                cropStatusBar = true,
                 maskUnanchoredNames = true,
                 ruleOverrides = mapOf("ip" to RuleState.MASKED),
             ),

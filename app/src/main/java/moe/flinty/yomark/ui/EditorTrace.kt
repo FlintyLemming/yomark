@@ -10,6 +10,7 @@ import moe.flinty.yomark.debug.TraceStage
 import moe.flinty.yomark.debug.describe
 import moe.flinty.yomark.debug.describeCandidate
 import moe.flinty.yomark.engine.RecognitionConfig
+import kotlin.math.roundToInt
 
 /*
  * 编辑器往调试信息里记的那几节（见 debug/Trace.kt）：这一次识别的输入（哪张图、什么方案）和最后进编辑器的结果。
@@ -31,14 +32,18 @@ internal fun inputSection(image: SourceImage, config: RecognitionConfig) = Trace
     },
 )
 
-/** 合并之后的那些框，要打码的进编辑器，其余的认出来了也不打码。识别整个抛了异常（不该发生，各环节的异常引擎都吞了）也记下来。 */
+/**
+ * 合并之后的那些框，要打码的进编辑器，其余的认出来了也不打码；顶上要裁掉一条的话（实验室的「裁切状态栏」）摘要里带一句。
+ * 识别整个抛了异常（不该发生，各环节的异常引擎都吞了）也记下来。
+ */
 internal fun resultSection(outcome: Result<AnalysisResult>): TraceSection = outcome.fold(
     onSuccess = { result ->
         val masked = result.candidates.count { it.enabledByDefault }
         TraceSection(
             stage = TraceStage.RESULT,
             title = "结果",
-            summary = "合并后 ${result.candidates.size} 处：打码 $masked · 不打码 ${result.candidates.size - masked}",
+            summary = "合并后 ${result.candidates.size} 处：打码 $masked · 不打码 ${result.candidates.size - masked}" +
+                result.crop?.let { " · 裁掉顶上 ${it.roundToInt()} 像素" }.orEmpty(),
             lines = result.candidates.map { describeCandidate(it, result.lines) },
         )
     },

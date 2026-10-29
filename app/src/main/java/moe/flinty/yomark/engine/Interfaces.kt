@@ -2,6 +2,7 @@ package moe.flinty.yomark.engine
 
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.CropFinding
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
 
@@ -44,6 +45,15 @@ interface RegionDetector {
 interface PageAnalyzer {
     val id: String
     suspend fun analyze(image: SourceImage, lines: List<TextLine>): List<Candidate>
+}
+
+/**
+ * 要从图顶上裁掉的一条：实验室的「裁切状态栏」（StatusBarCropper）。和 [PageAnalyzer] 一样在文字识别之后跑，看文字也看像素。
+ * 它不出候选：裁切线进 AnalysisResult.crop，编辑器上压暗那一条，导出时裁掉。
+ */
+interface CropFinder {
+    val id: String
+    suspend fun find(image: SourceImage, lines: List<TextLine>): CropFinding
 }
 
 /**

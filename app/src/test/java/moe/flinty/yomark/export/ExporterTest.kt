@@ -15,6 +15,7 @@ import moe.flinty.yomark.core.model.MaskOptions
 import moe.flinty.yomark.core.model.MaskPlan
 import moe.flinty.yomark.core.model.MaskStyle
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.core.model.TopCrop
 import moe.flinty.yomark.render.RendererRegistry
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -201,6 +202,67 @@ class ExporterTest {
             if (withMark.bitmap!!.getPixel(x, y) != without.bitmap!!.getPixel(x, y)) differs = true
         }
         assertThat(differs).isTrue()
+    }
+
+    /**
+     * 实验室的「裁切状态栏」：顶上那一条按分析图的坐标给，导出时换算到原图再裁。
+     * 源图左上角那块红的高 300：裁掉 100 行（分析图上 50 行，scale 0.5），红的剩 200 行。
+     */
+    @Test
+    fun `the status bar is cut off the top at the original resolution`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("crop.png", 400, 600, png = true)
+        val plan = planWith().copy(crop = TopCrop(50f))
+        val out = exporter(sink).export(ExportRequest(src, "image/png", plan, 0.5f, false)) as ExportOutcome.Success
+        assertThat(out.width).isEqualTo(400)
+        assertThat(out.height).isEqualTo(500)
+        val bmp = sink.bitmap!!
+        assertThat(bmp.width).isEqualTo(400)
+        assertThat(bmp.height).isEqualTo(500)
+        assertThat(bmp.getPixel(100, 0)).isEqualTo(Color.RED)
+        assertThat(bmp.getPixel(100, 199)).isEqualTo(Color.RED)
+        assertThat(bmp.getPixel(100, 200)).isEqualTo(Color.WHITE)
+    }
+
+    /** 点过「留着状态栏」的：整张导出。 */
+    @Test
+    fun `a cut the user turned off keeps the whole picture`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("keep.png", 400, 600, png = true)
+        val plan = planWith().copy(crop = TopCrop(50f, on = false))
+        exporter(sink).export(ExportRequest(src, "image/png", plan, 0.5f, false))
+        assertThat(sink.bitmap!!.height).isEqualTo(600)
+        assertThat(sink.bitmap!!.getPixel(100, 299)).isEqualTo(Color.RED)
+        assertThat(sink.bitmap!!.getPixel(100, 300)).isEqualTo(Color.WHITE)
+    }
+
+    /** 码先画在整张图上再裁：伸进状态栏的码，裁剩的那截还在原地。 */
+    @Test
+    fun `masks are drawn before the cut and keep their place`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("crop-mask.png", 400, 600, png = true)
+        // 分析图上 (100,0)-(150,100)：原图 (200,0)-(300,200)，裁掉顶上 100 行后剩 (200,0)-(300,100)
+        val plan = planWith(maskedItem(100f, 0f, 150f, 100f)).copy(crop = TopCrop(50f))
+        exporter(sink).export(ExportRequest(src, "image/png", plan, 0.5f, false))
+        val bmp = sink.bitmap!!
+        assertThat(bmp.getPixel(250, 0)).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(bmp.getPixel(250, 99)).isEqualTo(MaskOptions.SKY_BLUE)
+        assertThat(bmp.getPixel(250, 101)).isEqualTo(Color.WHITE)
+    }
+
+    /** 品牌水印落在裁好的图的角上，躲码时按码在裁好的图上的位置躲：底边一整条码，水印就不压在它上面。 */
+    @Test
+    fun `the watermark avoids masks where they are after the cut`() = runTest {
+        val sink = FakeSink()
+        val src = writeSource("crop-mark.png", 600, 700, png = true)
+        // 原图底下 100 行一整条码；裁掉顶上 100 行后是 600×600 的底下 100 行，右下角、左下角都占了
+        val plan = planWith(maskedItem(0f, 600f, 600f, 700f)).copy(crop = TopCrop(100f))
+        exporter(sink).export(ExportRequest(src, "image/png", plan, 1f, true))
+        val bmp = sink.bitmap!!
+        assertThat(bmp.height).isEqualTo(600)
+        for (x in 0 until 600 step 5) for (y in 500 until 600 step 5) {
+            assertThat(bmp.getPixel(x, y)).isEqualTo(MaskOptions.SKY_BLUE)
+        }
     }
 
     @Test

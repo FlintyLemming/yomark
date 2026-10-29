@@ -4,6 +4,7 @@ import android.graphics.PointF
 import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.MaskItem
+import moe.flinty.yomark.core.model.TopCrop
 import moe.flinty.yomark.render.MaskOrder
 import kotlin.math.hypot
 import kotlin.math.max
@@ -52,6 +53,9 @@ object GestureRules {
 
         /** 点掉过的一块识别结果：原样打回去。 */
         data class Dismissed(val item: MaskItem) : TapTarget
+
+        /** 顶上要裁掉的那一条（实验室的「裁切状态栏」）：裁着的不裁了，留着状态栏；不裁的又裁上。 */
+        data object Crop : TapTarget
     }
 
     /**
@@ -60,8 +64,12 @@ object GestureRules {
      *
      * 点掉的码排在行前面：误点掉了，原地再点一下就是原来那块，不是整行；头像这种底下没字的，也只有这样才点得回来。
      *
+     * 顶上要裁掉的那一条（[crop]，2026-10-29）：裁着时压暗盖在最上面，点在上面就是点它，压在底下的码点不着；
+     * 点掉了（留着状态栏）排在点掉的码后面、字前面，和点掉的码一样原地再点一下又裁上。状态栏上的时间这几个字因此点不上码。
+     *
      * @param dismissed 点掉过的识别结果，后点掉的在后
      * @param reach 点没落在任何一段里时，离一段多近也算点中它（图像像素，见 [LINE_REACH_DP]）
+     * @param width 图的宽：点在图外（左右两边的空白）不算点中顶上那一条
      */
     fun tapTarget(
         items: List<MaskItem>,
@@ -69,9 +77,14 @@ object GestureRules {
         p: PointF,
         reach: Float = 0f,
         dismissed: List<MaskItem> = emptyList(),
+        crop: TopCrop? = null,
+        width: Int = 0,
     ): TapTarget? {
+        val band = crop?.takeIf { p.y >= 0f && p.y < it.height && p.x >= 0f && p.x < width }
+        if (band?.on == true) return TapTarget.Crop
         hitTest(items, p)?.let { return TapTarget.Item(it) }
         dismissed.lastOrNull { it.quad.contains(p) }?.let { return TapTarget.Dismissed(it) }
+        if (band != null) return TapTarget.Crop
         return lineAt(lines, p, reach)?.let { TapTarget.Line(it) }
     }
 

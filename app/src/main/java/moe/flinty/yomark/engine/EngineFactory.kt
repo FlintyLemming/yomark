@@ -12,6 +12,7 @@ import moe.flinty.yomark.engine.ppocr.PaddleTextRecognizer
 import moe.flinty.yomark.rules.Rule
 import moe.flinty.yomark.rules.RuleCatalog
 import moe.flinty.yomark.rules.RuleClassifier
+import moe.flinty.yomark.statusbar.StatusBarCropper
 
 /**
  * 装配（spec §4.4 + 2026-09-04 增补设计 §2）：**整个应用只有这一处知道用的是哪家的模型。**
@@ -37,6 +38,7 @@ fun buildEngine(context: Context, config: RecognitionConfig = RecognitionConfig(
     pageAnalyzers = if (config.chatState == RuleState.OFF) emptyList() else {
         listOf(ChatDetector().traced())
     },
+    cropFinders = if (config.cropStatusBar) listOf(StatusBarCropper().traced()) else emptyList(),
 )
 
 /**

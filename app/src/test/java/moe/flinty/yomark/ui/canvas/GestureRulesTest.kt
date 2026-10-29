@@ -6,6 +6,7 @@ import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.MaskItem
 import moe.flinty.yomark.core.model.SensitiveKind
+import moe.flinty.yomark.core.model.TopCrop
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -129,6 +130,44 @@ class GestureRulesTest {
         val watermark = line(0f, 0f, 400f, 200f)
         val text = line(10f, 90f, 300f, 110f)
         assertThat(GestureRules.lineAt(listOf(watermark, text), PointF(100f, 100f), reach = 0f)).isEqualTo(text)
+    }
+
+    // ---------- 顶上要裁掉的那一条（实验室的「裁切状态栏」） ----------
+
+    /** 裁着时压暗盖在最上面：点在上面就是点它，压在底下的码、字都点不着；点在它下面照旧。 */
+    @Test
+    fun `a band being cropped is hit before the masks and text in it`() {
+        val clock = detected("clock", 30f, 18f, 84f, 32f)
+        val row = line(28f, 16f, 86f, 34f)
+        val crop = TopCrop(50f)
+        assertThat(GestureRules.tapTarget(listOf(clock), listOf(row), PointF(50f, 25f), crop = crop, width = 540))
+            .isEqualTo(GestureRules.TapTarget.Crop)
+        assertThat(GestureRules.tapTarget(emptyList(), emptyList(), PointF(400f, 49f), crop = crop, width = 540))
+            .isEqualTo(GestureRules.TapTarget.Crop)
+        assertThat(GestureRules.tapTarget(emptyList(), emptyList(), PointF(400f, 51f), crop = crop, width = 540)).isNull()
+    }
+
+    /** 点掉了（留着状态栏）：码、点掉的码先点，空白处、字上点它是又裁上。 */
+    @Test
+    fun `a band left uncropped comes after masks and dismissed masks but before text`() {
+        val clock = detected("clock", 30f, 18f, 84f, 32f)
+        val carrier = detected("carrier", 300f, 18f, 380f, 32f)
+        val row = line(100f, 16f, 200f, 34f)
+        val crop = TopCrop(50f, on = false)
+        val tap = { p: PointF -> GestureRules.tapTarget(listOf(clock), listOf(row), p, dismissed = listOf(carrier), crop = crop, width = 540) }
+        assertThat(tap(PointF(50f, 25f))).isEqualTo(GestureRules.TapTarget.Item(clock))
+        assertThat(tap(PointF(320f, 25f))).isEqualTo(GestureRules.TapTarget.Dismissed(carrier))
+        assertThat(tap(PointF(150f, 25f))).isEqualTo(GestureRules.TapTarget.Crop)
+        assertThat(tap(PointF(450f, 40f))).isEqualTo(GestureRules.TapTarget.Crop)
+    }
+
+    /** 点在图外（图两边、上面的空白）不算点中那一条。 */
+    @Test
+    fun `a tap outside the image misses the band`() {
+        val crop = TopCrop(50f)
+        listOf(PointF(-5f, 20f), PointF(545f, 20f), PointF(100f, -3f)).forEach { p ->
+            assertThat(GestureRules.tapTarget(emptyList(), emptyList(), p, crop = crop, width = 540)).isNull()
+        }
     }
 
     @Test

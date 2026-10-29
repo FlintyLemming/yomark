@@ -6,6 +6,7 @@ import android.graphics.RectF
 import moe.flinty.yomark.core.geometry.Quad
 import moe.flinty.yomark.core.image.SourceImage
 import moe.flinty.yomark.core.model.Candidate
+import moe.flinty.yomark.core.model.CropFinding
 import moe.flinty.yomark.core.model.DetectorSource
 import moe.flinty.yomark.core.model.SensitiveKind
 import moe.flinty.yomark.core.model.TextLine
@@ -301,5 +302,47 @@ class RedactionEngineTest {
         val notReady = RedactionEngine(FakeRecognizer(), emptyList(), emptyList(), CandidateMerger(), refiners = listOf(off))
         assertThat(notReady.refineReady()).isFalse()
         assertThat(engine().refineReady()).isFalse()          // 设置里关了 = 没有 refiner
+    }
+
+    // ---------- 裁切线（实验室的「裁切状态栏」） ----------
+
+    private class FakeCropFinder(val top: Float?, val boom: Boolean = false) : CropFinder {
+        override val id = "fake-crop"
+        var seenLines: List<TextLine>? = null
+        override suspend fun find(image: SourceImage, lines: List<TextLine>): CropFinding {
+            seenLines = lines
+            if (boom) error("crop finder exploded")
+            return CropFinding(top, listOf("fake"))
+        }
+    }
+
+    @Test
+    fun `without crop finders nothing is cropped`() = runTest {
+        assertThat(engine().analyze(image()).crop).isNull()
+    }
+
+    /** 找裁切线的看的是文字识别读出来的行；几个都找到了取裁得多的。 */
+    @Test
+    fun `crop finders see the recognized lines and the deepest cut wins`() = runTest {
+        val line = TextLine(quad(), "14:30", 0.9f, emptyList())
+        val shallow = FakeCropFinder(40f)
+        val deep = FakeCropFinder(62f)
+        val none = FakeCropFinder(null)
+        val result = RedactionEngine(
+            FakeRecognizer(lines = listOf(line)), emptyList(), emptyList(), CandidateMerger(), cropFinders = listOf(shallow, none, deep),
+        ).analyze(image())
+        assertThat(result.crop).isEqualTo(62f)
+        assertThat(shallow.seenLines).containsExactly(line)
+    }
+
+    /** 找裁切线抛了异常：不裁，码照出。 */
+    @Test
+    fun `an exploding crop finder means no crop and the masks still come`() = runTest {
+        val result = RedactionEngine(
+            FakeRecognizer(), emptyList(), listOf(FakeClassifier("rules", available = true, out = listOf(candidate("e")))),
+            CandidateMerger(), cropFinders = listOf(FakeCropFinder(62f, boom = true)),
+        ).analyze(image())
+        assertThat(result.crop).isNull()
+        assertThat(result.candidates.map { it.id }).containsExactly("e")
     }
 }

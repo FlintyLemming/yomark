@@ -79,6 +79,11 @@ data class RecognitionConfig(
      */
     val chatState: RuleState = RuleState.OFF,
     /**
+     * 认出截图顶上的状态栏，导出时裁掉（见 StatusBarCropper）。在「实验室」里，出厂关着（2026-10-29 加上）。
+     * 关着时根本不找。
+     */
+    val cropStatusBar: Boolean = false,
+    /**
      * 没有旁证、只凭字面猜出的人名要不要也打码。出厂不打：HanLP 会把药名、品牌名、规格词都猜成人名，
      * 附近没有电话、证件号、地址、「收货人」这类字段的，十有八九不是人（见 RuleClassifier）。
      * 人名一行选「关」时它不起作用。原先打开后这些只圈出，存档的键沿用那时的。

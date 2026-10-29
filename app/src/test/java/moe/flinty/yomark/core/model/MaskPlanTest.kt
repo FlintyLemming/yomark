@@ -77,4 +77,38 @@ class MaskPlanTest {
         assertThat(item("r").byUser).isFalse()
         assertThat(item("ai", DetectorSource.LLM).byUser).isFalse()
     }
+
+    // ---------- 顶上要裁掉的那一条（实验室的「裁切状态栏」） ----------
+
+    @Test
+    fun `nothing is cropped without a crop or with one turned off`() {
+        assertThat(plan().cropTop).isEqualTo(0f)
+        assertThat(plan().copy(crop = TopCrop(62f, on = false)).cropTop).isEqualTo(0f)
+        assertThat(plan().copy(crop = TopCrop(62f)).cropTop).isEqualTo(62f)
+    }
+
+    /** 点一下不裁，再点一下又裁，高度一直记着；码不受牵连。 */
+    @Test
+    fun `toggling the crop keeps its height and the masks`() {
+        val p = plan(item("a")).copy(crop = TopCrop(62f))
+        val kept = p.toggleCrop()
+        assertThat(kept.crop).isEqualTo(TopCrop(62f, on = false))
+        assertThat(kept.items).isEqualTo(p.items)
+        assertThat(kept.toggleCrop()).isEqualTo(p)
+    }
+
+    @Test
+    fun `toggling without a crop changes nothing`() {
+        val p = plan(item("a"))
+        assertThat(p.toggleCrop()).isSameInstanceAs(p)
+    }
+
+    /** 改码的那几样不动裁切。 */
+    @Test
+    fun `editing masks leaves the crop alone`() {
+        val p = plan(item("a")).copy(crop = TopCrop(62f, on = false))
+        assertThat(p.remove("a").crop).isEqualTo(p.crop)
+        assertThat(p.add(item("b")).crop).isEqualTo(p.crop)
+        assertThat(p.restyleRedactions(marker).crop).isEqualTo(p.crop)
+    }
 }

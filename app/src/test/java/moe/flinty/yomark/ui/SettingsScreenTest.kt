@@ -161,11 +161,11 @@ class SettingsScreenTest {
         assertThat(opened).containsExactly(SettingsPage.GENERAL)
     }
 
-    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它。 */
+    /** 聊天记录挪进了实验室：一级页上不再单独一行，实验室那一行的小字写着它，和后来加的裁切状态栏。 */
     @Test fun chatScreenshotsLiveInLabs() {
         val opened = mutableListOf<SettingsPage>()
         home(onOpen = { opened += it })
-        compose.onNodeWithText("识别聊天记录").assertIsDisplayed()
+        compose.onNodeWithText("识别聊天记录、裁切状态栏").assertIsDisplayed()
         compose.onNodeWithText("实验室").performClick()
         assertThat(opened).containsExactly(SettingsPage.LABS)
     }
@@ -213,6 +213,27 @@ class SettingsScreenTest {
         show { LabsSettingsScreen(RecognitionConfig(chatState = RuleState.MASKED), onChange = { latest = it }, onNavigateUp = {}) }
         compose.onNodeWithText("识别聊天记录").assertIsOn().performClick()
         assertThat(latest).isEqualTo(RecognitionConfig())
+    }
+
+    /** 裁切状态栏出厂关着，开关只管它自己，聊天记录不受牵连。 */
+    @Test fun croppingTheStatusBarIsOffOutOfTheBoxAndCanBeTurnedOnAndOff() {
+        var latest: RecognitionConfig? = null
+        show { LabsSettingsScreen(RecognitionConfig(chatState = RuleState.MASKED), onChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNodeWithText("裁切状态栏").assertIsOff().performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig(chatState = RuleState.MASKED, cropStatusBar = true))
+    }
+
+    @Test fun croppingTheStatusBarCanBeTurnedOffAgain() {
+        var latest: RecognitionConfig? = null
+        show { LabsSettingsScreen(RecognitionConfig(cropStatusBar = true), onChange = { latest = it }, onNavigateUp = {}) }
+        compose.onNodeWithText("裁切状态栏").assertIsOn().performClick()
+        assertThat(latest).isEqualTo(RecognitionConfig())
+    }
+
+    /** 页脚说它做什么、怎么留着状态栏，加一句局限。 */
+    @Test fun theCropFooterSaysWhatItDoesAndHowToKeepTheBar() {
+        show { LabsSettingsScreen(RecognitionConfig(), onChange = {}, onNavigateUp = {}) }
+        compose.onNodeWithText("导出时裁掉截图顶上的状态栏，编辑器里点压暗的那条可以留着，不保证识别完全准确").assertIsDisplayed()
     }
 
     // ---------- 语言 ----------

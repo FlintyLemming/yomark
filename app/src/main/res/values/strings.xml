@@ -233,6 +233,7 @@
     <string name="settings_face">Faces</string>
     <string name="settings_barcode">Barcodes</string>
     <string name="settings_chat">Detect chat screenshots</string>
+    <string name="settings_crop_status_bar">Crop status bar</string>
     <string name="settings_ai">AI</string>
     <string name="settings_edit">Editing</string>
     <string name="settings_general">General</string>
@@ -246,7 +247,7 @@
     <string name="settings_ai_summary">Gemini Nano, PP-OCR, ML Kit</string>
     <string name="settings_general_summary">Editing, recognition, export, watermark style</string>
     <string name="settings_appearance_summary">Dark theme, theme color, scan effect</string>
-    <string name="settings_labs_summary">Detect chat screenshots</string>
+    <string name="settings_labs_summary">Detect chat screenshots, crop status bar</string>
     <string name="settings_developer_summary">Debug info, debug log, scan results</string>
     <string name="settings_help_summary">Replay the intro tour</string>
     <string name="settings_about_summary">Version %1$s · Privacy policy · Feedback · Reset</string>
@@ -313,6 +314,7 @@
     <string name="barcode_loose_summary">Also masks likely codes that don\'t decode; may be wrong</string>
     <string name="barcode_footer">QR codes and barcodes</string>
     <string name="chat_footer">Masks avatars, display names and the chat title in chat screenshots; not always accurate</string>
+    <string name="crop_status_bar_footer">Crops the status bar off screenshots on export; tap the dimmed strip in the editor to keep it; not always accurate</string>
 
     <!-- settings: AI -->
     <string name="ai_model">Model</string>

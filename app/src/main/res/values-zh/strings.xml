@@ -233,6 +233,7 @@
     <string name="settings_face">人脸</string>
     <string name="settings_barcode">条码</string>
     <string name="settings_chat">识别聊天记录</string>
+    <string name="settings_crop_status_bar">裁切状态栏</string>
     <string name="settings_ai">AI</string>
     <string name="settings_edit">编辑</string>
     <string name="settings_general">通用</string>
@@ -246,7 +247,7 @@
     <string name="settings_ai_summary">Gemini Nano、PP-OCR、ML Kit</string>
     <string name="settings_general_summary">编辑、识别、导出、水印样式</string>
     <string name="settings_appearance_summary">深色模式、主题色、识别动效</string>
-    <string name="settings_labs_summary">识别聊天记录</string>
+    <string name="settings_labs_summary">识别聊天记录、裁切状态栏</string>
     <string name="settings_developer_summary">调试信息、调试记录、扫描结果</string>
     <string name="settings_help_summary">重新观看引导</string>
     <string name="settings_about_summary">版本 %1$s · 隐私权政策 · 反馈 · 恢复默认设置</string>
@@ -313,6 +314,7 @@
     <string name="barcode_loose_summary">解不出的疑似条码也打码，可能误遮</string>
     <string name="barcode_footer">包括二维码和条形码</string>
     <string name="chat_footer">遮住聊天截图里的头像、昵称和聊天标题，不保证识别完全准确</string>
+    <string name="crop_status_bar_footer">导出时裁掉截图顶上的状态栏，编辑器里点压暗的那条可以留着，不保证识别完全准确</string>
 
     <!-- settings: AI -->
     <string name="ai_model">大模型</string>
